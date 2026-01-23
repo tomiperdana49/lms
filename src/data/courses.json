@@ -1,0 +1,75 @@
+[
+    {
+        "id": 1,
+        "title": "Company Profile Nusa Net",
+        "description": "Pelajari selengkapnya tentang visi, misi, dan layanan unggulan dari Nusa Net ISP.",
+        "duration": "15 menit",
+        "modulesCount": 97,
+        "studentCount": 72475,
+        "progress": 0,
+        "modules": [
+            {
+                "id": 1,
+                "title": "Nusa Net ISP Profile",
+                "duration": "10:00",
+                "videoType": "youtube",
+                "videoId": "kLI2EtlAFg0",
+                "locked": false
+            },
+            {
+                "id": 2,
+                "title": "Kotlin Basic Syntax",
+                "duration": "15:00",
+                "videoType": "youtube",
+                "videoId": "PsaFVLr8t4E",
+                "locked": true
+            }
+        ]
+    },
+    {
+        "id": 2,
+        "title": "Belajar Membuat Aplikasi Android untuk Pemula",
+        "description": "Langkah awal menjadi Android Developer expert dengan mempelajari dasar pembuatan aplikasi.",
+        "duration": "60 jam belajar",
+        "modulesCount": 49,
+        "studentCount": 127673,
+        "progress": 35,
+        "modules": [
+            {
+                "id": 1,
+                "title": "Intro to Android Studio",
+                "duration": "12:00",
+                "videoType": "youtube",
+                "videoId": "fis26HvvDII",
+                "locked": false
+            },
+            {
+                "id": 2,
+                "title": "Building your first app",
+                "duration": "20:00",
+                "videoType": "youtube",
+                "videoId": "EcFOdfS-FM",
+                "locked": false
+            }
+        ]
+    },
+    {
+        "id": 3,
+        "title": "Belajar Fundamental Aplikasi Android",
+        "description": "Pelajari komponen fundamental Android untuk membuat aplikasi yang robust.",
+        "duration": "140 jam belajar",
+        "modulesCount": 107,
+        "studentCount": 43929,
+        "progress": 0,
+        "modules": [
+            {
+                "id": 1,
+                "title": "Activity Lifecycle",
+                "duration": "15:00",
+                "videoType": "youtube",
+                "videoId": "iL6t09a9hMc",
+                "locked": false
+            }
+        ]
+    }
+]

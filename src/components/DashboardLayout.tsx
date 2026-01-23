@@ -1,0 +1,172 @@
+import { useState, type ReactNode } from 'react';
+import {
+    LayoutDashboard,
+    Library,
+    BookOpen,
+    Users,
+    Globe,
+    Calendar,
+    Menu,
+    X,
+    Bell,
+    Search,
+    LogOut
+} from 'lucide-react';
+import type { Page, Role } from '../types';
+
+interface DashboardLayoutProps {
+    children: ReactNode;
+    activePage: Page;
+    onNavigate: (page: Page) => void;
+    userRole: Role;
+    onRoleChange: (role: Role) => void; // Keeping for compatibility, but might be less used
+    onLogout: () => void;
+}
+
+const DashboardLayout = ({ children, activePage, onNavigate, userRole, onLogout }: DashboardLayoutProps) => {
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+
+    const menuItems: { icon: React.ElementType; label: string; id: Page | string }[] = [
+        { icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard' },
+        { icon: Library, label: 'Reading Log', id: 'reading-log' },
+        { icon: BookOpen, label: 'Courses', id: 'courses' },
+        { icon: Users, label: 'Internal', id: 'internal' },
+        { icon: Globe, label: 'External', id: 'external' },
+        { icon: Calendar, label: 'Calendar', id: 'calendar' },
+    ];
+
+    const getRoleLabel = (role: Role) => {
+        switch (role) {
+            case 'STAFF': return 'Staff';
+            case 'SUPERVISOR': return 'Supervisor';
+            case 'HR':
+            case 'HR_ADMIN': return 'HR Super Admin';
+            default: return 'User';
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-gray-50 flex font-sans text-slate-800">
+            {/* Mobile Sidebar Overlay */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+
+            {/* Sidebar */}
+            <aside
+                className={`
+          fixed lg:static inset-y-0 left-0 z-50
+          w-64 bg-slate-900 text-white transition-transform duration-300 ease-in-out
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}
+            >
+                <div className="h-full flex flex-col">
+                    {/* Logo / Brand */}
+                    <div className="p-6 border-b border-slate-700 flex items-center justify-between">
+                        <h1 className="text-xl font-bold tracking-wider">LMS NUSA</h1>
+                        <button onClick={toggleSidebar} className="lg:hidden text-slate-400 hover:text-white">
+                            <X size={24} />
+                        </button>
+                    </div>
+
+                    {/* Menu */}
+                    <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+                        {menuItems.map((item) => (
+                            <button
+                                key={item.label}
+                                onClick={() => {
+                                    onNavigate(item.id as Page);
+                                    setIsSidebarOpen(false); // Close on mobile
+                                }}
+                                className={`
+                  w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left
+                  ${activePage === item.id
+                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                    }
+                `}
+                            >
+                                <item.icon size={20} />
+                                <span className="font-medium">{item.label}</span>
+                            </button>
+                        ))}
+                    </nav>
+
+                    {/* Logout Button (Sidebar Bottom) */}
+                    <div className="p-4">
+                        <button
+                            onClick={onLogout}
+                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-slate-800 hover:text-red-300 transition-colors"
+                        >
+                            <LogOut size={20} />
+                            <span className="font-medium">Sign Out</span>
+                        </button>
+                    </div>
+
+                    {/* User Profile Mini */}
+                    <div className="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
+                        &copy; 2026 PT Media Antar Nusa
+                    </div>
+                </div>
+            </aside>
+
+            {/* Main Content Wrapper */}
+            <div className="flex-1 flex flex-col min-w-0">
+                {/* Top Header */}
+                <header className="sticky top-0 z-30 px-6 py-4 bg-white/80 backdrop-blur-md border-b border-gray-200 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={toggleSidebar}
+                            className="p-2 -ml-2 text-slate-600 hover:bg-gray-100 rounded-lg lg:hidden"
+                        >
+                            <Menu size={24} />
+                        </button>
+
+                        {/* Search Bar */}
+                        <div className="hidden md:flex items-center bg-gray-100 rounded-full px-4 py-2 w-64">
+                            <Search size={18} className="text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search..."
+                                className="bg-transparent border-none focus:outline-none text-sm ml-2 w-full text-slate-700"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                        <button className="relative text-slate-500 hover:text-slate-700 transition-colors">
+                            <Bell size={20} />
+                            <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                        </button>
+
+                        <div className="flex items-center gap-3 pl-6 border-l border-gray-200">
+                            <div className="text-right hidden sm:block">
+                                <p className="text-sm font-semibold text-slate-800">Demo User</p>
+                                <p className="text-xs text-blue-600 font-bold">{getRoleLabel(userRole)}</p>
+                            </div>
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white
+                                ${(userRole === 'HR' || userRole === 'HR_ADMIN') ? 'bg-gradient-to-tr from-purple-500 to-pink-600' :
+                                    userRole === 'SUPERVISOR' ? 'bg-gradient-to-tr from-orange-500 to-red-500' :
+                                        'bg-gradient-to-tr from-blue-500 to-teal-500'}
+                            `}>
+                                {(userRole === 'HR' || userRole === 'HR_ADMIN') ? 'HR' : userRole === 'SUPERVISOR' ? 'SV' : 'ST'}
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                {/* Page Content */}
+                <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
+                    {children}
+                </main>
+            </div>
+        </div>
+    );
+};
+
+export default DashboardLayout;

@@ -1,0 +1,248 @@
+{
+  "users": [
+    {
+      "id": 1678881237,
+      "name": "Jane Doe",
+      "email": "jane.doe@staff.com",
+      "password": "123",
+      "role": "STAFF"
+    },
+    {
+      "id": 1678881234,
+      "name": "Nusa Staff",
+      "email": "staff@nusa.com",
+      "password": "123",
+      "role": "STAFF"
+    },
+    {
+      "id": 1678881236,
+      "name": "Nusa Supervisor",
+      "email": "spv@nusa.com",
+      "password": "123",
+      "role": "SUPERVISOR"
+    },
+    {
+      "id": 1678881235,
+      "name": "HR Admin",
+      "email": "hr@nusa.com",
+      "password": "123",
+      "role": "HR_ADMIN"
+    }
+  ],
+  "logs": [
+    {
+      "id": 1769135151098,
+      "title": "Atomic Habits",
+      "category": "Buku Wajib Baca",
+      "location": "Medan - HO",
+      "source": "Buku dari Kantor",
+      "link": "https://support.microsoft.com/en-us/windows/screen-mirroring-and-projecting-to-your-pc-or-wireless-display-5af9f371-c704-1c7f-8f0d-fa607551d09c",
+      "date": "2026-01-23T02:25:51.098Z",
+      "status": "Finished",
+      "userName": "Nusa Staff",
+      "xp": 50,
+      "review": "saya suka baca",
+      "duration": 83,
+      "evidenceUrl": "/uploads/1769134470684-228048663.jpeg"
+    },
+    {
+      "id": 1769134514441,
+      "title": "Atomic Habits",
+      "category": "Buku Wajib Baca",
+      "location": "Medan - HO",
+      "source": "Buku dari Kantor",
+      "link": "",
+      "date": "2026-01-23T02:15:14.441Z",
+      "status": "Reading",
+      "userName": "Nusa Staff",
+      "xp": 10,
+      "evidenceUrl": "/uploads/1769134470684-228048663.jpeg"
+    },
+    {
+      "id": 9999999901,
+      "title": "Jane's Exclusive Book",
+      "category": "Science",
+      "location": "Jakarta",
+      "source": "Personal",
+      "link": "",
+      "date": "2026-01-22T08:00:00.000Z",
+      "status": "Finished",
+      "userName": "Jane Doe",
+      "xp": 50,
+      "review": "So exclusive.",
+      "duration": 60,
+      "evidenceUrl": ""
+    }
+  ],
+  "trainingRequests": [
+    {
+      "title": "Sertifikasi BNSP PLC",
+      "vendor": "KIM PLUS",
+      "cost": 1500000,
+      "date": "2026-01-23",
+      "duration": "3 hari",
+      "location": "Medan",
+      "paymentMethod": "REIMBURSEMENT",
+      "bankName": "",
+      "accountNumber": "",
+      "reason": "sangat berguna bagi bangsa pun",
+      "agreedToBond": false,
+      "agreedToPenalty": true,
+      "status": "REJECTED",
+      "submittedAt": "2026-01-22T04:17:23.647Z",
+      "isBonded": false,
+      "id": 1769055443647
+    }
+  ],
+  "meetings": [
+    {
+      "title": "Weekly Tech Sync",
+      "date": "2026-01-22",
+      "time": " - ",
+      "shortDate": "22 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "lovely room",
+      "description": "banyak lah",
+      "guests": {
+        "status": "Awaiting",
+        "count": 1,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "lovely room",
+      "id": 1769056038560
+    },
+    {
+      "title": "Evaluasi Kinerja Q1",
+      "date": "2026-01-24",
+      "time": "01:27 - 02:29",
+      "shortDate": "24 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Ruang Meeting harmonis",
+      "description": "politik",
+      "guests": {
+        "status": "Awaiting",
+        "count": 2,
+        "emails": [
+          "samnapit26@gmail.com",
+          "staff@nusa.com"
+        ]
+      },
+      "id": 1769138566093,
+      "meetLink": "Ruang Meeting harmonis"
+    }
+  ],
+  "courses": [
+    {
+      "id": 1,
+      "title": "Company Profile Nusa Net",
+      "description": "Pelajari selengkapnya tentang visi, misi, dan layanan unggulan dari Nusa Net ISP.",
+      "duration": "15 menit",
+      "modulesCount": 97,
+      "studentCount": 72475,
+      "progress": 0,
+      "modules": [
+        {
+          "id": 1,
+          "title": "Nusa Net ISP Profile",
+          "duration": "10:00",
+          "videoType": "youtube",
+          "videoId": "kLI2EtlAFg0",
+          "locked": false,
+          "quiz": {
+            "id": 1769140980609,
+            "title": "Quiz",
+            "questions": [
+              {
+                "id": 1769140991195,
+                "question": "siapa saya",
+                "options": [
+                  "True",
+                  "False"
+                ],
+                "correctAnswer": 0
+              },
+              {
+                "id": 1769141001378,
+                "question": "siapa kamu",
+                "options": [
+                  "True",
+                  "False"
+                ],
+                "correctAnswer": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": 2,
+          "title": "Kotlin Basic Syntax",
+          "duration": "15:00",
+          "videoType": "youtube",
+          "videoId": "PsaFVLr8t4E",
+          "locked": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Belajar Membuat Aplikasi Android untuk Pemula",
+      "description": "Langkah awal menjadi Android Developer expert dengan mempelajari dasar pembuatan aplikasi.",
+      "duration": "30 menit belajar",
+      "modulesCount": 49,
+      "studentCount": 127673,
+      "progress": 35,
+      "modules": [
+        {
+          "id": 1,
+          "title": "Intro to Android Studio",
+          "duration": "12:00",
+          "videoType": "youtube",
+          "videoId": "fis26HvvDII",
+          "locked": false
+        },
+        {
+          "id": 2,
+          "title": "Building your first app",
+          "duration": "20:00",
+          "videoType": "youtube",
+          "videoId": "EcFOdfS-FM",
+          "locked": false
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Belajar Fundamental Aplikasi Android",
+      "description": "Pelajari komponen fundamental Android untuk membuat aplikasi yang robust.",
+      "duration": "30 menit belajar",
+      "modulesCount": 107,
+      "studentCount": 43929,
+      "progress": 0,
+      "modules": [
+        {
+          "id": 1,
+          "title": "Activity Lifecycle",
+          "duration": "15:00",
+          "videoType": "youtube",
+          "videoId": "iL6t09a9hMc",
+          "locked": false
+        }
+      ]
+    }
+  ],
+  "progress": [
+    {
+      "userId": "Nusa Staff",
+      "courseId": 1,
+      "completedModuleIds": [
+        1,
+        2
+      ],
+      "lastAccess": "2026-01-23T04:02:25.043Z"
+    }
+  ]
+}
