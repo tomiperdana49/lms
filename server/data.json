@@ -91,7 +91,189 @@
       "status": "REJECTED",
       "submittedAt": "2026-01-22T04:17:23.647Z",
       "isBonded": false,
-      "id": 1769055443647
+      "id": 1769055443647,
+      "employeeName": "Unknown",
+      "employeeRole": "Staff"
+    },
+    {
+      "id": 1769236723372,
+      "title": "Node.js Performance",
+      "vendor": "Coursera",
+      "cost": 4536604,
+      "date": "2026-01-03",
+      "duration": "1 Day",
+      "location": "Online",
+      "paymentMethod": "CORPORATE_CARD",
+      "reason": "Upskilling",
+      "agreedToBond": false,
+      "agreedToPenalty": true,
+      "status": "PENDING_HR",
+      "submittedAt": "2026-01-24T06:37:24.892Z",
+      "isBonded": false,
+      "employeeName": "Nusa Staff",
+      "employeeRole": "Staff"
+    },
+    {
+      "id": 1769236707926,
+      "title": "Python for Data Science",
+      "vendor": "Coursera",
+      "cost": 2765423,
+      "date": "2026-01-06",
+      "duration": "1 Day",
+      "location": "Online",
+      "paymentMethod": "CORPORATE_CARD",
+      "reason": "Upskilling",
+      "agreedToBond": false,
+      "agreedToPenalty": true,
+      "status": "PENDING_HR",
+      "submittedAt": "2026-01-24T06:37:24.892Z",
+      "isBonded": false,
+      "employeeName": "Nusa Staff",
+      "employeeRole": "Staff"
+    },
+    {
+      "id": 1769236722813,
+      "title": "Python for Data Science",
+      "vendor": "Coursera",
+      "cost": 4013932,
+      "date": "2026-01-09",
+      "duration": "1 Day",
+      "location": "Online",
+      "paymentMethod": "CORPORATE_CARD",
+      "reason": "Upskilling",
+      "agreedToBond": false,
+      "agreedToPenalty": true,
+      "status": "PENDING_HR",
+      "submittedAt": "2026-01-24T06:37:24.892Z",
+      "isBonded": false,
+      "employeeName": "Nusa Staff",
+      "employeeRole": "Staff"
+    },
+    {
+      "id": 1769236705719,
+      "title": "Cybersecurity Basics",
+      "vendor": "Udemy",
+      "cost": 2346913,
+      "date": "2026-01-12",
+      "duration": "1 Day",
+      "location": "Online",
+      "paymentMethod": "CORPORATE_CARD",
+      "reason": "Upskilling",
+      "agreedToBond": false,
+      "agreedToPenalty": true,
+      "status": "APPROVED",
+      "submittedAt": "2026-01-24T06:37:24.892Z",
+      "isBonded": false,
+      "employeeName": "Nusa Staff",
+      "employeeRole": "Staff"
+    },
+    {
+      "id": 1769236687167,
+      "title": "Agile Leadership",
+      "vendor": "Coursera",
+      "cost": 2911159,
+      "date": "2026-01-15",
+      "duration": "1 Day",
+      "location": "Online",
+      "paymentMethod": "CORPORATE_CARD",
+      "reason": "Upskilling",
+      "agreedToBond": false,
+      "agreedToPenalty": true,
+      "status": "PENDING_HR",
+      "submittedAt": "2026-01-24T06:37:24.892Z",
+      "isBonded": false,
+      "employeeName": "Nusa Staff",
+      "employeeRole": "Staff"
+    },
+    {
+      "id": 1769236729741,
+      "title": "AWS Certification",
+      "vendor": "Udemy",
+      "cost": 3941935,
+      "date": "2026-01-18",
+      "duration": "1 Day",
+      "location": "Online",
+      "paymentMethod": "CORPORATE_CARD",
+      "reason": "Upskilling",
+      "agreedToBond": false,
+      "agreedToPenalty": true,
+      "status": "PENDING_HR",
+      "submittedAt": "2026-01-24T06:37:24.892Z",
+      "isBonded": false,
+      "employeeName": "Nusa Staff",
+      "employeeRole": "Staff"
+    },
+    {
+      "id": 1769236730669,
+      "title": "React Advanced",
+      "vendor": "Udemy",
+      "cost": 2404576,
+      "date": "2026-01-21",
+      "duration": "1 Day",
+      "location": "Online",
+      "paymentMethod": "CORPORATE_CARD",
+      "reason": "Upskilling",
+      "agreedToBond": false,
+      "agreedToPenalty": true,
+      "status": "PENDING_HR",
+      "submittedAt": "2026-01-24T06:37:24.892Z",
+      "isBonded": false,
+      "employeeName": "Nusa Staff",
+      "employeeRole": "Staff"
+    },
+    {
+      "id": 1769236689268,
+      "title": "Node.js Performance",
+      "vendor": "Coursera",
+      "cost": 4703554,
+      "date": "2026-01-24",
+      "duration": "1 Day",
+      "location": "Online",
+      "paymentMethod": "CORPORATE_CARD",
+      "reason": "Upskilling",
+      "agreedToBond": false,
+      "agreedToPenalty": true,
+      "status": "PENDING_HR",
+      "submittedAt": "2026-01-24T06:37:24.892Z",
+      "isBonded": false,
+      "employeeName": "Nusa Staff",
+      "employeeRole": "Staff"
+    },
+    {
+      "id": 1769236708555,
+      "title": "Python for Data Science",
+      "vendor": "Coursera",
+      "cost": 4343477,
+      "date": "2026-01-27",
+      "duration": "1 Day",
+      "location": "Online",
+      "paymentMethod": "CORPORATE_CARD",
+      "reason": "Upskilling",
+      "agreedToBond": false,
+      "agreedToPenalty": true,
+      "status": "PENDING_HR",
+      "submittedAt": "2026-01-24T06:37:24.892Z",
+      "isBonded": false,
+      "employeeName": "Nusa Staff",
+      "employeeRole": "Staff"
+    },
+    {
+      "id": 1769236680307,
+      "title": "AWS Certification",
+      "vendor": "Udemy",
+      "cost": 1196764,
+      "date": "2026-01-30",
+      "duration": "1 Day",
+      "location": "Online",
+      "paymentMethod": "CORPORATE_CARD",
+      "reason": "Upskilling",
+      "agreedToBond": false,
+      "agreedToPenalty": true,
+      "status": "APPROVED",
+      "submittedAt": "2026-01-24T06:37:24.892Z",
+      "isBonded": false,
+      "employeeName": "Nusa Staff",
+      "employeeRole": "Staff"
     }
   ],
   "meetings": [
@@ -133,6 +315,1241 @@
       },
       "id": 1769138566093,
       "meetLink": "Ruang Meeting harmonis"
+    },
+    {
+      "id": 1769236714419,
+      "title": "Sprint Planning - Team A",
+      "date": "2026-01-01",
+      "time": "12:00 - 13:00",
+      "shortDate": "1 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 7,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236699083,
+      "title": "Sprint Planning - Team B",
+      "date": "2026-01-01",
+      "time": "13:00 - 14:00",
+      "shortDate": "1 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 6,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236715248,
+      "title": "Marketing Sync - Team C",
+      "date": "2026-01-01",
+      "time": "13:00 - 14:00",
+      "shortDate": "1 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 10,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236688912,
+      "title": "Client Sync - Team D",
+      "date": "2026-01-01",
+      "time": "11:00 - 12:00",
+      "shortDate": "1 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 5,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236721730,
+      "title": "Client Sync - Team A",
+      "date": "2026-01-02",
+      "time": "12:00 - 13:00",
+      "shortDate": "2 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 3,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236742910,
+      "title": "Client Sync - Team B",
+      "date": "2026-01-02",
+      "time": "15:00 - 16:00",
+      "shortDate": "2 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 5,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236698613,
+      "title": "Daily Standup - Team C",
+      "date": "2026-01-02",
+      "time": "09:00 - 10:00",
+      "shortDate": "2 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 5,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236718635,
+      "title": "All Hands - Team A",
+      "date": "2026-01-03",
+      "time": "11:00 - 12:00",
+      "shortDate": "3 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 4,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236646786,
+      "title": "Design Huddle - Team B",
+      "date": "2026-01-03",
+      "time": "16:00 - 17:00",
+      "shortDate": "3 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 2,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236658901,
+      "title": "All Hands - Team C",
+      "date": "2026-01-03",
+      "time": "10:00 - 11:00",
+      "shortDate": "3 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 9,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236732667,
+      "title": "Design Huddle - Team A",
+      "date": "2026-01-04",
+      "time": "16:00 - 17:00",
+      "shortDate": "4 JAN",
+      "host": "Admin",
+      "type": "Offline",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 2,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236710804,
+      "title": "Design Huddle - Team B",
+      "date": "2026-01-04",
+      "time": "10:00 - 11:00",
+      "shortDate": "4 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 7,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236722772,
+      "title": "Daily Standup - Team A",
+      "date": "2026-01-05",
+      "time": "13:00 - 14:00",
+      "shortDate": "5 JAN",
+      "host": "Admin",
+      "type": "Offline",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 8,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236683810,
+      "title": "Budget Meeting - Team A",
+      "date": "2026-01-08",
+      "time": "10:00 - 11:00",
+      "shortDate": "8 JAN",
+      "host": "Admin",
+      "type": "Offline",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 4,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236734462,
+      "title": "HR Sync - Team B",
+      "date": "2026-01-08",
+      "time": "14:00 - 15:00",
+      "shortDate": "8 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 3,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236658708,
+      "title": "Project Review - Team C",
+      "date": "2026-01-08",
+      "time": "15:00 - 16:00",
+      "shortDate": "8 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 8,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236683589,
+      "title": "Budget Meeting - Team A",
+      "date": "2026-01-09",
+      "time": "09:00 - 10:00",
+      "shortDate": "9 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 7,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236714043,
+      "title": "Project Review - Team B",
+      "date": "2026-01-09",
+      "time": "11:00 - 12:00",
+      "shortDate": "9 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 10,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236663133,
+      "title": "Tech Talk - Team C",
+      "date": "2026-01-09",
+      "time": "15:00 - 16:00",
+      "shortDate": "9 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 6,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236728163,
+      "title": "All Hands - Team A",
+      "date": "2026-01-10",
+      "time": "15:00 - 16:00",
+      "shortDate": "10 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 10,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236716153,
+      "title": "Project Review - Team B",
+      "date": "2026-01-10",
+      "time": "09:00 - 10:00",
+      "shortDate": "10 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 7,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236688806,
+      "title": "Tech Talk - Team C",
+      "date": "2026-01-10",
+      "time": "11:00 - 12:00",
+      "shortDate": "10 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 9,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236700902,
+      "title": "HR Sync - Team A",
+      "date": "2026-01-11",
+      "time": "10:00 - 11:00",
+      "shortDate": "11 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 6,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236730192,
+      "title": "Tech Talk - Team B",
+      "date": "2026-01-11",
+      "time": "11:00 - 12:00",
+      "shortDate": "11 JAN",
+      "host": "Admin",
+      "type": "Offline",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 8,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236656256,
+      "title": "Daily Standup - Team A",
+      "date": "2026-01-12",
+      "time": "16:00 - 17:00",
+      "shortDate": "12 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 3,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236646123,
+      "title": "Client Sync - Team B",
+      "date": "2026-01-12",
+      "time": "16:00 - 17:00",
+      "shortDate": "12 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 6,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236666997,
+      "title": "Sprint Planning - Team C",
+      "date": "2026-01-12",
+      "time": "13:00 - 14:00",
+      "shortDate": "12 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 3,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236672844,
+      "title": "Tech Talk - Team D",
+      "date": "2026-01-12",
+      "time": "16:00 - 17:00",
+      "shortDate": "12 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 6,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236692597,
+      "title": "Marketing Sync - Team A",
+      "date": "2026-01-15",
+      "time": "10:00 - 11:00",
+      "shortDate": "15 JAN",
+      "host": "Admin",
+      "type": "Offline",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 8,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236687608,
+      "title": "Budget Meeting - Team B",
+      "date": "2026-01-15",
+      "time": "13:00 - 14:00",
+      "shortDate": "15 JAN",
+      "host": "Admin",
+      "type": "Offline",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 7,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236660520,
+      "title": "Client Sync - Team C",
+      "date": "2026-01-15",
+      "time": "15:00 - 16:00",
+      "shortDate": "15 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 7,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236685459,
+      "title": "Marketing Sync - Team D",
+      "date": "2026-01-15",
+      "time": "10:00 - 11:00",
+      "shortDate": "15 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 9,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236704857,
+      "title": "Daily Standup - Team A",
+      "date": "2026-01-16",
+      "time": "12:00 - 13:00",
+      "shortDate": "16 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 2,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236731985,
+      "title": "Daily Standup - Team B",
+      "date": "2026-01-16",
+      "time": "14:00 - 15:00",
+      "shortDate": "16 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 6,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236690912,
+      "title": "All Hands - Team C",
+      "date": "2026-01-16",
+      "time": "10:00 - 11:00",
+      "shortDate": "16 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 3,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236663520,
+      "title": "Budget Meeting - Team D",
+      "date": "2026-01-16",
+      "time": "09:00 - 10:00",
+      "shortDate": "16 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 4,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236721229,
+      "title": "Marketing Sync - Team A",
+      "date": "2026-01-17",
+      "time": "16:00 - 17:00",
+      "shortDate": "17 JAN",
+      "host": "Admin",
+      "type": "Offline",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 3,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236686009,
+      "title": "All Hands - Team B",
+      "date": "2026-01-17",
+      "time": "10:00 - 11:00",
+      "shortDate": "17 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 3,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236683132,
+      "title": "Project Review - Team C",
+      "date": "2026-01-17",
+      "time": "14:00 - 15:00",
+      "shortDate": "17 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 8,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236710504,
+      "title": "Tech Talk - Team D",
+      "date": "2026-01-17",
+      "time": "12:00 - 13:00",
+      "shortDate": "17 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 3,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236654483,
+      "title": "HR Sync - Team A",
+      "date": "2026-01-18",
+      "time": "12:00 - 13:00",
+      "shortDate": "18 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 5,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236717937,
+      "title": "HR Sync - Team B",
+      "date": "2026-01-18",
+      "time": "15:00 - 16:00",
+      "shortDate": "18 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 6,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236679138,
+      "title": "All Hands - Team C",
+      "date": "2026-01-18",
+      "time": "15:00 - 16:00",
+      "shortDate": "18 JAN",
+      "host": "Admin",
+      "type": "Offline",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 3,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236703863,
+      "title": "Daily Standup - Team D",
+      "date": "2026-01-18",
+      "time": "15:00 - 16:00",
+      "shortDate": "18 JAN",
+      "host": "Admin",
+      "type": "Offline",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 5,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236697606,
+      "title": "Tech Talk - Team A",
+      "date": "2026-01-19",
+      "time": "11:00 - 12:00",
+      "shortDate": "19 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 7,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236703870,
+      "title": "HR Sync - Team B",
+      "date": "2026-01-19",
+      "time": "11:00 - 12:00",
+      "shortDate": "19 JAN",
+      "host": "Admin",
+      "type": "Offline",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 7,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236735745,
+      "title": "Design Huddle - Team C",
+      "date": "2026-01-19",
+      "time": "10:00 - 11:00",
+      "shortDate": "19 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 7,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236670548,
+      "title": "Design Huddle - Team A",
+      "date": "2026-01-22",
+      "time": "10:00 - 11:00",
+      "shortDate": "22 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 10,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236731303,
+      "title": "Client Sync - Team B",
+      "date": "2026-01-22",
+      "time": "13:00 - 14:00",
+      "shortDate": "22 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 3,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236722247,
+      "title": "Daily Standup - Team C",
+      "date": "2026-01-22",
+      "time": "15:00 - 16:00",
+      "shortDate": "22 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 3,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236726569,
+      "title": "HR Sync - Team A",
+      "date": "2026-01-23",
+      "time": "14:00 - 15:00",
+      "shortDate": "23 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 6,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236731750,
+      "title": "Budget Meeting - Team B",
+      "date": "2026-01-23",
+      "time": "14:00 - 15:00",
+      "shortDate": "23 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 9,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236713782,
+      "title": "Marketing Sync - Team A",
+      "date": "2026-01-24",
+      "time": "09:00 - 10:00",
+      "shortDate": "24 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 3,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236688201,
+      "title": "Marketing Sync - Team B",
+      "date": "2026-01-24",
+      "time": "12:00 - 13:00",
+      "shortDate": "24 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 9,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236696885,
+      "title": "Project Review - Team A",
+      "date": "2026-01-25",
+      "time": "16:00 - 17:00",
+      "shortDate": "25 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 8,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236664955,
+      "title": "Daily Standup - Team B",
+      "date": "2026-01-25",
+      "time": "14:00 - 15:00",
+      "shortDate": "25 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 4,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236729292,
+      "title": "Design Huddle - Team A",
+      "date": "2026-01-26",
+      "time": "16:00 - 17:00",
+      "shortDate": "26 JAN",
+      "host": "Admin",
+      "type": "Offline",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 3,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236708415,
+      "title": "Daily Standup - Team A",
+      "date": "2026-01-29",
+      "time": "16:00 - 17:00",
+      "shortDate": "29 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 9,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236700472,
+      "title": "Daily Standup - Team B",
+      "date": "2026-01-29",
+      "time": "10:00 - 11:00",
+      "shortDate": "29 JAN",
+      "host": "Admin",
+      "type": "Offline",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 10,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236741366,
+      "title": "Sprint Planning - Team C",
+      "date": "2026-01-29",
+      "time": "15:00 - 16:00",
+      "shortDate": "29 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 10,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236674787,
+      "title": "Marketing Sync - Team A",
+      "date": "2026-01-30",
+      "time": "09:00 - 10:00",
+      "shortDate": "30 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 4,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236716201,
+      "title": "Client Sync - Team B",
+      "date": "2026-01-30",
+      "time": "12:00 - 13:00",
+      "shortDate": "30 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 4,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236665545,
+      "title": "HR Sync - Team C",
+      "date": "2026-01-30",
+      "time": "13:00 - 14:00",
+      "shortDate": "30 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 6,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236707091,
+      "title": "Sprint Planning - Team D",
+      "date": "2026-01-30",
+      "time": "15:00 - 16:00",
+      "shortDate": "30 JAN",
+      "host": "Admin",
+      "type": "Online",
+      "location": "Meeting Room A",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 5,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "id": 1769236739513,
+      "title": "Design Huddle - Team A",
+      "date": "2026-01-31",
+      "time": "16:00 - 17:00",
+      "shortDate": "31 JAN",
+      "host": "Admin",
+      "type": "Offline",
+      "location": "Google Meet",
+      "description": "Routine sync",
+      "guests": {
+        "status": "Awaiting",
+        "count": 3,
+        "emails": [
+          "staff@nusa.com"
+        ]
+      },
+      "meetLink": "https://meet.google.com/abc-defg-hij"
     }
   ],
   "courses": [
@@ -183,7 +1600,22 @@
           "duration": "15:00",
           "videoType": "youtube",
           "videoId": "PsaFVLr8t4E",
-          "locked": true
+          "locked": false,
+          "quiz": {
+            "id": 1769140980610,
+            "title": "Kotlin Quiz",
+            "questions": [
+              {
+                "id": 1,
+                "question": "Kotlin is Java?",
+                "options": [
+                  "Yes",
+                  "No"
+                ],
+                "correctAnswer": 1
+              }
+            ]
+          }
         }
       ]
     },
@@ -242,7 +1674,28 @@
         1,
         2
       ],
-      "lastAccess": "2026-01-23T04:02:25.043Z"
+      "lastAccess": "2026-01-24T03:35:55.493Z"
     }
-  ]
+  ],
+  "quizResults": [
+    {
+      "id": 1,
+      "studentId": "Nusa Staff",
+      "studentName": "Nusa Staff",
+      "courseId": 1,
+      "moduleId": 1,
+      "score": 100,
+      "date": "2026-01-24T10:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "studentId": "Nusa Staff",
+      "studentName": "Nusa Staff",
+      "courseId": 1,
+      "moduleId": 2,
+      "score": 100,
+      "date": "2026-01-24T10:15:00.000Z"
+    }
+  ],
+  "incentives": []
 }

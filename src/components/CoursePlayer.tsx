@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { PlayCircle, Lock, ChevronRight, BookOpen, ArrowLeft, X, Clock, CheckCircle } from 'lucide-react';
+import { PlayCircle, Lock, ChevronRight, BookOpen, ArrowLeft, X, Clock, CheckCircle, Award } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Course, Quiz, User } from '../types';
+import PopupNotification from './PopupNotification';
 
 interface CoursePlayerProps {
     user: User;
@@ -13,7 +14,18 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
     const [viewMode, setViewMode] = useState<'list' | 'player'>('list');
     const [activeCourse, setActiveCourse] = useState<Course | null>(null);
     const [activeModuleId, setActiveModuleId] = useState(1);
-    const [activeQuiz, setActiveQuiz] = useState<Quiz | undefined>(undefined);
+    const [activeQuiz, setActiveQuiz] = useState<{ quiz: Quiz, moduleId?: number } | undefined>(undefined);
+
+
+    const [quizResults, setQuizResults] = useState<Record<number, number>>({}); // moduleId -> best score or boolean
+
+    // Popup State
+    const [popup, setPopup] = useState<{ type: 'success' | 'error', message: string, isOpen: boolean }>({
+        type: 'success',
+        message: '',
+        isOpen: false
+    });
+
     // User Identity for API
     const userId = user?.name || 'guest';
 
@@ -59,7 +71,35 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
             }
         };
         loadCourses();
+
+
     }, [userId]);
+
+    // Fetch quiz results when activeCourse changes
+    useEffect(() => {
+        if (!activeCourse) return;
+        const fetchResults = async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/quiz/results/${userId}/${activeCourse.id}`);
+                const results = await res.json();
+                // Map results to { moduleId: score }
+                // Map results to { moduleId: score }
+                const map: Record<number, number> = {};
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                results.forEach((r: any) => {
+                    // If multiple attempts, take max
+                    if (r.moduleId) {
+                        const existing = map[r.moduleId] || 0;
+                        if (r.score > existing) map[r.moduleId] = r.score;
+                    }
+                });
+                setQuizResults(map);
+            } catch (e) {
+                console.error("Failed results", e);
+            }
+        };
+        fetchResults();
+    }, [activeCourse, userId]);
 
     const handleStartCourse = (course: Course) => {
         setActiveCourse(course);
@@ -85,10 +125,10 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             Learning Hub
                         </div>
                         <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight leading-tight">
-                            Expand Your Knowledge
+                            Modul Pembelajaran Online
                         </h1>
                         <p className="text-blue-100 text-lg md:text-xl leading-relaxed max-w-lg mb-8">
-                            Access premium courses designed to elevate your professional skills. Start your journey today.
+                            Akses modul premium untuk meningkatkan skill professional Anda.
                         </p>
                     </div>
 
@@ -147,7 +187,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         onClick={() => handleStartCourse(course)}
                                         className="w-full md:w-auto whitespace-nowrap px-8 py-3.5 rounded-xl font-bold text-white bg-slate-900 hover:bg-blue-600 shadow-lg hover:shadow-blue-500/30 transition-all duration-300 flex items-center justify-center gap-2 group-hover:translate-x-1"
                                     >
-                                        {course.progress > 0 ? 'Continue' : 'Start Learning'}
+                                        {course.progress > 0 ? 'Lanjutkan' : 'Mulai Belajar'}
                                         <ChevronRight size={18} />
                                     </button>
                                 </div>
@@ -155,37 +195,50 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         </div>
                     ))}
                 </div>
+                <PopupNotification
+                    isOpen={popup.isOpen}
+                    type={popup.type}
+                    message={popup.message}
+                    onClose={() => setPopup(prev => ({ ...prev, isOpen: false }))}
+                />
             </div>
         );
     }
 
 
 
+
+    // --- Quiz Modal (Student) ---
     // --- Quiz Modal (Student) ---
     if (activeQuiz) {
+        const { quiz, moduleId } = activeQuiz;
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
                 <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] ring-1 ring-white/20">
                     <div className="p-6 md:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                         <div>
                             <span className="text-xs font-bold text-blue-600 tracking-wider uppercase mb-1 block">Assessment</span>
-                            <h2 className="font-bold text-2xl text-slate-900">{activeQuiz.title}</h2>
+                            <h2 className="font-bold text-2xl text-slate-900">{quiz.title}</h2>
                         </div>
                         <button onClick={() => setActiveQuiz(undefined)} className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
                             <X size={24} />
                         </button>
                     </div>
 
-                    <div className="p-6 md:p-8 overflow-y-auto space-y-8">
-                        {activeQuiz.questions.length === 0 ? (
+                    <form
+                        id="quiz-form"
+                        className="p-6 md:p-8 overflow-y-auto space-y-8"
+                    >
+                        {/* We will handle submit via button click to avoid form complexity with TS for now, or just iterate refs. 
+                             Simpler: Use state for answers? Or just read from DOM? 
+                             Let's read from DOM for simplicity or strict FormData.
+                          */}
+                        {quiz.questions.length === 0 ? (
                             <div className="text-center py-12">
-                                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
-                                    <BookOpen size={32} />
-                                </div>
-                                <p className="text-slate-500 font-medium">No questions available yet.</p>
+                                <p className="text-slate-500 font-medium">No questions available.</p>
                             </div>
                         ) : (
-                            activeQuiz.questions.map((q, idx) => (
+                            quiz.questions.map((q, idx) => (
                                 <div key={q.id} className="space-y-4">
                                     <p className="font-semibold text-lg text-slate-900 leading-relaxed">
                                         <span className="text-slate-900/40 mr-2">{idx + 1}.</span> {q.question}
@@ -194,7 +247,13 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         {q.options.map((opt, optIdx) => (
                                             <label key={optIdx} className="group flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer transition-all">
                                                 <div className="relative flex items-center justify-center">
-                                                    <input type="radio" name={`q-${q.id}`} className="peer appearance-none w-5 h-5 border-2 border-slate-300 rounded-full checked:border-blue-600 checked:bg-blue-600 transition-colors" />
+                                                    <input
+                                                        type="radio"
+                                                        name={`q-${q.id}`}
+                                                        value={optIdx}
+                                                        required
+                                                        className="peer appearance-none w-5 h-5 border-2 border-slate-300 rounded-full checked:border-blue-600 checked:bg-blue-600 transition-colors"
+                                                    />
                                                 </div>
                                                 <span className="text-slate-600 group-hover:text-slate-900 font-medium">{opt}</span>
                                             </label>
@@ -203,7 +262,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                 </div>
                             ))
                         )}
-                    </div>
+                    </form>
 
                     <div className="p-6 md:p-8 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
                         <button
@@ -213,17 +272,96 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             Cancel
                         </button>
                         <button
-                            onClick={() => {
-                                alert('Quiz Submitted! Score: 100/100 (Mock)');
-                                setActiveQuiz(undefined);
+                            onClick={async () => {
+                                // Calculate Score
+                                const form = document.querySelector('#quiz-form') as HTMLFormElement;
+                                if (!form) return;
+                                const formData = new FormData(form);
+                                let correct = 0;
+                                let answered = 0;
+
+                                quiz.questions.forEach(q => {
+                                    const val = formData.get(`q-${q.id}`);
+                                    if (val !== null) {
+                                        answered++;
+                                        if (parseInt(val as string) === q.correctAnswer) {
+                                            correct++;
+                                        }
+                                    }
+                                });
+
+                                if (answered < quiz.questions.length) {
+                                    setPopup({ type: 'error', message: 'Please answer all questions before submitting.', isOpen: true });
+                                    return;
+                                }
+
+                                const score = Math.round((correct / quiz.questions.length) * 100);
+                                const isPassing = score >= 60; // Pass threshold
+
+                                if (!isPassing) {
+                                    setPopup({
+                                        type: 'error',
+                                        message: `Score: ${score}/100. You need 60% to pass. Please try again.`,
+                                        isOpen: true
+                                    });
+                                    return;
+                                }
+
+                                // Save to Backend
+                                try {
+                                    await fetch(`${API_BASE_URL}/api/quiz/submit`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            studentId: userId, // ideally ID
+                                            studentName: user.name,
+                                            courseId: activeCourse?.id,
+                                            moduleId: moduleId || null,
+                                            score
+                                        })
+                                    });
+
+                                    setPopup({
+                                        type: 'success',
+                                        message: `Assessment Passed! Score: ${score}/100`,
+                                        isOpen: true
+                                    });
+
+                                    // Update State
+                                    if (moduleId) {
+                                        setQuizResults(prev => ({ ...prev, [moduleId]: score }));
+
+                                        // Also update progress list locally to unlock next
+                                        if (activeCourse) {
+                                            const currentIndex = activeCourse.modules.findIndex(m => m.id === moduleId);
+                                            const nextModule = activeCourse.modules[currentIndex + 1];
+                                            const updatedCourse = { ...activeCourse };
+
+                                            // The backend logic handles adding the module status.
+                                            // We optimistically update local locks
+                                            if (nextModule) {
+                                                updatedCourse.modules = updatedCourse.modules.map(m =>
+                                                    m.id === nextModule.id ? { ...m, locked: false } : m
+                                                );
+                                                setCourses(prev => prev.map(c => c.id === updatedCourse.id ? updatedCourse : c));
+                                                setActiveCourse(updatedCourse);
+                                                setActiveModuleId(nextModule.id);
+                                            }
+                                        }
+                                    }
+                                    setActiveQuiz(undefined);
+                                } catch (err) {
+                                    console.error(err);
+                                    setPopup({ type: 'error', message: 'Failed to submit results. Please try again.', isOpen: true });
+                                }
                             }}
                             className="bg-blue-600 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-blue-700 shadow-lg hover:shadow-blue-500/30 transition-all transform active:scale-95"
                         >
-                            Submit Assessment
+                            Submit Results
                         </button>
                     </div>
                 </div>
-            </div>
+            </div >
         );
     }
 
@@ -268,7 +406,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                     <iframe
                                         width="100%"
                                         height="100%"
-                                        src={`https://www.youtube.com/embed/${activeModule.videoId}?autoplay=1`}
+                                        src={`https://www.youtube.com/embed/${activeModule.videoId}?autoplay=1&controls=0&disablekb=1&modestbranding=1&rel=0`}
                                         title={activeModule.title}
                                         frameBorder="0"
                                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -288,64 +426,75 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         <div className="bg-slate-900 border-t border-slate-800 p-6 md:p-10 pb-20">
                             <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-8 justify-between items-start">
                                 <div>
-                                    <h1 className="text-2xl font-bold text-white mb-3">{activeModule?.title || "Module Title"}</h1>
+                                    <h1 className="text-2xl font-bold text-white mb-3">{activeModule?.title || "Judul Materi"}</h1>
                                     <p className="text-slate-400 leading-relaxed max-w-2xl">
                                         Master this module to advance your skills. Watch the video completely to unlock the next steps.
                                     </p>
                                 </div>
                                 <div className="flex gap-3">
-                                    {/* Mark as Complete Button */}
-                                    <button
-                                        onClick={async () => {
-                                            if (!activeCourse || !activeModule) return;
-
-                                            // 1. Optimistic Update
-                                            const currentIndex = activeCourse.modules.findIndex(m => m.id === activeModule.id);
-                                            const nextModule = activeCourse.modules[currentIndex + 1];
-
-                                            try {
-                                                // 2. Call API
-                                                await fetch(`${API_BASE_URL}/api/progress/complete`, {
-                                                    method: 'POST',
-                                                    headers: { 'Content-Type': 'application/json' },
-                                                    body: JSON.stringify({ userId, courseId: activeCourse.id, moduleId: activeModule.id })
-                                                });
-
-                                                // 3. Update State
-                                                const updatedCourse = { ...activeCourse };
-
-                                                // Update completion logic locally
-                                                // If there is a next module, unlock it
-                                                if (nextModule) {
-                                                    updatedCourse.modules = updatedCourse.modules.map(m =>
-                                                        m.id === nextModule.id ? { ...m, locked: false } : m
-                                                    );
-                                                    setActiveCourse(updatedCourse);
-                                                    setActiveModuleId(nextModule.id);
-                                                } else {
-                                                    alert("Course Completed! Congratulations!");
-                                                }
-
-                                                // Update list view too
-                                                setCourses(prev => prev.map(c => c.id === updatedCourse.id ? updatedCourse : c));
-
-                                            } catch {
-                                                alert("Failed to save progress. Please try again.");
-                                            }
-                                        }}
-                                        className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-green-500 hover:shadow-green-500/20 transition-all flex items-center gap-2 group"
-                                    >
-                                        <CheckCircle size={20} className="group-hover:scale-110 transition-transform" />
-                                        Complete & Next
-                                    </button>
-
-                                    {activeModule?.quiz && (
+                                    {/* Control Buttons */}
+                                    {activeModule?.quiz ? (
+                                        // If module has quiz, render Quiz Button first if not passed
+                                        quizResults[activeModule.id] >= 60 ? (
+                                            <div className="flex gap-2">
+                                                <span className="bg-green-100 text-green-700 px-4 py-3 rounded-xl font-bold flex items-center gap-2">
+                                                    <CheckCircle size={20} /> Passed: {quizResults[activeModule.id]}%
+                                                </span>
+                                                <button
+                                                    onClick={() => {
+                                                        // Logic to manually move next if they stayed on page?
+                                                        // Should verify if next is locked.
+                                                        const currentIndex = activeCourse.modules.findIndex(m => m.id === activeModule.id);
+                                                        const nextMod = activeCourse.modules[currentIndex + 1];
+                                                        if (nextMod && !nextMod.locked) setActiveModuleId(nextMod.id);
+                                                    }}
+                                                    className="bg-slate-800 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-700 transition-all flex items-center gap-2"
+                                                >
+                                                    Lanjut <ChevronRight size={18} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => setActiveQuiz({ quiz: activeModule.quiz!, moduleId: activeModule.id })}
+                                                className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-500 transition-all flex items-center gap-2 animate-bounce"
+                                            >
+                                                <Award size={20} />
+                                                Kerjakan Quiz ({activeModule.quiz.questions.length} Soal)
+                                            </button>
+                                        )
+                                    ) : (
                                         <button
-                                            onClick={() => setActiveQuiz(activeModule.quiz)}
-                                            className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-500 hover:shadow-blue-500/20 transition-all flex items-center gap-2 group"
+                                            onClick={async () => {
+                                                if (!activeCourse || !activeModule) return;
+                                                const currentIndex = activeCourse.modules.findIndex(m => m.id === activeModule.id);
+                                                const nextModule = activeCourse.modules[currentIndex + 1];
+
+                                                try {
+                                                    await fetch(`${API_BASE_URL}/api/progress/complete`, {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ userId, courseId: activeCourse.id, moduleId: activeModule.id })
+                                                    });
+
+                                                    const updatedCourse = { ...activeCourse };
+                                                    if (nextModule) {
+                                                        updatedCourse.modules = updatedCourse.modules.map(m =>
+                                                            m.id === nextModule.id ? { ...m, locked: false } : m
+                                                        );
+                                                        setActiveCourse(updatedCourse);
+                                                        setActiveModuleId(nextModule.id);
+                                                        setCourses(prev => prev.map(c => c.id === updatedCourse.id ? updatedCourse : c));
+                                                    } else {
+                                                        setPopup({ type: 'success', message: 'Modul Selesai!', isOpen: true });
+                                                    }
+                                                } catch {
+                                                    setPopup({ type: 'error', message: 'Error saving progress', isOpen: true });
+                                                }
+                                            }}
+                                            className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-green-500 hover:shadow-green-500/20 transition-all flex items-center gap-2 group"
                                         >
-                                            <PlayCircle size={20} className="group-hover:scale-110 transition-transform" />
-                                            Quiz
+                                            <CheckCircle size={20} className="group-hover:scale-110 transition-transform" />
+                                            Selesai & Lanjut
                                         </button>
                                     )}
                                 </div>
@@ -357,9 +506,9 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                 {/* Sidebar (Right/Bottom) - Light Theme for Readability */}
                 <div className="w-full lg:w-[400px] bg-white border-l border-slate-200 flex flex-col shrink-0 z-10 shadow-xl">
                     <div className="p-6 border-b border-slate-100 bg-white sticky top-0">
-                        <h3 className="font-bold text-slate-800 text-lg mb-1">Course Content</h3>
+                        <h3 className="font-bold text-slate-800 text-lg mb-1">Daftar Materi</h3>
                         <p className="text-sm text-slate-400">
-                            {activeModuleId} / {activeCourse.modules.length} Modules Completed
+                            {activeModuleId} / {activeCourse.modules.length} Materi Selesai
                         </p>
                     </div>
 
@@ -412,10 +561,45 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             })}
                         </div>
                     </div>
+
+                    {/* Assessment Button */}
+                    {activeCourse.assessment && (
+                        <div className="p-4 pt-0">
+                            <button
+                                onClick={() => activeCourse.assessment && setActiveQuiz({ quiz: activeCourse.assessment, moduleId: undefined })}
+                                disabled={activeCourse.progress < 100}
+                                className={`w-full p-4 rounded-xl flex items-center gap-4 text-left transition-all border-2 border-dashed
+                                        ${activeCourse.progress >= 100
+                                        ? 'border-indigo-400 bg-indigo-50 hover:bg-indigo-100 cursor-pointer shadow-sm'
+                                        : 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-60'}
+                                    `}
+                            >
+                                <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center ${activeCourse.progress >= 100 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                                    <Award size={20} />
+                                </div>
+                                <div>
+                                    <p className={`font-bold ${activeCourse.progress >= 100 ? 'text-indigo-900' : 'text-slate-500'}`}>Final Assessment</p>
+                                    <p className="text-xs text-slate-400">{activeCourse.progress >= 100 ? 'Ready to take' : 'Complete all courses to unlock'}</p>
+                                </div>
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
-        </div>
+
+
+
+
+            <PopupNotification
+                isOpen={popup.isOpen}
+                type={popup.type}
+                message={popup.message}
+                onClose={() => setPopup(prev => ({ ...prev, isOpen: false }))}
+            />
+        </div >
     );
 };
+
+
 
 export default CoursePlayer;

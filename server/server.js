@@ -9,7 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 3002;
+const PORT = 3003;
 const DATA_FILE = path.join(__dirname, 'data.json');
 const UPLOADS_DIR = path.join(__dirname, '../uploads');
 
@@ -55,7 +55,8 @@ const readData = () => {
             trainingRequests: [],
             meetings: [],
             courses: [],
-            progress: []
+            progress: [],
+            quizResults: []
         };
     }
     const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
@@ -66,6 +67,7 @@ const readData = () => {
     if (!data.meetings) data.meetings = [];
     if (!data.courses) data.courses = [];
     if (!data.progress) data.progress = []; // [{ userId, courseId, completedModuleIds: [], lastAccess: date }]
+    if (!data.quizResults) data.quizResults = []; // [{ id, studentId, courseId, moduleId, score, date }]
     return data;
 };
 
@@ -144,6 +146,20 @@ app.post('/api/users', (req, res) => {
     res.json(newUser);
 });
 
+app.put('/api/users/:id', (req, res) => {
+    const { id } = req.params;
+    const updatedUser = req.body;
+    const data = readData();
+    const idx = data.users.findIndex(u => u.id == id);
+    if (idx !== -1) {
+        data.users[idx] = { ...data.users[idx], ...updatedUser };
+        writeData(data);
+        res.json(data.users[idx]);
+    } else {
+        res.status(404).json({ message: 'User not found' });
+    }
+});
+
 // --- READING LOGS ROUTES ---
 app.get('/api/logs', (req, res) => {
     const data = readData();
@@ -182,12 +198,15 @@ app.post('/api/training', (req, res) => {
 
 app.post('/api/training/:id/approve', (req, res) => {
     const { id } = req.params;
-    const { action } = req.body;
+    const { action, reason } = req.body;
     const data = readData();
     let updatedreq = null;
     data.trainingRequests = data.trainingRequests.map(req => {
         if (req.id == id) {
-            if (action === 'reject') req.status = 'REJECTED';
+            if (action === 'reject') {
+                req.status = 'REJECTED';
+                if (reason) req.rejectionReason = reason;
+            }
             else if (action === 'approve') {
                 if (req.status === 'PENDING_SUPERVISOR') req.status = 'PENDING_HR';
                 else if (req.status === 'PENDING_HR') req.status = 'APPROVED';
@@ -198,6 +217,24 @@ app.post('/api/training/:id/approve', (req, res) => {
     });
     writeData(data);
     res.json(updatedreq);
+});
+
+// Generic Update (Edit/Settlement)
+app.put('/api/training/:id', (req, res) => {
+    const { id } = req.params;
+    const updates = req.body;
+    const data = readData();
+    let updated = null;
+    const idx = data.trainingRequests.findIndex(r => r.id == id);
+
+    if (idx !== -1) {
+        data.trainingRequests[idx] = { ...data.trainingRequests[idx], ...updates };
+        updated = data.trainingRequests[idx];
+        writeData(data);
+        res.json(updated);
+    } else {
+        res.status(404).json({ message: 'Request not found' });
+    }
 });
 
 // --- MEETINGS ROUTES ---
@@ -330,6 +367,99 @@ app.post('/api/progress/complete', (req, res) => {
 
     writeData(data);
     res.json({ success: true, record });
+});
+
+// --- QUIZ ROUTES ---
+app.post('/api/quiz/submit', (req, res) => {
+    const { studentId, studentName, courseId, moduleId, score } = req.body;
+    const data = readData();
+
+    // Save result
+    const newResult = {
+        id: Date.now(),
+        studentId, // can be email/name
+        studentName,
+        courseId,
+        moduleId, // if null, it's final assessment
+        score,
+        date: new Date().toISOString()
+    };
+
+    // Replace previous result if exists? Or keep history? let's keep history but maybe frontend wants latest.
+    // For simplicity, let's just push.
+    data.quizResults.push(newResult);
+
+    // If score is passing (e.g. >= 60), mark module as complete?
+    // Let's assume frontend logic handles the 'complete' call separately after passing, 
+    // OR we do it here. Doing it here is safer.
+
+    if (score >= 60 && moduleId) {
+        let record = data.progress.find(p => p.userId == studentId && p.courseId == courseId);
+        if (!record) {
+            record = { userId: studentId, courseId, completedModuleIds: [], lastAccess: new Date().toISOString() };
+            data.progress.push(record);
+        }
+        if (!record.completedModuleIds.includes(moduleId)) {
+            record.completedModuleIds.push(moduleId);
+        }
+    }
+
+    writeData(data);
+    res.json({ success: true, result: newResult });
+});
+
+app.get('/api/quiz/results/:userId/:courseId', (req, res) => {
+    const { userId, courseId } = req.params;
+    const data = readData();
+    // Return all results for this user in this course
+    const results = data.quizResults.filter(r => r.studentId == userId && r.courseId == courseId);
+    res.json(results);
+});
+
+app.get('/api/quiz/all-results', (req, res) => {
+    const data = readData();
+    res.json(data.quizResults);
+});
+
+// --- INCENTIVE ROUTES ---
+app.get('/api/incentives', (req, res) => {
+    const data = readData();
+    // Check if incentives exist, if not init
+    if (!data.incentives) {
+        data.incentives = [];
+        writeData(data);
+    }
+    res.json(data.incentives);
+});
+
+app.post('/api/incentives', (req, res) => {
+    const data = readData();
+    if (!data.incentives) data.incentives = [];
+
+    const newIncentive = {
+        ...req.body,
+        id: Date.now(),
+        status: 'Active'
+    };
+    data.incentives.push(newIncentive);
+    writeData(data);
+    res.json(newIncentive);
+});
+
+app.put('/api/incentives/:id', (req, res) => {
+    const { id } = req.params;
+    const updates = req.body;
+    const data = readData();
+    if (!data.incentives) data.incentives = [];
+
+    const idx = data.incentives.findIndex(i => i.id == id);
+    if (idx !== -1) {
+        data.incentives[idx] = { ...data.incentives[idx], ...updates };
+        writeData(data);
+        res.json(data.incentives[idx]);
+    } else {
+        res.status(404).json({ message: 'Incentive not found' });
+    }
 });
 
 // --- SPA FALLBACK (Catch-All) ---

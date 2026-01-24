@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Role } from '../types';
+import PopupNotification from './PopupNotification';
 
 interface Meeting {
     id: number;
@@ -21,7 +22,7 @@ interface Meeting {
     time: string;
     shortDate: string;
     host: string;
-    type: 'Online' | 'Offline';
+    type: 'Online' | 'Offline' | 'Hybrid';
     location: string;
     description: string;
     guests: { status: 'Yes' | 'Awaiting'; count: number; emails: string[] };
@@ -55,6 +56,7 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
     const [meetings, setMeetings] = useState<Meeting[]>([]);
     const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [notification, setNotification] = useState<{ show: boolean; type: 'success' | 'error'; message: string }>({ show: false, type: 'success', message: '' });
 
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
@@ -66,8 +68,9 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
         startTime: '',
         endTime: '',
         host: '',
-        type: 'Online' as 'Online' | 'Offline',
+        type: 'Online' as 'Online' | 'Offline' | 'Hybrid',
         location: '',
+        meetLink: '',
         description: ''
     });
 
@@ -136,6 +139,7 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
             host: meeting.host,
             type: meeting.type,
             location: meeting.location,
+            meetLink: meeting.meetLink || '',
             description: meeting.description
         });
         setInvitedEmails(meeting.guests?.emails || []);
@@ -159,7 +163,27 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
                 count: invitedEmails.length,
                 emails: invitedEmails
             },
-            meetLink: formData.type === 'Online' ? formData.location : undefined
+            meetLink: (formData.type === 'Online' || formData.type === 'Hybrid') ? formData.location : undefined // Logic note: form uses 'location' state field for both. If Hybrid, we might need TWO fields? 
+            // Wait, currently formData.location is used for EITHER link OR room. 
+            // If Hybrid, we need BOTH.
+            // I need to add a separate `meetLink` field to formData to support Hybrid properly where user inputs BOTH room and link.
+            // Let's refactor formData slightly in this step or next. 
+            // Actually, let's look at the existing state. `formData` has `location`. It implies one field. 
+            // If Hybrid, I should add `meetLink` to formData.
+
+            // Correction: I should update formData structure first.
+            // But let's see if I can do it in one go.
+            // I will add `meetLink` to formData in the next chunk or this one if extends.
+
+            // Let's defer this block replacement until I fix the state structure.
+            // I'll skip this chunk for a moment and replace formData state definition FIRST.
+
+            // Re-evaluating plan: 
+            // 1. Update formData to have `meetLink` field explicitly.
+            // 2. Update form inputs to bind to `location` (room) and `meetLink` (url).
+            // 3. Update handleSave to map these correctly.
+
+            // Let's do a larger replace for the State definition.
         };
 
         if (isEditing && editId) {
@@ -173,7 +197,7 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
                 if (res.ok) {
                     const savedMeeting = await res.json();
                     setMeetings(meetings.map(m => m.id === editId ? safeMeeting(savedMeeting) : m));
-                    alert('Meeting updated successfully!');
+                    setNotification({ show: true, type: 'success', message: 'Meeting updated successfully!' });
                 }
             } catch (err) {
                 console.error(err);
@@ -189,7 +213,7 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
                 if (res.ok) {
                     const savedMeeting = await res.json();
                     setMeetings([...meetings, safeMeeting(savedMeeting)]);
-                    alert('Meeting scheduled & invitations sent!');
+                    setNotification({ show: true, type: 'success', message: 'Meeting scheduled & invitations sent!' });
                 }
             } catch (err) {
                 console.error(err);
@@ -212,7 +236,7 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
     };
 
     const resetForm = () => {
-        setFormData({ title: '', date: '', startTime: '', endTime: '', host: '', type: 'Online', location: '', description: '' });
+        setFormData({ title: '', date: '', startTime: '', endTime: '', host: '', type: 'Online', location: '', meetLink: '', description: '' });
         setInvitedEmails([]);
         setInviteEmail('');
         setIsEditing(false);
@@ -225,6 +249,12 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
 
     return (
         <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
+            <PopupNotification
+                isOpen={notification.show}
+                type={notification.type}
+                message={notification.message}
+                onClose={() => setNotification({ ...notification, show: false })}
+            />
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4">
                 <div>
@@ -272,7 +302,9 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide
-                                            ${meeting.type === 'Online' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-orange-50 text-orange-600 border-orange-100'}
+                                            ${meeting.type === 'Online' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
+                                                meeting.type === 'Hybrid' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                                                    'bg-orange-50 text-orange-600 border-orange-100'}
                                         `}>
                                             {meeting.type}
                                         </span>
@@ -399,34 +431,47 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
                                     <select
                                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-600"
                                         value={formData.type}
-                                        onChange={e => setFormData({ ...formData, type: e.target.value as 'Online' | 'Offline' })}
+                                        onChange={e => setFormData({ ...formData, type: e.target.value as 'Online' | 'Offline' | 'Hybrid' })}
                                     >
                                         <option value="Online">Online Video</option>
                                         <option value="Offline">In-Person</option>
+                                        <option value="Hybrid">Hybrid (In-Person + Online)</option>
                                     </select>
                                 </div>
                             </div>
 
-                            {/* Location */}
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">
-                                    {formData.type === 'Online' ? 'Meeting Link' : 'Room Location'}
-                                </label>
-                                <div className="relative">
-                                    {formData.type === 'Online' ? (
-                                        <Video size={18} className="absolute left-3.5 top-3 text-slate-400" />
-                                    ) : (
+                            {/* Location & Link - Conditional */}
+                            {(formData.type === 'Offline' || formData.type === 'Hybrid') && (
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Room / Location</label>
+                                    <div className="relative">
                                         <MapPin size={18} className="absolute left-3.5 top-3 text-slate-400" />
-                                    )}
-                                    <input
-                                        required
-                                        placeholder={formData.type === 'Online' ? 'Paste Google Meet / Zoom link here' : 'e.g. Meeting Room A, 2nd Floor'}
-                                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600"
-                                        value={formData.location}
-                                        onChange={e => setFormData({ ...formData, location: e.target.value })}
-                                    />
+                                        <input
+                                            required
+                                            placeholder="e.g. Meeting Room A, 2nd Floor"
+                                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600 mb-4"
+                                            value={formData.location}
+                                            onChange={e => setFormData({ ...formData, location: e.target.value })}
+                                        />
+                                    </div>
                                 </div>
-                            </div>
+                            )}
+
+                            {(formData.type === 'Online' || formData.type === 'Hybrid') && (
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Online Meeting Link</label>
+                                    <div className="relative">
+                                        <Video size={18} className="absolute left-3.5 top-3 text-slate-400" />
+                                        <input
+                                            required
+                                            placeholder="Paste Google Meet / Zoom link here"
+                                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600"
+                                            value={formData.meetLink}
+                                            onChange={e => setFormData({ ...formData, meetLink: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Email Invites */}
                             <div>
@@ -548,12 +593,13 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
                                     <div className="w-8 flex justify-center pt-0.5"><MapPin className="text-slate-400" size={20} /></div>
                                     <div>
                                         <p className="font-semibold text-slate-700 text-sm">Location</p>
-                                        {selectedMeeting.type === 'Online' ? (
-                                            <a href={selectedMeeting.meetLink} target="_blank" className="text-sm text-indigo-600 hover:underline break-all block">
+                                        {(selectedMeeting.type === 'Offline' || selectedMeeting.type === 'Hybrid') && (
+                                            <p className="text-sm text-slate-600">{selectedMeeting.location}</p>
+                                        )}
+                                        {(selectedMeeting.type === 'Online' || selectedMeeting.type === 'Hybrid') && selectedMeeting.meetLink && (
+                                            <a href={selectedMeeting.meetLink} target="_blank" className="text-sm text-indigo-600 hover:underline break-all block mt-0.5">
                                                 {selectedMeeting.meetLink}
                                             </a>
-                                        ) : (
-                                            <p className="text-sm text-slate-600">{selectedMeeting.location}</p>
                                         )}
                                     </div>
                                 </div>
@@ -589,7 +635,34 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
                                 </div>
                             </div>
 
-                            <div className="mt-8">
+                            <div className="mt-8 space-y-3">
+                                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1"><CalendarIcon size={12} /> Add to Calendar</p>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => {
+                                                const text = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:${selectedMeeting.title}\nDESCRIPTION:${selectedMeeting.description}\nLOCATION:${selectedMeeting.type === 'Online' ? selectedMeeting.meetLink : selectedMeeting.location}\nDTSTART:${new Date(`${selectedMeeting.date}T${selectedMeeting.time.split(' - ')[0]}`).toISOString().replace(/[-:]/g, '').split('.')[0]}Z\nDTEND:${new Date(`${selectedMeeting.date}T${selectedMeeting.time.split(' - ')[1]}`).toISOString().replace(/[-:]/g, '').split('.')[0]}Z\nEND:VEVENT\nEND:VCALENDAR`;
+                                                const blob = new Blob([text], { type: 'text/calendar' });
+                                                const url = window.URL.createObjectURL(blob);
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                a.download = `${selectedMeeting.title}.ics`;
+                                                a.click();
+                                            }}
+                                            className="flex-1 py-2 bg-white border border-slate-200 hover:bg-white hover:border-slate-300 text-slate-600 font-bold rounded-lg text-xs transition-all shadow-sm"
+                                        >
+                                            Outlook / Apple
+                                        </button>
+                                        <a
+                                            href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(selectedMeeting.title)}&details=${encodeURIComponent(selectedMeeting.description)}&location=${encodeURIComponent(selectedMeeting.type === 'Online' ? (selectedMeeting.meetLink || 'Online') : selectedMeeting.location)}&dates=${new Date(`${selectedMeeting.date}T${selectedMeeting.time.split(' - ')[0]}`).toISOString().replace(/[-:]/g, '').split('.')[0]}Z/${new Date(`${selectedMeeting.date}T${selectedMeeting.time.split(' - ')[1]}`).toISOString().replace(/[-:]/g, '').split('.')[0]}Z`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="flex-1 py-2 bg-white border border-slate-200 hover:bg-white hover:border-slate-300 text-blue-600 font-bold rounded-lg text-xs transition-all shadow-sm text-center flex items-center justify-center"
+                                        >
+                                            Google Calendar
+                                        </a>
+                                    </div>
+                                </div>
                                 <button
                                     onClick={() => setSelectedMeeting(null)}
                                     className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all"
@@ -611,7 +684,7 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
                                                     const updatedMeeting = { ...selectedMeeting, guests: data.guests };
                                                     setMeetings(meetings.map(m => m.id === selectedMeeting.id ? updatedMeeting : m));
                                                     setSelectedMeeting(updatedMeeting);
-                                                    alert("You have joined this event!");
+                                                    setNotification({ show: true, type: 'success', message: "You have joined this event!" });
                                                 }
                                             } catch (err) {
                                                 console.error(err);

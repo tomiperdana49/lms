@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { Briefcase, Send, Clock, DollarSign, Building, AlertTriangle, MapPin, CreditCard, Info } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Role } from '../types';
+import PopupNotification from './PopupNotification';
 
 type RequestStatus = 'PENDING_SUPERVISOR' | 'PENDING_HR' | 'APPROVED' | 'REJECTED';
 
@@ -28,6 +29,7 @@ const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) =
     // --- State ---
     const [requests, setRequests] = useState<TrainingRequest[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [notification, setNotification] = useState<{ show: boolean; type: 'success' | 'error'; message: string }>({ show: false, type: 'success', message: '' });
 
     // Form State
     const [formData, setFormData] = useState({
@@ -93,7 +95,7 @@ const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) =
                 }
             } catch (err) {
                 console.error("Upload failed", err);
-                alert("Gagal mengupload file.");
+                setNotification({ show: true, type: 'error', message: "Gagal mengupload file." });
             }
         }
     };
@@ -102,7 +104,7 @@ const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) =
         e.preventDefault();
 
         if (isBondRequired && !formData.agreedToBond) {
-            alert("Anda wajib menyetujui Ikatan Dinas untuk nominal ini.");
+            setNotification({ show: true, type: 'error', message: "Anda wajib menyetujui Ikatan Dinas untuk nominal ini." });
             return;
         }
 
@@ -132,11 +134,11 @@ const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) =
                     paymentMethod: 'REIMBURSEMENT', bankName: '', accountNumber: '', reason: '',
                     agreedToBond: false, agreedToPenalty: false, evidenceUrl: ''
                 });
-                alert("Pengajuan berhasil dikirim! Silakan menunggu persetujuan Leader.");
+                setNotification({ show: true, type: 'success', message: "Pengajuan berhasil dikirim! Silakan menunggu persetujuan Leader." });
             }
         } catch (err) {
             console.error(err);
-            alert("Gagal mengirim pengajuan.");
+            setNotification({ show: true, type: 'error', message: "Gagal mengirim pengajuan." });
         } finally {
             setIsLoading(false);
         }
@@ -164,7 +166,12 @@ const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) =
 
     return (
         <div className="max-w-6xl mx-auto py-8 grid lg:grid-cols-12 gap-8 animate-fade-in">
-
+            <PopupNotification
+                isOpen={notification.show}
+                type={notification.type}
+                message={notification.message}
+                onClose={() => setNotification({ ...notification, show: false })}
+            />
             {/* --- Left Code: Form --- */}
             <div className="lg:col-span-7 space-y-6">
                 <div className="flex items-center gap-3">

@@ -2,6 +2,7 @@ import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { BookOpen, Plus, ArrowLeft, Search, Filter, Book, Trophy, Calendar, Library, Trash2 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry } from '../types';
+import PopupNotification from './PopupNotification';
 
 interface ReadingLogPageProps {
     user: { name: string; email: string };
@@ -11,6 +12,7 @@ interface ReadingLogPageProps {
 const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
     const [logs, setLogs] = useState<ReadingLogEntry[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [notification, setNotification] = useState<{ show: boolean; type: 'success' | 'error'; message: string }>({ show: false, type: 'success', message: '' });
 
     // --- Stats State ---
     const [yearReadCount, setYearReadCount] = useState(0);
@@ -43,7 +45,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
             }
         } catch (err) {
             console.error("Failed to delete log", err);
-            alert("Failed to delete log.");
+            setNotification({ show: true, type: 'error', message: "Failed to delete log." });
         }
     };
 
@@ -110,14 +112,14 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                 if (res.ok) {
                     const result = await res.json();
                     setFormData(prev => ({ ...prev, evidenceUrl: result.fileUrl }));
-                    alert("Foto berhasil diupload!");
+                    setNotification({ show: true, type: 'success', message: "Foto berhasil diupload!" });
                 } else {
                     const errText = await res.text();
-                    alert(`Upload gagal. Status: ${res.status} ${res.statusText} - ${errText}`);
+                    setNotification({ show: true, type: 'error', message: `Upload gagal. Status: ${res.status} ${res.statusText} - ${errText}` });
                 }
             } catch (err) {
                 console.error("Upload error:", err);
-                alert(`Error saat upload foto: ${(err as Error).message}`);
+                setNotification({ show: true, type: 'error', message: `Error saat upload foto: ${(err as Error).message}` });
             }
         }
     };
@@ -180,7 +182,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         if (formData.action === 'Start') {
             const activeBook = logs.find(log => log.userName === user.name && log.status === 'Reading');
             if (activeBook) {
-                alert(`You are currently reading "${activeBook.title}". Please finish it before starting a new one.`);
+                setNotification({ show: true, type: 'error', message: `You are currently reading "${activeBook.title}". Please finish it before starting a new one.` });
                 setIsLoading(false);
                 return;
             }
@@ -200,7 +202,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
             );
 
             if (recentDuplicate) {
-                alert(`You have already completed "${recentDuplicate.title}" on ${new Date(recentDuplicate.date).toLocaleDateString()}. You cannot read the same book within 6 months.`);
+                setNotification({ show: true, type: 'error', message: `You have already completed "${recentDuplicate.title}" on ${new Date(recentDuplicate.date).toLocaleDateString()}. You cannot read the same book within 6 months.` });
                 setIsLoading(false);
                 return;
             }
@@ -277,11 +279,11 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
                 setLogs(updatedLogs);
                 setFormData({ ...formData, title: '', link: '', review: '', duration: 0 }); // Reset some fields
-                alert("Reading log saved!");
+                setNotification({ show: true, type: 'success', message: "Reading log saved!" });
             }
         } catch (err) {
             console.error("Failed to save log", err);
-            alert("Error saving log.");
+            setNotification({ show: true, type: 'error', message: "Error saving log." });
         } finally {
             setIsLoading(false);
         }
@@ -289,6 +291,12 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
     return (
         <div className="max-w-6xl mx-auto space-y-6">
+            <PopupNotification
+                isOpen={notification.show}
+                type={notification.type}
+                message={notification.message}
+                onClose={() => setNotification({ ...notification, show: false })}
+            />
             <div className="flex items-center justify-between">
                 <button onClick={onBack} className="text-sm text-slate-500 hover:text-blue-600 flex items-center gap-1 transition-colors">
                     <ArrowLeft size={14} /> Back to Dashboard

@@ -22,8 +22,8 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName }: DashboardH
             bg: 'bg-orange-50'
         },
         {
-            title: 'Online Courses',
-            subtitle: 'Video & quiz',
+            title: 'Modul Online',
+            subtitle: 'Modul & Quiz',
             icon: <Video size={24} />,
             page: 'courses' as Page,
             color: 'text-blue-600',
@@ -94,7 +94,7 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName }: DashboardH
 
                 {/* --- Left Column: Compact Calendar (3 cols) --- */}
                 <div className="hidden lg:block lg:col-span-3 h-full overflow-hidden">
-                    <LMSCalendar compact={true} userEmail={userEmail} />
+                    <LMSCalendar compact={true} userEmail={userEmail} userRole={userRole} />
                 </div>
 
                 {/* --- Center Column: Features Menu (6 cols) --- */}

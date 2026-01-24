@@ -1,7 +1,8 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { Users, UserPlus, Mail, Lock, Shield, ArrowLeft, Trophy, AlertCircle } from 'lucide-react';
+import { Users, UserPlus, Mail, Lock, Shield, ArrowLeft, Trophy, AlertCircle, Edit } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Role, User, ReadingLogEntry } from '../types';
+import PopupNotification from './PopupNotification';
 
 interface UserManagementProps {
     userRole: Role;
@@ -13,6 +14,8 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
     const [userLogs, setUserLogs] = useState<Record<string, ReadingLogEntry[]>>({});
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [notification, setNotification] = useState<{ show: boolean; type: 'success' | 'error'; message: string }>({ show: false, type: 'success', message: '' });
+    const [editingUser, setEditingUser] = useState<User | null>(null);
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -49,24 +52,55 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${API_BASE_URL}/api/users`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
-            });
-            if (res.ok) {
-                const newUser = await res.json();
-                setUsers([...users, newUser]);
-                setIsFormOpen(false);
-                setFormData({ name: '', email: '', password: '', role: 'STAFF' });
-                alert('User created successfully!');
+            if (editingUser) {
+                // UPDATE
+                const res = await fetch(`${API_BASE_URL}/api/users/${editingUser.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                if (res.ok) {
+                    const updated = await res.json();
+                    setUsers(users.map(u => u.id === updated.id ? updated : u));
+                    setIsFormOpen(false);
+                    setEditingUser(null);
+                    setFormData({ name: '', email: '', password: '', role: 'STAFF' });
+                    setNotification({ show: true, type: 'success', message: 'User updated successfully!' });
+                } else {
+                    setNotification({ show: true, type: 'error', message: 'Failed to update user' });
+                }
             } else {
-                const err = await res.json();
-                alert(err.message || 'Failed to create user');
+                // CREATE
+                const res = await fetch(`${API_BASE_URL}/api/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                if (res.ok) {
+                    const newUser = await res.json();
+                    setUsers([...users, newUser]);
+                    setIsFormOpen(false);
+                    setFormData({ name: '', email: '', password: '', role: 'STAFF' });
+                    setNotification({ show: true, type: 'success', message: 'User created successfully!' });
+                } else {
+                    const err = await res.json();
+                    setNotification({ show: true, type: 'error', message: err.message || 'Failed to create user' });
+                }
             }
         } catch (error) {
             console.error(error);
         }
+    };
+
+    const handleEdit = (user: User) => {
+        setEditingUser(user);
+        setFormData({
+            name: user.name,
+            email: user.email,
+            password: '', // Keep empty or handle password update logic separately (optional)
+            role: user.role
+        });
+        setIsFormOpen(true);
     };
 
     const getIncentiveStatus = (userName: string) => {
@@ -100,6 +134,12 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
 
     return (
         <div className="max-w-6xl mx-auto py-6">
+            <PopupNotification
+                isOpen={notification.show}
+                type={notification.type}
+                message={notification.message}
+                onClose={() => setNotification({ ...notification, show: false })}
+            />
             <button onClick={onBack} className="text-sm text-slate-500 hover:text-blue-600 flex items-center gap-1 mb-4 transition-colors">
                 <ArrowLeft size={14} /> Back to Dashboard
             </button>
@@ -126,6 +166,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                     <div className="w-32 text-center">Role</div>
                     <div className="w-32 text-center">Books Read</div>
                     <div className="w-40 text-center">Incentive Status</div>
+                    <div className="w-16 text-center">Edit</div>
                 </div>
                 <div className="divide-y divide-slate-50">
                     {users.map((u) => {
@@ -158,6 +199,15 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                         </div>
                                     )}
                                 </div>
+                                <div className="w-16 flex justify-center">
+                                    <button
+                                        onClick={() => handleEdit(u)}
+                                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        title="Edit User"
+                                    >
+                                        <Edit size={18} />
+                                    </button>
+                                </div>
                             </div>
                         );
                     })}
@@ -169,8 +219,8 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                            <h2 className="font-bold text-lg text-slate-800">Create New User</h2>
-                            <button onClick={() => setIsFormOpen(false)} className="text-slate-400 hover:text-slate-600">Close</button>
+                            <h2 className="font-bold text-lg text-slate-800">{editingUser ? 'Edit User' : 'Create New User'}</h2>
+                            <button onClick={() => { setIsFormOpen(false); setEditingUser(null); }} className="text-slate-400 hover:text-slate-600">Close</button>
                         </div>
                         <form onSubmit={handleSubmit} className="p-6 space-y-4">
                             <div>
@@ -224,7 +274,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                 </div>
                             </div>
                             <button className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-lg shadow-purple-900/20 mt-4">
-                                Create Account
+                                {editingUser ? 'Update User' : 'Create Account'}
                             </button>
                         </form>
                     </div>

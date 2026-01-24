@@ -10,6 +10,7 @@ import {
     TrendingUp,
     AlertCircle,
     ChevronRight,
+    Award
 } from 'lucide-react';
 import type { Page, User, ReadingLogEntry } from '../types';
 import { API_BASE_URL } from '../config';
@@ -17,7 +18,11 @@ import UserManagement from './UserManagement';
 import AdminReadingLog from './AdminReadingLog';
 import InternalMeetingList from './InternalMeetingList';
 import AdminCourseManager from './AdminCourseManager';
+
 import TrainingManager from './TrainingManager';
+import HRReportGenerator from './HRReportGenerator';
+import IncentiveManager from './IncentiveManager';
+import LMSCalendar from './LMSCalendar';
 
 interface AdminDashboardProps {
     user: User;
@@ -25,7 +30,7 @@ interface AdminDashboardProps {
     onLogout: () => void;
 }
 
-type AdminView = 'overview' | 'users' | 'logs' | 'training' | 'meetings' | 'courses';
+type AdminView = 'overview' | 'users' | 'logs' | 'training' | 'meetings' | 'courses' | 'reports' | 'incentives' | 'calendar';
 
 const SidebarItem = ({ view, icon: Icon, label, currentView, setCurrentView }: { view: AdminView, icon: ElementType, label: string, currentView: AdminView, setCurrentView: (v: AdminView) => void }) => (
     <button
@@ -127,6 +132,12 @@ const AdminDashboard = ({ user, onLogout }: AdminDashboardProps) => {
                 return <AdminCourseManager />;
             case 'training':
                 return <TrainingManager />;
+            case 'reports':
+                return <HRReportGenerator />;
+            case 'incentives':
+                return <IncentiveManager />;
+            case 'calendar':
+                return <LMSCalendar compact={false} userEmail={user.email} userRole={user.role} />;
             case 'overview':
             default:
                 return (
@@ -167,28 +178,39 @@ const AdminDashboard = ({ user, onLogout }: AdminDashboardProps) => {
                                 </div>
                             </div>
 
-                            {/* Notifications / Quick Actions */}
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-                                <h3 className="text-lg font-bold text-slate-800 mb-4">Quick Actions</h3>
-                                <div className="space-y-3">
-                                    <button
-                                        onClick={() => setCurrentView('meetings')}
-                                        className="w-full text-left p-3 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors font-medium flex justify-between items-center group">
-                                        Schedule Meeting
-                                        <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </button>
-                                    <button
-                                        onClick={() => setCurrentView('users')}
-                                        className="w-full text-left p-3 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-medium flex justify-between items-center group">
-                                        Add New Staff
-                                        <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </button>
-                                    <button
-                                        onClick={() => setCurrentView('training')}
-                                        className="w-full text-left p-3 rounded-xl bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors font-medium flex justify-between items-center group">
-                                        Review Training Requests
-                                        <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </button>
+                            {/* Right Column: Quick Actions & Calendar */}
+                            <div className="space-y-6">
+                                {/* Notifications / Quick Actions */}
+                                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                                    <h3 className="text-lg font-bold text-slate-800 mb-4">Quick Actions</h3>
+                                    <div className="space-y-3">
+                                        <button
+                                            onClick={() => setCurrentView('meetings')}
+                                            className="w-full text-left p-3 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors font-medium flex justify-between items-center group">
+                                            Schedule Meeting
+                                            <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentView('users')}
+                                            className="w-full text-left p-3 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-medium flex justify-between items-center group">
+                                            Add New Staff
+                                            <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentView('training')}
+                                            className="w-full text-left p-3 rounded-xl bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors font-medium flex justify-between items-center group">
+                                            Review Training Requests
+                                            <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Calendar Widget */}
+                                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 overflow-hidden">
+                                    <h3 className="text-lg font-bold text-slate-800 mb-4">Training Calendar</h3>
+                                    <div className="h-[300px]">
+                                        <LMSCalendar compact={true} userEmail={user.email} userRole={user.role} />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -210,13 +232,16 @@ const AdminDashboard = ({ user, onLogout }: AdminDashboardProps) => {
                 <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                     <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 mt-4">Main</p>
                     <SidebarItem view="overview" icon={LayoutDashboard} label="Overview" currentView={currentView} setCurrentView={setCurrentView} />
+                    <SidebarItem view="calendar" icon={Calendar} label="Calendar" currentView={currentView} setCurrentView={setCurrentView} />
 
                     <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 mt-6">Management</p>
                     <SidebarItem view="users" icon={Users} label="User Management" currentView={currentView} setCurrentView={setCurrentView} />
                     <SidebarItem view="courses" icon={BookOpen} label="Course Management" currentView={currentView} setCurrentView={setCurrentView} />
                     <SidebarItem view="logs" icon={FileText} label="Reading Logs" currentView={currentView} setCurrentView={setCurrentView} />
                     <SidebarItem view="training" icon={FileText} label="Training Requests" currentView={currentView} setCurrentView={setCurrentView} />
-                    <SidebarItem view="meetings" icon={Calendar} label="Internal Meetings" currentView={currentView} setCurrentView={setCurrentView} />
+                    <SidebarItem view="reports" icon={TrendingUp} label="HR Reports" currentView={currentView} setCurrentView={setCurrentView} />
+                    <SidebarItem view="incentives" icon={Award} label="Incentives" currentView={currentView} setCurrentView={setCurrentView} />
+                    <SidebarItem view="meetings" icon={Users} label="Internal Meetings" currentView={currentView} setCurrentView={setCurrentView} />
                 </nav>
 
                 <div className="p-4 border-t border-slate-100">

@@ -1,29 +1,123 @@
 import { useState, useEffect } from 'react';
 import { Edit, Trash2, Plus, GripVertical, Save, X, BookOpen, Clock } from 'lucide-react';
 import { API_BASE_URL } from '../config';
-import type { Course, Module } from '../types';
+import type { Course, Module, Quiz, QuizResult } from '../types';
 
 const AdminCourseManager = () => {
+    // Helper to render Quiz Editor
+    const renderQuizEditor = (quiz: Quiz | undefined, onUpdate: (q: Quiz) => void, onDelete?: () => void) => {
+        if (!quiz) return null;
+        return (
+            <div className="mt-4 space-y-4 border-l-2 border-slate-200 pl-4">
+                <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-bold text-slate-700 text-sm uppercase">Quiz Questions</h4>
+                    {onDelete && (
+                        <button onClick={onDelete} className="text-red-500 text-xs hover:underline">Delete Quiz</button>
+                    )}
+                </div>
+                {quiz.questions.map((q, qIdx) => (
+                    <div key={q.id} className="bg-slate-100 p-4 rounded-xl space-y-3">
+                        <div className="flex justify-between items-start gap-2">
+                            <div className="flex-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">Question {qIdx + 1}</label>
+                                <input
+                                    value={q.question}
+                                    onChange={(e) => {
+                                        const newQuestions = [...quiz.questions];
+                                        newQuestions[qIdx].question = e.target.value;
+                                        onUpdate({ ...quiz, questions: newQuestions });
+                                    }}
+                                    className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-200 text-sm font-medium"
+                                    placeholder="Enter question here..."
+                                />
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const newQuestions = quiz.questions.filter(qu => qu.id !== q.id);
+                                    onUpdate({ ...quiz, questions: newQuestions });
+                                }}
+                                className="text-red-400 hover:text-red-600 p-1"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {q.options.map((opt, optIdx) => (
+                                <div key={optIdx} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${q.correctAnswer === optIdx ? 'bg-green-50 border-green-200' : 'bg-white border-slate-200'}`}>
+                                    <input
+                                        type="radio"
+                                        name={`correct-${q.id}`}
+                                        checked={q.correctAnswer === optIdx}
+                                        onChange={() => {
+                                            const newQuestions = [...quiz.questions];
+                                            newQuestions[qIdx].correctAnswer = optIdx;
+                                            onUpdate({ ...quiz, questions: newQuestions });
+                                        }}
+                                        className="accent-green-600 w-4 h-4 cursor-pointer"
+                                    />
+                                    <input
+                                        value={opt}
+                                        onChange={(e) => {
+                                            const newQuestions = [...quiz.questions];
+                                            newQuestions[qIdx].options[optIdx] = e.target.value;
+                                            onUpdate({ ...quiz, questions: newQuestions });
+                                        }}
+                                        className="flex-1 px-3 py-1.5 rounded-md border border-slate-200 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all bg-white"
+                                        placeholder={`Option ${String.fromCharCode(65 + optIdx)}`}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+                <button
+                    onClick={() => {
+                        onUpdate({
+                            ...quiz,
+                            questions: [
+                                ...quiz.questions,
+                                {
+                                    id: Date.now(),
+                                    question: '',
+                                    options: ['', '', '', ''],
+                                    correctAnswer: 0
+                                }
+                            ]
+                        });
+                    }}
+                    className="w-full py-2 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 font-bold hover:border-blue-400 hover:text-blue-500 transition-colors"
+                >
+                    + Add Question
+                </button>
+            </div>
+        );
+    };
+
     const [courses, setCourses] = useState<Course[]>([]);
     const [editingCourse, setEditingCourse] = useState<Course | null>(null);
     const [editorTab, setEditorTab] = useState<'content' | 'grades'>('content');
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [progressData, setProgressData] = useState<Record<string, any>[]>([]);
+    const [allQuizResults, setAllQuizResults] = useState<QuizResult[]>([]);
 
     // --- Fetch Data from API ---
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [resCourses, resProgress] = await Promise.all([
+                const [resCourses, resProgress, resQuiz] = await Promise.all([
                     fetch(`${API_BASE_URL}/api/courses`),
-                    fetch(`${API_BASE_URL}/api/progress`)
+                    fetch(`${API_BASE_URL}/api/progress`),
+                    fetch(`${API_BASE_URL}/api/quiz/all-results`)
                 ]);
                 const coursesData = await resCourses.json();
                 const progressJson = await resProgress.json();
+                const quizJson = resQuiz.ok ? await resQuiz.json() : [];
 
                 setCourses(coursesData);
                 setProgressData(progressJson);
+                setAllQuizResults(quizJson);
             } catch (err) {
                 console.error("Failed to load data:", err);
             }
@@ -112,7 +206,7 @@ const AdminCourseManager = () => {
                     <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                         <div className="flex flex-col">
                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                {courses.find(c => c.id === editingCourse.id) ? 'Managing Course' : 'Creating Course'}
+                                {courses.find(c => c.id === editingCourse.id) ? 'Managing Modul' : 'Creating Modul'}
                             </span>
                             <h2 className="font-bold text-xl text-slate-800">{editingCourse.title}</h2>
                         </div>
@@ -148,7 +242,7 @@ const AdminCourseManager = () => {
                                     </h3>
                                     <div className="grid grid-cols-1 gap-4">
                                         <div>
-                                            <label className="block text-sm font-semibold text-slate-700 mb-1">Course Title</label>
+                                            <label className="block text-sm font-semibold text-slate-700 mb-1">Nama Modul</label>
                                             <input
                                                 value={editingCourse.title}
                                                 onChange={e => setEditingCourse({ ...editingCourse, title: e.target.value })}
@@ -175,23 +269,23 @@ const AdminCourseManager = () => {
                                                 />
                                                 <Clock size={16} className="absolute left-3.5 top-3 text-slate-400" />
                                             </div>
-                                            <p className="text-xs text-slate-400 mt-1">This text will be displayed on the course card.</p>
+                                            <p className="text-xs text-slate-400 mt-1">This text will be displayed on the module card.</p>
                                         </div>
                                     </div>
                                 </section>
 
-                                {/* 2. Modules */}
+                                {/* 2. Courses (Modules in code) */}
                                 <section className="space-y-4">
                                     <div className="flex items-center justify-between">
                                         <h3 className="font-bold text-slate-700 flex items-center gap-2">
                                             <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">2</span>
-                                            Modules & Lessons
+                                            Courses / Materi
                                         </h3>
                                         <button
                                             onClick={() => {
                                                 const newMod: Module = {
                                                     id: Date.now(),
-                                                    title: 'New Module',
+                                                    title: 'New Course',
                                                     duration: '05:00',
                                                     videoType: 'youtube',
                                                     videoId: '',
@@ -204,7 +298,7 @@ const AdminCourseManager = () => {
                                             }}
                                             className="text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
                                         >
-                                            <Plus size={16} /> Add Module
+                                            <Plus size={16} /> Add Course
                                         </button>
                                     </div>
 
@@ -223,7 +317,7 @@ const AdminCourseManager = () => {
                                                                 newMods[idx] = { ...mod, title: e.target.value };
                                                                 setEditingCourse({ ...editingCourse, modules: newMods });
                                                             }}
-                                                            placeholder="Module Title"
+                                                            placeholder="Course/Materi Title"
                                                             className="px-3 py-2 rounded-lg border border-slate-200 text-sm"
                                                         />
                                                         <div className="flex gap-2">
@@ -265,81 +359,39 @@ const AdminCourseManager = () => {
 
                                                 {/* Quiz Section for Module */}
                                                 <div className="pl-8 pt-2 border-t border-slate-200/50">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quiz</span>
-                                                        {mod.quiz ? (
-                                                            <div className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-lg text-xs font-medium border border-green-100">
-                                                                <span>{mod.quiz.questions.length} Questions</span>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        if (confirm('Delete this quiz?')) {
-                                                                            const newMods = [...editingCourse.modules];
-                                                                            delete newMods[idx].quiz;
-                                                                            setEditingCourse({ ...editingCourse, modules: newMods });
-                                                                        }
-                                                                    }}
-                                                                    className="hover:text-red-600 ml-2"
-                                                                >
-                                                                    <X size={12} />
-                                                                </button>
-                                                            </div>
-                                                        ) : (
+
+                                                    {/* Quiz Editor for Course */}
+                                                    {mod.quiz ? (
+                                                        renderQuizEditor(
+                                                            mod.quiz,
+                                                            (updatedQuiz) => {
+                                                                const newMods = [...editingCourse.modules];
+                                                                newMods[idx].quiz = updatedQuiz;
+                                                                setEditingCourse({ ...editingCourse, modules: newMods });
+                                                            },
+                                                            () => {
+                                                                if (confirm('Delete this quiz?')) {
+                                                                    const newMods = [...editingCourse.modules];
+                                                                    delete newMods[idx].quiz;
+                                                                    setEditingCourse({ ...editingCourse, modules: newMods });
+                                                                }
+                                                            }
+                                                        )
+                                                    ) : (
+                                                        <div className="mt-2">
                                                             <button
                                                                 onClick={() => {
                                                                     const newMods = [...editingCourse.modules];
                                                                     newMods[idx].quiz = {
                                                                         id: Date.now(),
-                                                                        title: 'Quiz',
+                                                                        title: 'Quiz for ' + mod.title,
                                                                         questions: []
                                                                     };
                                                                     setEditingCourse({ ...editingCourse, modules: newMods });
                                                                 }}
-                                                                className="text-xs bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded text-slate-700 transition-colors"
+                                                                className="text-xs bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg text-indigo-700 font-medium transition-colors border border-indigo-100 flex items-center gap-1"
                                                             >
-                                                                + Create Quiz
-                                                            </button>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Quiz Editor Inline */}
-                                                    {mod.quiz && (
-                                                        <div className="mt-2 space-y-2 pl-4 border-l-2 border-green-100">
-                                                            {mod.quiz.questions.map((q, qIdx) => (
-                                                                <div key={q.id} className="text-sm text-slate-600 flex justify-between">
-                                                                    <span>{qIdx + 1}. {q.question}</span>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            const newMods = [...editingCourse.modules];
-                                                                            if (newMods[idx].quiz) {
-                                                                                newMods[idx].quiz.questions = newMods[idx].quiz.questions.filter(qu => qu.id !== q.id);
-                                                                                setEditingCourse({ ...editingCourse, modules: newMods });
-                                                                            }
-                                                                        }}
-                                                                        className="text-red-400 hover:text-red-600"
-                                                                    >
-                                                                        <X size={12} />
-                                                                    </button>
-                                                                </div>
-                                                            ))}
-                                                            <button
-                                                                onClick={() => {
-                                                                    const questionText = prompt('Enter Question:');
-                                                                    if (questionText) {
-                                                                        const newMods = [...editingCourse.modules];
-                                                                        if (newMods[idx].quiz) {
-                                                                            newMods[idx].quiz.questions.push({
-                                                                                id: Date.now(),
-                                                                                question: questionText,
-                                                                                options: ['True', 'False'],
-                                                                                correctAnswer: 0
-                                                                            });
-                                                                            setEditingCourse({ ...editingCourse, modules: newMods });
-                                                                        }
-                                                                    }
-                                                                }}
-                                                                className="text-xs text-blue-600 hover:underline"
-                                                            >
-                                                                + Add Question (Simple)
+                                                                + Add Quiz
                                                             </button>
                                                         </div>
                                                     )}
@@ -347,6 +399,55 @@ const AdminCourseManager = () => {
                                             </div>
                                         ))}
                                     </div>
+                                </section>
+
+                                {/* 3. Final Assessment */}
+                                <section className="space-y-4 pt-4 border-t border-slate-200">
+                                    <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                                        <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">3</span>
+                                        Final Assessment (Evaluasi Akhir Modul)
+                                    </h3>
+
+                                    {!editingCourse.assessment ? (
+                                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-8 text-center">
+                                            <p className="text-slate-500 mb-4">No assessment created for this module yet.</p>
+                                            <button
+                                                onClick={() => setEditingCourse({
+                                                    ...editingCourse,
+                                                    assessment: {
+                                                        id: Date.now(),
+                                                        title: 'Final Assessment',
+                                                        questions: []
+                                                    }
+                                                })}
+                                                className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-blue-700 transition-colors"
+                                            >
+                                                Create Assessment
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                                            <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
+                                                <h4 className="font-bold text-lg text-slate-800">Assessment Questions</h4>
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm('Remove Assessment?')) {
+                                                            const upd = { ...editingCourse };
+                                                            delete upd.assessment;
+                                                            setEditingCourse(upd);
+                                                        }
+                                                    }}
+                                                    className="text-red-500 hover:text-red-700 font-medium text-sm"
+                                                >
+                                                    Remove Assessment
+                                                </button>
+                                            </div>
+                                            {renderQuizEditor(
+                                                editingCourse.assessment,
+                                                (updatedQuiz) => setEditingCourse({ ...editingCourse, assessment: updatedQuiz })
+                                            )}
+                                        </div>
+                                    )}
                                 </section>
                             </div>
                         ) : (
@@ -392,12 +493,24 @@ const AdminCourseManager = () => {
                                                             <tr key={record.userId} className="hover:bg-blue-50/50 transition-colors">
                                                                 <td className="p-4 font-medium text-slate-800 sticky left-0 bg-white hover:bg-blue-50/50 border-r border-slate-100">
                                                                     {record.userId}
+                                                                    {/* DEBUG Removed */}
                                                                 </td>
                                                                 {editingCourse.modules.map(mod => {
                                                                     const isCompleted = completedIds.includes(mod.id);
+                                                                    // Find score if available
+                                                                    const result = allQuizResults.find(r => r.studentId == record.userId && r.courseId == editingCourse.id && r.moduleId == mod.id);
+
+                                                                    // If we have a result, show score. If simply completed (e.g. video watch) and no quiz result found/needed, show Done?
+                                                                    // User req: "buat dalam bentuk angka skor".
+                                                                    // So if there is a quiz result, show score.
+
                                                                     return (
                                                                         <td key={mod.id} className="p-4 text-center border-l border-dashed border-slate-100">
-                                                                            {isCompleted ? (
+                                                                            {result ? (
+                                                                                <span className={`px-2 py-1 rounded text-xs font-bold ${result.score >= 60 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                                                    {result.score}
+                                                                                </span>
+                                                                            ) : isCompleted ? (
                                                                                 <span className="px-2 py-1 rounded text-xs font-bold bg-green-100 text-green-700">
                                                                                     Done
                                                                                 </span>
@@ -451,14 +564,14 @@ const AdminCourseManager = () => {
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
                 <div className="relative z-10 flex justify-between items-end">
                     <div>
-                        <h1 className="text-3xl font-bold mb-2">Course Management</h1>
-                        <p className="text-blue-100 max-w-xl">Create, edit, and manage training courses for your team. Track progress and update modules easily.</p>
+                        <h1 className="text-3xl font-bold mb-2">Manajemen Modul Online</h1>
+                        <p className="text-blue-100 max-w-xl">Create, edit, and manage training modules. Track progress.</p>
                     </div>
                     <button
                         onClick={handleAddNewCourse}
                         className="bg-white text-blue-600 px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg hover:bg-blue-50 transition-all"
                     >
-                        <Plus size={20} /> New Course
+                        <Plus size={20} /> New Modul
                     </button>
                 </div>
             </div>
@@ -471,7 +584,7 @@ const AdminCourseManager = () => {
 
                         <div className="flex justify-between items-start mb-4">
                             <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider">
-                                General
+                                Modul
                             </span>
                             <div className="flex gap-1">
                                 <button
@@ -502,7 +615,7 @@ const AdminCourseManager = () => {
                         <p className="text-slate-500 text-sm mb-4 line-clamp-2">{course.description}</p>
 
                         <div className="flex items-center justify-between text-sm text-slate-400 border-t border-slate-50 pt-4">
-                            <span>{course.modules.length} Modules</span>
+                            <span>{course.modules.length} Courses</span>
                             <span className="flex items-center gap-1">
                                 <GripVertical size={14} /> Reorder
                             </span>

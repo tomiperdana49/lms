@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { LogIn, Lock, Mail } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { User } from '../types';
+import PopupNotification from './PopupNotification';
 
 interface LoginPageProps {
     onLogin: (user: User) => void;
@@ -10,12 +11,17 @@ interface LoginPageProps {
 const LoginPage = ({ onLogin }: LoginPageProps) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    // Notification State
+    const [notification, setNotification] = useState<{
+        show: boolean;
+        type: 'success' | 'error';
+        message: string;
+    }>({ show: false, type: 'success', message: '' });
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        setError('');
         setIsLoading(true);
 
         try {
@@ -28,19 +34,44 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
             const data = await response.json();
 
             if (data.success) {
-                onLogin(data.user);
+                // Show Success Popup
+                setNotification({
+                    show: true,
+                    type: 'success',
+                    message: 'Login successful! Redirecting to dashboard...'
+                });
+
+                // Delay actual login action to let user see the popup
+                setTimeout(() => {
+                    onLogin(data.user);
+                }, 1500);
             } else {
-                setError(data.message || 'Login failed');
+                setNotification({
+                    show: true,
+                    type: 'error',
+                    message: data.message || 'Login failed. Please check your credentials.'
+                });
+                setIsLoading(false); // Only stop loading on error, keep loading on success until redirect
             }
         } catch {
-            setError('Unable to connect to server. Please try again.');
-        } finally {
+            setNotification({
+                show: true,
+                type: 'error',
+                message: 'Unable to connect to server. Please check your internet connection.'
+            });
             setIsLoading(false);
         }
     };
 
     return (
         <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+            <PopupNotification
+                isOpen={notification.show}
+                type={notification.type}
+                message={notification.message}
+                onClose={() => setNotification({ ...notification, show: false })}
+            />
+
             <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
                 <div className="bg-blue-600 p-8 text-center">
                     <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
@@ -52,12 +83,6 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
 
                 <div className="p-8">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        {error && (
-                            <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100 text-center">
-                                {error}
-                            </div>
-                        )}
-
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
                             <div className="relative">

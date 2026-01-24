@@ -58,6 +58,7 @@ export interface Course {
     studentCount: number;
     progress: number;
     modules: Module[];
+    assessment?: Quiz;
 }
 
 export interface QuizResult {
@@ -68,4 +69,21 @@ export interface QuizResult {
     moduleId: number;
     score: number;
     date: string;
+}
+
+export interface TrainingRequest {
+    id: number;
+    employeeName: string;
+    employeeRole: string;
+    title: string;
+    vendor: string;
+    cost: number;
+    date: string;
+    status: 'PENDING_SUPERVISOR' | 'PENDING_HR' | 'APPROVED' | 'REJECTED';
+    justification: string;
+    priority: 'High' | 'Medium' | 'Low';
+    location?: string;
+    division?: string;
+    rejectionReason?: string;
+    additionalCost?: number;
 }
