@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { Users, UserPlus, Mail, Lock, Shield, ArrowLeft, Trophy, AlertCircle, Edit } from 'lucide-react';
+import { Users, UserPlus, Mail, Lock, Shield, ArrowLeft, Edit } from 'lucide-react';
 import { API_BASE_URL } from '../config';
-import type { Role, User, ReadingLogEntry } from '../types';
+import type { Role, User } from '../types';
 import PopupNotification from './PopupNotification';
 
 interface UserManagementProps {
@@ -11,7 +11,6 @@ interface UserManagementProps {
 
 const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
     const [users, setUsers] = useState<User[]>([]);
-    const [userLogs, setUserLogs] = useState<Record<string, ReadingLogEntry[]>>({});
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [notification, setNotification] = useState<{ show: boolean; type: 'success' | 'error'; message: string }>({ show: false, type: 'success', message: '' });
@@ -26,25 +25,22 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [usersRes, logsRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/api/users`),
-                    fetch(`${API_BASE_URL}/api/logs`)
-                ]);
-                const usersData = await usersRes.json();
-                const logsData = await logsRes.json();
+                const res = await fetch(`${API_BASE_URL}/api/users`);
+                if (!res.ok) throw new Error('Failed to fetch users');
 
-                setUsers(usersData);
-
-                // Group logs by userName (since we don't have IDs on users easily accessible here for now)
-                const logsByUser: Record<string, ReadingLogEntry[]> = {};
-                logsData.forEach((log: ReadingLogEntry) => {
-                    const userKey = log.userName || 'Unknown';
-                    if (!logsByUser[userKey]) logsByUser[userKey] = [];
-                    logsByUser[userKey].push(log);
-                });
-                setUserLogs(logsByUser);
-            } catch (err) { console.error(err); }
-            finally { setIsLoading(false); }
+                const usersData = await res.json();
+                if (Array.isArray(usersData)) {
+                    setUsers(usersData);
+                } else {
+                    console.error("API did not return an array", usersData);
+                    setUsers([]);
+                }
+            } catch (err) {
+                console.error(err);
+                setNotification({ show: true, type: 'error', message: 'Failed to load users. See console.' });
+            } finally {
+                setIsLoading(false);
+            }
         };
         fetchData();
     }, []);
@@ -103,29 +99,6 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
         setIsFormOpen(true);
     };
 
-    const getIncentiveStatus = (userName: string) => {
-        const logs = userLogs[userName] || [];
-        // Incentive Rules:
-        // 1. Duration > 6 months = No Incentive (Per book logic? Or global?)
-        //    Assumption: If ANY book took > 6 months, user is disqualified? Or just that book doesn't count?
-        //    Let's assume "that book doesn't count".
-        // 2. 5 Books Completed = Additional Incentive.
-
-        // Filter valid completed books
-        const validBooks = logs.filter(log => {
-            if (log.status !== 'Finished') return false;
-            // Duration check: Ideally we have startDate and endDate.
-            // Currently we only have one date. 
-            // Mock Logic: Assume all finished books are valid duration for this prototype unless flagged.
-            return true;
-        });
-
-        const count = validBooks.length;
-        const isEligible = count >= 5;
-
-        return { count, isEligible };
-    };
-
     if (userRole !== 'HR' && userRole !== 'HR_ADMIN') {
         return <div className="p-8 text-center text-red-500">Access Denied. HR Only.</div>;
     }
@@ -147,9 +120,9 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
             <div className="flex justify-between items-center mb-8">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Users className="text-purple-600" /> User Management & Incentives
+                        <Users className="text-purple-600" /> User Management
                     </h1>
-                    <p className="text-sm text-slate-500 mt-1">Manage staff and view incentive eligibility.</p>
+                    <p className="text-sm text-slate-500 mt-1">Manage staff access and roles.</p>
                 </div>
                 <button
                     onClick={() => setIsFormOpen(!isFormOpen)}
@@ -164,13 +137,10 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                 <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-600 flex items-center text-sm">
                     <div className="flex-1 pl-2">Name / Email</div>
                     <div className="w-32 text-center">Role</div>
-                    <div className="w-32 text-center">Books Read</div>
-                    <div className="w-40 text-center">Incentive Status</div>
                     <div className="w-16 text-center">Edit</div>
                 </div>
                 <div className="divide-y divide-slate-50">
                     {users.map((u) => {
-                        const { count, isEligible } = getIncentiveStatus(u.name);
                         return (
                             <div key={u.id || u.email} className="p-4 flex items-center hover:bg-slate-50 transition-colors">
                                 <div className="flex-1 pl-2">
@@ -184,20 +154,6 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                                 'bg-green-100 text-green-700'}`}>
                                         {u.role}
                                     </span>
-                                </div>
-                                <div className="w-32 text-center font-semibold text-slate-700">
-                                    {count} Books
-                                </div>
-                                <div className="w-40 flex justify-center">
-                                    {isEligible ? (
-                                        <div className="flex items-center gap-1 text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100">
-                                            <Trophy size={14} /> Eligible
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-1 text-xs font-medium text-slate-400">
-                                            <AlertCircle size={14} /> {5 - count} more to go
-                                        </div>
-                                    )}
                                 </div>
                                 <div className="w-16 flex justify-center">
                                     <button

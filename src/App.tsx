@@ -9,16 +9,25 @@ import LMSCalendar from './components/LMSCalendar';
 import LoginPage from './components/LoginPage';
 import UserManagement from './components/UserManagement';
 import AdminDashboard from './components/AdminDashboard';
+import IncentiveManager from './components/IncentiveManager';
 import type { Page, Role, User } from './types';
+
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [activePage, setActivePage] = useState<Page>('dashboard');
-  /* readingLogs removed */
+
+  // REPLACE THIS WITH YOUR ACTUAL GOOGLE CLIENT ID
+  const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID_HERE";
 
   // If not logged in, show Login Page
   if (!user) {
-    return <LoginPage onLogin={setUser} />;
+    return (
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <LoginPage onLogin={setUser} />
+      </GoogleOAuthProvider>
+    );
   }
 
   // Mock logout for demo
@@ -28,38 +37,43 @@ function App() {
   const userRole: Role = user.role;
 
   return (
-    <DashboardLayout
-      activePage={activePage}
-      onNavigate={setActivePage}
-      userRole={userRole}
-      // Actually, let's update DashboardLayout to show Logout instead of just switch.
-      // For now, let's keep the prop to avoid breaking build, but effective role comes from user.
-      onLogout={handleLogout}
-      onRoleChange={(role) => setUser({ ...user, role })}
-    >
-      {activePage === 'dashboard' && <DashboardHome onNavigate={setActivePage} userRole={userRole} userEmail={user?.email} userName={user?.name} />}
-      {activePage === 'reading-log' && (
-        <ReadingLogPage
-          user={user!}
-          onBack={() => setActivePage('dashboard')}
-        />
-      )}
-      {activePage === 'courses' && <CoursePlayer user={user!} />}
-      {activePage === 'internal' && <InternalMeetingList userRole={userRole} userEmail={user?.email || ''} />}
-      {activePage === 'external' && <TrainingRequestForm userRole={userRole} userName={user?.name} />}
-      {activePage === 'calendar' && <LMSCalendar userEmail={user?.email} />}
-      {/* User Management Route - Only for HR */}
-      {activePage === 'users' && <UserManagement userRole={userRole} onBack={() => setActivePage('dashboard')} />}
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <DashboardLayout
+        activePage={activePage}
+        onNavigate={setActivePage}
+        userRole={userRole}
+        onLogout={handleLogout}
+        onRoleChange={(role) => setUser({ ...user, role })}
+      >
+        {activePage === 'dashboard' && <DashboardHome onNavigate={setActivePage} userRole={userRole} userEmail={user?.email} userName={user?.name} />}
+        {activePage === 'reading-log' && (
+          <ReadingLogPage
+            user={user!}
+            onBack={() => setActivePage('dashboard')}
+          />
+        )}
+        {activePage === 'courses' && <CoursePlayer user={user!} />}
+        {activePage === 'internal' && <InternalMeetingList userRole={userRole} userEmail={user?.email || ''} />}
+        {activePage === 'external' && <TrainingRequestForm userRole={userRole} userName={user?.name} />}
+        {activePage === 'calendar' && <LMSCalendar userEmail={user?.email} />}
+        {/* User Management Route - Only for HR */}
+        {activePage === 'users' && <UserManagement userRole={userRole} onBack={() => setActivePage('dashboard')} />}
 
-      {/* Admin Panel Route - Replaces individual admin routes for a unified dashboard */}
-      {activePage === 'admin-dashboard' && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
-        <AdminDashboard
-          user={user!}
-          onNavigate={setActivePage}
-          onLogout={handleLogout}
-        />
-      )}
-    </DashboardLayout>
+        {activePage === 'incentives' && (
+          // @ts-ignore
+          <IncentiveManager user={user!} />
+        )}
+
+        {/* Admin Panel Route */}
+        {activePage === 'admin-dashboard' && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
+          <AdminDashboard
+            user={user!}
+            onNavigate={setActivePage}
+            onLogout={handleLogout}
+          />
+        )}
+      </DashboardLayout>
+    </GoogleOAuthProvider>
   );
 }
 

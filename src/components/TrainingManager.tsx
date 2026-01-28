@@ -36,11 +36,21 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 const TrainingManager = () => {
+    // --- Data State ---
     const [requests, setRequests] = useState<TrainingRequest[]>([]);
+
+    // --- Filter State ---
+    const [viewMode, setViewMode] = useState<'list' | 'recap'>('list');
+    const [selectedYear, setSelectedYear] = useState<number | 'All'>(new Date().getFullYear());
+    const [selectedPeriod, setSelectedPeriod] = useState<string>('All Year');
+    const [selectedBranch, setSelectedBranch] = useState<string>('All Branches');
     const [searchQuery, setSearchQuery] = useState('');
+
+    // --- Modal State ---
     const [selectedRequest, setSelectedRequest] = useState<TrainingRequest | null>(null);
     const [isRejectMode, setIsRejectMode] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
+    const [recapDetailUser, setRecapDetailUser] = useState<string | null>(null);
 
     // Settlement State
     const [isSettlementOpen, setIsSettlementOpen] = useState(false);
@@ -50,6 +60,62 @@ const TrainingManager = () => {
         settlementNotes: ''
     });
 
+    const periodOptions = [
+        "All Year",
+        "Q1 (Jan-Mar)", "Q2 (Apr-Jun)", "Q3 (Jul-Sep)", "Q4 (Oct-Dec)",
+        "Semester 1 (Jan-Jun)", "Semester 2 (Jul-Dec)",
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ];
+
+    const getPeriodDates = () => {
+        const year = selectedYear === 'All' ? new Date().getFullYear() : selectedYear;
+        // Default: Full Year
+        let start = new Date(year, 0, 1);
+        let end = new Date(year, 11, 31, 23, 59, 59);
+
+        if (selectedPeriod === 'All Year') return [start, end];
+
+        if (selectedPeriod.startsWith('Q1')) { end = new Date(year, 2, 31, 23, 59, 59); }
+        else if (selectedPeriod.startsWith('Q2')) { start = new Date(year, 3, 1); end = new Date(year, 5, 30, 23, 59, 59); }
+        else if (selectedPeriod.startsWith('Q3')) { start = new Date(year, 6, 1); end = new Date(year, 8, 30, 23, 59, 59); }
+        else if (selectedPeriod.startsWith('Q4')) { start = new Date(year, 9, 1); end = new Date(year, 11, 31, 23, 59, 59); }
+        else if (selectedPeriod.startsWith('Semester 1')) { end = new Date(year, 5, 30, 23, 59, 59); }
+        else if (selectedPeriod.startsWith('Semester 2')) { start = new Date(year, 6, 1); }
+        else {
+            // Monthly
+            const monthIdx = new Date(`${selectedPeriod} 1, ${year}`).getMonth();
+            if (!isNaN(monthIdx)) {
+                start = new Date(year, monthIdx, 1);
+                end = new Date(year, monthIdx + 1, 0, 23, 59, 59);
+            }
+        }
+        return [start, end];
+    };
+
+    // --- Filtered Data for List View ---
+    const filteredRequests = requests.filter(req => {
+        const d = new Date(req.date);
+        const [start, end] = getPeriodDates();
+
+        // Year & Period Filter
+        if (selectedYear !== 'All' && d.getFullYear() !== selectedYear) return false;
+        if (d < start || d > end) return false;
+
+        // Branch Filter
+        const branch = req.location || 'Online';
+        if (selectedBranch !== 'All Branches' && !branch.includes(selectedBranch)) return false;
+
+        // Search Filter
+        const lowerSearch = searchQuery.toLowerCase();
+        return (
+            (req.employeeName || '').toLowerCase().includes(lowerSearch) ||
+            (req.title || '').toLowerCase().includes(lowerSearch) ||
+            (req.vendor || '').toLowerCase().includes(lowerSearch)
+        );
+    });
+
+    // --- Effects & Actions ---
     useEffect(() => {
         fetch(`${API_BASE_URL}/api/training`)
             .then(res => res.json())
@@ -159,7 +225,6 @@ const TrainingManager = () => {
                                 <div>
                                     <div class="label">Final Actual Cost</div>
                                     <div class="value">${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(req.cost)}</div> 
-                                    <!-- Note: Assuming logic updates cost or we use req.finalCost if available. For now using cost -->
                                 </div>
                                 <div>
                                     <div class="label">Additional/Excess Cost</div>
@@ -196,26 +261,64 @@ const TrainingManager = () => {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    cost: settleData.finalCost, // Update main cost to final? Or separate field? User prompt implies updating "additional cost". I'll update both for completeness.
+                    cost: settleData.finalCost,
                     additionalCost: settleData.additionalCost,
-                    // settlementNotes: settleData.settlementNotes // Needs field in type if we want to save it everywhere
                 })
             });
             if (res.ok) {
                 const updated = await res.json();
                 setRequests(requests.map(r => r.id === updated.id ? updated : r));
                 setIsSettlementOpen(false);
-                // Keep selectedRequest open to show update
                 setSelectedRequest(updated);
             }
         } catch (err) { console.error(err); }
     };
 
-    const filteredRequests = requests.filter(req =>
-        (req.employeeName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (req.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (req.vendor || '').toLowerCase().includes(searchQuery.toLowerCase())
-    );
+
+
+    const getUserRecap = () => {
+        const [start, end] = getPeriodDates();
+
+        const userGroups: Record<string, TrainingRequest[]> = {};
+
+        requests.forEach(req => {
+            const d = new Date(req.date);
+            if (selectedYear !== 'All' && d.getFullYear() !== selectedYear) return;
+            if (d < start || d > end) return;
+
+            // Branch Filter
+            const branch = req.location || 'Online';
+            if (selectedBranch !== 'All Branches' && !branch.includes(selectedBranch)) return;
+
+            // Search
+            const searchLower = searchQuery.toLowerCase();
+            if (searchQuery &&
+                !req.employeeName.toLowerCase().includes(searchLower) &&
+                !req.title.toLowerCase().includes(searchLower)) return;
+
+            const name = req.employeeName;
+            if (!userGroups[name]) userGroups[name] = [];
+            userGroups[name].push(req);
+        });
+
+        return Object.entries(userGroups).map(([name, items]) => {
+            const totalRequests = items.length;
+            const approvedRequests = items.filter(i => i.status === 'APPROVED').length;
+            const totalCost = items.reduce((sum, i) => {
+                // Only count cost if approved? Or all? Usually budgets track APPROVED costs.
+                if (i.status !== 'APPROVED') return sum;
+                return sum + (i.cost || 0) + (i.additionalCost || 0);
+            }, 0);
+
+            return {
+                name,
+                totalRequests,
+                approvedRequests,
+                totalCost,
+                requests: items
+            };
+        }).sort((a, b) => b.totalCost - a.totalCost);
+    };
 
     return (
         <div className="space-y-8 animate-fade-in">
@@ -226,92 +329,265 @@ const TrainingManager = () => {
                     <p className="text-slate-500 mt-1">List of all training requests submitted by employees</p>
                 </div>
 
+                <div className="flex items-center gap-3">
+                    <div className="bg-white p-1 rounded-xl border border-slate-200 shadow-sm flex">
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'list' ? 'bg-blue-100 text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            List View
+                        </button>
+                        <button
+                            onClick={() => setViewMode('recap')}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'recap' ? 'bg-blue-100 text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Recapitulation
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Global Filter Bar */}
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between mb-6">
                 <div className="relative w-full md:w-96">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                    <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
                     <input
                         type="text"
-                        placeholder="Search employee, training..."
+                        placeholder="Search Employee, Title, Vendor..."
+                        className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-600"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                     />
                 </div>
-            </div>
 
-            {/* Training Requests List */}
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase font-semibold">
-                            <tr>
-                                <th className="px-6 py-4">Employee</th>
-                                <th className="px-6 py-4">Training Title</th>
-                                <th className="px-6 py-4">Vendor</th>
-                                <th className="px-6 py-4">Date</th>
-                                <th className="px-6 py-4">Cost</th>
-                                <th className="px-6 py-4">Add. Cost</th>
-                                <th className="px-6 py-4">Priority</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {filteredRequests.map(req => (
-                                <tr
-                                    key={req.id}
-                                    onClick={() => setSelectedRequest(req)}
-                                    className="hover:bg-slate-50 cursor-pointer transition-colors"
-                                >
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
-                                                {req.employeeName.charAt(0)}
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-slate-700 text-sm">{req.employeeName}</p>
-                                                <p className="text-xs text-slate-400">{req.employeeRole}</p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <p className="font-semibold text-slate-700 text-sm">{req.title}</p>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <p className="text-sm text-slate-600">{req.vendor}</p>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <p className="text-sm text-slate-600">{new Date(req.date).toLocaleDateString()}</p>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <p className="font-mono text-sm text-slate-600">{formatCurrency(req.cost)}</p>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <p className="font-mono text-sm text-slate-600">
-                                            {req.additionalCost ? formatCurrency(req.additionalCost) : '-'}
-                                        </p>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`text-xs font-bold px-2 py-1 rounded border 
-                                            ${req.priority === 'High' ? 'bg-red-50 text-red-600 border-red-100' :
-                                                req.priority === 'Medium' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
-                                                    'bg-slate-50 text-slate-500 border-slate-100'}
-                                        `}>
-                                            {req.priority}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+                    <select
+                        value={selectedBranch}
+                        onChange={(e) => setSelectedBranch(e.target.value)}
+                        className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                        <option value="All Branches">All Branches</option>
+                        <option value="Medan-HO">Medan-HO</option>
+                        <option value="Medan-Cabang">Medan-Cabang</option>
+                        <option value="Jakarta">Jakarta</option>
+                        <option value="Bali">Bali</option>
+                        <option value="Binjai">Binjai</option>
+                        <option value="Tanjung Morawa">Tanjung Morawa</option>
+                        <option value="Online">Online Only</option>
+                    </select>
+
+                    <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(e.target.value === 'All' ? 'All' : parseInt(e.target.value))}
+                        className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                        <option value="All">All Years</option>
+                        <option value={2024}>2024</option>
+                        <option value={2025}>2025</option>
+                    </select>
+
+                    <select
+                        value={selectedPeriod}
+                        onChange={(e) => setSelectedPeriod(e.target.value)}
+                        className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                        {periodOptions.map(opt => (
+                            <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                    </select>
                 </div>
-
-                {filteredRequests.length === 0 && (
-                    <div className="text-center py-12">
-                        <p className="text-slate-400 italic">No training requests found.</p>
-                    </div>
-                )}
             </div>
 
-            {/* Approval Modal */}
+            {viewMode === 'list' && (
+                <>
+
+
+                    {/* Training Requests List */}
+                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase font-semibold">
+                                    <tr>
+                                        <th className="px-6 py-4">Employee</th>
+                                        <th className="px-6 py-4">Training Title</th>
+                                        <th className="px-6 py-4">Vendor</th>
+                                        <th className="px-6 py-4">Date</th>
+                                        <th className="px-6 py-4">Cost</th>
+                                        <th className="px-6 py-4">Add. Cost</th>
+                                        <th className="px-6 py-4">Priority</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {filteredRequests.map(req => (
+                                        <tr
+                                            key={req.id}
+                                            onClick={() => setSelectedRequest(req)}
+                                            className="hover:bg-slate-50 cursor-pointer transition-colors"
+                                        >
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+                                                        {req.employeeName.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-slate-700 text-sm">{req.employeeName}</p>
+                                                        <p className="text-xs text-slate-400">{req.employeeRole}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="font-semibold text-slate-700 text-sm">{req.title}</p>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="text-sm text-slate-600">{req.vendor}</p>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="text-sm text-slate-600">{new Date(req.date).toLocaleDateString()}</p>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="font-mono text-sm text-slate-600">{formatCurrency(req.cost)}</p>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="font-mono text-sm text-slate-600">
+                                                    {req.additionalCost ? formatCurrency(req.additionalCost) : '-'}
+                                                </p>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`text-xs font-bold px-2 py-1 rounded border 
+                                                ${req.priority === 'High' ? 'bg-red-50 text-red-600 border-red-100' :
+                                                        req.priority === 'Medium' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
+                                                            'bg-slate-50 text-slate-500 border-slate-100'}
+                                            `}>
+                                                    {req.priority}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {filteredRequests.length === 0 && (
+                            <div className="text-center py-12">
+                                <p className="text-slate-400 italic">No training requests found.</p>
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
+
+            {viewMode === 'recap' && (
+                <div className="space-y-6 animate-in slide-in-from-bottom-4">
+
+
+                    {/* Recap Table */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs tracking-wider">
+                                <tr>
+                                    <th className="px-6 py-4">Employee Name</th>
+                                    <th className="px-6 py-4 text-center">Requests (Total)</th>
+                                    <th className="px-6 py-4 text-center">Approved</th>
+                                    <th className="px-6 py-4 text-right">Total Cost (Approved)</th>
+                                    <th className="px-6 py-4 text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {getUserRecap().length === 0 ? (
+                                    <tr><td colSpan={5} className="p-8 text-center text-slate-400 italic">No matching records found.</td></tr>
+                                ) : (
+                                    getUserRecap().map((stat, idx) => (
+                                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-6 py-4 font-bold text-slate-700">{stat.name}</td>
+                                            <td className="px-6 py-4 text-center text-slate-600 font-semibold">{stat.totalRequests}</td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-lg text-xs font-bold">
+                                                    {stat.approvedRequests}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-mono text-slate-700 font-bold">
+                                                {formatCurrency(stat.totalCost)}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <button
+                                                    onClick={() => setRecapDetailUser(stat.name)}
+                                                    className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 text-slate-500 rounded-lg text-xs font-bold transition-all shadow-sm"
+                                                >
+                                                    View Details
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Recap Detail Modal */}
+            {recapDetailUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white">
+                            <div>
+                                <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                                    <FileText className="text-blue-600" size={20} /> {recapDetailUser} - Training History
+                                </h2>
+                                <p className="text-xs text-slate-500 font-medium">{selectedPeriod} • {selectedYear} • {selectedBranch}</p>
+                            </div>
+                            <button onClick={() => setRecapDetailUser(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><XCircle size={20} /></button>
+                        </div>
+
+                        <div className="overflow-y-auto p-6">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
+                                    <tr>
+                                        <th className="px-4 py-3">Date</th>
+                                        <th className="px-4 py-3">Training Title</th>
+                                        <th className="px-4 py-3">Vendor</th>
+                                        <th className="px-4 py-3 text-right">Est. Cost</th>
+                                        <th className="px-4 py-3 text-right">Add. Cost</th>
+                                        <th className="px-4 py-3 text-right">Total</th>
+                                        <th className="px-4 py-3 text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {getUserRecap().find(u => u.name === recapDetailUser)?.requests.map((r) => (
+                                        <tr key={r.id} className="hover:bg-slate-50">
+                                            <td className="px-4 py-3 text-slate-600">{new Date(r.date).toLocaleDateString()}</td>
+                                            <td className="px-4 py-3 font-bold text-slate-700">{r.title}</td>
+                                            <td className="px-4 py-3 text-slate-600">{r.vendor}</td>
+                                            <td className="px-4 py-3 text-right font-mono text-slate-500">
+                                                {formatCurrency(r.cost)}
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-mono text-orange-600">
+                                                {r.additionalCost ? formatCurrency(r.additionalCost) : '-'}
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-mono text-slate-800 font-bold">
+                                                {formatCurrency((r.cost || 0) + (r.additionalCost || 0))}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <StatusBadge status={r.status} />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="p-4 border-t border-slate-100 bg-slate-50 text-right">
+                            <button onClick={() => setRecapDetailUser(null)} className="px-6 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-100 transition-colors shadow-sm">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Approval Modal (Existing) */}
             {selectedRequest && (
+
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden ring-1 ring-white/10 flex flex-col max-h-[90vh]">
                         <div className="p-8 border-b border-slate-100 flex justify-between items-start bg-slate-50/80">

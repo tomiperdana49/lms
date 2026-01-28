@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { LogIn, Lock, Mail } from 'lucide-react';
+import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
+import { jwtDecode } from "jwt-decode";
 import { API_BASE_URL } from '../config';
 import type { User } from '../types';
 import PopupNotification from './PopupNotification';
@@ -34,14 +36,12 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
             const data = await response.json();
 
             if (data.success) {
-                // Show Success Popup
                 setNotification({
                     show: true,
                     type: 'success',
                     message: 'Login successful! Redirecting to dashboard...'
                 });
 
-                // Delay actual login action to let user see the popup
                 setTimeout(() => {
                     onLogin(data.user);
                 }, 1500);
@@ -51,7 +51,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                     type: 'error',
                     message: data.message || 'Login failed. Please check your credentials.'
                 });
-                setIsLoading(false); // Only stop loading on error, keep loading on success until redirect
+                setIsLoading(false);
             }
         } catch {
             setNotification({
@@ -59,6 +59,39 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                 type: 'error',
                 message: 'Unable to connect to server. Please check your internet connection.'
             });
+            setIsLoading(false);
+        }
+    };
+
+    const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+        if (!credentialResponse.credential) return;
+
+        try {
+            setIsLoading(true);
+            const decoded: any = jwtDecode(credentialResponse.credential);
+            const googleEmail = decoded.email;
+
+            // Call Backend to verify/create user
+            const response = await fetch(`${API_BASE_URL}/api/auth/google`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: googleEmail })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setNotification({ show: true, type: 'success', message: `Welcome back, ${data.user.name}!` });
+                setTimeout(() => {
+                    onLogin(data.user);
+                }, 1500);
+            } else {
+                setNotification({ show: true, type: 'error', message: data.message || 'Google Login Failed' });
+                setIsLoading(false);
+            }
+        } catch (err) {
+            console.error(err);
+            setNotification({ show: true, type: 'error', message: 'Google Login Error' });
             setIsLoading(false);
         }
     };
@@ -120,6 +153,26 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                         >
                             {isLoading ? 'Signing in...' : 'Sign In'}
                         </button>
+
+                        <div className="relative my-6">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-slate-200"></div>
+                            </div>
+                            <div className="relative flex justify-center text-sm">
+                                <span className="px-2 bg-white text-slate-500">Or continue with</span>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-center">
+                            <GoogleLogin
+                                onSuccess={handleGoogleSuccess}
+                                onError={() => {
+                                    setNotification({ show: true, type: 'error', message: 'Google Login Failed' });
+                                }}
+                                useOneTap
+                                width="100%"
+                            />
+                        </div>
 
                         <div className="text-center text-xs text-slate-400 mt-4">
                             <p>Demo Accounts:</p>

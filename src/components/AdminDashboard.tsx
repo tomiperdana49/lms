@@ -135,7 +135,7 @@ const AdminDashboard = ({ user, onLogout }: AdminDashboardProps) => {
             case 'reports':
                 return <HRReportGenerator />;
             case 'incentives':
-                return <IncentiveManager />;
+                return <IncentiveManager user={user} />;
             case 'calendar':
                 return <LMSCalendar compact={false} userEmail={user.email} userRole={user.role} />;
             case 'overview':

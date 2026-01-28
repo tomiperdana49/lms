@@ -10,7 +10,8 @@ import {
     X,
     Bell,
     Search,
-    LogOut
+    LogOut,
+    Award
 } from 'lucide-react';
 import type { Page, Role } from '../types';
 
@@ -35,6 +36,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, onLogout 
         { icon: Users, label: 'Internal', id: 'internal' },
         { icon: Globe, label: 'External', id: 'external' },
         { icon: Calendar, label: 'Calendar', id: 'calendar' },
+        { icon: Award, label: 'Incentives', id: 'incentives' },
     ];
 
     const getRoleLabel = (role: Role) => {

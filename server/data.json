@@ -31,6 +31,18 @@
   ],
   "logs": [
     {
+      "id": 1769505072505,
+      "title": "Who Moved My Cheese?",
+      "category": "Buku Wajib Baca",
+      "location": "Medan - HO",
+      "source": "Buku dari Kantor",
+      "date": "2026-01-27T09:11:12.505Z",
+      "startDate": "2026-01-27T09:11:12.505Z",
+      "status": "Reading",
+      "userName": "Nusa Staff",
+      "evidenceUrl": "/uploads/1769505067573-975049632.jpeg"
+    },
+    {
       "id": 1769135151098,
       "title": "Atomic Habits",
       "category": "Buku Wajib Baca",
@@ -43,20 +55,10 @@
       "xp": 50,
       "review": "saya suka baca",
       "duration": 83,
-      "evidenceUrl": "/uploads/1769134470684-228048663.jpeg"
-    },
-    {
-      "id": 1769134514441,
-      "title": "Atomic Habits",
-      "category": "Buku Wajib Baca",
-      "location": "Medan - HO",
-      "source": "Buku dari Kantor",
-      "link": "",
-      "date": "2026-01-23T02:15:14.441Z",
-      "status": "Reading",
-      "userName": "Nusa Staff",
-      "xp": 10,
-      "evidenceUrl": "/uploads/1769134470684-228048663.jpeg"
+      "evidenceUrl": "/uploads/1769134470684-228048663.jpeg",
+      "hrApprovalStatus": "Approved",
+      "managedCategory": "Non-Fiksi Text",
+      "incentiveAmount": 100000
     },
     {
       "id": 9999999901,
@@ -71,7 +73,10 @@
       "xp": 50,
       "review": "So exclusive.",
       "duration": 60,
-      "evidenceUrl": ""
+      "evidenceUrl": "",
+      "hrApprovalStatus": "Approved",
+      "managedCategory": "Non-Fiksi Text",
+      "incentiveAmount": 100000
     }
   ],
   "trainingRequests": [
@@ -294,7 +299,15 @@
         ]
       },
       "meetLink": "lovely room",
-      "id": 1769056038560
+      "id": 1769056038560,
+      "costReport": {
+        "trainerIncentive": 968790,
+        "snackCost": 436576798,
+        "lunchCost": 45679808,
+        "otherCost": 67889,
+        "participantsCount": 1,
+        "isFinalized": true
+      }
     },
     {
       "title": "Evaluasi Kinerja Q1",
@@ -1550,6 +1563,25 @@
         ]
       },
       "meetLink": "https://meet.google.com/abc-defg-hij"
+    },
+    {
+      "title": "coba",
+      "date": "2026-01-28",
+      "time": "06:39 - 17:45",
+      "shortDate": "28 JAN",
+      "host": "sam",
+      "type": "Hybrid",
+      "location": "amargedon room",
+      "description": "adal agi",
+      "guests": {
+        "status": "Awaiting",
+        "count": 1,
+        "emails": [
+          "samnapit26@gmail.com"
+        ]
+      },
+      "meetLink": "bjncbwobcwjqonk",
+      "id": 1769409646651
     }
   ],
   "courses": [
@@ -1588,6 +1620,17 @@
                 "options": [
                   "True",
                   "False"
+                ],
+                "correctAnswer": 0
+              },
+              {
+                "id": 1769506216133,
+                "question": "",
+                "options": [
+                  "",
+                  "",
+                  "",
+                  ""
                 ],
                 "correctAnswer": 0
               }
@@ -1675,6 +1718,14 @@
         2
       ],
       "lastAccess": "2026-01-24T03:35:55.493Z"
+    },
+    {
+      "userId": "Nusa Staff",
+      "courseId": 2,
+      "completedModuleIds": [
+        1
+      ],
+      "lastAccess": "2026-01-27T01:42:20.060Z"
     }
   ],
   "quizResults": [
@@ -1697,5 +1748,1897 @@
       "date": "2026-01-24T10:15:00.000Z"
     }
   ],
-  "incentives": []
+  "incentives": [
+    {
+      "courseName": "AWS Sertifikat",
+      "startDate": "2026-01-27",
+      "endDate": "2027-12-11",
+      "description": "adalah pokoknya",
+      "evidenceUrl": "/uploads/1769398425589-476499433.jpeg",
+      "requesterName": "Nusa Staff",
+      "employeeName": "Nusa Staff",
+      "status": "Active",
+      "reward": "250000",
+      "monthlyAmount": 0,
+      "id": 1769399686552
+    },
+    {
+      "courseName": "KIM Plus",
+      "startDate": "2026-01-15",
+      "endDate": "2026-01-31",
+      "description": "ncjebvpuibaokaw",
+      "evidenceUrl": "/uploads/1769408146367-646540055.png",
+      "requesterName": "Nusa Staff",
+      "employeeName": "Nusa Staff",
+      "status": "Pending",
+      "reward": "",
+      "monthlyAmount": 0,
+      "id": 1769408150929
+    },
+    {
+      "courseName": "bvreobi",
+      "startDate": "2026-01-16",
+      "endDate": "2026-02-07",
+      "description": "cwj jciwc",
+      "evidenceUrl": "/uploads/1769408460881-223912823.jpeg",
+      "requesterName": "Nusa Staff",
+      "employeeName": "Nusa Staff",
+      "status": "Pending",
+      "reward": "",
+      "monthlyAmount": 0,
+      "id": 1769408461920
+    },
+    {
+      "courseName": "cdcfcygvhbjkn",
+      "startDate": "2026-01-20",
+      "endDate": "2026-01-31",
+      "description": "cvhibjonk",
+      "evidenceUrl": "/uploads/1769408960307-102302376.jpeg",
+      "requesterName": "Nusa Staff",
+      "employeeName": "Nusa Staff",
+      "status": "Active",
+      "reward": "500000",
+      "monthlyAmount": 0,
+      "id": 1769408961458
+    },
+    {
+      "courseName": "cfgvhbjn",
+      "startDate": "2026-01-26",
+      "endDate": "2026-10-26",
+      "description": "h j, jkl",
+      "evidenceUrl": "/uploads/1769410182893-535078840.jpeg",
+      "requesterName": "Nusa Staff",
+      "employeeName": "Nusa Staff",
+      "status": "Denied",
+      "reward": "",
+      "monthlyAmount": 0,
+      "id": 1769410185225
+    }
+  ],
+  "books": [
+    {
+      "id": 1,
+      "title": "Atomic Habits",
+      "category": "Buku Wajib Baca",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 2,
+      "title": "The Psychology of Money",
+      "category": "Finance",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 3,
+      "title": "Start With Why",
+      "category": "Leadership",
+      "location": "Jakarta"
+    },
+    {
+      "id": 4,
+      "title": "Clean Code",
+      "category": "Technology",
+      "location": "Medan - Cabang"
+    },
+    {
+      "id": 5,
+      "title": "Rich Dad Poor Dad",
+      "category": "Finance",
+      "location": "Binjai"
+    },
+    {
+      "id": 6,
+      "title": "Filosofi Teras",
+      "category": "Self Improvement",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 7,
+      "title": "Laut Bercerita",
+      "category": "Fiction",
+      "location": "Bali"
+    },
+    {
+      "id": 8,
+      "title": "Bumi Manusia",
+      "category": "Fiction",
+      "location": "Jakarta"
+    },
+    {
+      "id": 1769479578310,
+      "title": "Merry Riana: Langkah Sejuta Suluh",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576615,
+      "title": "Ganti Hati... Tantangan Jadi Menteri",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579819,
+      "title": "Sang Burung Biru",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578269,
+      "title": "Robert Kuok",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577646,
+      "title": "Keliling Eropa 6 Bulan Hanya 1.000 Dolar!",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479582006,
+      "title": "Bukan Testimoni Susno",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572799,
+      "title": "Incomplete: My Life, My World, My Story",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578263,
+      "title": "Wawancara dengan JK Rowling, Si Pencipta Harry Potter",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573073,
+      "title": "The Ciputra Way",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573311,
+      "title": "Perjalanan ke India dan Thailand Mencari Surga di Bumi",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574396,
+      "title": "Trump: Jangan Pernah Menyerah!",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580580,
+      "title": "The Steve Jobs Way",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575475,
+      "title": "Flying High",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575763,
+      "title": "Indonesia Dikhianati",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575843,
+      "title": "Luhut",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576020,
+      "title": "Life Without Limits",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573892,
+      "title": "Tragedi IPDN",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578658,
+      "title": "Si Ular Besi Antar Jonan Jadi Menteri",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574696,
+      "title": "Jonan & Evolusi Kereta Api Indonesia",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580023,
+      "title": "Obama In His Own Word",
+      "category": "Buku Biografi dan Sejarah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576603,
+      "title": "Certified Sales Management",
+      "category": "Sales dan Marketing",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578781,
+      "title": "Bagaimana Meningkatkan Kekayaan Anda Hingga 2.000% dalam Waktu 6 Bulan/Kurang dalam Marketing",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575091,
+      "title": "Surat Menyurat",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575138,
+      "title": "Good to Great",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580882,
+      "title": "Connecting The Dots",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578054,
+      "title": "Naked Sales",
+      "category": "Sales dan Marketing",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578227,
+      "title": "#MO",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574342,
+      "title": "Disruption",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577674,
+      "title": "Advanced Selling Strategies",
+      "category": "Sales dan Marketing",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573246,
+      "title": "Pedoman Lengkap Menulis Surat",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579300,
+      "title": "222 Tanya Jawab Hak & Kewajiban Karyawan & Perusahaan",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578835,
+      "title": "The Effective Executive",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575097,
+      "title": "Bercerita dengan Data",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581835,
+      "title": "Business Moms",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579710,
+      "title": "Manajemen Pemasaran",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572726,
+      "title": "Undang-Undang Perpajakan",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579930,
+      "title": "The 1-Page Marketing Plan",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575098,
+      "title": "$100M Offers",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576515,
+      "title": "Manajemen Modern",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573288,
+      "title": "Who Wants to Be a Smiling Investor",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579810,
+      "title": "Built to Last",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579901,
+      "title": "Yes! I Can Serve",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576919,
+      "title": "Di Balik Kesuksesan McDonald's",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574072,
+      "title": "Project Management",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573125,
+      "title": "Wirausaha Muda Mandiri",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574868,
+      "title": "Cara Gampang Mengubah Karyawan Menjadi Aset Produktif & Menguntungkan",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580264,
+      "title": "Samsung Electronics",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578255,
+      "title": "Untung Besar 80 jt-an",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573277,
+      "title": "Sales EQ",
+      "category": "Sales dan Marketing",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579115,
+      "title": "The Wal-Mart Way",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574649,
+      "title": "Delivering Happiness",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580226,
+      "title": "The Black Swan",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576720,
+      "title": "Blown to Bits",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575834,
+      "title": "Key Performance Indicators",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574207,
+      "title": "Key Management Ratios",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575046,
+      "title": "Focus",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577429,
+      "title": "Building A Story Brand",
+      "category": "Sales dan Marketing",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576139,
+      "title": "Psikotes & TPA Pascasarjana",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575815,
+      "title": "Great Customer Service",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576792,
+      "title": "Kata-kata bijak",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575006,
+      "title": "From Zero to Survive",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577442,
+      "title": "The Cashflow Quadrant",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579719,
+      "title": "Re-Code Your Change DNA",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579432,
+      "title": "Apa Apa Saja yang Harus di Lakukan Manajer & Supervisor",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577289,
+      "title": "Winning at Human Relations",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576506,
+      "title": "Sony vs Samsung",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581629,
+      "title": "Step by Step in Developing BSC-Based Individual Perfomance Management",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576589,
+      "title": "Step by Step in Cascading Balance Scorecard to Functional Scorecards",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577917,
+      "title": "Sampaikanlah Walau Satu Konten",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580201,
+      "title": "Setiap Manajer Harus Baca Buku Ini!",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575320,
+      "title": "10 Jurus Terlarang",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577860,
+      "title": "Komunikasi Siber",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573647,
+      "title": "The 4 Disciplines of Execution",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573936,
+      "title": "The Culture Code",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581545,
+      "title": "Sales Breakthrough",
+      "category": "Sales dan Marketing",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573442,
+      "title": "The Great Ideas",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577177,
+      "title": "Jurus Anti-Gagal Dalam Menjual",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575338,
+      "title": "Dunia di Tahun 2020",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578460,
+      "title": "Memahami Psikotes",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575981,
+      "title": "Great Supervisor",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581034,
+      "title": "Be Your Own Boss Now",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580941,
+      "title": "Buying Trances",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581132,
+      "title": "Pemasaran Duct Tape",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576349,
+      "title": "The Communication Book",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578167,
+      "title": "Leadership for Managers",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575465,
+      "title": "Second Chance Untuk Uang, Hidup & Dunia Kita",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479582352,
+      "title": "Latihan Psikotes",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573792,
+      "title": "Build: An Unorthodox Guide to Making Things Worth Making",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580462,
+      "title": "Solution Selling",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572725,
+      "title": "The Unwritten Laws of Business",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579189,
+      "title": "A Class with Drucker: Pelajaran Berharga dari Guru Manajemen",
+      "category": "Buku Bisnis dan Manajemen",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579736,
+      "title": "Because She Can",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578420,
+      "title": "The One-Night Wife",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576267,
+      "title": "The Playboy Doctor",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577900,
+      "title": "Bad Men",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573417,
+      "title": "Kala Lonceng Cinta Berdentang",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581235,
+      "title": "The Manager",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576108,
+      "title": "Man and Wife",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580802,
+      "title": "Dracula",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574777,
+      "title": "Negeri 5 Menara",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580447,
+      "title": "The Book of Lost Things",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578022,
+      "title": "Laut dan Kupu-Kupu",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578889,
+      "title": "Divortiare",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575151,
+      "title": "20 Cerpen Indonesia Terbaik 2008",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581239,
+      "title": "Demi Allah, Aku Jadi Teroris",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581688,
+      "title": "Why Mars & Venus Collide",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580388,
+      "title": "Katakan Cinta dengan Warna",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572820,
+      "title": "Dokter Juga Manusia",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573048,
+      "title": "Brondong Lover",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579315,
+      "title": "The Zahir",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575233,
+      "title": "I Don't Care",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575586,
+      "title": "Laki-laki yang Salah",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577627,
+      "title": "Sang Alkemis",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572512,
+      "title": "Quidditch Through The Ages",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579848,
+      "title": "Fantastic Beasts & Where to Find Them",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581965,
+      "title": "The Penderwicks",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574893,
+      "title": "Rahasia Selma",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581658,
+      "title": "The Life-Changing Magic of Tidying Up",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572968,
+      "title": "Exes Anonymous Klub Patah Hati",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579292,
+      "title": "The Slippery Slope",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576485,
+      "title": "Mine Till Midnight",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572455,
+      "title": "Dog Handling",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580342,
+      "title": "PS: I Love You",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577880,
+      "title": "The Viscount Who Loved Me",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574129,
+      "title": "Tanah Tabu",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577671,
+      "title": "In A Class by Itself",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575686,
+      "title": "Pelajaran Cinta Untuk Harvard",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576073,
+      "title": "Cinta Sepanjang Amazon",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575992,
+      "title": "The Name of the Name",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575486,
+      "title": "Devil in Winter",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576755,
+      "title": "Spammer",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573466,
+      "title": "To Tokyo to Love",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575026,
+      "title": "10 Cerpen Indonesia Terbaik 2008",
+      "category": "Buku Fiksi/Novel",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581251,
+      "title": "The Fine Art Of The Big Talk",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578063,
+      "title": "Profit Is King",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576775,
+      "title": "Learning 5.1",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578250,
+      "title": "Sebuah Seni untuk Bersikap Bodo Amat",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573820,
+      "title": "How To Win Friends & Influence People",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580895,
+      "title": "Super Great Memory",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574508,
+      "title": "8 Kekuatan Keunggulan Diri",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479582269,
+      "title": "Oh My Goodness",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577774,
+      "title": "Purple Cow",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574642,
+      "title": "⁠77++ Tanya Jawab Cara Bodoh Berjualan",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576481,
+      "title": "77 Cara Bodoh Hidup Bahagia",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576406,
+      "title": "Kekuatan Kata Tidak",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572471,
+      "title": "Attitude Is Everything",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580273,
+      "title": "Sukses Memimpin",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579085,
+      "title": "Makanya, Mikir!",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580917,
+      "title": "Control Your Expectation",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579486,
+      "title": "⁠Simplify Your Work Life",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575499,
+      "title": "Think and Grow Rich",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576915,
+      "title": "Quiet",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479582331,
+      "title": "Rahasia Menghancurkan Mental Block",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575403,
+      "title": "50 Kesalahan Sales dan Solusinya",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581675,
+      "title": "Terima Kasih Sudah Mengatakannya",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581991,
+      "title": "Mindset",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579554,
+      "title": "Getting to Yes",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575895,
+      "title": "Gesture",
+      "category": "Buku Paling Diminati",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578381,
+      "title": "Manifest: 7 Langkah Menuju Hidup yang Indah",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572805,
+      "title": "The Secret of Mindset",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574551,
+      "title": "Be Brilliant and Productive",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581608,
+      "title": "Thinking, Fast and Slow",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574102,
+      "title": "Lean In: Women, Work, and The Will to Lead",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575350,
+      "title": "Cantik, Cerdas, dan Feminin",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577614,
+      "title": "The Empathy Effect",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576658,
+      "title": "Faktor Faktor Prestasi",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575799,
+      "title": "Memetik Matahari",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580589,
+      "title": "Self Driving",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573288,
+      "title": "Stop Over Thinking",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579480,
+      "title": "Seni Membaca Bahasa Tubuh",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575831,
+      "title": "Empower Yourself",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576260,
+      "title": "The Power of Now",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580275,
+      "title": "Merawat Luka Batin",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575189,
+      "title": "21 Lessons for the 21st Century",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580314,
+      "title": "The Way to Happiness",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575372,
+      "title": "Unlocking Happiness",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579390,
+      "title": "Etiket: Sukses Membawa Diri di Segala Kesempatan",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573216,
+      "title": "Butir-Butir Mutiara Kesuksesan",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573655,
+      "title": "Mindset Therapy",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573196,
+      "title": "Tak Apa-apa Tak Sempurna",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580901,
+      "title": "Buku Anti Malas dan Suka Menunda",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574273,
+      "title": "Emotional Intelligence",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479582290,
+      "title": "Etika",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579163,
+      "title": "Do It With Passion!",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579189,
+      "title": "5 Aturan Pikiran",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577553,
+      "title": "Same as Ever",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577992,
+      "title": "The Principles of Power",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581470,
+      "title": "Sayangi Dirimu, Berhentilah Menyenangkan Semua Orang",
+      "category": "Buku Pengembangan Diri",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573931,
+      "title": "Metapsikologi",
+      "category": "Buku Pribadi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479582180,
+      "title": "AI dalam Dunia HR (Manfaat dan Tantangannya untuk Perusahaan)",
+      "category": "Buku Pribadi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572997,
+      "title": "The Things You Can See Only When You Slow Down",
+      "category": "Buku Pribadi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576930,
+      "title": "Everyday Information Architecture",
+      "category": "Buku Pribadi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581506,
+      "title": "The 360 Degree Leader",
+      "category": "Buku Pribadi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573387,
+      "title": "DotCom Secrets",
+      "category": "Buku Pribadi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581911,
+      "title": "The Art Stoicism",
+      "category": "Buku Pribadi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573928,
+      "title": "Atomic Design",
+      "category": "Buku Pribadi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574933,
+      "title": "⁠Modular Design Frameworks: A Projects-based Guide for UI/UX Designers",
+      "category": "Buku Pribadi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581319,
+      "title": "Membaca Pikiran Orang Lewat Bahasa Tubuh",
+      "category": "Buku Pribadi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572556,
+      "title": "Filsafat Ilmu Pengetahuan",
+      "category": "Buku Pribadi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575477,
+      "title": "Untukmu yang Akan Menikah dan Telah Menikah",
+      "category": "Buku Religi dan Hubungan",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579642,
+      "title": "Happiness Through Budha Damma",
+      "category": "Buku Religi dan Hubungan",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574260,
+      "title": "Mengapa Doa Saya Selalu Dikabulkan",
+      "category": "Buku Religi dan Hubungan",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573632,
+      "title": "Kado Cinta",
+      "category": "Buku Religi dan Hubungan",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577594,
+      "title": "The Puberty Book",
+      "category": "Buku Religi dan Hubungan",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574777,
+      "title": "Kerjaku, Ibadahku",
+      "category": "Buku Religi dan Hubungan",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581683,
+      "title": "Awarness Of Ramadhan",
+      "category": "Buku Religi dan Hubungan",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479582080,
+      "title": "Curhat ke Mamah Dedeh",
+      "category": "Buku Religi dan Hubungan",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579512,
+      "title": "Laku dan Tutur Islami",
+      "category": "Buku Religi dan Hubungan",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575152,
+      "title": "Improvisasi Jazz",
+      "category": "Buku Religi dan Hubungan",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574931,
+      "title": "Sambut Tahun Pertama Bayi Anda",
+      "category": "Buku Religi dan Hubungan",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575367,
+      "title": "Jurus Sehat Rasulullah",
+      "category": "Buku Religi dan Hubungan",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576364,
+      "title": "Etiket",
+      "category": "Buku Religi dan Hubungan",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573533,
+      "title": "Membuka Pintu Hati",
+      "category": "Buku Religi dan Hubungan",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578867,
+      "title": "⁠Mencari Bening Mata Air",
+      "category": "Buku Religi dan Hubungan",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575592,
+      "title": "Bahagia Bersama",
+      "category": "Buku Religi dan Hubungan",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581794,
+      "title": "Mikrotik Certified Training Essentials",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577489,
+      "title": "Modul Linux Server Fundamental & Advance Server",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577915,
+      "title": "MICKE",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576560,
+      "title": "Digital Creative & Information and Communication Technology Industries",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573967,
+      "title": "How Google Works",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574070,
+      "title": "High Performance Web Sites",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572445,
+      "title": "Red Hat Linux System Administration Handbook",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575522,
+      "title": "High Performance MySQL",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580456,
+      "title": "The Mythical Man-Month",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581611,
+      "title": "Metode Statistika",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577986,
+      "title": "Teknik Programan Turbo Prolog Tingkat Lanjut",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580716,
+      "title": "Analisis & Desain",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572778,
+      "title": "Borland Delphi 7 Pemrograman",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573407,
+      "title": "Bikin PC Aman dari Serangan Virus, Spam, dan Spyware",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579482,
+      "title": "Sistem Informasi Manajemen",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579517,
+      "title": "CGI & PERL",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579174,
+      "title": "Introduction to Cryptography",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577647,
+      "title": "Introduction to Database and Visual Programming",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578322,
+      "title": "AutoCAD 3D & 3ds Max untuk Interior",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572556,
+      "title": "Teknik Rendering dengan Autocad 2024",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575449,
+      "title": "Membongkar Trik Rahasia Para Master PHP",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575990,
+      "title": "Openstack",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575769,
+      "title": "Enterprise Server Redhat",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580701,
+      "title": "Grid Systems",
+      "category": "Buku Teknologi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574909,
+      "title": "The 7 Habits of Highly Effective People (ENG)",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574028,
+      "title": "The Power Of Habit (ENG)",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580463,
+      "title": "The Power Of Habit (IDN)",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577464,
+      "title": "7 Kebiasaan Manusia yang Sangat Efektif",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575975,
+      "title": "Homo Deus",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576176,
+      "title": "How To Win Friends & Influence People In The Digital Age",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581622,
+      "title": "Sapiens: Riwayat Singkat Umat Manusia",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579168,
+      "title": "Sapiens: Pilar-Pilar Peradaban",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572794,
+      "title": "The 80/20 Principle",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577477,
+      "title": "The 48 Laws of Power",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576756,
+      "title": "Winners Dream",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576155,
+      "title": "Hypnotic Writing",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479582230,
+      "title": "Tipping Point",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577223,
+      "title": "Work Rules!",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572816,
+      "title": "Sapiens: Kelahiran Umat Manusia",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581082,
+      "title": "Berani Tidak Disukai",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580105,
+      "title": "Start With Why",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579212,
+      "title": "Noise: A Flaw in Human Judgment",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576902,
+      "title": "Ikigai",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576746,
+      "title": "The 12 Week Year",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580335,
+      "title": "TED Talks",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573427,
+      "title": "The Subtle Art Of Not Giving A Fuck",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573263,
+      "title": "The Psychology of Money",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577984,
+      "title": "Hooked",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580332,
+      "title": "Zero to One",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579897,
+      "title": "The 7 Habits of Highly Effective People (IDN)",
+      "category": "Buku Terlaris",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580286,
+      "title": "Atomic Habits",
+      "category": "Buku Wajib Baca",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577638,
+      "title": "Who Moved My Cheese?",
+      "category": "Buku Wajib Baca",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579681,
+      "title": "Kiichiro Toyota",
+      "category": "Komik Bisnis/Non Fiksi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573305,
+      "title": "Project X Cup Noodle",
+      "category": "Komik Bisnis/Non Fiksi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581951,
+      "title": "Project X Shinkansen",
+      "category": "Komik Bisnis/Non Fiksi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479582260,
+      "title": "Project X Seven Eleven",
+      "category": "Komik Bisnis/Non Fiksi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581630,
+      "title": "Keluarga Super Irit",
+      "category": "Komik Bisnis/Non Fiksi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580181,
+      "title": "Kapten Dinaran: Battle of Nusantara Vol 1",
+      "category": "Komik Bisnis/Non Fiksi",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577925,
+      "title": "Mentoring Millennials (MODUL)",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573973,
+      "title": "Is Your Organization Millennial Ready (MODUL)",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577872,
+      "title": "Profile of Medan",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581400,
+      "title": "A Gift of Love",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575478,
+      "title": "Green Awards",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580853,
+      "title": "Unravelled: Sustainability Has Come Undone",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574571,
+      "title": "Overcoming The Pandemic",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578242,
+      "title": "Building Cities & Urban Centres",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479573813,
+      "title": "Adaptive Reuse",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580755,
+      "title": "Building Maintenance & Mechanical Electrical System",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479578405,
+      "title": "Sistem Linux Thin Client",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579638,
+      "title": "Create Server Via Browser",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479576625,
+      "title": "Akses Lengkap Direktori Data",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581497,
+      "title": "Build Private Network",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574595,
+      "title": "Virtualisasi Xen Server",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479572666,
+      "title": "Hard Drive Management",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479579272,
+      "title": "Web Conference",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479580455,
+      "title": "Openfire Server Chatting",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581952,
+      "title": "Employer Branding For Millennials: A Blueprint",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479577933,
+      "title": "Yellow Pages Medan",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479574688,
+      "title": "Tanaman Obat untuk Mengatasi Diabetes Melitus",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479575312,
+      "title": "Special: Grebeg Gunungan Idul Adha-Cermin Cinta Raja",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    },
+    {
+      "id": 1769479581374,
+      "title": "Inspiring Sasando",
+      "category": "Majalah",
+      "location": "Medan - HO"
+    }
+  ]
 }

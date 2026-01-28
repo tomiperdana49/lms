@@ -288,7 +288,7 @@ const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) =
                                     />
                                     {formData.evidenceUrl ? (
                                         <div className="flex items-center justify-center gap-2 text-teal-600 font-bold">
-                                            <span>File Uploaded: {formData.evidenceUrl.split('/').pop()}</span>
+                                            <span>File Uploaded: {formData.evidenceUrl ? formData.evidenceUrl.split('/').pop() : 'Unknown file'}</span>
                                             <button type="button" onClick={(e) => {
                                                 e.preventDefault();
                                                 setFormData({ ...formData, evidenceUrl: '' });

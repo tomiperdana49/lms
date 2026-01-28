@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Edit, Trash2, Plus, GripVertical, Save, X, BookOpen, Clock } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Course, Module, Quiz, QuizResult } from '../types';
+import PopupNotification from './PopupNotification';
 
 const AdminCourseManager = () => {
     // Helper to render Quiz Editor
@@ -98,6 +99,15 @@ const AdminCourseManager = () => {
     const [editingCourse, setEditingCourse] = useState<Course | null>(null);
     const [editorTab, setEditorTab] = useState<'content' | 'grades'>('content');
 
+    // Popup State
+    const [popup, setPopup] = useState<{ type: 'success' | 'error', message: string, isOpen: boolean }>({
+        type: 'success',
+        message: '',
+        isOpen: false
+    });
+
+    // ... (existing rendering logic)
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [progressData, setProgressData] = useState<Record<string, any>[]>([]);
     const [allQuizResults, setAllQuizResults] = useState<QuizResult[]>([]);
@@ -107,7 +117,7 @@ const AdminCourseManager = () => {
         const fetchData = async () => {
             try {
                 const [resCourses, resProgress, resQuiz] = await Promise.all([
-                    fetch(`${API_BASE_URL}/api/courses`),
+                    fetch(`${API_BASE_URL}/api/courses-json`),
                     fetch(`${API_BASE_URL}/api/progress`),
                     fetch(`${API_BASE_URL}/api/quiz/all-results`)
                 ]);
@@ -124,8 +134,6 @@ const AdminCourseManager = () => {
         };
         fetchData();
     }, []);
-
-    // Helper removed (saveToStorage) as we use API calls now
 
     const handleDeleteCourse = async (id: number) => {
         if (confirm('Are you sure you want to delete this course?')) {
@@ -176,6 +184,7 @@ const AdminCourseManager = () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(editingCourse)
                 });
+                if (!res.ok) throw new Error('Failed to save');
                 const saved = await res.json();
                 setCourses([...courses, saved]);
             } else {
@@ -185,14 +194,15 @@ const AdminCourseManager = () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(editingCourse)
                 });
+                if (!res.ok) throw new Error('Failed to update');
                 const saved = await res.json();
                 setCourses(courses.map(c => c.id === saved.id ? saved : c));
             }
             setEditingCourse(null);
-            alert('Course Saved Successfully!');
+            setPopup({ type: 'success', message: 'Course Saved Successfully!', isOpen: true });
         } catch (err) {
             console.error('Failed to save course', err);
-            alert('Failed to save course');
+            setPopup({ type: 'error', message: 'Failed to save course. Please check the connection.', isOpen: true });
         }
     };
 
@@ -334,16 +344,35 @@ const AdminCourseManager = () => {
                                                                 />
                                                                 <Clock size={14} className="absolute left-2.5 top-3 text-slate-400" />
                                                             </div>
-                                                            <input
-                                                                value={mod.videoId || ''}
-                                                                onChange={e => {
-                                                                    const newMods = [...editingCourse.modules];
-                                                                    newMods[idx] = { ...mod, videoId: e.target.value };
-                                                                    setEditingCourse({ ...editingCourse, modules: newMods });
-                                                                }}
-                                                                placeholder="YouTube Video ID"
-                                                                className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm font-mono"
-                                                            />
+                                                            <div className="relative flex-1">
+                                                                <input
+                                                                    value={mod.videoId || ''}
+                                                                    onChange={e => {
+                                                                        const val = e.target.value;
+                                                                        // Helper to extract ID from URL
+                                                                        let videoId = val;
+                                                                        try {
+                                                                            if (val.includes('youtube.com') || val.includes('youtu.be')) {
+                                                                                const url = new URL(val.startsWith('http') ? val : `https://${val}`);
+                                                                                if (val.includes('youtu.be')) {
+                                                                                    videoId = url.pathname.slice(1);
+                                                                                } else {
+                                                                                    videoId = url.searchParams.get('v') || videoId;
+                                                                                }
+                                                                            }
+                                                                        } catch (err) {
+                                                                            // If invalid URL, assume it's an ID or partial text
+                                                                            console.log('Not a valid URL, treating as ID', err);
+                                                                        }
+
+                                                                        const newMods = [...editingCourse.modules];
+                                                                        newMods[idx] = { ...mod, videoId: videoId };
+                                                                        setEditingCourse({ ...editingCourse, modules: newMods });
+                                                                    }}
+                                                                    placeholder="YouTube Video ID or Link"
+                                                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+                                                                />
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <button
@@ -642,6 +671,13 @@ const AdminCourseManager = () => {
             </div>
 
             {renderEditor()}
+
+            <PopupNotification
+                isOpen={popup.isOpen}
+                type={popup.type}
+                message={popup.message}
+                onClose={() => setPopup(prev => ({ ...prev, isOpen: false }))}
+            />
         </div>
     );
 };

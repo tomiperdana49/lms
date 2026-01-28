@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MoreHorizontal, MapPin, Video, Plus, X } from 'lucide-react';
 import { API_BASE_URL } from '../config';
-import type { Role } from '../types';
+import type { Role, Meeting, Incentive, TrainingRequest } from '../types';
 
 interface CalendarEvent {
     id: number;
@@ -57,8 +57,7 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
             const isHR = userRole === 'HR' || userRole === 'HR_ADMIN';
 
             // 1. Process Meetings (Internal)
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            meetings.forEach((m: any) => {
+            meetings.forEach((m: Meeting) => {
                 // Show if public (HR Host) OR user is invited OR User is HR (Access All)
                 if (isHR || m.host === 'HR Team' || m.host === 'Admin' || (userEmail && m.guests?.emails?.includes(userEmail))) {
                     loadedEvents.push({
@@ -76,24 +75,23 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
 
             // 2. Process External Training (HR Only sees Approved External Training as schedule items?)
             // Usually regular users see their own requested training. HR sees all optimized.
+            // 2. Process External Training
             if (isHR) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                training.forEach((t: any) => {
-                    if (t.status === 'APPROVED' || t.status === 'COMPLETED') {
+                training.forEach((t: TrainingRequest) => {
+                    if (t.status === 'APPROVED') {
                         loadedEvents.push({
                             id: t.id,
                             title: `Training: ${t.title} (${t.employeeName})`,
                             type: 'EXTERNAL',
                             date: new Date(t.date),
-                            time: 'All Day', // External training often full day or just date tracked
+                            time: 'All Day',
                             description: `Provider: ${t.vendor}. Justification: ${t.justification}`
                         });
                     }
                 });
             } else if (userEmail) {
                 // Regular user sees their own
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                training.forEach((t: any) => {
+                training.forEach((t: TrainingRequest) => {
                     if (t.employeeName.toLowerCase().includes(userEmail.split('@')[0].toLowerCase())) {
                         loadedEvents.push({
                             id: t.id,
@@ -108,8 +106,7 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
             }
 
             // 3. Process Incentives
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            incentives.forEach((inc: any) => {
+            incentives.forEach((inc: Incentive) => {
                 if (isHR && inc.status === 'Active') {
                     // HR Sees all active incentives expiry
                     loadedEvents.push({

@@ -1,11 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { PlayCircle, Lock, ChevronRight, BookOpen, ArrowLeft, X, Clock, CheckCircle, Award } from 'lucide-react';
 import { API_BASE_URL } from '../config';
-import type { Course, Quiz, User } from '../types';
+import type { Course, Quiz, User, QuizResult } from '../types';
 import PopupNotification from './PopupNotification';
 
 interface CoursePlayerProps {
     user: User;
+}
+
+declare global {
+    interface Window {
+        YT: any;
+        onYouTubeIframeAPIReady: () => void;
+    }
 }
 
 const CoursePlayer = ({ user }: CoursePlayerProps) => {
@@ -18,6 +25,11 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
 
     const [quizResults, setQuizResults] = useState<Record<number, number>>({}); // moduleId -> best score or boolean
+    const [isVideoCompleted, setIsVideoCompleted] = useState(false);
+    const playerRef = useRef<any>(null);
+
+    // Derived state
+    const activeModule = activeCourse?.modules.find(m => m.id === activeModuleId);
 
     // Popup State
     const [popup, setPopup] = useState<{ type: 'success' | 'error', message: string, isOpen: boolean }>({
@@ -33,8 +45,8 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
     useEffect(() => {
         const loadCourses = async () => {
             try {
-                // 1. Fetch all courses
-                const res = await fetch(`${API_BASE_URL}/api/courses`);
+                // 1. Fetch all courses (from static file for now)
+                const res = await fetch(`${API_BASE_URL}/api/courses-json`);
                 const allCourses = await res.json();
 
                 // 2. Sync Progress for each course
@@ -56,7 +68,8 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             // Previous module completed?
                             const prevMod = course.modules[idx - 1];
                             const isLocked = idx === 0 ? false : (prevMod && !completedIds.includes(prevMod.id));
-                            return { ...m, locked: isLocked };
+                            const isCompleted = completedIds.includes(m.id);
+                            return { ...m, locked: isLocked, completed: isCompleted };
                         });
 
                         return { ...course, progress, modules };
@@ -85,8 +98,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                 // Map results to { moduleId: score }
                 // Map results to { moduleId: score }
                 const map: Record<number, number> = {};
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                results.forEach((r: any) => {
+                results.forEach((r: QuizResult) => {
                     // If multiple attempts, take max
                     if (r.moduleId) {
                         const existing = map[r.moduleId] || 0;
@@ -100,6 +112,56 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
         };
         fetchResults();
     }, [activeCourse, userId]);
+
+    // --- YouTube API Logic ---
+    useEffect(() => {
+        if (!window.YT) {
+            const tag = document.createElement('script');
+            tag.src = "https://www.youtube.com/iframe_api";
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+        }
+    }, []);
+
+    // Initialize Player when active module changes
+    useEffect(() => {
+        if (!activeModule || !activeModule.videoId || viewMode !== 'player') return;
+
+        // Reset state: if previously completed, allow immediately
+        setIsVideoCompleted(activeModule.completed || false);
+
+        const initPlayer = () => {
+            // Destroy existing if needed (though loadVideoById is preferred for smoother transition)
+            if (playerRef.current && typeof playerRef.current.loadVideoById === 'function') {
+                playerRef.current.loadVideoById(activeModule.videoId);
+            } else {
+                playerRef.current = new window.YT.Player('youtube-player', {
+                    height: '100%',
+                    width: '100%',
+                    videoId: activeModule.videoId,
+                    playerVars: {
+                        autoplay: 1,
+                        controls: 1,
+                        rel: 0,
+                        modestbranding: 1
+                    },
+                    events: {
+                        onStateChange: (event: any) => {
+                            if (event.data === window.YT.PlayerState.ENDED) {
+                                setIsVideoCompleted(true);
+                            }
+                        }
+                    }
+                });
+            }
+        };
+
+        if (window.YT && window.YT.Player) {
+            initPlayer();
+        } else {
+            window.onYouTubeIframeAPIReady = initPlayer;
+        }
+    }, [activeModule?.id, activeModule?.videoId, viewMode, activeModule?.completed]); // key on ID to ensure reload
 
     const handleStartCourse = (course: Course) => {
         setActiveCourse(course);
@@ -369,7 +431,9 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
     // --- Player View ---
     if (!activeCourse) return null;
 
-    const activeModule = activeCourse.modules.find(m => m.id === activeModuleId);
+    // activeModule is already defined at top level for hooks, but we ensure it's used here.
+    // If somehow undefined (e.g. bad ID), handle gracefully?
+    // Const activeModule is already in scope.
 
     return (
         <div className="flex flex-col h-[calc(100vh-80px)] bg-slate-900">
@@ -403,16 +467,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         <div className="flex-1 flex items-center justify-center p-4 lg:p-10 min-h-[400px]">
                             <div className="w-full max-w-5xl aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative ring-1 ring-slate-800 group">
                                 {activeModule?.videoType === 'youtube' && activeModule.videoId ? (
-                                    <iframe
-                                        width="100%"
-                                        height="100%"
-                                        src={`https://www.youtube.com/embed/${activeModule.videoId}?autoplay=1&controls=0&disablekb=1&modestbranding=1&rel=0`}
-                                        title={activeModule.title}
-                                        frameBorder="0"
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                        allowFullScreen
-                                        className="absolute inset-0"
-                                    ></iframe>
+                                    <div id="youtube-player" className="absolute inset-0" />
                                 ) : (
                                     <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 bg-slate-900/50 backdrop-blur-sm">
                                         <PlayCircle size={64} className="mb-4 opacity-50" />
@@ -464,6 +519,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         )
                                     ) : (
                                         <button
+                                            disabled={!isVideoCompleted && activeModule && !activeModule.completed}
                                             onClick={async () => {
                                                 if (!activeCourse || !activeModule) return;
                                                 const currentIndex = activeCourse.modules.findIndex(m => m.id === activeModule.id);
@@ -491,10 +547,17 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                     setPopup({ type: 'error', message: 'Error saving progress', isOpen: true });
                                                 }
                                             }}
-                                            className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-green-500 hover:shadow-green-500/20 transition-all flex items-center gap-2 group"
+                                            className={`px-6 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2 group
+                                                ${(!isVideoCompleted && activeModule && !activeModule.completed)
+                                                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                                                    : 'bg-green-600 text-white hover:bg-green-500 hover:shadow-green-500/20'}
+                                            `}
                                         >
-                                            <CheckCircle size={20} className="group-hover:scale-110 transition-transform" />
-                                            Selesai & Lanjut
+                                            {(!isVideoCompleted && activeModule && !activeModule.completed) ? (
+                                                <> <Lock size={18} /> Tonton sampai selesai </>
+                                            ) : (
+                                                <> <CheckCircle size={20} className="group-hover:scale-110 transition-transform" /> Selesai & Lanjut </>
+                                            )}
                                         </button>
                                     )}
                                 </div>

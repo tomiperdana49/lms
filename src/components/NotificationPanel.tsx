@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Bell, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import { API_BASE_URL } from '../config';
+import type { Meeting, TrainingRequest } from '../types';
 
 interface Notification {
     id: number;
@@ -35,10 +36,8 @@ const NotificationPanel = ({ userEmail, userName }: NotificationPanelProps) => {
                 // 1. Transform Meetings to Notifications
                 // Filter: Only include meetings where the user is invited (in guest list)
                 const meetingNotifs: Notification[] = meetings
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    .filter((m: any) => m.guests?.emails?.includes(userEmail))
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    .map((m: any) => ({
+                    .filter((m: Meeting) => m.guests?.emails?.includes(userEmail))
+                    .map((m: Meeting) => ({
                         id: m.id,
                         title: 'Upcoming Meeting',
                         message: `${m.title} at ${m.time} (${m.type})`,
@@ -50,10 +49,8 @@ const NotificationPanel = ({ userEmail, userName }: NotificationPanelProps) => {
                 // 2. Transform Training Requests to Notifications
                 // Filter: Only include requests submitted by the current user
                 const trainingNotifs: Notification[] = training
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    .filter((t: any) => t.userName === userName)
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    .map((t: any) => ({
+                    .filter((t: TrainingRequest) => t.userName === userName)
+                    .map((t: TrainingRequest) => ({
                         id: t.id,
                         title: `Training: ${t.status?.replace('_', ' ')}`,
                         message: `Request for "${t.title}" is ${t.status?.toLowerCase().replace('_', ' ')}.`,

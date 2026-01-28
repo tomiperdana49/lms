@@ -14,9 +14,12 @@ export interface ReadingLogEntry {
     startDate?: string;
     finishDate?: string;
     evidenceUrl?: string;
+    hrApprovalStatus?: 'Pending' | 'Approved' | 'Rejected'; // New: HR verification
+    incentiveAmount?: number; // New: Approved incentive amount
+    rejectionReason?: string; // New: Reason for rejection
 }
 
-export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard';
+export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives';
 export type Role = 'STAFF' | 'SUPERVISOR' | 'HR' | 'HR_ADMIN';
 
 export interface User {
@@ -46,6 +49,7 @@ export interface Module {
     videoType?: 'youtube' | 'local';
     videoId?: string;
     locked: boolean;
+    completed?: boolean;
     quiz?: Quiz; // Optional quiz attached to module
 }
 
@@ -86,4 +90,46 @@ export interface TrainingRequest {
     division?: string;
     rejectionReason?: string;
     additionalCost?: number;
+    userName?: string;
+    submittedAt?: string;
+}
+
+export interface Meeting {
+    id: number;
+    title: string;
+    date: string;
+    time: string;
+    type: 'Online' | 'Offline' | 'Hybrid';
+    host: string;
+    description: string;
+    location?: string;
+    meetLink?: string;
+    guests: {
+        status: string;
+        count: number;
+        emails: string[];
+    };
+    costReport?: CostReport;
+}
+
+export interface CostReport {
+    trainerIncentive: number;
+    snackCost: number;
+    lunchCost: number;
+    otherCost: number;
+    participantsCount: number; // Actual attendance
+    isFinalized: boolean;
+}
+
+export interface Incentive {
+    id: number;
+    courseName: string;
+    employeeName: string;
+    startDate: string;
+    endDate: string;
+    status: 'Active' | 'Expired' | 'Pending' | 'Denied' | 'Resign';
+    reward: string;
+    requesterName?: string;
+    description?: string;
+    evidenceUrl?: string; // Certificate photo
 }

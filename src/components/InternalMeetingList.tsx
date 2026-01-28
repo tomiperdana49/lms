@@ -9,30 +9,20 @@ import {
     Plus,
     FileText,
     Calendar as CalendarIcon,
-    ArrowRight
+    ArrowRight,
+    DollarSign,
+    CheckCircle
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
-import type { Role } from '../types';
+import type { Role, Meeting, CostReport } from '../types';
 import PopupNotification from './PopupNotification';
-
-interface Meeting {
-    id: number;
-    title: string;
-    date: string;
-    time: string;
-    shortDate: string;
-    host: string;
-    type: 'Online' | 'Offline' | 'Hybrid';
-    location: string;
-    description: string;
-    guests: { status: 'Yes' | 'Awaiting'; count: number; emails: string[] };
-    meetLink?: string;
-}
 
 interface InternalMeetingListProps {
     userRole: Role;
-    userEmail: string;
+    userEmail?: string;
 }
+
+type ExtendedMeeting = Meeting & { shortDate?: string };
 
 const AvatarStack = ({ count }: { count: number }) => (
     <div className="flex -space-x-2 overflow-hidden">
@@ -53,13 +43,25 @@ const AvatarStack = ({ count }: { count: number }) => (
 
 const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) => {
     // --- State ---
-    const [meetings, setMeetings] = useState<Meeting[]>([]);
-    const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+    const [meetings, setMeetings] = useState<ExtendedMeeting[]>([]);
+    const [selectedMeeting, setSelectedMeeting] = useState<ExtendedMeeting | null>(null);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [notification, setNotification] = useState<{ show: boolean; type: 'success' | 'error'; message: string }>({ show: false, type: 'success', message: '' });
 
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
+
+    // Reporting State
+    const [isReportOpen, setIsReportOpen] = useState(false);
+    const [reportData, setReportData] = useState<CostReport>({
+        trainerIncentive: 0,
+        snackCost: 0,
+        lunchCost: 0,
+        otherCost: 0,
+        participantsCount: 0,
+        isFinalized: false
+    });
+    const [reportingId, setReportingId] = useState<number | null>(null);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -78,22 +80,100 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
     const [inviteEmail, setInviteEmail] = useState('');
     const [invitedEmails, setInvitedEmails] = useState<string[]>([]);
 
+    // --- Filter State ---
+    const [viewMode, setViewMode] = useState<'list' | 'recap'>('list');
+    const [selectedYear, setSelectedYear] = useState<number | 'All'>(new Date().getFullYear());
+    const [selectedPeriod, setSelectedPeriod] = useState<string>('All Year'); // Default to All Year for easier initial view
+    const [selectedBranch, setSelectedBranch] = useState<string>('All Branches');
+    const [searchQuery, setSearchQuery] = useState(''); // Unified search term
+
+    // Recap Detail Modal
+    const [recapDetailHost, setRecapDetailHost] = useState<string | null>(null);
+
+    const periodOptions = [
+        "All Year",
+        "Q1 (Jan-Mar)", "Q2 (Apr-Jun)", "Q3 (Jul-Sep)", "Q4 (Oct-Dec)",
+        "Semester 1 (Jan-Jun)", "Semester 2 (Jul-Dec)",
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ];
+
+    const getPeriodDates = () => {
+        const year = selectedYear === 'All' ? new Date().getFullYear() : selectedYear;
+        // Default: Full Year
+        let start = new Date(year, 0, 1);
+        let end = new Date(year, 11, 31, 23, 59, 59);
+
+        if (selectedPeriod === 'All Year') return [start, end];
+
+        if (selectedPeriod.startsWith('Q1')) { end = new Date(year, 2, 31, 23, 59, 59); }
+        else if (selectedPeriod.startsWith('Q2')) { start = new Date(year, 3, 1); end = new Date(year, 5, 30, 23, 59, 59); }
+        else if (selectedPeriod.startsWith('Q3')) { start = new Date(year, 6, 1); end = new Date(year, 8, 30, 23, 59, 59); }
+        else if (selectedPeriod.startsWith('Q4')) { start = new Date(year, 9, 1); end = new Date(year, 11, 31, 23, 59, 59); }
+        else if (selectedPeriod.startsWith('Semester 1')) { end = new Date(year, 5, 30, 23, 59, 59); }
+        else if (selectedPeriod.startsWith('Semester 2')) { start = new Date(year, 6, 1); }
+        else {
+            // Monthly
+            const monthIdx = new Date(`${selectedPeriod} 1, ${year}`).getMonth();
+            if (!isNaN(monthIdx)) {
+                start = new Date(year, monthIdx, 1);
+                end = new Date(year, monthIdx + 1, 0, 23, 59, 59);
+            }
+        }
+        return [start, end];
+    };
+
+    // --- Filtered Data ---
+    const filteredMeetings = meetings.filter(m => {
+        // PERMISSION CHECK: Non-HR can ONLY see meetings they are invited to
+        if (userRole !== 'HR' && userRole !== 'HR_ADMIN') {
+            if (!userEmail) return false; // Guest without email sees nothing
+            const invites = m.guests?.emails || [];
+            // Check if userEmail matches any invite (case-insensitive usually, but strict here)
+            // Also simpler check: email string match
+            const isInvited = invites.some(email => email.toLowerCase() === userEmail.toLowerCase());
+            if (!isInvited) return false;
+        }
+
+        const d = new Date(m.date);
+        const [start, end] = getPeriodDates();
+
+        // Year & Period
+        if (selectedYear !== 'All' && d.getFullYear() !== selectedYear) return false;
+        if (d < start || d > end) return false;
+
+        // Branch
+        const branchName = m.location || 'Online';
+        if (selectedBranch !== 'All Branches' && !branchName.includes(selectedBranch)) return false;
+
+        // Search
+        const lower = searchQuery.toLowerCase();
+        return (
+            m.title.toLowerCase().includes(lower) ||
+            m.host.toLowerCase().includes(lower)
+        );
+    });
+
     // --- Handlers ---
 
-    // Helper to safely parse meeting data from API or legacy JSON
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const safeMeeting = (m: any): Meeting => {
-        const dateObj = new Date(m.date);
-        const shortDate = m.shortDate || `${dateObj.getDate()} ${dateObj.toLocaleString('default', { month: 'short' }).toUpperCase()}`;
+    // Helper to safely parse meeting data
+    const safeMeeting = (m: any): ExtendedMeeting => {
+        let shortDate = m.shortDate || '';
+        if (!shortDate && m.date) {
+            const dateObj = new Date(m.date);
+            if (!isNaN(dateObj.getTime())) {
+                shortDate = `${dateObj.getDate()} ${dateObj.toLocaleString('default', { month: 'short' }).toUpperCase()}`;
+            }
+        }
 
         return {
             ...m,
-            host: m.host || 'Admin', // Fallback for legacy data
+            host: m.host || 'Admin',
             type: m.type || (m.location && m.location.toLowerCase().includes('meet') ? 'Online' : 'Offline'),
-            description: m.description || m.agenda || 'No description provided.',
-            shortDate,
+            description: m.description || 'No description provided.',
+            shortDate: shortDate || 'TBD',
             guests: m.guests || { status: 'Awaiting', count: 0, emails: [] }
-        } as Meeting;
+        } as ExtendedMeeting;
     };
 
     // --- Fetch Meetings ---
@@ -101,8 +181,35 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
         fetch(`${API_BASE_URL}/api/meetings`)
             .then(res => res.json())
             .then(data => {
-                // Sanitize data on load
-                setMeetings(data.map(safeMeeting));
+                const sorted = data.map(safeMeeting).sort((a: ExtendedMeeting, b: ExtendedMeeting) => {
+                    // Compare Dates
+                    const dateA = new Date(a.date).getTime();
+                    const dateB = new Date(b.date).getTime();
+                    if (dateA !== dateB) return dateA - dateB;
+
+                    // Compare Times (Extract Start Time)
+                    const getMinutes = (timeStr: string) => {
+                        if (!timeStr) return 0;
+                        // Extract first valid HH:mm pattern
+                        const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+                        if (!match) return 0;
+
+                        let [_, hrs, mins, period] = match;
+                        let hours = parseInt(hrs);
+                        const minutes = parseInt(mins);
+
+                        if (period) {
+                            period = period.toUpperCase();
+                            if (period === 'PM' && hours < 12) hours += 12;
+                            if (period === 'AM' && hours === 12) hours = 0;
+                        }
+
+                        return hours * 60 + minutes;
+                    };
+
+                    return getMinutes(a.time) - getMinutes(b.time);
+                });
+                setMeetings(sorted);
             })
             .catch(err => console.error("Failed to fetch meetings", err));
     }, []);
@@ -124,13 +231,19 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
         setInvitedEmails(invitedEmails.filter(email => email !== emailToRemove));
     };
 
-    const openEditModal = (meeting: Meeting) => {
+    const openEditModal = (meeting: ExtendedMeeting) => {
         setSelectedMeeting(null);
         setEditId(meeting.id);
         setIsEditing(true);
 
         // Populate form
-        const [start, end] = meeting.time.split(' - ');
+        let start = '', end = '';
+        if (meeting.time && meeting.time.includes(' - ')) {
+            const parts = meeting.time.split(' - ');
+            start = parts[0] ? parts[0].trim() : '';
+            end = parts[1] ? parts[1].trim() : '';
+        }
+
         setFormData({
             title: meeting.title,
             date: meeting.date,
@@ -138,13 +251,53 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
             endTime: end || '',
             host: meeting.host,
             type: meeting.type,
-            location: meeting.location,
+            location: meeting.location || '',
             meetLink: meeting.meetLink || '',
             description: meeting.description
         });
         setInvitedEmails(meeting.guests?.emails || []);
         setIsCreateOpen(true);
     };
+
+    const openReportModal = (meeting: ExtendedMeeting) => {
+        setReportingId(meeting.id);
+        setReportData({
+            trainerIncentive: meeting.costReport?.trainerIncentive || 0,
+            snackCost: meeting.costReport?.snackCost || 0,
+            lunchCost: meeting.costReport?.lunchCost || 0,
+            otherCost: meeting.costReport?.otherCost || 0,
+            participantsCount: meeting.costReport?.participantsCount || meeting.guests?.count || 0,
+            isFinalized: true
+        });
+        setIsReportOpen(true);
+    };
+
+    const handleSaveReport = async (e: FormEvent) => {
+        e.preventDefault();
+        if (!reportingId) return;
+
+        // Optimistic update
+        const updatedMeetings = meetings.map(m => m.id === reportingId ? { ...m, costReport: { ...reportData, isFinalized: true } } : m);
+        setMeetings(updatedMeetings);
+        setIsReportOpen(false);
+        setNotification({ show: true, type: 'success', message: 'Financial report saved successfully!' });
+
+        // Persist to backend
+        try {
+            const m = meetings.find(x => x.id === reportingId);
+            if (m) {
+                const body = { ...m, costReport: { ...reportData, isFinalized: true } };
+                await fetch(`${API_BASE_URL}/api/meetings/${reportingId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+            }
+        } catch (err) {
+            console.error("Failed to save report", err);
+        }
+    };
+
 
     const handleSave = async (e: FormEvent) => {
         e.preventDefault();
@@ -163,27 +316,7 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
                 count: invitedEmails.length,
                 emails: invitedEmails
             },
-            meetLink: (formData.type === 'Online' || formData.type === 'Hybrid') ? formData.location : undefined // Logic note: form uses 'location' state field for both. If Hybrid, we might need TWO fields? 
-            // Wait, currently formData.location is used for EITHER link OR room. 
-            // If Hybrid, we need BOTH.
-            // I need to add a separate `meetLink` field to formData to support Hybrid properly where user inputs BOTH room and link.
-            // Let's refactor formData slightly in this step or next. 
-            // Actually, let's look at the existing state. `formData` has `location`. It implies one field. 
-            // If Hybrid, I should add `meetLink` to formData.
-
-            // Correction: I should update formData structure first.
-            // But let's see if I can do it in one go.
-            // I will add `meetLink` to formData in the next chunk or this one if extends.
-
-            // Let's defer this block replacement until I fix the state structure.
-            // I'll skip this chunk for a moment and replace formData state definition FIRST.
-
-            // Re-evaluating plan: 
-            // 1. Update formData to have `meetLink` field explicitly.
-            // 2. Update form inputs to bind to `location` (room) and `meetLink` (url).
-            // 3. Update handleSave to map these correctly.
-
-            // Let's do a larger replace for the State definition.
+            meetLink: formData.meetLink
         };
 
         if (isEditing && editId) {
@@ -243,464 +376,808 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
         setEditId(null);
     };
 
-    // --- Render Helpers ---
+    const getHostStats = () => {
+        const [start, end] = getPeriodDates();
 
+        // chunk meetings by host
+        const hosts: Record<string, ExtendedMeeting[]> = {};
 
+        meetings.forEach(m => {
+            const d = new Date(m.date);
+            if (selectedYear !== 'All' && d.getFullYear() !== selectedYear) return;
+            if (d < start || d > end) return;
+
+            // Branch Filter (Location)
+            const branchName = m.location || 'Online';
+            // Simple logic: if Selected != All, and branchName doesn't include selected string, skip
+            if (selectedBranch !== 'All Branches' && !branchName.includes(selectedBranch)) return;
+
+            // Search Filter
+            if (searchQuery) {
+                const lower = searchQuery.toLowerCase();
+                if (!m.host.toLowerCase().includes(lower) &&
+                    !m.title.toLowerCase().includes(lower)) return;
+            }
+
+            const hostName = m.host;
+            if (!hosts[hostName]) hosts[hostName] = [];
+            hosts[hostName].push(m);
+        });
+
+        // Convert to array
+        return Object.entries(hosts).map(([host, hostMeetings]) => {
+            const sessions = hostMeetings.length;
+
+            let totalParticipants = 0;
+            let totalCost = 0;
+            let totalTrainerIncentive = 0;
+
+            hostMeetings.forEach(m => {
+                const pCount = m.costReport?.participantsCount || m.guests?.count || 0;
+                totalParticipants += pCount;
+
+                if (m.costReport) {
+                    totalCost += (m.costReport.trainerIncentive + m.costReport.snackCost + m.costReport.lunchCost + m.costReport.otherCost);
+                    totalTrainerIncentive += m.costReport.trainerIncentive;
+                }
+            });
+
+            return {
+                host,
+                sessions,
+                totalParticipants,
+                totalCost,
+                totalTrainerIncentive,
+                meetings: hostMeetings
+            };
+        }).sort((a, b) => b.totalCost - a.totalCost); // Sort by highest cost? or sessions?
+    };
+
+    const formatCurrency = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
+        <div className="space-y-6 animate-fade-in">
             <PopupNotification
                 isOpen={notification.show}
                 type={notification.type}
                 message={notification.message}
                 onClose={() => setNotification({ ...notification, show: false })}
             />
+
             {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4">
+            <div className="bg-white rounded-3xl p-6 border border-slate-100 flex flex-col md:flex-row justify-between md:items-center gap-4 shadow-sm">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Users className="text-indigo-600" /> Internal Events & Training
+                        <Users className="text-indigo-600" /> Internal L&D Sessions
                     </h1>
-                    <p className="text-slate-500 mt-1">Schedule and manage internal knowledge sharing sessions.</p>
+                    <p className="text-slate-500 mt-1">Manage sharing sessions, townhalls, and internal training.</p>
                 </div>
-                {userRole === 'HR' || userRole === 'HR_ADMIN' && (
-                    <button
-                        onClick={() => setIsCreateOpen(true)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all flex items-center gap-2 active:scale-95"
-                    >
-                        <Plus size={20} /> Schedule Event
-                    </button>
-                )}
+                <div className="flex gap-3">
+                    <div className="bg-slate-50 p-1 rounded-xl border border-slate-200 flex">
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'list' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            List View
+                        </button>
+                        {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                            <button
+                                onClick={() => setViewMode('recap')}
+                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'recap' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Recapitulation
+                            </button>
+                        )}
+                    </div>
+
+                    {viewMode === 'list' && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                        <button
+                            onClick={() => { setIsEditing(false); resetForm(); setIsCreateOpen(true); }}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/20 flex items-center gap-2 transition-all"
+                        >
+                            <Plus size={18} /> New Session
+                        </button>
+                    )}
+                </div>
             </div>
 
-            {/* Event List */}
-            <div className="grid gap-4">
-                {meetings.length === 0 ? (
-                    <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-slate-200">
-                        <CalendarIcon size={48} className="mx-auto text-slate-300 mb-4" />
-                        <h3 className="text-lg font-bold text-slate-700">No events scheduled</h3>
-                        <p className="text-slate-400">Be the first to schedule a team sharing session.</p>
+            {/* Global Filter Bar */}
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between mb-6">
+                <div className="relative w-full md:w-96">
+                    <Clock className="absolute left-4 top-3.5 text-slate-400" size={18} />
+                    <input
+                        type="text"
+                        placeholder="Search Host or Title..."
+                        className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-600"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                </div>
+
+                <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+                    <select
+                        value={selectedBranch}
+                        onChange={(e) => setSelectedBranch(e.target.value)}
+                        className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                    >
+                        <option value="All Branches">All Branches</option>
+                        <option value="Medan-HO">Medan-HO</option>
+                        <option value="Medan-Cabang">Medan-Cabang</option>
+                        <option value="Jakarta">Jakarta</option>
+                        <option value="Bali">Bali</option>
+                        <option value="Binjai">Binjai</option>
+                        <option value="Tanjung Morawa">Tanjung Morawa</option>
+                        <option value="Online">Online Only</option>
+                    </select>
+
+                    <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(e.target.value === 'All' ? 'All' : parseInt(e.target.value))}
+                        className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                    >
+                        <option value="All">All Year</option>
+                        {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+
+                    <select
+                        value={selectedPeriod}
+                        onChange={(e) => setSelectedPeriod(e.target.value)}
+                        className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white min-w-[140px]"
+                    >
+                        {periodOptions.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                </div>
+            </div>
+
+            {
+                viewMode === 'recap' && (
+                    <div className="space-y-6 animate-in slide-in-from-bottom-4">
+
+
+                        {/* Recapitulation Table */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs tracking-wider">
+                                    <tr>
+                                        <th className="px-6 py-4">Host Name</th>
+                                        <th className="px-6 py-4 text-center">Sessions</th>
+                                        <th className="px-6 py-4 text-center">Audience</th>
+                                        <th className="px-6 py-4 text-right">Trainer Incentive</th>
+                                        <th className="px-6 py-4 text-right">Total Cost</th>
+                                        <th className="px-6 py-4 text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {getHostStats().length === 0 ? (
+                                        <tr><td colSpan={6} className="p-8 text-center text-slate-400 italic">No data found matching filters.</td></tr>
+                                    ) : (
+                                        getHostStats().map((stat, idx) => (
+                                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-6 py-4 font-bold text-slate-700">{stat.host}</td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-bold">
+                                                        {stat.sessions}x
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-center text-slate-600 font-semibold">{stat.totalParticipants}</td>
+                                                <td className="px-6 py-4 text-right font-mono text-green-600 font-bold">
+                                                    {formatCurrency(stat.totalTrainerIncentive)}
+                                                </td>
+                                                <td className="px-6 py-4 text-right font-mono text-slate-700 font-bold">
+                                                    {formatCurrency(stat.totalCost)}
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <button
+                                                        onClick={() => setRecapDetailHost(stat.host)}
+                                                        className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600 text-slate-500 rounded-lg text-xs font-bold transition-all shadow-sm"
+                                                    >
+                                                        View Details
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                ) : (
-                    meetings.map((meeting) => (
-                        <div
-                            key={meeting.id}
-                            onClick={() => setSelectedMeeting(meeting)}
-                            className="bg-white p-5 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer border border-slate-100 group relative overflow-hidden"
-                        >
-                            {/* Left Accent Bar */}
-                            <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${meeting.type === 'Online' ? 'bg-indigo-500' : 'bg-orange-500'}`} />
+                )
+            }
 
-                            <div className="flex flex-col md:flex-row gap-6 items-start md:items-center pl-3">
-                                {/* Date Box */}
-                                <div className="flex flex-col items-center justify-center w-16 h-16 bg-slate-50 rounded-xl border border-slate-200 group-hover:border-indigo-200 group-hover:bg-indigo-50 transition-colors">
-                                    <span className="text-xs font-bold text-slate-500 uppercase group-hover:text-indigo-500">{meeting.shortDate?.split(' ')[1] || 'DEC'}</span>
-                                    <span className="text-2xl font-bold text-slate-800 group-hover:text-indigo-700">{meeting.shortDate?.split(' ')[0] || '01'}</span>
-                                </div>
 
-                                {/* Main Info */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide
-                                            ${meeting.type === 'Online' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
-                                                meeting.type === 'Hybrid' ? 'bg-purple-50 text-purple-600 border-purple-100' :
-                                                    'bg-orange-50 text-orange-600 border-orange-100'}
-                                        `}>
+            {
+                viewMode === 'list' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {(filteredMeetings.length === 0) ? (
+                            <div className="col-span-full py-12 text-center text-slate-400 italic bg-white rounded-3xl border border-dashed border-slate-200">
+                                No meetings scheduled.
+                            </div>
+                        ) : (
+                            filteredMeetings.map((meeting) => (
+                                <div
+                                    key={meeting.id}
+                                    className="group bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer relative overflow-hidden"
+                                    onClick={() => setSelectedMeeting(meeting)}
+                                >
+                                    <div className={`absolute top-0 left-0 w-1.5 h-full ${meeting.type === 'Online' ? 'bg-blue-400' : 'bg-emerald-400'}`} />
+
+                                    <div className="flex justify-between items-start mb-4 pl-2">
+                                        <div className="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 text-center min-w-[60px]">
+                                            <span className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                {(meeting.shortDate || 'TBD TBD').split(' ')[1]}
+                                            </span>
+                                            <span className="block text-xl font-black text-slate-800 leading-none mt-0.5">
+                                                {(meeting.shortDate || 'TBD').split(' ')[0]}
+                                            </span>
+                                        </div>
+                                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${meeting.type === 'Online'
+                                            ? 'bg-blue-50 text-blue-600 border-blue-100'
+                                            : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                            }`}>
                                             {meeting.type}
                                         </span>
-                                        <span className="text-xs text-slate-400 flex items-center gap-1">
-                                            <Clock size={12} /> {meeting.time}
-                                        </span>
                                     </div>
-                                    <h3 className="text-lg font-bold text-slate-800 truncate pr-4 group-hover:text-indigo-600 transition-colors">
+
+                                    <h3 className="font-bold text-lg text-slate-800 mb-2 pl-2 line-clamp-2 leading-tight group-hover:text-indigo-600 transition-colors">
                                         {meeting.title}
                                     </h3>
-                                    <div className="flex items-center gap-4 mt-2">
-                                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                                            <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
+
+                                    <div className="space-y-2 pl-2 mb-6">
+                                        <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                                            <Clock size={14} className="text-slate-400" />
+                                            {meeting.time}
+                                        </div>
+                                        <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                                            <MapPin size={14} className="text-slate-400" />
+                                            <span className="line-clamp-1">{meeting.location || 'Online'}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                                            <div className="w-4 h-4 rounded-full bg-indigo-100 flex items-center justify-center text-[8px] font-bold text-indigo-600">
                                                 {meeting.host.charAt(0)}
                                             </div>
-                                            Hosted by <span className="font-semibold">{meeting.host}</span>
-                                        </div>
-                                        <div className="h-3 w-px bg-slate-200" />
-                                        <div className="flex items-center gap-2">
-                                            <AvatarStack count={meeting.guests?.count || 0} />
-                                            <span className="text-xs text-slate-400">{meeting.guests?.count || 0} attending</span>
+                                            Host: {meeting.host}
                                         </div>
                                     </div>
-                                </div>
 
-                                {/* Action Icon */}
-                                <div className="hidden md:flex items-center gap-2">
-                                    {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                openEditModal(meeting);
-                                            }}
-                                            className="p-2 rounded-full bg-slate-100 text-slate-500 hover:bg-blue-100 hover:text-blue-600 transition-colors"
-                                            title="Edit Meeting"
-                                        >
-                                            <FileText size={18} />
-                                        </button>
-                                    )}
-                                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-50 text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-all opacity-0 group-hover:opacity-100">
-                                        <ArrowRight size={20} />
+                                    <div className="pl-2 flex items-center justify-between border-t border-slate-50 pt-4 mt-auto">
+                                        <AvatarStack count={meeting.guests?.count || 0} />
+
+                                        <div className="flex items-center gap-2">
+                                            {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                                                <>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); openReportModal(meeting); }}
+                                                        className="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:bg-green-100 hover:text-green-600 transition-colors"
+                                                        title="Financial Report"
+                                                    >
+                                                        <DollarSign size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); openEditModal(meeting); }}
+                                                        className="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                                                        title="Edit Meeting"
+                                                    >
+                                                        <FileText size={16} />
+                                                    </button>
+                                                </>
+                                            )}
+                                            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                                                <ArrowRight size={16} />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    ))
-                )}
-            </div>
+                            ))
+                        )}
+                    </div>
+                )
+            }
 
             {/* Create Modal */}
-            {isCreateOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
-                            <h2 className="font-bold text-lg text-slate-800">
-                                {isEditing ? 'Edit Session' : 'Schedule New Session'}
-                            </h2>
-                            <button onClick={() => { setIsCreateOpen(false); resetForm(); }} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={20} /></button>
-                        </div>
-
-                        <div className="overflow-y-auto p-6 space-y-5">
-                            {/* Title */}
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Event Title</label>
-                                <input
-                                    required
-                                    placeholder="e.g. Q1 Design Review"
-                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-slate-300 font-semibold text-slate-700"
-                                    value={formData.title}
-                                    onChange={e => setFormData({ ...formData, title: e.target.value })}
-                                />
+            {
+                isCreateOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+                            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+                                <h2 className="font-bold text-lg text-slate-800">
+                                    {isEditing ? 'Edit Session' : 'Schedule New Session'}
+                                </h2>
+                                <button onClick={() => { setIsCreateOpen(false); resetForm(); }} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={20} /></button>
                             </div>
 
-                            {/* Date & Time */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="overflow-y-auto p-6 space-y-5">
+                                {/* Title */}
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Date</label>
-                                    <input
-                                        type="date"
-                                        required
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600"
-                                        value={formData.date}
-                                        onChange={e => setFormData({ ...formData, date: e.target.value })}
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Start</label>
-                                        <input
-                                            type="time"
-                                            required
-                                            className="w-full px-2 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-center text-slate-600"
-                                            value={formData.startTime}
-                                            onChange={e => setFormData({ ...formData, startTime: e.target.value })}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">End</label>
-                                        <input
-                                            type="time"
-                                            required
-                                            className="w-full px-2 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-center text-slate-600"
-                                            value={formData.endTime}
-                                            onChange={e => setFormData({ ...formData, endTime: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Type & Host */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Host Name</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Event Title</label>
                                     <input
                                         required
-                                        placeholder="Who is presenting?"
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600"
-                                        value={formData.host}
-                                        onChange={e => setFormData({ ...formData, host: e.target.value })}
+                                        placeholder="e.g. Q1 Design Review"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-slate-300 font-semibold text-slate-700"
+                                        value={formData.title}
+                                        onChange={e => setFormData({ ...formData, title: e.target.value })}
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Event Type</label>
-                                    <select
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-600"
-                                        value={formData.type}
-                                        onChange={e => setFormData({ ...formData, type: e.target.value as 'Online' | 'Offline' | 'Hybrid' })}
-                                    >
-                                        <option value="Online">Online Video</option>
-                                        <option value="Offline">In-Person</option>
-                                        <option value="Hybrid">Hybrid (In-Person + Online)</option>
-                                    </select>
-                                </div>
-                            </div>
 
-                            {/* Location & Link - Conditional */}
-                            {(formData.type === 'Offline' || formData.type === 'Hybrid') && (
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Room / Location</label>
-                                    <div className="relative">
-                                        <MapPin size={18} className="absolute left-3.5 top-3 text-slate-400" />
+                                {/* Date & Time */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Date</label>
                                         <input
+                                            type="date"
                                             required
-                                            placeholder="e.g. Meeting Room A, 2nd Floor"
-                                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600 mb-4"
-                                            value={formData.location}
-                                            onChange={e => setFormData({ ...formData, location: e.target.value })}
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600"
+                                            value={formData.date}
+                                            onChange={e => setFormData({ ...formData, date: e.target.value })}
                                         />
                                     </div>
-                                </div>
-                            )}
-
-                            {(formData.type === 'Online' || formData.type === 'Hybrid') && (
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Online Meeting Link</label>
-                                    <div className="relative">
-                                        <Video size={18} className="absolute left-3.5 top-3 text-slate-400" />
-                                        <input
-                                            required
-                                            placeholder="Paste Google Meet / Zoom link here"
-                                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600"
-                                            value={formData.meetLink}
-                                            onChange={e => setFormData({ ...formData, meetLink: e.target.value })}
-                                        />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Start</label>
+                                            <input
+                                                type="time"
+                                                required
+                                                className="w-full px-2 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-center text-slate-600"
+                                                value={formData.startTime}
+                                                onChange={e => setFormData({ ...formData, startTime: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">End</label>
+                                            <input
+                                                type="time"
+                                                required
+                                                className="w-full px-2 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-center text-slate-600"
+                                                value={formData.endTime}
+                                                onChange={e => setFormData({ ...formData, endTime: e.target.value })}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                            )}
 
-                            {/* Email Invites */}
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Invite Participants</label>
-                                <div className="w-full px-3 py-2 rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500 bg-white transition-all min-h-[50px] flex flex-wrap gap-2">
-                                    {invitedEmails.map(email => (
-                                        <span key={email} className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 animate-in zoom-in-95">
-                                            {email}
-                                            <button onClick={() => removeEmail(email)} className="hover:text-indigo-900"><X size={12} /></button>
-                                        </span>
-                                    ))}
-                                    <input
-                                        className="flex-1 min-w-[120px] outline-none text-sm py-1"
-                                        placeholder={invitedEmails.length > 0 ? "" : "Type email and press Enter..."}
-                                        value={inviteEmail}
-                                        onChange={e => setInviteEmail(e.target.value)}
-                                        onKeyDown={handleInviteKeyDown}
+                                {/* Type & Host */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Host Name</label>
+                                        <input
+                                            required
+                                            placeholder="Who is presenting?"
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600"
+                                            value={formData.host}
+                                            onChange={e => setFormData({ ...formData, host: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Event Type</label>
+                                        <select
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-600"
+                                            value={formData.type}
+                                            onChange={e => setFormData({ ...formData, type: e.target.value as 'Online' | 'Offline' | 'Hybrid' })}
+                                        >
+                                            <option value="Online">Online Video</option>
+                                            <option value="Offline">In-Person</option>
+                                            <option value="Hybrid">Hybrid (In-Person + Online)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Location & Link - Conditional */}
+                                {(formData.type === 'Offline' || formData.type === 'Hybrid') && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Room / Location</label>
+                                        <div className="relative">
+                                            <MapPin size={18} className="absolute left-3.5 top-3 text-slate-400" />
+                                            <input
+                                                required
+                                                placeholder="e.g. Meeting Room A, 2nd Floor"
+                                                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600 mb-4"
+                                                value={formData.location}
+                                                onChange={e => setFormData({ ...formData, location: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {(formData.type === 'Online' || formData.type === 'Hybrid') && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Online Meeting Link</label>
+                                        <div className="relative">
+                                            <Video size={18} className="absolute left-3.5 top-3 text-slate-400" />
+                                            <input
+                                                required
+                                                placeholder="Paste Google Meet / Zoom link here"
+                                                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600"
+                                                value={formData.meetLink}
+                                                onChange={e => setFormData({ ...formData, meetLink: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Email Invites */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Invite Participants</label>
+                                    <div className="w-full px-3 py-2 rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500 bg-white transition-all min-h-[50px] flex flex-wrap gap-2">
+                                        {invitedEmails.map(email => (
+                                            <span key={email} className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 animate-in zoom-in-95">
+                                                {email}
+                                                <button onClick={() => removeEmail(email)} className="hover:text-indigo-900"><X size={12} /></button>
+                                            </span>
+                                        ))}
+                                        <input
+                                            className="flex-1 min-w-[120px] outline-none text-sm py-1"
+                                            placeholder={invitedEmails.length > 0 ? "" : "Type email and press Enter..."}
+                                            value={inviteEmail}
+                                            onChange={e => setInviteEmail(e.target.value)}
+                                            onKeyDown={handleInviteKeyDown}
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1.5 pl-1">Press <kbd className="font-sans px-1 py-0.5 rounded border border-slate-300 bg-slate-50">Enter</kbd> to add email</p>
+                                </div>
+
+                                {/* Description */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Description</label>
+                                    <textarea
+                                        rows={3}
+                                        required
+                                        placeholder="What is this session about?"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600 resize-none"
+                                        value={formData.description}
+                                        onChange={e => setFormData({ ...formData, description: e.target.value })}
                                     />
                                 </div>
-                                <p className="text-[10px] text-slate-400 mt-1.5 pl-1">Press <kbd className="font-sans px-1 py-0.5 rounded border border-slate-300 bg-slate-50">Enter</kbd> to add email</p>
                             </div>
 
-                            {/* Description */}
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Description</label>
-                                <textarea
-                                    rows={3}
-                                    required
-                                    placeholder="What is this session about?"
-                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600 resize-none"
-                                    value={formData.description}
-                                    onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                />
+                            {/* Footer */}
+                            <div className="p-5 border-t border-slate-100 bg-slate-50 flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsCreateOpen(false); resetForm(); }}
+                                    className="flex-1 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    onClick={(e) => handleSave(e)}
+                                    className="flex-[2] py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <CalendarIcon size={18} /> {isEditing ? 'Update Event' : 'Send Invitations'}
+                                </button>
                             </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="p-5 border-t border-slate-100 bg-slate-50 flex gap-3">
-                            <button
-                                type="button"
-                                onClick={() => { setIsCreateOpen(false); resetForm(); }}
-                                className="flex-1 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                onClick={(e) => handleSave(e)}
-                                className="flex-[2] py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
-                            >
-                                <CalendarIcon size={18} /> {isEditing ? 'Update Event' : 'Send Invitations'}
-                            </button>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
+
+            {/* Financial Report Modal */}
+            {
+                isReportOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+                            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+                                <div>
+                                    <h2 className="font-bold text-lg text-slate-800">Finalize Report</h2>
+                                    <p className="text-xs text-slate-500">Input post-training costs for HR Reporting.</p>
+                                </div>
+                                <button onClick={() => setIsReportOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={20} /></button>
+                            </div>
+                            <div className="p-6 space-y-5 overflow-y-auto">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Actual Participants</label>
+                                    <input
+                                        type="number"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        value={reportData.participantsCount}
+                                        onChange={e => setReportData({ ...reportData, participantsCount: Number(e.target.value) })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Trainer Incentive (IDR)</label>
+                                    <input
+                                        type="number"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        value={reportData.trainerIncentive}
+                                        onChange={e => setReportData({ ...reportData, trainerIncentive: Number(e.target.value) })}
+                                    />
+                                </div>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Snack Cost</label>
+                                        <input
+                                            type="number"
+                                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                            value={reportData.snackCost}
+                                            onChange={e => setReportData({ ...reportData, snackCost: Number(e.target.value) })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Lunch Cost</label>
+                                        <input
+                                            type="number"
+                                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                            value={reportData.lunchCost}
+                                            onChange={e => setReportData({ ...reportData, lunchCost: Number(e.target.value) })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Other Cost</label>
+                                        <input
+                                            type="number"
+                                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                            value={reportData.otherCost}
+                                            onChange={e => setReportData({ ...reportData, otherCost: Number(e.target.value) })}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-5 border-t border-slate-100 bg-slate-50 flex gap-3">
+                                <button
+                                    onClick={() => setIsReportOpen(false)}
+                                    className="flex-1 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSaveReport}
+                                    className="flex-[2] py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all"
+                                >
+                                    Save Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Recap Detail Modal */}
+            {
+                recapDetailHost && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+                            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white">
+                                <div>
+                                    <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                                        <Users className="text-indigo-600" size={20} /> {recapDetailHost} - Session Details
+                                    </h2>
+                                    <p className="text-xs text-slate-500 font-medium">{selectedPeriod} • {selectedYear} • {selectedBranch}</p>
+                                </div>
+                                <button onClick={() => setRecapDetailHost(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={20} /></button>
+                            </div>
+
+                            <div className="overflow-y-auto p-6">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
+                                        <tr>
+                                            <th className="px-4 py-3">Date</th>
+                                            <th className="px-4 py-3">Title</th>
+                                            <th className="px-4 py-3">Type</th>
+                                            <th className="px-4 py-3 text-center">Guests</th>
+                                            <th className="px-4 py-3 text-right">Trainer Inc.</th>
+                                            <th className="px-4 py-3 text-right">Total Cost</th>
+                                            <th className="px-4 py-3 text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {getHostStats().find(h => h.host === recapDetailHost)?.meetings.map((m) => (
+                                            <tr key={m.id} className="hover:bg-slate-50">
+                                                <td className="px-4 py-3 text-slate-600">{m.shortDate}</td>
+                                                <td className="px-4 py-3 font-bold text-slate-700">{m.title}</td>
+                                                <td className="px-4 py-3">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${m.type === 'Online' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                                        }`}>
+                                                        {m.type}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs font-bold">
+                                                        {m.costReport?.participantsCount || m.guests?.count || 0}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-mono text-green-600 font-bold">
+                                                    {formatCurrency(m.costReport?.trainerIncentive || 0)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-mono text-slate-700">
+                                                    {formatCurrency((m.costReport?.trainerIncentive || 0) + (m.costReport?.snackCost || 0) + (m.costReport?.lunchCost || 0) + (m.costReport?.otherCost || 0))}
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    {m.costReport?.isFinalized ? (
+                                                        <div className="flex items-center justify-center gap-1 text-green-600 font-bold text-xs uppercase">
+                                                            <CheckCircle size={14} /> Reported
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-orange-500 font-bold text-xs uppercase">Pending</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="p-4 border-t border-slate-100 bg-slate-50 text-right">
+                                <button onClick={() => setRecapDetailHost(null)} className="px-6 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-100 transition-colors shadow-sm">
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
 
             {/* Read-Only Detail Modal */}
-            {selectedMeeting && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-[2px]"
-                    onClick={() => setSelectedMeeting(null)}
-                >
+            {
+                selectedMeeting && (
                     <div
-                        className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20"
-                        onClick={(e) => e.stopPropagation()}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-[2px]"
+                        onClick={() => setSelectedMeeting(null)}
                     >
-                        <div className="relative h-32 bg-gradient-to-r from-indigo-500 to-purple-500">
-                            <div className="absolute top-4 right-4 flex gap-2">
-                                {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
-                                    <>
-                                        <button
-                                            onClick={() => openEditModal(selectedMeeting)}
-                                            className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-colors backdrop-blur-sm"
-                                        >
-                                            <FileText size={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(selectedMeeting.id)}
-                                            className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-colors backdrop-blur-sm"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </>
-                                )}
-                                <button
-                                    onClick={() => setSelectedMeeting(null)}
-                                    className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-colors backdrop-blur-sm"
-                                >
-                                    <X size={18} />
-                                </button>
-                            </div>
-                            <div className="absolute -bottom-8 left-6">
-                                <div className="w-16 h-16 bg-white rounded-2xl shadow-lg flex flex-col items-center justify-center border border-slate-100">
-                                    <span className="text-xs font-bold text-indigo-500 uppercase">{selectedMeeting.shortDate?.split(' ')[1]}</span>
-                                    <span className="text-2xl font-bold text-slate-800">{selectedMeeting.shortDate?.split(' ')[0]}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="pt-10 px-6 pb-6">
-                            <h2 className="text-2xl font-bold text-slate-800 mb-1 leading-snug">{selectedMeeting.title}</h2>
-                            <p className="text-slate-500 font-medium text-sm mb-6 flex items-center gap-2">
-                                <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-600">{selectedMeeting.type}</span>
-                                <span>•</span>
-                                {selectedMeeting.date}
-                            </p>
-
-                            <div className="space-y-4">
-                                <div className="flex gap-4">
-                                    <div className="w-8 flex justify-center pt-0.5"><Clock className="text-slate-400" size={20} /></div>
-                                    <div>
-                                        <p className="font-semibold text-slate-700 text-sm">Time</p>
-                                        <p className="text-sm text-slate-600">{selectedMeeting.time}</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-4">
-                                    <div className="w-8 flex justify-center pt-0.5"><MapPin className="text-slate-400" size={20} /></div>
-                                    <div>
-                                        <p className="font-semibold text-slate-700 text-sm">Location</p>
-                                        {(selectedMeeting.type === 'Offline' || selectedMeeting.type === 'Hybrid') && (
-                                            <p className="text-sm text-slate-600">{selectedMeeting.location}</p>
-                                        )}
-                                        {(selectedMeeting.type === 'Online' || selectedMeeting.type === 'Hybrid') && selectedMeeting.meetLink && (
-                                            <a href={selectedMeeting.meetLink} target="_blank" className="text-sm text-indigo-600 hover:underline break-all block mt-0.5">
-                                                {selectedMeeting.meetLink}
-                                            </a>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-4">
-                                    <div className="w-8 flex justify-center pt-0.5"><Users className="text-slate-400" size={20} /></div>
-                                    <div className="flex-1">
-                                        <p className="font-semibold text-slate-700 text-sm mb-2">
-                                            {selectedMeeting.guests?.emails?.length || 0} Invited Guests
-                                        </p>
-                                        {selectedMeeting.guests?.emails && selectedMeeting.guests.emails.length > 0 ? (
-                                            <div className="flex flex-wrap gap-2">
-                                                {selectedMeeting.guests.emails.map((email: string) => (
-                                                    <div key={email} className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-full border border-slate-100">
-                                                        <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold">
-                                                            {email.charAt(0).toUpperCase()}
-                                                        </div>
-                                                        <span className="text-xs text-slate-600">{email}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <p className="text-xs text-slate-400 italic">No specific invites sent.</p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-4 pt-2">
-                                    <div className="w-8 flex justify-center pt-0.5"><FileText className="text-slate-400" size={20} /></div>
-                                    <p className="text-sm text-slate-600 leading-relaxed">
-                                        {selectedMeeting.description}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="mt-8 space-y-3">
-                                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                                    <p className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1"><CalendarIcon size={12} /> Add to Calendar</p>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => {
-                                                const text = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:${selectedMeeting.title}\nDESCRIPTION:${selectedMeeting.description}\nLOCATION:${selectedMeeting.type === 'Online' ? selectedMeeting.meetLink : selectedMeeting.location}\nDTSTART:${new Date(`${selectedMeeting.date}T${selectedMeeting.time.split(' - ')[0]}`).toISOString().replace(/[-:]/g, '').split('.')[0]}Z\nDTEND:${new Date(`${selectedMeeting.date}T${selectedMeeting.time.split(' - ')[1]}`).toISOString().replace(/[-:]/g, '').split('.')[0]}Z\nEND:VEVENT\nEND:VCALENDAR`;
-                                                const blob = new Blob([text], { type: 'text/calendar' });
-                                                const url = window.URL.createObjectURL(blob);
-                                                const a = document.createElement('a');
-                                                a.href = url;
-                                                a.download = `${selectedMeeting.title}.ics`;
-                                                a.click();
-                                            }}
-                                            className="flex-1 py-2 bg-white border border-slate-200 hover:bg-white hover:border-slate-300 text-slate-600 font-bold rounded-lg text-xs transition-all shadow-sm"
-                                        >
-                                            Outlook / Apple
-                                        </button>
-                                        <a
-                                            href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(selectedMeeting.title)}&details=${encodeURIComponent(selectedMeeting.description)}&location=${encodeURIComponent(selectedMeeting.type === 'Online' ? (selectedMeeting.meetLink || 'Online') : selectedMeeting.location)}&dates=${new Date(`${selectedMeeting.date}T${selectedMeeting.time.split(' - ')[0]}`).toISOString().replace(/[-:]/g, '').split('.')[0]}Z/${new Date(`${selectedMeeting.date}T${selectedMeeting.time.split(' - ')[1]}`).toISOString().replace(/[-:]/g, '').split('.')[0]}Z`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="flex-1 py-2 bg-white border border-slate-200 hover:bg-white hover:border-slate-300 text-blue-600 font-bold rounded-lg text-xs transition-all shadow-sm text-center flex items-center justify-center"
-                                        >
-                                            Google Calendar
-                                        </a>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setSelectedMeeting(null)}
-                                    className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all"
-                                >
-                                    Close Details
-                                </button>
-                                {userEmail && !selectedMeeting.guests?.emails?.includes(userEmail) && (
+                        <div
+                            className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="relative h-32 bg-gradient-to-r from-indigo-500 to-purple-500">
+                                <div className="absolute top-4 right-4 flex gap-2">
+                                    {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                                        <>
+                                            <button
+                                                onClick={() => openEditModal(selectedMeeting)}
+                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-colors backdrop-blur-sm"
+                                            >
+                                                <FileText size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(selectedMeeting.id)}
+                                                className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-colors backdrop-blur-sm"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </>
+                                    )}
                                     <button
-                                        onClick={async () => {
-                                            try {
-                                                const res = await fetch(`${API_BASE_URL}/api/meetings/${selectedMeeting.id}/rsvp`, {
-                                                    method: 'POST',
-                                                    headers: { 'Content-Type': 'application/json' },
-                                                    body: JSON.stringify({ email: userEmail })
-                                                });
-                                                if (res.ok) {
-                                                    const data = await res.json();
-                                                    // Update local state
-                                                    const updatedMeeting = { ...selectedMeeting, guests: data.guests };
-                                                    setMeetings(meetings.map(m => m.id === selectedMeeting.id ? updatedMeeting : m));
-                                                    setSelectedMeeting(updatedMeeting);
-                                                    setNotification({ show: true, type: 'success', message: "You have joined this event!" });
-                                                }
-                                            } catch (err) {
-                                                console.error(err);
-                                            }
-                                        }}
-                                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-200 mt-3"
+                                        onClick={() => setSelectedMeeting(null)}
+                                        className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-colors backdrop-blur-sm"
                                     >
-                                        Join Event
+                                        <X size={18} />
                                     </button>
-                                )}
+                                </div>
+                                <div className="absolute -bottom-8 left-6">
+                                    <div className="w-16 h-16 bg-white rounded-2xl shadow-lg flex flex-col items-center justify-center border border-slate-100">
+                                        <span className="text-xs font-bold text-indigo-500 uppercase">{selectedMeeting.shortDate?.split(' ')[1]}</span>
+                                        <span className="text-2xl font-bold text-slate-800">{selectedMeeting.shortDate?.split(' ')[0]}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-10 px-6 pb-6">
+                                <h2 className="text-2xl font-bold text-slate-800 mb-1 leading-snug">{selectedMeeting.title}</h2>
+                                <p className="text-slate-500 font-medium text-sm mb-6 flex items-center gap-2">
+                                    <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-600">{selectedMeeting.type}</span>
+                                    <span>•</span>
+                                    {selectedMeeting.date}
+                                </p>
+
+                                <div className="space-y-4">
+                                    <div className="flex gap-4">
+                                        <div className="w-8 flex justify-center pt-0.5"><Clock className="text-slate-400" size={20} /></div>
+                                        <div>
+                                            <p className="font-semibold text-slate-700 text-sm">Time</p>
+                                            <p className="text-sm text-slate-600">{selectedMeeting.time}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-4">
+                                        <div className="w-8 flex justify-center pt-0.5"><MapPin className="text-slate-400" size={20} /></div>
+                                        <div>
+                                            <p className="font-semibold text-slate-700 text-sm">Location</p>
+                                            {(selectedMeeting.type === 'Offline' || selectedMeeting.type === 'Hybrid') && (
+                                                <p className="text-sm text-slate-600">{selectedMeeting.location}</p>
+                                            )}
+                                            {(selectedMeeting.type === 'Online' || selectedMeeting.type === 'Hybrid') && selectedMeeting.meetLink && (
+                                                <a href={selectedMeeting.meetLink} target="_blank" className="text-sm text-indigo-600 hover:underline break-all block mt-0.5">
+                                                    {selectedMeeting.meetLink}
+                                                </a>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-4">
+                                        <div className="w-8 flex justify-center pt-0.5"><Users className="text-slate-400" size={20} /></div>
+                                        <div className="flex-1">
+                                            <p className="font-semibold text-slate-700 text-sm mb-2">
+                                                {selectedMeeting.guests?.emails?.length || 0} Invited Guests
+                                            </p>
+                                            {selectedMeeting.guests?.emails && selectedMeeting.guests.emails.length > 0 ? (
+                                                <div className="flex flex-wrap gap-2">
+                                                    {selectedMeeting.guests.emails.map((email: string) => (
+                                                        <div key={email} className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-full border border-slate-100">
+                                                            <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold">
+                                                                {email.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <span className="text-xs text-slate-600">{email}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-slate-400 italic">No specific invites sent.</p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-4 pt-2">
+                                        <div className="w-8 flex justify-center pt-0.5"><FileText className="text-slate-400" size={20} /></div>
+                                        <p className="text-sm text-slate-600 leading-relaxed">
+                                            {selectedMeeting.description}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="mt-8 space-y-3">
+                                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                                        <p className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1"><CalendarIcon size={12} /> Add to Calendar</p>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    if (!selectedMeeting) return;
+                                                    try {
+                                                        const parts = selectedMeeting.time.split(' - ');
+                                                        const start = parts[0] ? parts[0].trim() : '09:00';
+                                                        const end = parts[1] ? parts[1].trim() : '10:00';
+                                                        const startDate = new Date(`${selectedMeeting.date}T${start}`);
+                                                        const endDate = new Date(`${selectedMeeting.date}T${end}`);
+                                                        const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+                                                        const text = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:${selectedMeeting.title}\nDESCRIPTION:${selectedMeeting.description}\nLOCATION:${selectedMeeting.type === 'Online' ? selectedMeeting.meetLink : selectedMeeting.location}\nDTSTART:${fmt(startDate)}\nDTEND:${fmt(endDate)}\nEND:VEVENT\nEND:VCALENDAR`;
+                                                        const blob = new Blob([text], { type: 'text/calendar' });
+                                                        const url = window.URL.createObjectURL(blob);
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = `${selectedMeeting.title}.ics`;
+                                                        a.click();
+                                                    } catch (e) {
+                                                        console.error("Error generating ICS", e);
+                                                        setNotification({ show: true, type: 'error', message: "Could not generate calendar file due to invalid date format." });
+                                                    }
+                                                }}
+                                                className="flex-1 py-2 bg-white border border-slate-200 hover:bg-white hover:border-slate-300 text-slate-600 font-bold rounded-lg text-xs transition-all shadow-sm"
+                                            >
+                                                Outlook / Apple
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    if (!selectedMeeting) return;
+                                                    try {
+                                                        const parts = selectedMeeting.time.split(' - ');
+                                                        const start = parts[0] ? parts[0].trim() : '09:00';
+                                                        const end = parts[1] ? parts[1].trim() : '10:00';
+                                                        const startDate = new Date(`${selectedMeeting.date}T${start}`);
+                                                        const endDate = new Date(`${selectedMeeting.date}T${end}`);
+                                                        const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+                                                        const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(selectedMeeting.title)}&details=${encodeURIComponent(selectedMeeting.description)}&location=${encodeURIComponent(selectedMeeting.type === 'Online' ? (selectedMeeting.meetLink || 'Online') : (selectedMeeting.location || ''))}&dates=${fmt(startDate)}/${fmt(endDate)}`;
+                                                        window.open(url, '_blank');
+                                                    } catch (e) {
+                                                        console.error("Error opening Google Calendar", e);
+                                                        setNotification({ show: true, type: 'error', message: "Could not open calendar due to invalid date format." });
+                                                    }
+                                                }}
+                                                className="flex-1 py-2 bg-white border border-slate-200 hover:bg-white hover:border-slate-300 text-blue-600 font-bold rounded-lg text-xs transition-all shadow-sm text-center flex items-center justify-center"
+                                            >
+                                                Google Calendar
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setSelectedMeeting(null)}
+                                        className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all"
+                                    >
+                                        Close Details
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

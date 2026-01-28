@@ -1,4 +1,4 @@
-import { BookOpen, Users, Briefcase, Calendar as CalendarIcon, Video, GraduationCap, Shield } from 'lucide-react';
+import { BookOpen, Users, Briefcase, Calendar as CalendarIcon, Video, GraduationCap, Shield, Award } from 'lucide-react';
 import type { Page, Role } from '../types';
 import LMSCalendar from './LMSCalendar';
 
@@ -44,6 +44,14 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName }: DashboardH
             page: 'external' as Page,
             color: 'text-teal-600',
             bg: 'bg-teal-50'
+        },
+        {
+            title: 'Incentives',
+            subtitle: 'Claim rewards',
+            icon: <Award size={24} />,
+            page: 'incentives' as Page,
+            color: 'text-amber-500',
+            bg: 'bg-amber-50'
         },
         {
             title: 'Calendar Training',
