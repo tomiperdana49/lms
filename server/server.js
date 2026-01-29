@@ -162,19 +162,60 @@ app.get('/api/books', (req, res) => {
 app.get('/api/logs', async (req, res) => {
     try {
         const logs = await query('SELECT * FROM reading_logs ORDER BY date DESC');
-        res.json(logs);
+        // Map snake_case to camelCase
+        const mappedLogs = logs.map(log => ({
+            ...log,
+            userName: log.user_name,
+            readingDuration: log.reading_duration,
+            startDate: log.start_date,
+            finishDate: log.finish_date,
+            evidenceUrl: log.evidence_url,
+            hrApprovalStatus: log.hr_approval_status,
+            incentiveAmount: log.incentive_amount,
+            rejectionReason: log.rejection_reason
+        }));
+        res.json(mappedLogs);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/logs', async (req, res) => {
     try {
         const log = req.body;
+        // Fix: Ensure we use the correct column names for INSERT
+        // Note: For POST, we might be receiving camelCase from frontend, so we map it to snake_case for DB
         const result = await query(
-            'INSERT INTO reading_logs (title, author, category, date, duration, review, status, user_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [log.title, log.author, log.category, new Date(log.date), log.duration, log.review, log.status || 'Reading', log.userName]
+            'INSERT INTO reading_logs (title, author, category, date, duration, review, status, user_name, evidence_url, start_date, finish_date, reading_duration, hr_approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+                log.title,
+                log.author || '',
+                log.category,
+                new Date(log.date),
+                log.duration || 0,
+                log.review || '',
+                log.status || 'Reading',
+                log.userName,
+                log.evidenceUrl || '',
+                log.startDate ? new Date(log.startDate) : new Date(),
+                log.finishDate ? new Date(log.finishDate) : null,
+                log.readingDuration || 0,
+                log.hrApprovalStatus || 'Pending'
+            ]
         );
-        const newLog = await query('SELECT * FROM reading_logs WHERE id = ?', [result.insertId]);
-        res.json(newLog[0]);
+        const newLogs = await query('SELECT * FROM reading_logs WHERE id = ?', [result.insertId]);
+        const newLog = newLogs[0];
+
+        // Return camelCase
+        res.json({
+            ...newLog,
+            userName: newLog.user_name,
+            readingDuration: newLog.reading_duration,
+            startDate: newLog.start_date,
+            finishDate: newLog.finish_date,
+            evidenceUrl: newLog.evidence_url,
+            hrApprovalStatus: newLog.hr_approval_status,
+            incentiveAmount: newLog.incentive_amount,
+            rejectionReason: newLog.rejection_reason
+        });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -189,12 +230,48 @@ app.put('/api/logs/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
-        const fields = Object.keys(updates).map(k => `${k} = ?`).join(', ');
-        const values = Object.values(updates);
+
+        // Manual mapping for updates if needed, or simple direct mapping if keys match
+        // But keys won't match. Frontend sends camelCase.
+        // We need to construct snake_case update
+        const dbUpdates = {};
+        if (updates.userName !== undefined) dbUpdates.user_name = updates.userName;
+        if (updates.readingDuration !== undefined) dbUpdates.reading_duration = updates.readingDuration;
+        if (updates.startDate !== undefined) dbUpdates.start_date = new Date(updates.startDate);
+        if (updates.finishDate !== undefined) dbUpdates.finish_date = new Date(updates.finishDate);
+        if (updates.evidenceUrl !== undefined) dbUpdates.evidence_url = updates.evidenceUrl;
+        if (updates.hrApprovalStatus !== undefined) dbUpdates.hr_approval_status = updates.hrApprovalStatus;
+        if (updates.incentiveAmount !== undefined) dbUpdates.incentive_amount = updates.incentiveAmount;
+        if (updates.rejectionReason !== undefined) dbUpdates.rejection_reason = updates.rejectionReason;
+        if (updates.status !== undefined) dbUpdates.status = updates.status;
+        if (updates.review !== undefined) dbUpdates.review = updates.review;
+        if (updates.link !== undefined) dbUpdates.link = updates.link;
+
+        // If no valid fields, just return current
+        if (Object.keys(dbUpdates).length === 0) {
+            const current = await query('SELECT * FROM reading_logs WHERE id = ?', [id]);
+            return res.json(current[0]); // Should map this too, but for now safe
+        }
+
+        const fields = Object.keys(dbUpdates).map(k => `${k} = ?`).join(', ');
+        const values = Object.values(dbUpdates);
 
         await query(`UPDATE reading_logs SET ${fields} WHERE id = ?`, [...values, id]);
-        const updated = await query('SELECT * FROM reading_logs WHERE id = ?', [id]);
-        res.json(updated[0]);
+
+        const updatedLogs = await query('SELECT * FROM reading_logs WHERE id = ?', [id]);
+        const updated = updatedLogs[0];
+
+        res.json({
+            ...updated,
+            userName: updated.user_name,
+            readingDuration: updated.reading_duration,
+            startDate: updated.start_date,
+            finishDate: updated.finish_date,
+            evidenceUrl: updated.evidence_url,
+            hrApprovalStatus: updated.hr_approval_status,
+            incentiveAmount: updated.incentive_amount,
+            rejectionReason: updated.rejection_reason
+        });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -205,7 +282,22 @@ app.get('/api/training', async (req, res) => {
         // Rename rejection_reason to rejectionReason for frontend compatibility if needed, or update frontend.
         // For now, let's map in code if strictly needed, but snake_case vs camelCase might be an issue.
         // Frontend likely expects camelCase.
-        const mapped = requests.map(r => ({ ...r, submittedAt: r.submitted_at, rejectionReason: r.rejection_reason }));
+        // Map snake_case DB columns to camelCase for frontend
+        const mapped = requests.map(r => ({
+            ...r,
+            submittedAt: r.submitted_at,
+            rejectionReason: r.rejection_reason,
+            employeeName: r.employee_name, // Map DB column to frontend prop
+            supervisorName: r.supervisor_name,
+            supervisorApprovedAt: r.supervisor_approved_at,
+            hrName: r.hr_name,
+            hrApprovedAt: r.hr_approved_at,
+            employeeRole: r.employee_role, // Map DB column to frontend prop
+            costTraining: r.cost_training || 0,
+            costTransport: r.cost_transport || 0,
+            costAccommodation: r.cost_accommodation || 0,
+            costOthers: r.cost_others || 0
+        }));
         res.json(mapped);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -215,40 +307,89 @@ app.post('/api/training', async (req, res) => {
         const reqData = req.body;
         const submittedAt = new Date();
         const result = await query(
-            'INSERT INTO training_requests (title, vendor, cost, date, status, submitted_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [reqData.title, reqData.vendor, reqData.cost, new Date(reqData.date), reqData.status || 'PENDING_HR', submittedAt]
+            'INSERT INTO training_requests (title, vendor, cost, date, status, submitted_at, employee_name, employee_role, cost_training, cost_transport, cost_accommodation, cost_others) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+                reqData.title,
+                reqData.vendor,
+                reqData.cost,
+                new Date(reqData.date),
+                reqData.status || 'PENDING_SUPERVISOR',
+                submittedAt,
+                reqData.employeeName,
+                reqData.employeeRole,
+                reqData.costTraining || 0,
+                reqData.costTransport || 0,
+                reqData.costAccommodation || 0,
+                reqData.costOthers || 0
+            ]
         );
         const newReq = await query('SELECT * FROM training_requests WHERE id = ?', [result.insertId]);
-        res.json({ ...newReq[0], submittedAt: newReq[0].submitted_at });
+        const r = newReq[0];
+        res.json({
+            ...r,
+            submittedAt: r.submitted_at,
+            employeeName: r.employee_name,
+            employeeRole: r.employee_role,
+            costTraining: r.cost_training,
+            costTransport: r.cost_transport,
+            costAccommodation: r.cost_accommodation,
+            costOthers: r.cost_others
+        });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/training/:id/approve', async (req, res) => {
     try {
         const { id } = req.params;
-        const { action, reason } = req.body;
+        const { action, reason, approverName } = req.body;
 
         // Fetch current status first
         const currentRows = await query('SELECT status FROM training_requests WHERE id = ?', [id]);
         if (currentRows.length === 0) return res.status(404).json({ message: 'Not found' });
 
         let newStatus = currentRows[0].status;
-        let updateSql = 'UPDATE training_requests SET status = ? WHERE id = ?';
-        let params = [newStatus, id];
+        let updateSql = '';
+        let params = [];
+        const now = new Date();
 
         if (action === 'reject') {
             newStatus = 'REJECTED';
-            updateSql = 'UPDATE training_requests SET status = ?, rejection_reason = ? WHERE id = ?';
-            params = [newStatus, reason, id];
+            // We can track who rejected it based on current stage
+            // If currently PENDING_SUPERVISOR, then Supervisor rejected.
+            // If PENDING_HR, then HR rejected.
+            if (currentRows[0].status === 'PENDING_SUPERVISOR') {
+                updateSql = 'UPDATE training_requests SET status = ?, rejection_reason = ?, supervisor_name = ? WHERE id = ?';
+                params = [newStatus, reason, approverName, id];
+            } else {
+                updateSql = 'UPDATE training_requests SET status = ?, rejection_reason = ?, hr_name = ? WHERE id = ?';
+                params = [newStatus, reason, approverName, id];
+            }
         } else if (action === 'approve') {
-            if (newStatus === 'PENDING_SUPERVISOR') newStatus = 'PENDING_HR';
-            else if (newStatus === 'PENDING_HR') newStatus = 'APPROVED';
-            params = [newStatus, id];
+            if (newStatus === 'PENDING_SUPERVISOR') {
+                newStatus = 'PENDING_HR';
+                updateSql = 'UPDATE training_requests SET status = ?, supervisor_name = ?, supervisor_approved_at = ? WHERE id = ?';
+                params = [newStatus, approverName, now, id];
+            }
+            else if (newStatus === 'PENDING_HR') {
+                newStatus = 'APPROVED';
+                updateSql = 'UPDATE training_requests SET status = ?, hr_name = ?, hr_approved_at = ? WHERE id = ?';
+                params = [newStatus, approverName, now, id];
+            }
         }
 
-        await query(updateSql, params);
+        if (updateSql) {
+            await query(updateSql, params);
+        }
+
         const updated = await query('SELECT * FROM training_requests WHERE id = ?', [id]);
-        res.json({ ...updated[0], submittedAt: updated[0].submitted_at, rejectionReason: updated[0].rejection_reason });
+        const r = updated[0];
+        res.json({
+            ...r,
+            submittedAt: r.submitted_at,
+            rejectionReason: r.rejection_reason,
+            supervisorName: r.supervisor_name,
+            hrName: r.hr_name
+        });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -409,6 +550,7 @@ app.get('/api/progress/:userId/:courseId', async (req, res) => {
             userId: record.user_id,
             courseId: record.course_id,
             completedModuleIds: completedModuleIds || [],
+            moduleProgress: typeof record.module_progress === 'string' ? JSON.parse(record.module_progress) : record.module_progress || {},
             lastAccess: record.last_access
         });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -449,11 +591,126 @@ app.post('/api/progress/complete', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.post('/api/progress/time', async (req, res) => {
+    try {
+        const { userId, courseId, moduleId, timestamp } = req.body;
+
+        const rows = await query('SELECT * FROM progress WHERE user_id = ? AND course_id = ?', [userId, courseId]);
+        let moduleProgress = {};
+        let recordId = null;
+
+        if (rows.length > 0) {
+            recordId = rows[0].id;
+            moduleProgress = typeof rows[0].module_progress === 'string'
+                ? JSON.parse(rows[0].module_progress)
+                : rows[0].module_progress || {};
+        }
+
+        moduleProgress[moduleId] = timestamp;
+        const jsonProgress = JSON.stringify(moduleProgress);
+        const now = new Date();
+
+        if (recordId) {
+            await query('UPDATE progress SET module_progress = ?, last_access = ? WHERE id = ?', [jsonProgress, now, recordId]);
+        } else {
+            // Should rarely happen if they haven't started, but possible
+            await query('INSERT INTO progress (user_id, course_id, module_progress, last_access) VALUES (?, ?, ?, ?)',
+                [userId, courseId, jsonProgress, now]);
+        }
+
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- INCENTIVES ---
 // --- INCENTIVES ---
 app.get('/api/incentives', async (req, res) => {
     try {
-        const rows = await query('SELECT * FROM incentives');
-        res.json(rows);
+        const rows = await query('SELECT * FROM incentives ORDER BY id DESC');
+        // Map snake_case to camelCase
+        const mapped = rows.map(i => ({
+            ...i,
+            employeeName: i.employee_name,
+            courseName: i.course_name,
+            evidenceUrl: i.evidence_url,
+            startDate: i.start_date,
+            endDate: i.end_date,
+            monthlyAmount: i.monthly_amount
+        }));
+        res.json(mapped);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/incentives', async (req, res) => {
+    try {
+        const i = req.body;
+        // Insert with new columns
+        const result = await query(
+            'INSERT INTO incentives (employee_name, course_name, description, start_date, end_date, evidence_url, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [
+                i.employeeName,
+                i.courseName,
+                i.description || '',
+                new Date(i.startDate),
+                new Date(i.endDate),
+                i.evidenceUrl || '',
+                i.status || 'Pending'
+            ]
+        );
+        const newInc = await query('SELECT * FROM incentives WHERE id = ?', [result.insertId]);
+        const r = newInc[0];
+
+        // Return mapped
+        res.json({
+            ...r,
+            employeeName: r.employee_name,
+            courseName: r.course_name,
+            evidenceUrl: r.evidence_url,
+            startDate: r.start_date,
+            endDate: r.end_date,
+            monthlyAmount: r.monthly_amount
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/incentives/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updates = req.body;
+
+        // Build update manually since we need to map keys potentially, 
+        // OR just expect specific fields. For simplicity in this specialized endpoint:
+        let sql = 'UPDATE incentives SET ';
+        const params = [];
+
+        if (updates.status) {
+            sql += 'status = ?, ';
+            params.push(updates.status);
+        }
+        if (updates.reward) {
+            sql += 'reward = ?, ';
+            params.push(updates.reward);
+        }
+        // Remove trailing comma
+        sql = sql.slice(0, -2);
+        sql += ' WHERE id = ?';
+        params.push(id);
+
+        if (params.length > 1) { // At least one field + id
+            await query(sql, params);
+        }
+
+        const updated = await query('SELECT * FROM incentives WHERE id = ?', [id]);
+        const r = updated[0];
+        res.json({
+            ...r,
+            employeeName: r.employee_name,
+            courseName: r.course_name,
+            evidenceUrl: r.evidence_url,
+            startDate: r.start_date,
+            endDate: r.end_date,
+            monthlyAmount: r.monthly_amount
+        });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

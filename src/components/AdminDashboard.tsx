@@ -16,10 +16,10 @@ import type { Page, User, ReadingLogEntry } from '../types';
 import { API_BASE_URL } from '../config';
 import UserManagement from './UserManagement';
 import AdminReadingLog from './AdminReadingLog';
-import InternalMeetingList from './InternalMeetingList';
-import AdminCourseManager from './AdminCourseManager';
+import TrainingInternalList from './TrainingInternalList';
+import OnlineModulesManager from './OnlineModulesManager';
 
-import TrainingManager from './TrainingManager';
+import TrainingExternalManager from './TrainingExternalManager';
 import HRReportGenerator from './HRReportGenerator';
 import IncentiveManager from './IncentiveManager';
 import LMSCalendar from './LMSCalendar';
@@ -89,10 +89,11 @@ const AdminDashboard = ({ user, onLogout }: AdminDashboardProps) => {
         // Fetch aggregated data
         const fetchData = async () => {
             try {
-                const [usersRes, logsRes, meetingsRes] = await Promise.all([
+                const [usersRes, logsRes, meetingsRes, trainingRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/api/users`),
                     fetch(`${API_BASE_URL}/api/logs`),
-                    fetch(`${API_BASE_URL}/api/meetings`)
+                    fetch(`${API_BASE_URL}/api/meetings`),
+                    fetch(`${API_BASE_URL}/api/training`)
                 ]);
 
                 if (usersRes.ok && logsRes.ok && meetingsRes.ok) {
@@ -100,11 +101,19 @@ const AdminDashboard = ({ user, onLogout }: AdminDashboardProps) => {
                     const logs: ReadingLogEntry[] = await logsRes.json();
                     const meetings = await meetingsRes.json();
 
+                    // Process Training Data
+                    let pendingCount = 0;
+                    if (trainingRes.ok) {
+                        const training = await trainingRes.json();
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        pendingCount = training.filter((t: any) => t.status && String(t.status).toUpperCase().includes('PENDING')).length;
+                    }
+
                     setStats({
                         totalUsers: users.length,
                         booksRead: logs.filter(l => l.status === 'Finished').length,
                         activeMeetings: meetings.length,
-                        pendingTraining: 4 // Mocked count matching TrainingManager mocks
+                        pendingTraining: pendingCount
                     });
 
                     // sorting logs by date descending
@@ -123,15 +132,11 @@ const AdminDashboard = ({ user, onLogout }: AdminDashboardProps) => {
     const renderContent = () => {
         switch (currentView) {
             case 'users':
-                return <UserManagement userRole={user.role} onBack={() => setCurrentView('overview')} />;
-            case 'logs':
-                return <AdminReadingLog onBack={() => setCurrentView('overview')} />;
-            case 'meetings':
-                return <InternalMeetingList userRole={user.role} userEmail={user.email} />;
-            case 'courses':
-                return <AdminCourseManager />;
-            case 'training':
-                return <TrainingManager />;
+            case 'users': return <UserManagement userRole={user.role} />;
+            case 'logs': return <AdminReadingLog />;
+            case 'training': return <TrainingExternalManager userRole={user.role} userName={user.name} />;
+            case 'meetings': return <TrainingInternalList userRole={user.role} />;
+            case 'courses': return <OnlineModulesManager userRole={user.role} />;
             case 'reports':
                 return <HRReportGenerator />;
             case 'incentives':
@@ -146,7 +151,7 @@ const AdminDashboard = ({ user, onLogout }: AdminDashboardProps) => {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <StatCard label="Total Staff" value={stats.totalUsers} icon={Users} color="bg-blue-500" trend="+12%" />
                             <StatCard label="Books Read" value={stats.booksRead} icon={BookOpen} color="bg-orange-500" trend="+8%" />
-                            <StatCard label="Internal Meetings" value={stats.activeMeetings} icon={Calendar} color="bg-purple-500" />
+                            <StatCard label="Training Internal" value={stats.activeMeetings} icon={Calendar} color="bg-purple-500" />
                             <StatCard label="Pending Requests" value={stats.pendingTraining} icon={AlertCircle} color="bg-rose-500" />
                         </div>
 
@@ -236,12 +241,12 @@ const AdminDashboard = ({ user, onLogout }: AdminDashboardProps) => {
 
                     <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 mt-6">Management</p>
                     <SidebarItem view="users" icon={Users} label="User Management" currentView={currentView} setCurrentView={setCurrentView} />
-                    <SidebarItem view="courses" icon={BookOpen} label="Course Management" currentView={currentView} setCurrentView={setCurrentView} />
+                    <SidebarItem view="courses" icon={BookOpen} label="Online Modules Management" currentView={currentView} setCurrentView={setCurrentView} />
                     <SidebarItem view="logs" icon={FileText} label="Reading Logs" currentView={currentView} setCurrentView={setCurrentView} />
                     <SidebarItem view="training" icon={FileText} label="Training Requests" currentView={currentView} setCurrentView={setCurrentView} />
                     <SidebarItem view="reports" icon={TrendingUp} label="HR Reports" currentView={currentView} setCurrentView={setCurrentView} />
                     <SidebarItem view="incentives" icon={Award} label="Incentives" currentView={currentView} setCurrentView={setCurrentView} />
-                    <SidebarItem view="meetings" icon={Users} label="Internal Meetings" currentView={currentView} setCurrentView={setCurrentView} />
+                    <SidebarItem view="meetings" icon={Users} label="Training Internal" currentView={currentView} setCurrentView={setCurrentView} />
                 </nav>
 
                 <div className="p-4 border-t border-slate-100">

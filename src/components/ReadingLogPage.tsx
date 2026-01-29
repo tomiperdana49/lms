@@ -3,6 +3,7 @@ import { BookOpen, ArrowLeft, Search, Book, Trophy, Trash2, XCircle } from 'luci
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry } from '../types';
 import PopupNotification from './PopupNotification';
+import ConfirmationModal from './ConfirmationModal';
 
 interface ReadingLogPageProps {
     user: { name: string; email: string };
@@ -44,6 +45,17 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         duration: 0,
         evidenceUrl: ''
     });
+
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+    }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
+
+    const openConfirm = (title: string, message: string, onConfirm: () => void) => {
+        setConfirmConfig({ isOpen: true, title, message, onConfirm });
+    };
 
     // --- Fetch Data ---
     useEffect(() => {
@@ -89,20 +101,22 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         }
     }, [showSuggestions]);
 
-    const handleDelete = async (id: number) => {
-        if (!confirm('Are you sure you want to delete this log?')) return;
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/logs/${id}`, { method: 'DELETE' });
-            if (res.ok) {
-                setLogs(logs.filter(log => log.id !== id));
-                if (selectedLog?.id === id) {
-                    setSelectedLog(null);
+    const handleDelete = (id: number) => {
+        openConfirm('Delete Log', 'Are you sure you want to delete this log?', async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/logs/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    setLogs(logs.filter(log => log.id !== id));
+                    if (selectedLog?.id === id) {
+                        setSelectedLog(null);
+                    }
+                    setNotification({ show: true, type: 'success', message: "Log deleted successfully." });
                 }
+            } catch (err) {
+                console.error("Failed to delete log", err);
+                setNotification({ show: true, type: 'error', message: "Failed to delete log." });
             }
-        } catch (err) {
-            console.error("Failed to delete log", err);
-            setNotification({ show: true, type: 'error', message: "Failed to delete log." });
-        }
+        });
     };
 
     const handleFileChange = async (e: ChangeEvent<HTMLInputElement>, isFinishForm: boolean) => {
@@ -255,6 +269,19 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
             return;
         }
 
+        // 3. Validate Mandatory Fields
+        if (!startFormData.title || !startFormData.category || !startFormData.location || !startFormData.source) {
+            setNotification({ show: true, type: 'error', message: 'Mohon lengkapi semua kolom.' });
+            setIsLoading(false);
+            return;
+        }
+
+        if (!startFormData.evidenceUrl) {
+            setNotification({ show: true, type: 'error', message: 'Wajib upload Bukti Foto Pengambilan Buku.' });
+            setIsLoading(false);
+            return;
+        }
+
         const newLog: Partial<ReadingLogEntry> = {
             id: Date.now(),
             title: startFormData.title,
@@ -300,6 +327,19 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
         if (now.getTime() - startDate.getTime() < oneDay) {
             setNotification({ show: true, type: 'error', message: 'Anda belum bisa menyelesaikan buku ini. Minimal peminjaman adalah 1 hari.' });
+            setIsLoading(false);
+            return;
+        }
+
+        // Validation for Finish Form
+        if (!finishFormData.link) {
+            setNotification({ show: true, type: 'error', message: 'Mohon isi Link Review.' });
+            setIsLoading(false);
+            return;
+        }
+
+        if (!finishFormData.evidenceUrl) {
+            setNotification({ show: true, type: 'error', message: 'Wajib upload Bukti Foto Pengembalian Buku.' });
             setIsLoading(false);
             return;
         }
@@ -723,6 +763,15 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                     )}
                 </div>
             </div>
+            <ConfirmationModal
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig({ ...confirmConfig, isOpen: false })}
+                onConfirm={confirmConfig.onConfirm}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                confirmText="Yes, Delete"
+                variant="danger"
+            />
         </div>
     );
 };

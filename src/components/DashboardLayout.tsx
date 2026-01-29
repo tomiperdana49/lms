@@ -32,8 +32,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, onLogout 
     const menuItems: { icon: React.ElementType; label: string; id: Page | string }[] = [
         { icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard' },
         { icon: Library, label: 'Reading Log', id: 'reading-log' },
-        { icon: BookOpen, label: 'Courses', id: 'courses' },
-        { icon: Users, label: 'Internal', id: 'internal' },
+        { icon: BookOpen, label: 'Online Modules', id: 'courses' },
+        { icon: Users, label: 'Training Internal', id: 'internal' },
         { icon: Globe, label: 'External', id: 'external' },
         { icon: Calendar, label: 'Calendar', id: 'calendar' },
         { icon: Award, label: 'Incentives', id: 'incentives' },

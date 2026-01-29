@@ -16,8 +16,9 @@ import {
 import { API_BASE_URL } from '../config';
 import type { Role, Meeting, CostReport } from '../types';
 import PopupNotification from './PopupNotification';
+import ConfirmationModal from './ConfirmationModal';
 
-interface InternalMeetingListProps {
+interface TrainingInternalListProps {
     userRole: Role;
     userEmail?: string;
 }
@@ -41,7 +42,7 @@ const AvatarStack = ({ count }: { count: number }) => (
     </div>
 );
 
-const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) => {
+const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps) => {
     // --- State ---
     const [meetings, setMeetings] = useState<ExtendedMeeting[]>([]);
     const [selectedMeeting, setSelectedMeeting] = useState<ExtendedMeeting | null>(null);
@@ -50,6 +51,7 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
 
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
+    const [meetingToDelete, setMeetingToDelete] = useState<number | null>(null);
 
     // Reporting State
     const [isReportOpen, setIsReportOpen] = useState(false);
@@ -357,14 +359,24 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
         resetForm();
     };
 
-    const handleDelete = async (id: number) => {
-        if (!confirm('Cancel this meeting?')) return;
+    const confirmDelete = (id: number) => {
+        setMeetingToDelete(id);
+    };
+
+    const handleDelete = async () => {
+        if (!meetingToDelete) return;
         try {
-            await fetch(`${API_BASE_URL}/api/meetings/${id}`, { method: 'DELETE' });
-            setMeetings(meetings.filter(m => m.id !== id));
-            setSelectedMeeting(null);
+            await fetch(`${API_BASE_URL}/api/meetings/${meetingToDelete}`, { method: 'DELETE' });
+            setMeetings(meetings.filter(m => m.id !== meetingToDelete));
+            if (selectedMeeting?.id === meetingToDelete) {
+                setSelectedMeeting(null);
+            }
+            setNotification({ show: true, type: 'success', message: 'Meeting cancelled successfully.' });
         } catch (err) {
             console.error(err);
+            setNotification({ show: true, type: 'error', message: 'Failed to cancel meeting.' });
+        } finally {
+            setMeetingToDelete(null);
         }
     };
 
@@ -444,11 +456,21 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
                 onClose={() => setNotification({ ...notification, show: false })}
             />
 
+            <ConfirmationModal
+                isOpen={!!meetingToDelete}
+                onClose={() => setMeetingToDelete(null)}
+                onConfirm={handleDelete}
+                title="Cancel Meeting"
+                message="Are you sure you want to cancel this meeting? This action cannot be undone."
+                confirmText="Yes, Cancel it"
+                variant="danger"
+            />
+
             {/* Header */}
             <div className="bg-white rounded-3xl p-6 border border-slate-100 flex flex-col md:flex-row justify-between md:items-center gap-4 shadow-sm">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Users className="text-indigo-600" /> Internal L&D Sessions
+                        <Users className="text-indigo-600" /> Training Internal
                     </h1>
                     <p className="text-slate-500 mt-1">Manage sharing sessions, townhalls, and internal training.</p>
                 </div>
@@ -1027,7 +1049,7 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
                                                 <FileText size={18} />
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(selectedMeeting.id)}
+                                                onClick={() => confirmDelete(selectedMeeting.id)}
                                                 className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-colors backdrop-blur-sm"
                                             >
                                                 <Trash2 size={18} />
@@ -1181,4 +1203,4 @@ const InternalMeetingList = ({ userRole, userEmail }: InternalMeetingListProps) 
     );
 };
 
-export default InternalMeetingList;
+export default TrainingInternalList;

@@ -20,7 +20,14 @@ CREATE TABLE IF NOT EXISTS reading_logs (
     duration INT,
     review TEXT,
     status VARCHAR(50) DEFAULT 'Reading',
-    user_name VARCHAR(255)
+    user_name VARCHAR(255),
+    start_date DATETIME,
+    finish_date DATETIME,
+    evidence_url VARCHAR(255),
+    reading_duration INT DEFAULT 0,
+    hr_approval_status VARCHAR(50) DEFAULT 'Pending',
+    incentive_amount DECIMAL(15, 2) DEFAULT 0,
+    rejection_reason TEXT
 );
 
 CREATE TABLE IF NOT EXISTS training_requests (
@@ -31,7 +38,17 @@ CREATE TABLE IF NOT EXISTS training_requests (
     date DATE,
     status VARCHAR(50) DEFAULT 'PENDING_HR',
     submitted_at DATETIME,
-    rejection_reason TEXT
+    rejection_reason TEXT,
+    employee_name VARCHAR(255),
+    employee_role VARCHAR(50),
+    supervisor_name VARCHAR(255),
+    supervisor_approved_at DATETIME,
+    hr_name VARCHAR(255),
+    hr_approved_at DATETIME,
+    cost_training DECIMAL(15, 2) DEFAULT 0,
+    cost_transport DECIMAL(15, 2) DEFAULT 0,
+    cost_accommodation DECIMAL(15, 2) DEFAULT 0,
+    cost_others DECIMAL(15, 2) DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS meetings (
@@ -83,8 +100,13 @@ CREATE TABLE IF NOT EXISTS quiz_results (
 
 CREATE TABLE IF NOT EXISTS incentives (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255),
-    amount DECIMAL(15, 2),
+    employee_name VARCHAR(255) NOT NULL,
+    course_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    start_date DATE,
+    end_date DATE,
+    evidence_url VARCHAR(255),
     status VARCHAR(50) DEFAULT 'Pending',
-    date DATETIME
+    reward DECIMAL(15, 2) DEFAULT 0,
+    monthly_amount DECIMAL(15, 2) DEFAULT 0
 );

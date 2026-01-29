@@ -3,8 +3,8 @@ import DashboardLayout from './components/DashboardLayout';
 import DashboardHome from './components/DashboardHome';
 import ReadingLogPage from './components/ReadingLogPage';
 import CoursePlayer from './components/CoursePlayer';
-import InternalMeetingList from './components/InternalMeetingList';
-import TrainingRequestForm from './components/TrainingRequestForm';
+import TrainingInternalList from './components/TrainingInternalList';
+import TrainingExternalForm from './components/TrainingExternalForm';
 import LMSCalendar from './components/LMSCalendar';
 import LoginPage from './components/LoginPage';
 import UserManagement from './components/UserManagement';
@@ -53,8 +53,8 @@ function App() {
           />
         )}
         {activePage === 'courses' && <CoursePlayer user={user!} />}
-        {activePage === 'internal' && <InternalMeetingList userRole={userRole} userEmail={user?.email || ''} />}
-        {activePage === 'external' && <TrainingRequestForm userRole={userRole} userName={user?.name} />}
+        {activePage === 'internal' && <TrainingInternalList userRole={userRole} userEmail={user?.email || ''} />}
+        {activePage === 'external' && <TrainingExternalForm user={user!} />}
         {activePage === 'calendar' && <LMSCalendar userEmail={user?.email} />}
         {/* User Management Route - Only for HR */}
         {activePage === 'users' && <UserManagement userRole={userRole} onBack={() => setActivePage('dashboard')} />}

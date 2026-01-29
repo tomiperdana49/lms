@@ -26,7 +26,13 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
     const [quizResults, setQuizResults] = useState<Record<number, number>>({}); // moduleId -> best score or boolean
     const [isVideoCompleted, setIsVideoCompleted] = useState(false);
+
+    // Player State
     const playerRef = useRef<any>(null);
+
+    const [moduleProgress, setModuleProgress] = useState<Record<number, number>>({});
+    const playerInterval = useRef<any>(null);
+
 
     // Derived state
     const activeModule = activeCourse?.modules.find(m => m.id === activeModuleId);
@@ -55,6 +61,10 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         const progressRes = await fetch(`${API_BASE_URL}/api/progress/${userId}/${course.id}`);
                         const progressData = await progressRes.json();
                         const completedIds = progressData.completedModuleIds || [];
+                        // Save module progress map to state if active course
+                        if (activeCourse && activeCourse.id === course.id) {
+                            setModuleProgress(progressData.moduleProgress || {});
+                        }
 
                         // Calculate progress percentage
                         const progress = course.modules.length > 0
@@ -127,25 +137,91 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
     useEffect(() => {
         if (!activeModule || !activeModule.videoId || viewMode !== 'player') return;
 
-        // Reset state: if previously completed, allow immediately
-        setIsVideoCompleted(activeModule.completed || false);
+        // Reset state
+        const isAlreadyCompleted = activeModule.completed || false;
+        setIsVideoCompleted(isAlreadyCompleted);
+
+        // RESUME LOGIC:
+        // If completed, allowed max is Infinity.
+        // If not, it is the saved timestamp OR 0.
+        let savedTime = moduleProgress[activeModule.id] || 0;
+
+        // Smart Resume: If we are effectively at the end (within 10s of completion logic), start at 0
+        // We don't have duration here easily unless we stored it in progress, but we can guess or rely on 'completed' flag.
+        // If module is completed, we should probably start at 0 for re-watching convenience?
+        // Or user defaults to start. let's check savedTime vs expected duration if we had it.
+        // Simpler: If activeModule.completed, start at 0.
+        if (isAlreadyCompleted && savedTime > 0) {
+            savedTime = 0;
+        }
+
+
+
+
+        // Clear previous interval
+        if (playerInterval.current) clearInterval(playerInterval.current);
+
+        const checkProgress = () => {
+            if (!playerRef.current || !playerRef.current.getCurrentTime) return;
+
+            const ct = playerRef.current.getCurrentTime();
+            const dur = playerRef.current.getDuration();
+
+
+            // Mark completed if near end (95% or < 5s remaining)
+            if (!isAlreadyCompleted && dur > 0 && (ct >= dur - 5 || ct / dur > 0.95)) {
+                setIsVideoCompleted(true);
+            }
+        };
+
+        // Create a separate save interval or just save on pause/leave? 
+        // Reliance on explicit save loop is better for crashes.
+        const saveInterval = setInterval(() => {
+            if (playerRef.current && playerRef.current.getCurrentTime) {
+                const ct = playerRef.current.getCurrentTime();
+                if (ct > 0 && !isAlreadyCompleted) {
+                    fetch(`${API_BASE_URL}/api/progress/time`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId,
+                            courseId: activeCourse?.id,
+                            moduleId: activeModule.id,
+                            timestamp: Math.floor(ct) // Save integer seconds 
+                        })
+                    }).catch(e => console.error("Auto-save failed", e));
+                }
+            }
+        }, 5000); // Save every 5 seconds
 
         const initPlayer = () => {
             // Destroy existing if needed (though loadVideoById is preferred for smoother transition)
-            if (playerRef.current && typeof playerRef.current.loadVideoById === 'function') {
-                playerRef.current.loadVideoById(activeModule.videoId);
+            if (playerRef.current && typeof playerRef.current.cueVideoById === 'function') {
+                // Use cueVideoById to load effectively but stay paused, letting user click play.
+                // This resolves "cannot start" glitches if loadVideoById auto-plays in background.
+                playerRef.current.cueVideoById({
+                    videoId: activeModule.videoId,
+                    startSeconds: savedTime
+                });
             } else {
                 playerRef.current = new window.YT.Player('youtube-player', {
                     height: '100%',
                     width: '100%',
                     videoId: activeModule.videoId,
                     playerVars: {
-                        autoplay: 1,
-                        controls: 1,
+                        start: Math.floor(savedTime), // Start at saved time
+                        autoplay: 0,
+                        controls: 1, // ENABLE NATIVE CONTROLS
                         rel: 0,
-                        modestbranding: 1
+                        modestbranding: 1,
+                        disablekb: 0, // ENABLE KEYBOARD
+                        fs: 1, // Enable native fullscreen
+                        iv_load_policy: 3
                     },
                     events: {
+                        onReady: () => {
+                            // Valid event
+                        },
                         onStateChange: (event: any) => {
                             if (event.data === window.YT.PlayerState.ENDED) {
                                 setIsVideoCompleted(true);
@@ -154,6 +230,9 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     }
                 });
             }
+
+            // Start Polling
+            playerInterval.current = setInterval(checkProgress, 500);
         };
 
         if (window.YT && window.YT.Player) {
@@ -161,7 +240,15 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
         } else {
             window.onYouTubeIframeAPIReady = initPlayer;
         }
-    }, [activeModule?.id, activeModule?.videoId, viewMode, activeModule?.completed]); // key on ID to ensure reload
+
+        return () => {
+            if (playerInterval.current) clearInterval(playerInterval.current);
+            clearInterval(saveInterval);
+        };
+    }, [activeModule?.id, activeModule?.videoId, viewMode, activeModule?.completed, moduleProgress, userId, activeCourse?.id]);
+
+    // Custom Controls Handlers
+
 
     const handleStartCourse = (course: Course) => {
         setActiveCourse(course);

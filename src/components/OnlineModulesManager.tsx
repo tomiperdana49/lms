@@ -3,8 +3,9 @@ import { Edit, Trash2, Plus, GripVertical, Save, X, BookOpen, Clock } from 'luci
 import { API_BASE_URL } from '../config';
 import type { Course, Module, Quiz, QuizResult } from '../types';
 import PopupNotification from './PopupNotification';
+import ConfirmationModal from './ConfirmationModal';
 
-const AdminCourseManager = () => {
+const OnlineModulesManager = () => {
     // Helper to render Quiz Editor
     const renderQuizEditor = (quiz: Quiz | undefined, onUpdate: (q: Quiz) => void, onDelete?: () => void) => {
         if (!quiz) return null;
@@ -112,38 +113,57 @@ const AdminCourseManager = () => {
     const [progressData, setProgressData] = useState<Record<string, any>[]>([]);
     const [allQuizResults, setAllQuizResults] = useState<QuizResult[]>([]);
 
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+    }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
+
+    const openConfirm = (title: string, message: string, onConfirm: () => void) => {
+        setConfirmConfig({ isOpen: true, title, message, onConfirm });
+    };
+
     // --- Fetch Data from API ---
     useEffect(() => {
         const fetchData = async () => {
+            // Fetch Courses first (Critical)
             try {
-                const [resCourses, resProgress, resQuiz] = await Promise.all([
-                    fetch(`${API_BASE_URL}/api/courses-json`),
-                    fetch(`${API_BASE_URL}/api/progress`),
-                    fetch(`${API_BASE_URL}/api/quiz/all-results`)
-                ]);
-                const coursesData = await resCourses.json();
-                const progressJson = await resProgress.json();
-                const quizJson = resQuiz.ok ? await resQuiz.json() : [];
-
-                setCourses(coursesData);
-                setProgressData(progressJson);
-                setAllQuizResults(quizJson);
-            } catch (err) {
-                console.error("Failed to load data:", err);
+                const resCourses = await fetch(`${API_BASE_URL}/api/courses-json`);
+                if (resCourses.ok) {
+                    const coursesData = await resCourses.json();
+                    setCourses(coursesData);
+                }
+            } catch (e) {
+                console.error("Courses fetch error", e);
+                setPopup({ type: 'error', message: `Failed to load courses: ${e instanceof Error ? e.message : String(e)}`, isOpen: true });
             }
+
+            // Fetch secondary data independently
+            try {
+                const resProgress = await fetch(`${API_BASE_URL}/api/progress`);
+                if (resProgress.ok) setProgressData(await resProgress.json());
+            } catch (e) { console.warn("Progress fetch failed", e); }
+
+            try {
+                const resQuiz = await fetch(`${API_BASE_URL}/api/quiz/all-results`);
+                if (resQuiz.ok) setAllQuizResults(await resQuiz.json());
+            } catch (e) { console.warn("Quiz stats fetch failed", e); }
         };
         fetchData();
     }, []);
 
-    const handleDeleteCourse = async (id: number) => {
-        if (confirm('Are you sure you want to delete this course?')) {
+    const handleDeleteCourse = (id: number) => {
+        openConfirm('Delete Course', 'Are you sure you want to delete this course? This action cannot be undone.', async () => {
             try {
                 await fetch(`${API_BASE_URL}/api/courses/${id}`, { method: 'DELETE' });
                 setCourses(courses.filter(c => c.id !== id));
+                setPopup({ type: 'success', message: 'Course deleted successfully.', isOpen: true });
             } catch (err) {
                 console.error("Failed to delete course", err);
+                setPopup({ type: 'error', message: 'Failed to delete course.', isOpen: true });
             }
-        }
+        });
     };
 
     const handleAddNewCourse = () => {
@@ -399,11 +419,11 @@ const AdminCourseManager = () => {
                                                                 setEditingCourse({ ...editingCourse, modules: newMods });
                                                             },
                                                             () => {
-                                                                if (confirm('Delete this quiz?')) {
+                                                                openConfirm('Delete Quiz', 'Delete this quiz? All questions will be lost.', () => {
                                                                     const newMods = [...editingCourse.modules];
                                                                     delete newMods[idx].quiz;
                                                                     setEditingCourse({ ...editingCourse, modules: newMods });
-                                                                }
+                                                                });
                                                             }
                                                         )
                                                     ) : (
@@ -460,11 +480,11 @@ const AdminCourseManager = () => {
                                                 <h4 className="font-bold text-lg text-slate-800">Assessment Questions</h4>
                                                 <button
                                                     onClick={() => {
-                                                        if (confirm('Remove Assessment?')) {
+                                                        openConfirm('Remove Assessment', 'Are you sure you want to remove the final assessment?', () => {
                                                             const upd = { ...editingCourse };
                                                             delete upd.assessment;
                                                             setEditingCourse(upd);
-                                                        }
+                                                        });
                                                     }}
                                                     className="text-red-500 hover:text-red-700 font-medium text-sm"
                                                 >
@@ -678,8 +698,18 @@ const AdminCourseManager = () => {
                 message={popup.message}
                 onClose={() => setPopup(prev => ({ ...prev, isOpen: false }))}
             />
+
+            <ConfirmationModal
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig({ ...confirmConfig, isOpen: false })}
+                onConfirm={confirmConfig.onConfirm}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                confirmText="Yes, Proceed"
+                variant="danger"
+            />
         </div>
     );
 };
 
-export default AdminCourseManager;
+export default OnlineModulesManager;

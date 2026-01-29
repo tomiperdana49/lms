@@ -18,14 +18,17 @@ interface TrainingRequest {
     isBonded: boolean;
     evidenceUrl?: string;
     userName?: string;
+    // New fields
+    costTraining?: number;
+    costTransport?: number;
+    costAccommodation?: number;
+    costOthers?: number;
+    supervisorName?: string;
+    hrName?: string;
+    rejectionReason?: string;
 }
 
-interface TrainingRequestFormProps {
-    userRole: Role;
-    userName?: string;
-}
-
-const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) => {
+const TrainingExternalForm = ({ user }: { user: { name: string; role: string } }) => {
     // --- State ---
     const [requests, setRequests] = useState<TrainingRequest[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -36,6 +39,10 @@ const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) =
         title: '',
         vendor: '',
         cost: '',
+        costTraining: '',
+        costTransport: '',
+        costAccommodation: '',
+        costOthers: '',
         date: '',
         duration: '',
         location: '',
@@ -49,8 +56,25 @@ const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) =
     });
 
     // --- Derived Logic ---
-    const costValue = Number(formData.cost.replace(/\./g, ''));
-    const BOND_THRESHOLD = userRole === 'STAFF' ? 2500000 : 5000000;
+    const parseCurrency = (val: string) => Number(val.replace(/\D/g, ''));
+
+    // Calculate total cost from components
+    const totalCostValue =
+        parseCurrency(formData.costTraining) +
+        parseCurrency(formData.costTransport) +
+        parseCurrency(formData.costAccommodation) +
+        parseCurrency(formData.costOthers);
+
+    // Update main cost field when components change
+    useEffect(() => {
+        setFormData(prev => ({
+            ...prev,
+            cost: totalCostValue > 0 ? new Intl.NumberFormat('id-ID').format(totalCostValue) : ''
+        }));
+    }, [formData.costTraining, formData.costTransport, formData.costAccommodation, formData.costOthers]);
+
+    const costValue = totalCostValue;
+    const BOND_THRESHOLD = user.role === 'STAFF' ? 2500000 : 5000000;
     const isBondRequired = costValue > BOND_THRESHOLD;
     const isSubmitDisabled = isLoading || (isBondRequired && !formData.agreedToBond) || !formData.agreedToPenalty;
 
@@ -68,7 +92,7 @@ const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) =
         let value: string | boolean = e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value;
 
         // Auto-format currency logic
-        if (e.target.name === 'cost' && typeof value === 'string') {
+        if (['cost', 'costTraining', 'costTransport', 'costAccommodation', 'costOthers'].includes(e.target.name) && typeof value === 'string') {
             // Remove existing non-digits to get raw number
             const raw = value.replace(/\D/g, '');
             // Format with thousand separators
@@ -103,6 +127,24 @@ const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) =
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
 
+        // Validation
+        const requiredFields = [
+            { field: formData.title, label: 'Nama Pelatihan' },
+            { field: formData.vendor, label: 'Vendor' },
+            { field: formData.date, label: 'Tanggal' },
+            { field: formData.duration, label: 'Durasi' },
+            { field: formData.location, label: 'Lokasi' },
+            { field: totalCostValue > 0, label: 'Rincian Biaya' },
+            { field: formData.paymentMethod === 'DIRECT' ? (formData.bankName && formData.accountNumber) : true, label: 'Detail Bank (untuk Transfer Langsung)' },
+            { field: formData.evidenceUrl, label: 'Brosur / Bukti Pendukung' }
+        ];
+
+        const missingField = requiredFields.find(f => !f.field);
+        if (missingField) {
+            setNotification({ show: true, type: 'error', message: `Mohon lengkapi: ${missingField.label}` });
+            return;
+        }
+
         if (isBondRequired && !formData.agreedToBond) {
             setNotification({ show: true, type: 'error', message: "Anda wajib menyetujui Ikatan Dinas untuk nominal ini." });
             return;
@@ -112,11 +154,18 @@ const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) =
 
         const newRequest = {
             ...formData,
-            cost: costValue,
+            ...formData,
+            cost: costValue, // Use calculated total
+            costTraining: parseCurrency(formData.costTraining),
+            costTransport: parseCurrency(formData.costTransport),
+            costAccommodation: parseCurrency(formData.costAccommodation),
+            costOthers: parseCurrency(formData.costOthers),
             status: 'PENDING_SUPERVISOR',
             submittedAt: new Date().toISOString(),
             isBonded: isBondRequired,
-            userName: userName || 'Unknown'
+            userName: user.name || 'Unknown',
+            employeeName: user.name || 'Unknown', // Add for backend
+            employeeRole: user.role || 'STAFF'    // Add for backend
         };
 
         try {
@@ -130,7 +179,8 @@ const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) =
                 setRequests([savedReq, ...requests]);
                 // Reset Form
                 setFormData({
-                    title: '', vendor: '', cost: '', date: '', duration: '', location: '',
+                    title: '', vendor: '', cost: '', costTraining: '', costTransport: '', costAccommodation: '', costOthers: '',
+                    date: '', duration: '', location: '',
                     paymentMethod: 'REIMBURSEMENT', bankName: '', accountNumber: '', reason: '',
                     agreedToBond: false, agreedToPenalty: false, evidenceUrl: ''
                 });
@@ -141,24 +191,6 @@ const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) =
             setNotification({ show: true, type: 'error', message: "Gagal mengirim pengajuan." });
         } finally {
             setIsLoading(false);
-        }
-    };
-
-    // --- Simulation Logic (Real API Call) ---
-    const simulateStatus = async (id: number, action: 'approve' | 'reject') => {
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/training/${id}/approve`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action })
-            });
-
-            if (res.ok) {
-                const updatedReq = await res.json();
-                setRequests(requests.map(req => req.id === id ? updatedReq : req));
-            }
-        } catch (err) {
-            console.error("Failed to update status", err);
         }
     };
 
@@ -242,12 +274,40 @@ const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) =
                                 <DollarSign size={18} /> Biaya & Pembayaran
                             </h3>
 
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Total Biaya (Rp)</label>
-                                <div className="relative">
-                                    <span className="absolute left-4 top-3 font-bold text-slate-400">Rp</span>
-                                    <input required type="text" name="cost" value={formData.cost} onChange={handleChange} placeholder="0"
-                                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-teal-500 outline-none font-bold text-slate-700" />
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+                                <label className="block text-xs font-bold text-slate-500 uppercase">Rincian Biaya (Estimasi)</label>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {[
+                                        { label: 'Biaya Training/Trainer', name: 'costTraining' },
+                                        { label: 'Biaya Transportasi', name: 'costTransport' },
+                                        { label: 'Biaya Akomodasi', name: 'costAccommodation' },
+                                        { label: 'Biaya Lainnya (Makan, Laundry, dll)', name: 'costOthers' }
+                                    ].map((field) => (
+                                        <div key={field.name}>
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">{field.label}</label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">Rp</span>
+                                                <input
+                                                    type="text"
+                                                    name={field.name}
+                                                    value={(formData as any)[field.name]}
+                                                    onChange={handleChange}
+                                                    placeholder="0"
+                                                    className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-teal-500 outline-none text-sm font-semibold text-slate-700 bg-white"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="pt-3 border-t border-slate-200">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Total Biaya (Otomatis)</label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-3 font-bold text-slate-400">Rp</span>
+                                        <input readOnly type="text" name="cost" value={formData.cost}
+                                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-100 font-bold text-slate-700 cursor-not-allowed" />
+                                    </div>
                                 </div>
                             </div>
 
@@ -386,32 +446,45 @@ const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) =
                                         <h3 className="font-bold text-slate-800 leading-tight">{req.title}</h3>
                                     </div>
                                     <div className="text-right">
-                                        <span className={`text-xs font-bold px-2 py-1 rounded-lg ${req.status === 'APPROVED' ? 'bg-green-100 text-green-700' : req.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-blue-50 text-blue-600'}`}>
-                                            {req.status === 'APPROVED' ? 'Disetujui' : req.status === 'REJECTED' ? 'Ditolak' : 'Proses'}
-                                        </span>
+                                        {/* Stepper for Status */}
+                                        <div className="flex flex-col items-end gap-2">
+                                            <div className="flex items-center gap-1 text-[10px]">
+                                                <div className={`px-1.5 py-0.5 rounded border flex items-center gap-1 ${req.supervisorName ? 'bg-green-50 border-green-200 text-green-700' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                                                    <span className="font-bold">SPV</span>
+                                                    {req.supervisorName ? <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div> : <div className="w-1.5 h-1.5 rounded-full border border-slate-300"></div>}
+                                                </div>
+                                                <div className={`w-3 h-0.5 ${req.supervisorName ? 'bg-green-200' : 'bg-slate-100'}`}></div>
+                                                <div className={`px-1.5 py-0.5 rounded border flex items-center gap-1 ${req.hrName ? 'bg-green-50 border-green-200 text-green-700' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                                                    <span className="font-bold">HR</span>
+                                                    {req.hrName ? <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div> : <div className="w-1.5 h-1.5 rounded-full border border-slate-300"></div>}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
                                 <div className="pl-3 mt-3 flex items-center justify-between text-sm">
-                                    <div className="text-slate-500 font-medium">
-                                        Rp {req.cost.toLocaleString()}
-                                    </div>
-                                    <div className="text-slate-400 text-xs">
-                                        {new Date(req.submittedAt).toLocaleDateString()}
+                                    <div className="text-slate-500 font-medium w-full">
+                                        <div className="font-bold text-slate-700">Total: Rp {req.cost.toLocaleString('id-ID')}</div>
+                                        <div className="text-[10px] text-slate-400 mt-1 space-y-0.5">
+                                            {(req.costTraining || 0) > 0 && <div>Training: Rp {(req.costTraining || 0).toLocaleString('id-ID')}</div>}
+                                            {(req.costTransport || 0) > 0 && <div>Transport: Rp {(req.costTransport || 0).toLocaleString('id-ID')}</div>}
+                                            {(req.costAccommodation || 0) > 0 && <div>Akomodasi: Rp {(req.costAccommodation || 0).toLocaleString('id-ID')}</div>}
+                                            {(req.costOthers || 0) > 0 && <div>Lainnya: Rp {(req.costOthers || 0).toLocaleString('id-ID')}</div>}
+                                        </div>
+
+                                        {/* Rejection Reason */}
+                                        {req.status === 'REJECTED' && req.rejectionReason && (
+                                            <div className="mt-3 bg-red-50 p-3 rounded-lg border border-red-100 text-xs animate-in fade-in">
+                                                <p className="font-bold text-red-800 flex items-center gap-1"><AlertTriangle size={12} /> Ditolak:</p>
+                                                <p className="text-red-600 italice mt-0.5">"{req.rejectionReason}"</p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-
-                                {/* Simulation Buttons */}
-                                {(userRole === 'HR' || userRole === 'SUPERVISOR') && req.status.includes('PENDING') && (
-                                    <div className="mt-4 pl-3 pt-3 border-t border-slate-50 flex gap-2">
-                                        <button onClick={() => simulateStatus(req.id, 'reject')} className="flex-1 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-lg transition-colors">
-                                            Tolak
-                                        </button>
-                                        <button onClick={() => simulateStatus(req.id, 'approve')} className="flex-1 py-1.5 bg-green-50 hover:bg-green-100 text-green-600 text-xs font-bold rounded-lg transition-colors">
-                                            Setujui
-                                        </button>
-                                    </div>
-                                )}
+                                <div className="absolute right-3 bottom-3 text-[10px] text-slate-400">
+                                    {new Date(req.submittedAt).toLocaleDateString()}
+                                </div>
                             </div>
                         ))
                     )}
@@ -421,4 +494,4 @@ const TrainingRequestForm = ({ userRole, userName }: TrainingRequestFormProps) =
     );
 };
 
-export default TrainingRequestForm;
+export default TrainingExternalForm;

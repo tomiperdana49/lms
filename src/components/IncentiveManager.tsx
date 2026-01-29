@@ -3,6 +3,7 @@ import { Award, Plus, CheckCircle, XCircle, Clock, History, Image as ImageIcon, 
 import { API_BASE_URL } from '../config';
 import type { User, Incentive } from '../types';
 import PopupNotification from './PopupNotification';
+import ConfirmationModal from './ConfirmationModal';
 
 interface IncentiveManagerProps {
     user?: User;
@@ -62,6 +63,17 @@ const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
         isOpen: false, id: null, incentive: null
     });
     const [approvalReward, setApprovalReward] = useState(''); // HR inputs this
+
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+    }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
+
+    const openConfirm = (title: string, message: string, onConfirm: () => void) => {
+        setConfirmConfig({ isOpen: true, title, message, onConfirm });
+    };
     // --- Summary Logic State (Moved to top level to avoid hook errors) ---
     const [summaryYear, setSummaryYear] = useState(new Date().getFullYear());
 
@@ -151,40 +163,54 @@ const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
         }
     };
 
-    const denyRequest = async (id: number) => {
-        if (!confirm('Deny this request?')) return;
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/incentives/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'Denied' })
-            });
+    const denyRequest = (id: number) => {
+        openConfirm('Deny Request', 'Are you sure you want to deny this request?', async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/incentives/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'Denied' })
+                });
 
-            if (res.ok) {
-                const updated = await res.json();
-                setIncentives(incentives.map(i => i.id === id ? updated : i));
-            }
-        } catch (err) { console.error(err); }
+                if (res.ok) {
+                    const updated = await res.json();
+                    setIncentives(incentives.map(i => i.id === id ? updated : i));
+                }
+            } catch (err) { console.error(err); }
+        });
     };
 
-    const markResign = async (id: number) => {
-        if (!confirm('Mark as Resigned (Stop Incentive)?')) return;
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/incentives/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'Resign' })
-            });
+    const markResign = (id: number) => {
+        openConfirm('Mark as Resigned', 'Mark this employee as Resigned and stop incentive?', async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/incentives/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'Resign' })
+                });
 
-            if (res.ok) {
-                const updated = await res.json();
-                setIncentives(incentives.map(i => i.id === id ? updated : i));
-            }
-        } catch (err) { console.error(err); }
+                if (res.ok) {
+                    const updated = await res.json();
+                    setIncentives(incentives.map(i => i.id === id ? updated : i));
+                }
+            } catch (err) { console.error(err); }
+        });
     };
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
+
+        // Validation
+        if (!formData.courseName || !formData.description || !formData.startDate || !formData.endDate) {
+            setNotification({ show: true, type: 'error', message: 'Mohon lengkapi semua data sertifikat.' });
+            return;
+        }
+
+        if (!formData.evidenceUrl) {
+            setNotification({ show: true, type: 'error', message: 'Wajib upload Bukti Sertifikat.' });
+            return;
+        }
+
         try {
             const newIncentive = {
                 ...formData,
@@ -636,6 +662,16 @@ const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
                     </div>
                 </div>
             )}
+
+            <ConfirmationModal
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig({ ...confirmConfig, isOpen: false })}
+                onConfirm={confirmConfig.onConfirm}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                confirmText="Yes, Proceed"
+                variant="danger"
+            />
         </div>
     );
 };

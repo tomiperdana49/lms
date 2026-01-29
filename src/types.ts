@@ -92,6 +92,8 @@ export interface TrainingRequest {
     additionalCost?: number;
     userName?: string;
     submittedAt?: string;
+    supervisorName?: string;
+    hrName?: string;
 }
 
 export interface Meeting {
