@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { Briefcase, Send, Clock, DollarSign, Building, AlertTriangle, MapPin, CreditCard, Info } from 'lucide-react';
 import { API_BASE_URL } from '../config';
-import type { Role } from '../types';
+// import type { Role } from '../types';
 import PopupNotification from './PopupNotification';
 
 type RequestStatus = 'PENDING_SUPERVISOR' | 'PENDING_HR' | 'APPROVED' | 'REJECTED';

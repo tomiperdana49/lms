@@ -109,8 +109,7 @@ const OnlineModulesManager = () => {
 
     // ... (existing rendering logic)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [progressData, setProgressData] = useState<Record<string, any>[]>([]);
+    const [progressData, setProgressData] = useState<{ userId: number | string; courseId: number; completedModuleIds: number[] }[]>([]);
     const [allQuizResults, setAllQuizResults] = useState<QuizResult[]>([]);
 
     const [confirmConfig, setConfirmConfig] = useState<{

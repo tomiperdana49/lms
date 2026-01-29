@@ -60,11 +60,6 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
 
     const branches = ['All Branches', 'Jakarta', 'Surabaya', 'Semarang', 'Manado', 'Medan', 'Bandung', 'Jogja', 'Bali', 'Binjai', 'Tanjung Morawa'];
 
-    useEffect(() => {
-        fetchLogs();
-        fetchUsers();
-    }, []);
-
     const fetchLogs = () => {
         fetch(`${API_BASE_URL}/api/logs`)
             .then(res => res.json())
@@ -87,6 +82,11 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
             })
             .catch(err => console.error(err));
     };
+
+    useEffect(() => {
+        fetchLogs();
+        fetchUsers();
+    }, []);
 
     // --- Actions ---
 
@@ -199,13 +199,14 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
             case 'q3': return [new Date(y, 6, 1), new Date(y, 8, 30, 23, 59, 59)];
             case 'q4': return [new Date(y, 9, 1), new Date(y, 11, 31, 23, 59, 59)];
             case 'all': return [new Date(y, 0, 1), new Date(y, 11, 31, 23, 59, 59)];
-            default: // Month index (Incentive Period: 26th prev month - 25th current month)
+            default: { // Month index (Incentive Period: 26th prev month - 25th current month)
                 const m = parseInt(filterPeriod);
                 // Start: 26th of previous month
                 const start = new Date(y, m - 1, 26);
                 // End: 25th of current month
                 const end = new Date(y, m, 25, 23, 59, 59);
                 return [start, end];
+            }
         }
     };
 

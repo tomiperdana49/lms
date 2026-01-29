@@ -159,6 +159,7 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
     // --- Handlers ---
 
     // Helper to safely parse meeting data
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const safeMeeting = (m: any): ExtendedMeeting => {
         let shortDate = m.shortDate || '';
         if (!shortDate && m.date) {
@@ -196,12 +197,12 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                         const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
                         if (!match) return 0;
 
-                        let [_, hrs, mins, period] = match;
+                        const [, hrs, mins, rawPeriod] = match;
                         let hours = parseInt(hrs);
                         const minutes = parseInt(mins);
 
-                        if (period) {
-                            period = period.toUpperCase();
+                        if (rawPeriod) {
+                            const period = rawPeriod.toUpperCase();
                             if (period === 'PM' && hours < 12) hours += 12;
                             if (period === 'AM' && hours === 12) hours = 0;
                         }
