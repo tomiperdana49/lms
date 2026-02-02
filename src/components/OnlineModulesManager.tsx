@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Edit, Trash2, Plus, GripVertical, Save, X, BookOpen, Clock } from 'lucide-react';
 import { API_BASE_URL } from '../config';
-import type { Course, Module, Quiz, QuizResult } from '../types';
+import type { Course, Module, Quiz } from '../types';
 import PopupNotification from './PopupNotification';
 import ConfirmationModal from './ConfirmationModal';
 
