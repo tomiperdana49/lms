@@ -68,7 +68,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
 
         try {
             setIsLoading(true);
-            const decoded: any = jwtDecode(credentialResponse.credential);
+            const decoded = jwtDecode<{ email: string }>(credentialResponse.credential);
             const googleEmail = decoded.email;
 
             // Call Backend to verify/create user

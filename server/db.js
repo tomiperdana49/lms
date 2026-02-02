@@ -44,6 +44,11 @@ export const initDB = async () => {
             console.log("Added video_type column.");
         } catch (e) { /* Ignore if exists */ }
 
+        try {
+            await connection.query("ALTER TABLE reading_logs ADD COLUMN link VARCHAR(255)");
+            console.log("Added link column to reading_logs.");
+        } catch (e) { /* Ignore if exists */ }
+
         // 3. Seed Data if Users table is empty
 
         const [rows] = await connection.query('SELECT COUNT(*) as count FROM users');

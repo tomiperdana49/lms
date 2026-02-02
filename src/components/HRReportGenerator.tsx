@@ -51,52 +51,99 @@ const HRReportGenerator = () => {
         return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(amount);
     };
 
-    const getMonthIdx = (dateStr: string) => new Date(dateStr).getMonth();
-    const getYear = (dateStr: string) => new Date(dateStr).getFullYear();
+    // Helper to safety parse numbers
+    const safeNum = (val: any) => {
+        if (typeof val === 'number') return val;
+        if (!val) return 0;
+
+        // Try direct conversion first (handles standard DB strings "150000.00")
+        const direct = Number(val);
+        if (!isNaN(direct)) return direct;
+
+        // Handle "1.000.000" string format if present
+        if (typeof val === 'string') {
+            const clean = val.replace(/\./g, '').replace(/,/g, '.'); // Remove thousands dot, replace decimal comma
+            return Number(clean) || 0;
+        }
+        return 0;
+    };
 
     // Aggregation Logic
+    // Helper for Incentive Period (26th Prev Month - 25th Curr Month)
+    const getPeriodRange = (year: number, monthIdx: number) => {
+        const start = new Date(year, monthIdx - 1, 26);
+        const end = new Date(year, monthIdx, 25, 23, 59, 59, 999);
+        return { start, end };
+    };
+
+    const isInPeriod = (dateStr: string, range: { start: Date, end: Date }) => {
+        const d = new Date(dateStr);
+        return d >= range.start && d <= range.end;
+    };
+
     const monthlyData = months.map((monthName, idx) => {
         let internalTraining = 0;
         let readingIncentive = 0;
         let externalTraining = 0;
         let certIncentive = 0;
 
+        const { start, end } = getPeriodRange(year, idx);
+        const range = { start, end };
+
         // 1. Internal Training (Meetings)
         meetings.forEach(m => {
-            if (getYear(m.date) !== year) return;
-            if (getMonthIdx(m.date) !== idx) return;
             if (selectedBranch !== 'All' && m.location !== selectedBranch) return;
-            if (m.costReport) {
-                internalTraining += (m.costReport.trainerIncentive + m.costReport.snackCost + m.costReport.lunchCost + m.costReport.otherCost);
+            if (m.costReport && isInPeriod(m.date, range)) {
+                internalTraining += (
+                    safeNum(m.costReport.trainerIncentive) +
+                    safeNum(m.costReport.snackCost) +
+                    safeNum(m.costReport.lunchCost) +
+                    safeNum(m.costReport.otherCost) +
+                    (safeNum(m.costReport.audienceFee) * safeNum(m.costReport.participantsCount))
+                );
             }
         });
 
         // 2. Reading Incentive (Logs)
         logs.filter(l => l.hrApprovalStatus === 'Approved' && l.incentiveAmount).forEach(l => {
-            if (getYear(l.date) !== year) return;
-            if (getMonthIdx(l.date) !== idx) return;
-            if (selectedBranch !== 'All' && l.location !== selectedBranch) return; // Strict location match
-            readingIncentive += l.incentiveAmount!;
+            if (selectedBranch !== 'All' && l.location !== selectedBranch) return;
+            // Use finishDate if available, else date
+            const dateToCheck = l.finishDate || l.date;
+            if (isInPeriod(dateToCheck, range)) {
+                readingIncentive += safeNum(l.incentiveAmount);
+            }
         });
 
         // 3. External Training (Requests)
         requests.filter(r => r.status === 'APPROVED').forEach(r => {
-            if (getYear(r.date) !== year) return;
-            if (getMonthIdx(r.date) !== idx) return;
             if (selectedBranch !== 'All' && r.location !== selectedBranch) return;
-            externalTraining += (r.cost || 0) + (r.additionalCost || 0);
+            if (isInPeriod(r.date, range)) {
+                externalTraining += safeNum(r.cost) + safeNum(r.additionalCost);
+            }
         });
 
         // 4. Certificate Incentive (Incentives)
-        incentives.filter(i => i.status === 'Active').forEach(i => {
-            if (getYear(i.startDate) !== year) return;
-            if (getMonthIdx(i.startDate) !== idx) return;
-            // Note: Incentive doesn't have location, so we might skip branch filter or include all
-            // For strictness, if branch is selected, we might omit if we can't map user.
-            // Let's assume for now they are global or match 'Medan-HO' if strictly needed.
-            // To simplify: if 'All' branch selected, show. If specific branch, maybe show if we add location to Incentive type later.
-            // Currently showing all for simplified view.
-            certIncentive += Number(i.reward) || 0;
+        // Status: Active (Committed), Paid (Actual), Pending (Potential - OPTIONAL, usually HR only cares about Approved)
+        // We will track Active and Paid.
+        incentives.filter(i => ['Active', 'Paid'].includes(i.status)).forEach(i => {
+            const isOneTime = i.paymentType === 'One-Time';
+            const iStart = new Date(i.startDate);
+            const iEnd = new Date(i.endDate);
+            const dateToUse = i.approvedDate ? new Date(i.approvedDate) : iStart;
+
+            if (isOneTime) {
+                // One-Time: Count in the month of Approval/Payment
+                // Check if the relevant date falls in this month's range
+                if (isInPeriod(dateToUse.toISOString(), range)) {
+                    certIncentive += safeNum(i.reward);
+                }
+            } else {
+                // Recurring: Count if period overlaps with active duration
+                // (Start of Period <= End of Incentive) AND (End of Period >= Start of Incentive)
+                if (range.start <= iEnd && range.end >= iStart) {
+                    certIncentive += safeNum(i.reward);
+                }
+            }
         });
 
         return {
@@ -110,19 +157,36 @@ const HRReportGenerator = () => {
     });
 
     // Detail Data Generator
+    interface Transaction {
+        date: string;
+        category: string;
+        item: string;
+        pic: string;
+        details: string;
+        amount: number;
+    }
+
     const getDetailTransactions = (monthIdx: number) => {
-        const txs: any[] = [];
+        const txs: Transaction[] = [];
+        const { start, end } = getPeriodRange(year, monthIdx);
+        const range = { start, end };
 
         // Meetings
         meetings.forEach(m => {
-            if (getYear(m.date) !== year || getMonthIdx(m.date) !== monthIdx) return;
             if (selectedBranch !== 'All' && m.location !== selectedBranch) return;
-            if (m.costReport) {
-                const total = m.costReport.trainerIncentive + m.costReport.snackCost + m.costReport.lunchCost + m.costReport.otherCost;
+            if (m.costReport && isInPeriod(m.date, range)) {
+                // Safe sum using helper
+                const total = safeNum(m.costReport.trainerIncentive) +
+                    safeNum(m.costReport.snackCost) +
+                    safeNum(m.costReport.lunchCost) +
+                    safeNum(m.costReport.otherCost) +
+                    (safeNum(m.costReport.audienceFee) * safeNum(m.costReport.participantsCount));
+
                 const details = [];
                 if (m.costReport.snackCost) details.push(`Snack: ${formatCurrency(m.costReport.snackCost)}`);
                 if (m.costReport.lunchCost) details.push(`Lunch: ${formatCurrency(m.costReport.lunchCost)}`);
                 if (m.costReport.trainerIncentive) details.push(`Trainer: ${formatCurrency(m.costReport.trainerIncentive)}`);
+                if (m.costReport.audienceFee) details.push(`Audience: ${formatCurrency(m.costReport.audienceFee)}/pax`);
                 if (m.costReport.otherCost) details.push(`Other: ${formatCurrency(m.costReport.otherCost)}`);
 
                 txs.push({
@@ -138,46 +202,63 @@ const HRReportGenerator = () => {
 
         // Logs
         logs.filter(l => l.hrApprovalStatus === 'Approved' && l.incentiveAmount).forEach(l => {
-            if (getYear(l.date) !== year || getMonthIdx(l.date) !== monthIdx) return;
             if (selectedBranch !== 'All' && l.location !== selectedBranch) return;
-            txs.push({
-                date: l.date,
-                category: 'Reading Incentive',
-                item: l.title,
-                pic: l.userName,
-                details: `Category: ${l.category}`,
-                amount: l.incentiveAmount
-            });
+            const dateToCheck = l.finishDate || l.date;
+            if (isInPeriod(dateToCheck, range)) {
+                txs.push({
+                    date: l.date,
+                    category: 'Reading Incentive',
+                    item: l.title,
+                    pic: l.userName || 'Unknown',
+                    details: `Category: ${l.category}`,
+                    amount: safeNum(l.incentiveAmount)
+                });
+            }
         });
 
         // External Requests
         requests.filter(r => r.status === 'APPROVED').forEach(r => {
-            if (getYear(r.date) !== year || getMonthIdx(r.date) !== monthIdx) return;
             if (selectedBranch !== 'All' && r.location !== selectedBranch) return;
-            const details = [`Main Cost: ${formatCurrency(r.cost)}`];
-            if (r.additionalCost) details.push(`Addtl: ${formatCurrency(r.additionalCost)}`);
+            if (isInPeriod(r.date, range)) {
+                const details = [`Main Cost: ${formatCurrency(r.cost || 0)}`];
+                if (r.additionalCost) details.push(`Addtl: ${formatCurrency(r.additionalCost)}`);
 
-            txs.push({
-                date: r.date,
-                category: 'External Training',
-                item: r.title,
-                pic: r.employeeName,
-                details: details.join(', '),
-                amount: (r.cost || 0) + (r.additionalCost || 0)
-            });
+                txs.push({
+                    date: r.date,
+                    category: 'External Training',
+                    item: r.title,
+                    pic: r.employeeName || 'Unknown',
+                    details: details.join(', '),
+                    amount: safeNum(r.cost) + safeNum(r.additionalCost)
+                });
+            }
         });
 
         // Incentives
-        incentives.filter(i => i.status === 'Active').forEach(i => {
-            if (getYear(i.startDate) !== year || getMonthIdx(i.startDate) !== monthIdx) return;
-            txs.push({
-                date: i.startDate,
-                category: 'Cert. Incentive',
-                item: i.courseName,
-                pic: i.employeeName,
-                details: 'Reward Payout',
-                amount: Number(i.reward) || 0
-            });
+        incentives.filter(i => ['Active', 'Paid'].includes(i.status)).forEach(i => {
+            const isOneTime = i.paymentType === 'One-Time';
+            const iStart = new Date(i.startDate);
+            const iEnd = new Date(i.endDate);
+            const dateToUse = i.approvedDate ? new Date(i.approvedDate) : iStart;
+
+            let shouldInclude = false;
+
+            if (isOneTime) {
+                shouldInclude = isInPeriod(dateToUse.toISOString(), range);
+            } else {
+                shouldInclude = range.start <= iEnd && range.end >= iStart;
+            }
+
+            if (shouldInclude) {
+                txs.push({
+                    date: isOneTime ? dateToUse.toISOString() : range.end.toISOString(), // For recurring, log it at end of period
+                    category: `Cert. Incentive (${isOneTime ? 'One-Time' : 'Recurring'})`,
+                    item: i.courseName,
+                    pic: i.employeeName,
+                    details: `Status: ${i.status} • Reward: ${formatCurrency(safeNum(i.reward))}`,
+                    amount: safeNum(i.reward)
+                });
+            }
         });
 
         return txs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());

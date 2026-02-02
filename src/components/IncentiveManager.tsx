@@ -7,6 +7,7 @@ import ConfirmationModal from './ConfirmationModal';
 
 interface IncentiveManagerProps {
     user?: User;
+    viewMode?: 'personal' | 'admin';
 }
 
 // Minimal Error Boundary to catch runtime crashes
@@ -41,7 +42,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
     }
 }
 
-const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
+const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManagerProps) => {
     const [incentives, setIncentives] = useState<Incentive[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [activeTab, setActiveTab] = useState<'request' | 'active' | 'pending' | 'history' | 'summary'>('active');
@@ -58,11 +59,21 @@ const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
         requesterName: user?.name || ''
     });
 
+    // Accordion State for Active List
+    const [expandedEmployees, setExpandedEmployees] = useState<string[]>([]);
+
+    const toggleEmployee = (name: string) => {
+        setExpandedEmployees(prev =>
+            prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+        );
+    };
+
     // Approval State (HR)
     const [approvalModal, setApprovalModal] = useState<{ isOpen: boolean, id: number | null, incentive: Incentive | null }>({
         isOpen: false, id: null, incentive: null
     });
     const [approvalReward, setApprovalReward] = useState(''); // HR inputs this
+    const [approvalPaymentType, setApprovalPaymentType] = useState<'One-Time' | 'Recurring' | null>(null); // HR inputs this
 
     const [confirmConfig, setConfirmConfig] = useState<{
         isOpen: boolean;
@@ -77,7 +88,15 @@ const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
     // --- Summary Logic State (Moved to top level to avoid hook errors) ---
     const [summaryYear, setSummaryYear] = useState(new Date().getFullYear());
 
-    const isHR = user?.role === 'HR' || user?.role === 'HR_ADMIN';
+    // Logic: 'isHR' determines if they see Admin features.
+    // If viewMode is 'personal', we FORCE isHR to false for UI purposes (so they only see their own stuff).
+    // But we might want to keep actual role check for some things?
+    // User requested: "seharusnya di admin panel saja. jangan di tampilan insentif dashboardnya HR"
+    // So distinct split:
+    // Personal View: Behaves like Staff (Upload, My Requests).
+    // Admin View: Behaves like Admin (Pending, Active, History, Summary).
+
+    const isHR = (user?.role === 'HR' || user?.role === 'HR_ADMIN') && viewMode === 'admin';
 
     useEffect(() => {
         const fetchIncentives = async () => {
@@ -135,11 +154,12 @@ const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
     const openApprovalModal = (inc: Incentive) => {
         setApprovalModal({ isOpen: true, id: inc.id, incentive: inc });
         setApprovalReward(''); // Reset
+        setApprovalPaymentType(null); // Default to empty
     };
 
     const confirmApproval = async () => {
-        if (!approvalModal.id || !approvalReward) {
-            setNotification({ show: true, type: 'error', message: "Please enter the reward amount." });
+        if (!approvalModal.id || !approvalReward || !approvalPaymentType) {
+            setNotification({ show: true, type: 'error', message: "Please select Payment Frequency and Reward Amount." });
             return;
         }
 
@@ -149,7 +169,8 @@ const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     status: 'Active',
-                    reward: approvalReward
+                    reward: approvalReward,
+                    paymentType: approvalPaymentType
                 })
             });
 
@@ -180,13 +201,30 @@ const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
         });
     };
 
-    const markResign = (id: number) => {
-        openConfirm('Mark as Resigned', 'Mark this employee as Resigned and stop incentive?', async () => {
+    const markCanceled = (id: number) => {
+        openConfirm('Cancel Incentive', 'Are you sure you want to cancel this incentive?', async () => {
             try {
                 const res = await fetch(`${API_BASE_URL}/api/incentives/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: 'Resign' })
+                    body: JSON.stringify({ status: 'Canceled' })
+                });
+
+                if (res.ok) {
+                    const updated = await res.json();
+                    setIncentives(incentives.map(i => i.id === id ? updated : i));
+                }
+            } catch (err) { console.error(err); }
+        });
+    };
+
+    const markAsPaid = (id: number) => {
+        openConfirm('Confirm Payment', 'Mark this incentive as PAID? This will move it to History.', async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/incentives/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'Paid' })
                 });
 
                 if (res.ok) {
@@ -241,14 +279,55 @@ const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
     };
 
     // --- filtering ---
+    // --- filtering ---
+    const getOneTimePaymentDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        // Period cut-off: 25th. If submitted/approved after 25th, it belongs to NEXT month's period
+        // But the PAYMENT DATE (when it's "done") is effectively the 25th of the payment month.
+        // Example: Jan 20 -> Paid in Jan (Period ends Jan 25). Expired after Jan 25.
+        // Example: Jan 27 -> Paid in Feb (Period ends Feb 25). Expired after Feb 25.
+
+        // Let's set the "Expiry Date" for One-Time as the 26th of the Payment Month (start of next period).
+        // If current date >= 26th of Payment Month, it is HISTORY.
+
+        let paymentMonth = d.getMonth();
+        let paymentYear = d.getFullYear();
+
+        if (d.getDate() > 25) {
+            paymentMonth += 1;
+            if (paymentMonth > 11) {
+                paymentMonth = 0;
+                paymentYear += 1;
+            }
+        }
+
+        // history cut-off: End of the Payment Month (e.g. 31st 23:59)
+        // User request: "tgl 31 pukul 23.59"
+        // new Date(y, m+1, 0) gives last day of month m.
+        return new Date(paymentYear, paymentMonth + 1, 0, 23, 59, 59);
+    };
+
+    const isOneTimeHistory = (inc: Incentive) => {
+        if (inc.paymentType !== 'One-Time') return false; // Recurring follows status
+        // Use approvedDate if available, otherwise startDate (legacy)
+        const dateToUse = inc.approvedDate || inc.startDate;
+        const cutOff = getOneTimePaymentDate(dateToUse);
+        return new Date() >= cutOff;
+    };
+
     const myIncentives = incentives.filter(i => i.employeeName === user?.name);
     const pendingVerification = incentives.filter(i => i.status === 'Pending');
+
+    // Active: Status 'Active'
+    // NOTE: One-Time items now stay 'Active' until manually marked 'Paid'.
     const activeIncentives = isHR
         ? incentives.filter(i => i.status === 'Active')
-        : myIncentives.filter(i => ['Active', 'Pending'].includes(i.status));
+        : myIncentives.filter(i => i.status === 'Active' || i.status === 'Pending');
+
+    // History: Paid, Expired, Denied, Canceled
     const historyIncentives = isHR
-        ? incentives.filter(i => ['Expired', 'Denied', 'Resign'].includes(i.status))
-        : myIncentives.filter(i => ['Expired', 'Denied', 'Resign'].includes(i.status));
+        ? incentives.filter(i => ['Paid', 'Expired', 'Denied', 'Canceled'].includes(i.status))
+        : myIncentives.filter(i => ['Paid', 'Expired', 'Denied', 'Canceled'].includes(i.status));
 
 
     if (isLoading) {
@@ -277,8 +356,8 @@ const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
 
         const tree: Record<string, Record<string, Record<string, Incentive[]>>> = {};
 
-        // Filter for active incentives
-        const actives = incentives.filter(i => i.status === 'Active');
+        // Filter for active/paid incentives
+        const actives = incentives.filter(i => ['Active', 'Paid'].includes(i.status));
 
         const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -287,15 +366,31 @@ const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
             const monthEnd = new Date(summaryYear, idx + 1, 0);
 
             actives.forEach(inc => {
-                if (!inc.startDate || !inc.endDate) return;
+                // If it's One-Time and Paid, use approvedDate (payment date)
+                // If it's One-Time and Active, use approvedDate (if set) or startDate (projected)
+                const dateToUseStr = inc.approvedDate || inc.startDate;
+                if (!dateToUseStr || !inc.endDate) return;
 
-                const start = new Date(inc.startDate);
+                const start = new Date(dateToUseStr);
                 const end = new Date(inc.endDate);
+                const recurringStart = new Date(inc.startDate); // Recurring always runs from start date
 
                 if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
 
-                // If overlap
-                if (start <= monthEnd && end >= monthStart) {
+                // Logic Update: Check paymentType
+                const isOneTime = inc.paymentType === 'One-Time';
+                let shouldInclude = false;
+
+                if (isOneTime) {
+                    // Check if the relevant date falls in this month
+                    // We use the same calendar month logic as the loop
+                    shouldInclude = start.getMonth() === idx && start.getFullYear() === summaryYear;
+                } else {
+                    // Recurring: Overlap with startDate -> endDate
+                    shouldInclude = recurringStart <= monthEnd && end >= monthStart;
+                }
+
+                if (shouldInclude) {
                     if (!tree[month]) tree[month] = {};
 
                     const branch = 'General';
@@ -342,14 +437,12 @@ const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
                     </p>
                 </div>
 
-                {!isHR && (
-                    <button
-                        onClick={() => setIsFormOpen(true)}
-                        className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-amber-500/20 flex items-center gap-2"
-                    >
-                        <Plus size={18} /> Upload Certificate
-                    </button>
-                )}
+                <button
+                    onClick={() => setIsFormOpen(true)}
+                    className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-amber-500/20 flex items-center gap-2"
+                >
+                    <Plus size={18} /> Upload Certificate
+                </button>
             </div>
 
             {/* Tabs */}
@@ -372,16 +465,14 @@ const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
                 >
                     <CheckCircle size={16} /> Active List
                 </button>
-                {!isHR && (
-                    <button
-                        onClick={() => setActiveTab('request')}
-                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 whitespace-nowrap
-                            ${activeTab === 'request' ? 'bg-amber-100 text-amber-700' : 'text-slate-500 hover:bg-slate-50'}
-                        `}
-                    >
-                        <Clock size={16} /> My Requests
-                    </button>
-                )}
+                <button
+                    onClick={() => setActiveTab('request')}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 whitespace-nowrap
+                        ${activeTab === 'request' ? 'bg-amber-100 text-amber-700' : 'text-slate-500 hover:bg-slate-50'}
+                    `}
+                >
+                    <Clock size={16} /> My Requests
+                </button>
                 <button
                     onClick={() => setActiveTab('history')}
                     className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 whitespace-nowrap
@@ -489,82 +580,227 @@ const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
                                 <th className="px-6 py-4">Valid Until</th>
                                 <th className="px-6 py-4">Description/Evidence</th>
                                 <th className="px-6 py-4">Reward (IDR)</th>
+                                <th className="px-6 py-4">Frequency</th>
                                 <th className="px-6 py-4">Status</th>
                                 {isHR && <th className="px-6 py-4 text-right">Actions</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 bg-white">
                             {(
-                                activeTab === 'pending' ? pendingVerification :
-                                    activeTab === 'active' ? activeIncentives :
+                                activeTab === 'active' ? (
+                                    // Grouped View for Active List
+                                    (function () {
+                                        // Group by Employee
+                                        const grouped: Record<string, Incentive[]> = {};
+                                        activeIncentives.forEach(inc => {
+                                            const name = inc.employeeName || 'Unknown';
+                                            if (!grouped[name]) grouped[name] = [];
+                                            grouped[name].push(inc);
+                                        });
+
+                                        return Object.entries(grouped).map(([employeeName, employeeIncentives]) => (
+                                            <React.Fragment key={employeeName}>
+                                                {/* Group Header Row */}
+                                                <tr
+                                                    className="bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors border-b border-slate-200"
+                                                    onClick={() => toggleEmployee(employeeName)}
+                                                >
+                                                    <td colSpan={isHR ? 9 : 8} className="px-6 py-4">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="bg-amber-100 p-2 rounded-full text-amber-600 font-bold text-xs w-8 h-8 flex items-center justify-center border border-amber-200">
+                                                                    {employeeName.charAt(0)}
+                                                                </div>
+                                                                <div>
+                                                                    <span className="font-bold text-slate-700 text-sm block">{employeeName}</span>
+                                                                    <span className="text-xs text-slate-500 font-medium">{employeeIncentives.length} Active Certificate(s)</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className={`text-slate-400 transform transition-transform duration-300 ${expandedEmployees.includes(employeeName) ? 'rotate-180' : ''}`}>
+                                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                                                </svg>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+
+                                                {/* Expanded Rows */}
+                                                {expandedEmployees.includes(employeeName) && employeeIncentives.map(inc => (
+                                                    <tr key={inc.id} className="bg-white border-b border-slate-100 hover:bg-blue-50/50 transition-colors animate-in slide-in-from-top-2 fade-in duration-200">
+                                                        <td className="px-6 py-4 pl-16 font-bold text-slate-700 opacity-50 text-xs">↳</td>
+                                                        <td className="px-6 py-4 text-sm text-slate-600 font-medium">{inc.courseName}</td>
+                                                        <td className="px-6 py-4 text-xs text-slate-500 font-medium">
+                                                            {new Date(inc.startDate).toLocaleDateString()}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-xs text-slate-500 font-medium">
+                                                            {new Date(inc.endDate).toLocaleDateString()}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-slate-600">
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="italic text-slate-500">"{inc.description || '-'}"</span>
+                                                                {inc.evidenceUrl && (
+                                                                    <a href={`${API_BASE_URL}${inc.evidenceUrl}`} target="_blank" rel="noreferrer" className="text-blue-600 flex items-center gap-1 hover:underline text-xs font-bold">
+                                                                        <ImageIcon size={12} /> View Certificate
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 font-mono font-bold text-slate-700">
+                                                            {inc.reward ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(Number(inc.reward)) : '-'}
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            {inc.paymentType === 'One-Time' ? (
+                                                                <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-xs font-bold whitespace-nowrap">One-Time</span>
+                                                            ) : (
+                                                                <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold whitespace-nowrap">Monthly</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            {(() => {
+                                                                if (inc.status === 'Active') {
+                                                                    if (inc.paymentType === 'One-Time') {
+                                                                        const dateToUse = inc.approvedDate || inc.startDate;
+                                                                        const d = new Date(dateToUse);
+                                                                        if (d.getDate() > 25) d.setMonth(d.getMonth() + 1);
+                                                                        const periodLabel = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+                                                                        const isHistory = isOneTimeHistory(inc);
+                                                                        return (
+                                                                            <span className={`px-2 py-1 rounded text-xs font-bold w-fit flex items-center gap-1 ${isHistory ? 'bg-slate-200 text-slate-500' : 'bg-purple-100 text-purple-700'}`}>
+                                                                                <Clock size={12} /> Paid in {periodLabel}
+                                                                            </span>
+                                                                        );
+                                                                    }
+                                                                    return <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold w-fit">Active</span>;
+                                                                }
+                                                                return <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold w-fit">{inc.status}</span>;
+                                                            })()}
+                                                        </td>
+                                                        {isHR && (
+                                                            <td className="px-6 py-4 text-right">
+                                                                <div className="flex items-center justify-end gap-2">
+                                                                    {inc.paymentType === 'One-Time' && (
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); markAsPaid(inc.id); }}
+                                                                            className="px-3 py-1 bg-teal-500 text-white rounded-lg text-xs font-bold hover:bg-teal-600 shadow-sm flex items-center gap-1"
+                                                                            title="Mark as Paid"
+                                                                        >
+                                                                            <CheckCircle size={14} /> Mark Paid
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); markCanceled(inc.id); }}
+                                                                        className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200"
+                                                                    >
+                                                                        Cancel
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        )}
+                                                    </tr>
+                                                ))}
+                                            </React.Fragment>
+                                        ));
+                                    })()
+
+                                ) : (
+                                    activeTab === 'pending' ? pendingVerification :
                                         activeTab === 'history' ? historyIncentives :
-                                            (!isHR && activeTab === 'request') ? myIncentives : []
-                            ).map(inc => (
-                                <tr key={inc.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-6 py-4 font-bold text-slate-700">{inc.employeeName}</td>
-                                    <td className="px-6 py-4 text-sm text-slate-600">{inc.courseName}</td>
-                                    <td className="px-6 py-4 text-xs text-slate-500 font-medium">
-                                        {new Date(inc.startDate).toLocaleDateString()}
-                                    </td>
-                                    <td className="px-6 py-4 text-xs text-slate-500 font-medium">
-                                        {new Date(inc.endDate).toLocaleDateString()}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-slate-600">
-                                        <div className="flex flex-col gap-1">
-                                            <span className="italic">"{inc.description || '-'}"</span>
-                                            {inc.evidenceUrl && (
-                                                <a href={`${API_BASE_URL}${inc.evidenceUrl}`} target="_blank" rel="noreferrer" className="text-blue-600 flex items-center gap-1 hover:underline text-xs font-bold">
-                                                    <ImageIcon size={12} /> View Certificate
-                                                </a>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 font-mono font-bold text-slate-700">
-                                        {inc.reward ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(Number(inc.reward)) : '-'}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 rounded text-xs font-bold flex items-center gap-1 w-fit
-                                            ${inc.status === 'Active' ? 'bg-green-100 text-green-700' :
-                                                inc.status === 'Pending' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
-                                                    inc.status === 'Expired' ? 'bg-orange-100 text-orange-700' :
-                                                        inc.status === 'Resign' ? 'bg-slate-100 text-slate-500' :
-                                                            'bg-red-100 text-red-700'}
-                                         `}>
-                                            {inc.status === 'Pending' ? 'Processing by HR' : inc.status}
-                                        </span>
-                                    </td>
-                                    {isHR && (
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex justify-end gap-2">
-                                                {inc.status === 'Pending' && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => openApprovalModal(inc)}
-                                                            className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-bold hover:bg-green-600 shadow-lg shadow-green-500/20"
-                                                        >
-                                                            Approve
-                                                        </button>
-                                                        <button
-                                                            onClick={() => denyRequest(inc.id)}
-                                                            className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title="Deny"
-                                                        >
-                                                            <XCircle size={18} />
-                                                        </button>
-                                                    </>
-                                                )}
-                                                {inc.status === 'Active' && (
-                                                    <button
-                                                        onClick={() => markResign(inc.id)}
-                                                        className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200"
-                                                    >
-                                                        Cancel/Resign
-                                                    </button>
+                                            activeTab === 'request' ? myIncentives : []
+                                ).map(inc => (
+                                    <tr key={inc.id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="px-6 py-4 font-bold text-slate-700">{inc.employeeName}</td>
+                                        <td className="px-6 py-4 text-sm text-slate-600">{inc.courseName}</td>
+                                        <td className="px-6 py-4 text-xs text-slate-500 font-medium">
+                                            {new Date(inc.startDate).toLocaleDateString()}
+                                        </td>
+                                        <td className="px-6 py-4 text-xs text-slate-500 font-medium">
+                                            {new Date(inc.endDate).toLocaleDateString()}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-slate-600">
+                                            <div className="flex flex-col gap-1">
+                                                <span className="italic">"{inc.description || '-'}"</span>
+                                                {inc.evidenceUrl && (
+                                                    <a href={`${API_BASE_URL}${inc.evidenceUrl}`} target="_blank" rel="noreferrer" className="text-blue-600 flex items-center gap-1 hover:underline text-xs font-bold">
+                                                        <ImageIcon size={12} /> View Certificate
+                                                    </a>
                                                 )}
                                             </div>
                                         </td>
-                                    )}
-                                </tr>
-                            ))}
+                                        <td className="px-6 py-4 font-mono font-bold text-slate-700">
+                                            {inc.reward ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(Number(inc.reward)) : '-'}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {inc.status === 'Pending' ? (
+                                                <span className="text-slate-400 text-xs font-bold">-</span>
+                                            ) : inc.paymentType === 'One-Time' ? (
+                                                <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-xs font-bold whitespace-nowrap">One-Time</span>
+                                            ) : (
+                                                <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold whitespace-nowrap">Monthly</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {(() => {
+                                                if (inc.status === 'Pending') {
+                                                    return <span className="bg-blue-50 text-blue-600 border border-blue-100 px-2 py-1 rounded text-xs font-bold w-fit">Processing by HR</span>;
+                                                }
+                                                if (inc.status === 'Expired') {
+                                                    return <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold w-fit">Expired</span>;
+                                                }
+                                                if (inc.status === 'Canceled') {
+                                                    return <span className="bg-slate-100 text-slate-500 px-2 py-1 rounded text-xs font-bold w-fit">Canceled</span>;
+                                                }
+                                                if (inc.status === 'Active') {
+                                                    if (inc.paymentType === 'One-Time') {
+                                                        const dateToUse = inc.approvedDate || inc.startDate;
+                                                        const d = new Date(dateToUse);
+                                                        if (d.getDate() > 25) d.setMonth(d.getMonth() + 1);
+                                                        const periodLabel = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+                                                        const isHistory = isOneTimeHistory(inc);
+                                                        return (
+                                                            <span className={`px-2 py-1 rounded text-xs font-bold w-fit flex items-center gap-1 ${isHistory ? 'bg-slate-200 text-slate-500' : 'bg-purple-100 text-purple-700'}`}>
+                                                                <Clock size={12} /> Paid in {periodLabel}
+                                                            </span>
+                                                        );
+                                                    }
+                                                    return <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold w-fit">Active</span>;
+                                                }
+                                                return <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold w-fit">{inc.status}</span>;
+                                            })()}
+                                        </td>
+                                        {isHR && (
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    {inc.status === 'Pending' && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => openApprovalModal(inc)}
+                                                                className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-bold hover:bg-green-600 shadow-lg shadow-green-500/20"
+                                                            >
+                                                                Approve
+                                                            </button>
+                                                            <button
+                                                                onClick={() => denyRequest(inc.id)}
+                                                                className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title="Deny"
+                                                            >
+                                                                <XCircle size={18} />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {inc.status === 'Active' && (
+                                                        <button
+                                                            onClick={() => markCanceled(inc.id)}
+                                                            className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200"
+                                                        >
+                                                            Cancel Incentive
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        )}
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>
@@ -629,7 +865,27 @@ const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
                         </div>
                         <div className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-2">Select Monthly Reward (IDR)</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-2">Payment Frequency</label>
+                                <div className="flex gap-2 mb-4">
+                                    <button
+                                        onClick={() => setApprovalPaymentType('Recurring')}
+                                        className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all ${approvalPaymentType === 'Recurring'
+                                            ? 'bg-blue-100 border-blue-500 text-blue-700 shadow-sm ring-1 ring-blue-500'
+                                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                                    >
+                                        Recurring (Monthly)
+                                    </button>
+                                    <button
+                                        onClick={() => setApprovalPaymentType('One-Time')}
+                                        className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all ${approvalPaymentType === 'One-Time'
+                                            ? 'bg-amber-100 border-amber-500 text-amber-700 shadow-sm ring-1 ring-amber-500'
+                                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                                    >
+                                        One-Time Only
+                                    </button>
+                                </div>
+
+                                <label className="block text-sm font-bold text-slate-700 mb-2">Select Reward Amount (IDR)</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {['250000', '300000', '500000', '1000000'].map((amount) => (
                                         <button
@@ -649,11 +905,11 @@ const IncentiveManagerContent = ({ user }: IncentiveManagerProps) => {
                                 <button onClick={() => setApprovalModal({ isOpen: false, id: null, incentive: null })} className="flex-1 py-2 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancel</button>
                                 <button
                                     onClick={confirmApproval}
-                                    className={`flex-1 py-2 font-bold rounded-xl shadow-lg transition-all ${approvalReward
+                                    className={`flex-1 py-2 font-bold rounded-xl shadow-lg transition-all ${approvalReward && approvalPaymentType
                                         ? 'bg-green-600 text-white shadow-green-500/20 hover:bg-green-700'
                                         : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                                         }`}
-                                    disabled={!approvalReward}
+                                    disabled={!approvalReward || !approvalPaymentType}
                                 >
                                     Confirm
                                 </button>

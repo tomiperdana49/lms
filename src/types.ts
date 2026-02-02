@@ -19,7 +19,7 @@ export interface ReadingLogEntry {
     rejectionReason?: string; // New: Reason for rejection
 }
 
-export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives';
+export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'external-approval' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives';
 export type Role = 'STAFF' | 'SUPERVISOR' | 'HR' | 'HR_ADMIN';
 
 export interface User {
@@ -90,6 +90,11 @@ export interface TrainingRequest {
     division?: string;
     rejectionReason?: string;
     additionalCost?: number;
+    costTraining?: number;
+    costTransport?: number;
+    costAccommodation?: number;
+    costOthers?: number;
+    evidenceUrl?: string;
     userName?: string;
     submittedAt?: string;
     supervisorName?: string;
@@ -116,11 +121,15 @@ export interface Meeting {
 
 export interface CostReport {
     trainerIncentive: number;
+    audienceFee?: number; // New cost per audience member
     snackCost: number;
     lunchCost: number;
     otherCost: number;
     participantsCount: number; // Actual attendance
+    attendees?: string[]; // List of emails of attendees
     isFinalized: boolean;
+    isPaid?: boolean;
+    evidenceLink?: string; // Link to drive/materials
 }
 
 export interface Incentive {
@@ -129,9 +138,11 @@ export interface Incentive {
     employeeName: string;
     startDate: string;
     endDate: string;
-    status: 'Active' | 'Expired' | 'Pending' | 'Denied' | 'Resign';
+    status: 'Active' | 'Expired' | 'Pending' | 'Denied' | 'Canceled';
     reward: string;
     requesterName?: string;
     description?: string;
     evidenceUrl?: string; // Certificate photo
+    paymentType?: 'One-Time' | 'Recurring'; // New: Payment frequency
+    approvedDate?: string;
 }

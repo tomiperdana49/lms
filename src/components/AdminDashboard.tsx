@@ -10,7 +10,9 @@ import {
     TrendingUp,
     AlertCircle,
     ChevronRight,
-    Award
+    Award,
+    Menu,
+    X
 } from 'lucide-react';
 import type { Page, User, ReadingLogEntry } from '../types';
 import { API_BASE_URL } from '../config';
@@ -23,6 +25,7 @@ import TrainingExternalManager from './TrainingExternalManager';
 import HRReportGenerator from './HRReportGenerator';
 import IncentiveManager from './IncentiveManager';
 import LMSCalendar from './LMSCalendar';
+import QuizReportList from './QuizReportList';
 
 interface AdminDashboardProps {
     user: User;
@@ -30,7 +33,7 @@ interface AdminDashboardProps {
     onLogout: () => void;
 }
 
-type AdminView = 'overview' | 'users' | 'logs' | 'training' | 'meetings' | 'courses' | 'reports' | 'incentives' | 'calendar';
+type AdminView = 'overview' | 'users' | 'logs' | 'training' | 'meetings' | 'courses' | 'reports' | 'incentives' | 'calendar' | 'quiz-reports';
 
 const SidebarItem = ({ view, icon: Icon, label, currentView, setCurrentView }: { view: AdminView, icon: ElementType, label: string, currentView: AdminView, setCurrentView: (v: AdminView) => void }) => (
     <button
@@ -77,6 +80,14 @@ const StatCard = ({ label, value, icon: Icon, color, trend }: StatCardProps) => 
 
 const AdminDashboard = ({ user, onLogout }: AdminDashboardProps) => {
     const [currentView, setCurrentView] = useState<AdminView>('overview');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    // Auto-close sidebar on view change (mobile)
+    const handleSetView = (view: AdminView) => {
+        setCurrentView(view);
+        setIsSidebarOpen(false);
+    };
+
     const [stats, setStats] = useState({
         totalUsers: 0,
         booksRead: 0,
@@ -136,10 +147,12 @@ const AdminDashboard = ({ user, onLogout }: AdminDashboardProps) => {
             case 'training': return <TrainingExternalManager userRole={user.role} userName={user.name} />;
             case 'meetings': return <TrainingInternalList userRole={user.role} />;
             case 'courses': return <OnlineModulesManager />;
+            case 'quiz-reports':
+                return <QuizReportList onBack={() => setCurrentView('overview')} />;
             case 'reports':
                 return <HRReportGenerator />;
             case 'incentives':
-                return <IncentiveManager user={user} />;
+                return <IncentiveManager user={user} viewMode="admin" />;
             case 'calendar':
                 return <LMSCalendar compact={false} userEmail={user.email} userRole={user.role} />;
             case 'overview':
@@ -225,27 +238,39 @@ const AdminDashboard = ({ user, onLogout }: AdminDashboardProps) => {
 
     return (
         <div className="min-h-screen bg-slate-50 flex">
+            {/* Mobile Overlay */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 md:hidden animate-fade-in"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+
             {/* Sidebar */}
-            <aside className="w-64 bg-white border-r border-slate-200 fixed h-full z-10 hidden md:flex flex-col">
-                <div className="p-6 border-b border-slate-100">
+            <aside className={`w-64 bg-white border-r border-slate-200 fixed h-full z-50 flex flex-col transition-transform duration-300 md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                     <h1 className="text-xl font-bold text-blue-600 flex items-center gap-2">
                         <LayoutDashboard className="fill-blue-600" /> Admin Panel
                     </h1>
+                    <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-slate-400 hover:text-slate-600">
+                        <X size={24} />
+                    </button>
                 </div>
 
                 <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                     <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 mt-4">Main</p>
-                    <SidebarItem view="overview" icon={LayoutDashboard} label="Overview" currentView={currentView} setCurrentView={setCurrentView} />
-                    <SidebarItem view="calendar" icon={Calendar} label="Calendar" currentView={currentView} setCurrentView={setCurrentView} />
+                    <SidebarItem view="overview" icon={LayoutDashboard} label="Overview" currentView={currentView} setCurrentView={handleSetView} />
+                    <SidebarItem view="calendar" icon={Calendar} label="Calendar" currentView={currentView} setCurrentView={handleSetView} />
 
                     <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 mt-6">Management</p>
-                    <SidebarItem view="users" icon={Users} label="User Management" currentView={currentView} setCurrentView={setCurrentView} />
-                    <SidebarItem view="courses" icon={BookOpen} label="Online Modules Management" currentView={currentView} setCurrentView={setCurrentView} />
-                    <SidebarItem view="logs" icon={FileText} label="Reading Logs" currentView={currentView} setCurrentView={setCurrentView} />
-                    <SidebarItem view="training" icon={FileText} label="Training Requests" currentView={currentView} setCurrentView={setCurrentView} />
-                    <SidebarItem view="reports" icon={TrendingUp} label="HR Reports" currentView={currentView} setCurrentView={setCurrentView} />
-                    <SidebarItem view="incentives" icon={Award} label="Incentives" currentView={currentView} setCurrentView={setCurrentView} />
-                    <SidebarItem view="meetings" icon={Users} label="Training Internal" currentView={currentView} setCurrentView={setCurrentView} />
+                    <SidebarItem view="users" icon={Users} label="User Management" currentView={currentView} setCurrentView={handleSetView} />
+                    <SidebarItem view="courses" icon={BookOpen} label="Online Modules Management" currentView={currentView} setCurrentView={handleSetView} />
+                    <SidebarItem view="logs" icon={FileText} label="Reading Logs" currentView={currentView} setCurrentView={handleSetView} />
+                    <SidebarItem view="training" icon={FileText} label="Training Requests" currentView={currentView} setCurrentView={handleSetView} />
+                    <SidebarItem view="quiz-reports" icon={Award} label="Quiz Reports" currentView={currentView} setCurrentView={handleSetView} />
+                    <SidebarItem view="reports" icon={TrendingUp} label="HR Reports" currentView={currentView} setCurrentView={handleSetView} />
+                    <SidebarItem view="incentives" icon={Award} label="Incentives" currentView={currentView} setCurrentView={handleSetView} />
+                    <SidebarItem view="meetings" icon={Users} label="Training Internal" currentView={currentView} setCurrentView={handleSetView} />
                 </nav>
 
                 <div className="p-4 border-t border-slate-100">
@@ -268,11 +293,15 @@ const AdminDashboard = ({ user, onLogout }: AdminDashboardProps) => {
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 md:ml-64 p-8">
+            <main className="flex-1 md:ml-64 p-4 md:p-8">
                 {/* Mobile Header (Simplified) */}
                 <div className="md:hidden flex justify-between items-center mb-6">
-                    <h1 className="text-xl font-bold text-slate-800">Admin Panel</h1>
-                    {/* Add Mobile Menu Toggle Here if needed */}
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg">
+                            <Menu size={24} />
+                        </button>
+                        <h1 className="text-xl font-bold text-slate-800">Admin Panel</h1>
+                    </div>
                 </div>
 
                 {renderContent()}

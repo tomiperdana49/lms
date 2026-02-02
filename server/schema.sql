@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS reading_logs (
     date DATETIME NOT NULL,
     duration INT,
     review TEXT,
+    link VARCHAR(255),
     status VARCHAR(50) DEFAULT 'Reading',
     user_name VARCHAR(255),
     start_date DATETIME,
@@ -58,7 +59,8 @@ CREATE TABLE IF NOT EXISTS meetings (
     time VARCHAR(50),
     location VARCHAR(255),
     agenda TEXT,
-    guests_json JSON
+    guests_json JSON,
+    cost_report_json JSON
 );
 
 CREATE TABLE IF NOT EXISTS courses (
@@ -108,5 +110,7 @@ CREATE TABLE IF NOT EXISTS incentives (
     evidence_url VARCHAR(255),
     status VARCHAR(50) DEFAULT 'Pending',
     reward DECIMAL(15, 2) DEFAULT 0,
-    monthly_amount DECIMAL(15, 2) DEFAULT 0
+    monthly_amount DECIMAL(15, 2) DEFAULT 0,
+    payment_type ENUM('One-Time', 'Recurring') DEFAULT 'Recurring',
+    approved_date DATETIME
 );

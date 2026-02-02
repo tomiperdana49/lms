@@ -6,7 +6,8 @@ import {
     FileText,
     Printer,
     DollarSign,
-    Calendar
+    Calendar,
+    Info
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { TrainingRequest } from '../types';
@@ -53,23 +54,39 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
     const [rejectReason, setRejectReason] = useState('');
     const [recapDetailUser, setRecapDetailUser] = useState<string | null>(null);
 
+    // Cost Breakdown State
+    const [breakdownCost, setBreakdownCost] = useState({
+        training: 0,
+        transport: 0,
+        accommodation: 0,
+        others: 0
+    });
+
+    // Reset/Init Breakdown when modal opens
+    useEffect(() => {
+        if (selectedRequest) {
+            setBreakdownCost({
+                training: Number(selectedRequest.costTraining) || 0,
+                transport: Number(selectedRequest.costTransport) || 0,
+                accommodation: Number(selectedRequest.costAccommodation) || 0,
+                others: Number(selectedRequest.costOthers) || 0
+            });
+        }
+    }, [selectedRequest]);
+
+    const totalBreakdown = breakdownCost.training + breakdownCost.transport + breakdownCost.accommodation + breakdownCost.others;
+
     // Settlement State
     const [isSettlementOpen, setIsSettlementOpen] = useState(false);
     const [settleData, setSettleData] = useState({
-        finalCost: 0,
-        additionalCost: 0,
+        training: 0,
+        transport: 0,
+        accommodation: 0,
+        others: 0,
         settlementNotes: ''
     });
 
-    // ... (Filter logic omitted for brevity as it is unchanged) ...
-    // Note: I will need to be careful not to delete the filter logic if I'm not replacing it.
-    // Since I can't easily skip lines in a single replace block without copying them, I will target specific blocks.
-
-    // ...
-
-    // --- Filter Logic ---
-
-    // ... (Rest of component)
+    // ... (Filter logic continues)
 
     const periodOptions = [
         "All Year",
@@ -106,6 +123,18 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
 
     // --- Filtered Data for List View ---
     const filteredRequests = requests.filter(req => {
+        // Safety Filter: Never show own requests in Approval Manager (Prevent Self-Approval)
+        if (req.employeeName === userName) return false;
+
+        // Role-Based Status Filter
+        // (Removed strict filter for SPV to allow viewing history as requested)
+        // if (userRole === 'SUPERVISOR' && req.status !== 'PENDING_SUPERVISOR') return false;
+        // HR sees PENDING_HR for approval. They can also see APPROVED/REJECTED for history/management.
+        // But for "Approval Queue", primarily PENDING_HR.
+        // However, if looking at history (viewMode=list), we might want to see all.
+        // Let's keep it broad for HR but strict for SPV's "To Do" list.
+        // Actually, user instruction implied SPV feature is for "Approve Staff".
+
         const d = new Date(req.date);
         const [start, end] = getPeriodDates();
 
@@ -126,6 +155,8 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
         );
     });
 
+    const [isProcessing, setIsProcessing] = useState(false);
+
     // --- Effects & Actions ---
     useEffect(() => {
         fetch(`${API_BASE_URL}/api/training`)
@@ -139,11 +170,38 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
     };
 
     const handleAction = async (id: number, action: 'approve' | 'reject', reason?: string) => {
+        if (action === 'reject' && !reason) {
+            alert("Please provide a rejection reason.");
+            return;
+        }
+
+        setIsProcessing(true);
         try {
+            // Ensure costs are valid numbers
+            const finalCost = isNaN(totalBreakdown) ? 0 : totalBreakdown;
+            const breakdown = {
+                training: isNaN(breakdownCost.training) ? 0 : breakdownCost.training,
+                transport: isNaN(breakdownCost.transport) ? 0 : breakdownCost.transport,
+                accommodation: isNaN(breakdownCost.accommodation) ? 0 : breakdownCost.accommodation,
+                others: isNaN(breakdownCost.others) ? 0 : breakdownCost.others
+            };
+
             const res = await fetch(`${API_BASE_URL}/api/training/${id}/approve`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action, reason, approverName: userName || 'Admin' })
+                body: JSON.stringify({
+                    action,
+                    reason,
+                    approverName: userName || 'Admin',
+                    // Include updated costs if approving
+                    ...(action === 'approve' ? {
+                        cost: finalCost,
+                        costTraining: breakdown.training,
+                        costTransport: breakdown.transport,
+                        costAccommodation: breakdown.accommodation,
+                        costOthers: breakdown.others
+                    } : {})
+                })
             });
             if (res.ok) {
                 const updated = await res.json();
@@ -151,9 +209,14 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                 setSelectedRequest(null);
                 setIsRejectMode(false);
                 setRejectReason('');
+            } else {
+                alert("Failed to process request. Please try again.");
             }
         } catch (err) {
             console.error("Action failed", err);
+            alert("An error occurred. Please check your connection.");
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -258,24 +321,52 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
 
     const handleOpenSettlement = (req: TrainingRequest) => {
         setSettleData({
-            finalCost: req.cost,
-            additionalCost: req.additionalCost || 0,
-            settlementNotes: ''
+            training: Number(req.costTraining) || Number(req.cost) || 0,
+            transport: Number(req.costTransport) || 0,
+            accommodation: Number(req.costAccommodation) || 0,
+            others: Number(req.costOthers) || 0,
+            settlementNotes: req.rejectionReason || ''
         });
         setIsSettlementOpen(true);
     };
 
+    // ... (skipping some lines) ...
+
+    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-between items-center">
+        <span className="text-sm font-bold text-slate-600">Total Actual Cost</span>
+        <span className="text-xl font-black text-slate-800">
+            {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(
+                (Number(settleData.training) || 0) +
+                (Number(settleData.transport) || 0) +
+                (Number(settleData.accommodation) || 0) +
+                (Number(settleData.others) || 0)
+            )}
+        </span>
+    </div>
+
     const handleSaveSettlement = async () => {
         if (!selectedRequest) return;
         try {
+            // Calculate Totals
+            const newTotal = settleData.training + settleData.transport + settleData.accommodation + settleData.others;
+
+            // Backend schema has 'additional_cost'. Let's calc it:
+            const excess = Math.max(0, newTotal - (selectedRequest.cost || 0));
+
             const res = await fetch(`${API_BASE_URL}/api/training/${selectedRequest.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    cost: settleData.finalCost,
-                    additionalCost: settleData.additionalCost,
+                    cost: newTotal,
+                    costTraining: settleData.training,
+                    costTransport: settleData.transport,
+                    costAccommodation: settleData.accommodation,
+                    costOthers: settleData.others,
+                    additionalCost: excess, // Auto-calc
+                    settlementNote: settleData.settlementNotes
                 })
             });
+
             if (res.ok) {
                 const updated = await res.json();
                 setRequests(requests.map(r => r.id === updated.id ? updated : r));
@@ -318,7 +409,7 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
             const totalCost = items.reduce((sum, i) => {
                 // Only count cost if approved? Or all? Usually budgets track APPROVED costs.
                 if (i.status !== 'APPROVED') return sum;
-                return sum + (i.cost || 0) + (i.additionalCost || 0);
+                return sum + (Number(i.cost) || 0) + (Number(i.additionalCost) || 0);
             }, 0);
 
             return {
@@ -447,19 +538,10 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                             </div>
                                         </div>
                                     </div>
-
-                                    {req.status === 'REJECTED' && req.rejectionReason && (
-                                        <div className="mt-3 text-xs text-red-600 bg-red-50 p-2 rounded border border-red-100 flex items-start gap-2">
-                                            <XCircle size={14} className="mt-0.5 shrink-0" />
-                                            <div>
-                                                <span className="font-bold">Rejected:</span> {req.rejectionReason}
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
 
                                 <div className="flex items-center gap-2 self-start md:self-center">
-                                    <button onClick={() => { setSelectedRequest(req); setIsSettlementOpen(true); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View Details">
+                                    <button onClick={() => setSelectedRequest(req)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View Details">
                                         <FileText size={20} />
                                     </button>
 
@@ -467,13 +549,13 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                     {userRole === 'SUPERVISOR' && req.status === 'PENDING_SUPERVISOR' && (
                                         <div className="flex gap-2">
                                             <button onClick={() => handleAction(req.id, 'approve')} className="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 shadow-sm">Approve</button>
-                                            <button onClick={() => handleAction(req.id, 'reject')} className="px-3 py-1.5 bg-white border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-50">Reject</button>
+                                            <button onClick={() => { setSelectedRequest(req); setIsRejectMode(true); }} className="px-3 py-1.5 bg-white border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-50">Reject</button>
                                         </div>
                                     )}
                                     {userRole === 'HR' && req.status === 'PENDING_HR' && (
                                         <div className="flex gap-2">
                                             <button onClick={() => handleAction(req.id, 'approve')} className="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 shadow-sm">Final Approve</button>
-                                            <button onClick={() => handleAction(req.id, 'reject')} className="px-3 py-1.5 bg-white border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-50">Reject</button>
+                                            <button onClick={() => { setSelectedRequest(req); setIsRejectMode(true); }} className="px-3 py-1.5 bg-white border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-50">Reject</button>
                                         </div>
                                     )}
                                 </div>
@@ -575,13 +657,13 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                                 <td className="px-4 py-3 font-bold text-slate-700">{r.title}</td>
                                                 <td className="px-4 py-3 text-slate-600">{r.vendor}</td>
                                                 <td className="px-4 py-3 text-right font-mono text-slate-500">
-                                                    {formatCurrency(r.cost)}
+                                                    {formatCurrency(Number(r.cost) || 0)}
                                                 </td>
                                                 <td className="px-4 py-3 text-right font-mono text-orange-600">
-                                                    {r.additionalCost ? formatCurrency(r.additionalCost) : '-'}
+                                                    {(Number(r.additionalCost) || 0) > 0 ? formatCurrency(Number(r.additionalCost) || 0) : '-'}
                                                 </td>
                                                 <td className="px-4 py-3 text-right font-mono text-slate-800 font-bold">
-                                                    {formatCurrency((r.cost || 0) + (r.additionalCost || 0))}
+                                                    {formatCurrency((Number(r.cost) || 0) + (Number(r.additionalCost) || 0))}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
                                                     <StatusBadge status={r.status} />
@@ -635,26 +717,135 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-8">
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-400 uppercase mb-1">Cost Estimation</p>
-                                        <p className="text-2xl font-bold text-slate-800 tracking-tight">{formatCurrency(selectedRequest.cost)}</p>
+                                <div className="col-span-2">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <p className="text-sm font-bold text-slate-400 uppercase">Cost Breakdown</p>
+                                        {(userRole === 'HR' || userRole === 'HR_ADMIN') && selectedRequest.status === 'PENDING_HR' && (
+                                            <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded font-bold">Editable</span>
+                                        )}
                                     </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-400 uppercase mb-1">Priority</p>
-                                        <p className={`text-lg font-bold ${selectedRequest.priority === 'High' ? 'text-red-600' : 'text-slate-700'}`}>
-                                            {selectedRequest.priority} Priority
-                                        </p>
+
+                                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
+                                        {/* Editable Fields for HR during Pending Review */}
+                                        {(userRole === 'HR' || userRole === 'HR_ADMIN') && selectedRequest.status === 'PENDING_HR' ? (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {[
+                                                    { label: 'Training Cost', field: 'training' },
+                                                    { label: 'Transport', field: 'transport' },
+                                                    { label: 'Accommodation', field: 'accommodation' },
+                                                    { label: 'Others', field: 'others' }
+                                                ].map((item) => (
+                                                    <div key={item.field}>
+                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">{item.label}</label>
+                                                        <div className="relative">
+                                                            <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">Rp</span>
+                                                            <input
+                                                                type="text"
+                                                                value={new Intl.NumberFormat('id-ID').format((breakdownCost as any)[item.field])}
+                                                                onChange={(e) => {
+                                                                    const val = Number(e.target.value.replace(/\D/g, ''));
+                                                                    setBreakdownCost(prev => ({ ...prev, [item.field]: val }));
+                                                                }}
+                                                                className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-slate-700 bg-white"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            /* Read Only View for others */
+                                            <div className="grid grid-cols-2 gap-4 text-xs">
+                                                <div className="flex justify-between border-b border-slate-200 pb-1">
+                                                    <span className="text-slate-500">Training</span>
+                                                    <span className="font-mono font-bold">{formatCurrency(selectedRequest.costTraining || 0)}</span>
+                                                </div>
+                                                <div className="flex justify-between border-b border-slate-200 pb-1">
+                                                    <span className="text-slate-500">Transport</span>
+                                                    <span className="font-mono font-bold">{formatCurrency(selectedRequest.costTransport || 0)}</span>
+                                                </div>
+                                                <div className="flex justify-between border-b border-slate-200 pb-1">
+                                                    <span className="text-slate-500">Accommodation</span>
+                                                    <span className="font-mono font-bold">{formatCurrency(selectedRequest.costAccommodation || 0)}</span>
+                                                </div>
+                                                <div className="flex justify-between border-b border-slate-200 pb-1">
+                                                    <span className="text-slate-500">Others</span>
+                                                    <span className="font-mono font-bold">{formatCurrency(selectedRequest.costOthers || 0)}</span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="pt-3 border-t border-slate-200 flex justify-between items-center">
+                                            <span className="text-xs font-bold text-slate-500 uppercase">Total Estimated Cost</span>
+                                            <span className="text-xl font-bold text-slate-800 tracking-tight">
+                                                {formatCurrency((userRole === 'HR' || userRole === 'HR_ADMIN') && selectedRequest.status === 'PENDING_HR' ? totalBreakdown : selectedRequest.cost)}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 
                                 <div>
-                                    <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-                                        <FileText size={20} className="text-slate-400" /> Business Justification
+                                    <h3 className="text-sm font-bold text-slate-400 uppercase mb-2 flex items-center gap-2">
+                                        <FileText size={16} /> Business Justification
                                     </h3>
-                                    <div className="p-5 bg-slate-50 rounded-2xl text-slate-600 leading-relaxed border border-slate-100 italic">
-                                        "{selectedRequest.justification}"
+                                    <div className="p-4 bg-slate-50 rounded-xl text-slate-700 text-sm leading-relaxed border border-slate-200">
+                                        {selectedRequest.justification ? (
+                                            <span className="italic">"{selectedRequest.justification}"</span>
+                                        ) : (
+                                            <span className="text-slate-400 italic">No justification provided.</span>
+                                        )}
                                     </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-400 uppercase mb-2 flex items-center gap-2">
+                                        <Printer size={16} /> Supporting Documents
+                                    </h3>
+                                    {selectedRequest.evidenceUrl ? (
+                                        <div className="p-4 border border-slate-200 rounded-xl bg-slate-50 space-y-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                                                    <FileText size={20} />
+                                                </div>
+                                                <div className="flex-1 overflow-hidden">
+                                                    <p className="text-xs font-bold text-slate-500 uppercase">Attached File</p>
+                                                    <a
+                                                        href={`${API_BASE_URL}${selectedRequest.evidenceUrl}`}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="text-blue-600 font-bold text-sm truncate hover:underline block"
+                                                    >
+                                                        View Document / Download
+                                                    </a>
+                                                </div>
+                                            </div>
+
+                                            {/* Image Preview */}
+                                            {selectedRequest.evidenceUrl.match(/\.(jpeg|jpg|gif|png)$/i) && (
+                                                <div className="mt-2 rounded-lg overflow-hidden border border-slate-200">
+                                                    <img
+                                                        src={`${API_BASE_URL}${selectedRequest.evidenceUrl}`}
+                                                        alt="Evidence"
+                                                        className="w-full h-auto object-contain max-h-64 bg-slate-100"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* PDF Preview */}
+                                            {selectedRequest.evidenceUrl.match(/\.pdf$/i) && (
+                                                <div className="mt-2 rounded-lg overflow-hidden border border-slate-200 h-64">
+                                                    <iframe
+                                                        src={`${API_BASE_URL}${selectedRequest.evidenceUrl}#toolbar=0`}
+                                                        className="w-full h-full"
+                                                        title="PDF Preview"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="p-4 border border-dashed border-slate-300 rounded-xl text-center">
+                                            <p className="text-slate-400 text-sm italic">No supporting documents attached.</p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {selectedRequest.rejectionReason && (
@@ -687,7 +878,7 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                             <button
                                                 onClick={() => handleAction(selectedRequest.id, 'reject', rejectReason)}
                                                 className="px-4 py-2 font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg text-sm"
-                                                disabled={!rejectReason}
+                                                disabled={!rejectReason || isProcessing}
                                             >
                                                 Confirm Reject
                                             </button>
@@ -708,7 +899,8 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                                 </button>
                                                 <button
                                                     onClick={() => handleAction(selectedRequest.id, 'approve')}
-                                                    className="px-8 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2"
+                                                    disabled={isProcessing}
+                                                    className="px-8 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2 disabled:bg-slate-300 disabled:shadow-none"
                                                 >
                                                     <CheckCircle2 size={20} /> Approve (to HR)
                                                 </button>
@@ -726,7 +918,8 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                                 </button>
                                                 <button
                                                     onClick={() => handleAction(selectedRequest.id, 'approve')}
-                                                    className="px-8 py-3 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-lg shadow-green-500/20 transition-all flex items-center gap-2"
+                                                    disabled={isProcessing}
+                                                    className="px-8 py-3 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-lg shadow-green-500/20 transition-all flex items-center gap-2 disabled:bg-slate-300 disabled:shadow-none"
                                                 >
                                                     <CheckCircle2 size={20} /> Final Approve
                                                 </button>
@@ -736,12 +929,14 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                         {/* APPROVED STATUS Actions */}
                                         {selectedRequest.status === 'APPROVED' && (
                                             <>
-                                                <button
-                                                    onClick={() => handleOpenSettlement(selectedRequest)}
-                                                    className="px-5 py-3 rounded-xl font-bold text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 transition-all flex items-center gap-2"
-                                                >
-                                                    <DollarSign size={18} /> Settlement
-                                                </button>
+                                                {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                                                    <button
+                                                        onClick={() => handleOpenSettlement(selectedRequest)}
+                                                        className="px-5 py-3 rounded-xl font-bold text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 transition-all flex items-center gap-2"
+                                                    >
+                                                        <DollarSign size={18} /> Settlement
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => handlePrint(selectedRequest)}
                                                     className="px-6 py-3 rounded-xl font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-all flex items-center gap-2"
@@ -766,39 +961,71 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                         {/* Finance Settlement Modal */}
                         {isSettlementOpen && (
                             <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
-                                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-6">
-                                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><DollarSign className="text-green-600" /> Finance Settlement</h3>
+                                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden p-6">
+                                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                        <DollarSign className="text-green-600" /> Finance Settlement
+                                    </h3>
+
+                                    <div className="bg-blue-50 p-3 rounded-lg text-xs text-blue-700 mb-4 flex items-start gap-2">
+                                        <Info size={16} className="shrink-0 mt-0.5" />
+                                        <p>Adjust the actual costs below. The <strong>Final Actual Cost</strong> and <strong>Excess Cost</strong> will be calculated automatically based on the approved budget.</p>
+                                    </div>
+
                                     <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Final Actual Cost</label>
-                                            <input
-                                                type="number"
-                                                className="w-full px-3 py-2 border rounded-lg"
-                                                value={settleData.finalCost}
-                                                onChange={e => setSettleData({ ...settleData, finalCost: parseInt(e.target.value) })}
-                                            />
+                                        {[
+                                            { label: 'Actual Training Cost', key: 'training' },
+                                            { label: 'Actual Transport', key: 'transport' },
+                                            { label: 'Actual Accommodation', key: 'accommodation' },
+                                            { label: 'Actual Others', key: 'others' }
+                                        ].map((field) => (
+                                            <div key={field.key} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                                                <label className="text-xs font-bold text-slate-500 uppercase">{field.label}</label>
+                                                <div className="md:col-span-2 relative">
+                                                    <span className="absolute left-4 top-2.5 text-slate-400 font-bold text-sm">Rp</span>
+                                                    <input
+                                                        type="number"
+                                                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-green-500"
+                                                        value={settleData[field.key as keyof typeof settleData] || ''}
+                                                        onChange={(e) => setSettleData({ ...settleData, [field.key]: parseFloat(e.target.value) || 0 })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-between items-center">
+                                        <span className="text-sm font-bold text-slate-600">Total Actual Cost</span>
+                                        <span className="text-xl font-black text-slate-800">
+                                            {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(
+                                                (Number(settleData.training) || 0) +
+                                                (Number(settleData.transport) || 0) +
+                                                (Number(settleData.accommodation) || 0) +
+                                                (Number(settleData.others) || 0)
+                                            )}
+                                        </span>
+                                    </div>
+
+                                    {((settleData.training || 0) + (settleData.transport || 0) + (settleData.accommodation || 0) + (settleData.others || 0) - (selectedRequest?.cost || 0)) > 0 && (
+                                        <div className="flex justify-between items-center text-red-600 mt-2 px-4">
+                                            <span className="text-sm font-bold">Excess (Additional)</span>
+                                            <span className="text-md font-bold">
+                                                + {formatCurrency(((settleData.training || 0) + (settleData.transport || 0) + (settleData.accommodation || 0) + (settleData.others || 0)) - (selectedRequest?.cost || 0))}
+                                            </span>
                                         </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Additional / Excess Cost</label>
-                                            <input
-                                                type="number"
-                                                className="w-full px-3 py-2 border rounded-lg text-red-600 font-bold"
-                                                value={settleData.additionalCost}
-                                                onChange={e => setSettleData({ ...settleData, additionalCost: parseInt(e.target.value) })}
-                                            />
-                                        </div>
-                                        <div className="flex gap-2 pt-4">
-                                            <button onClick={() => setIsSettlementOpen(false)} className="flex-1 py-2 text-slate-500 font-bold hover:bg-slate-100 rounded-lg">Cancel</button>
-                                            <button onClick={handleSaveSettlement} className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-lg shadow-green-200">Save Settlement</button>
-                                        </div>
+                                    )}
+
+                                    <div className="flex gap-2 pt-6">
+                                        <button onClick={() => setIsSettlementOpen(false)} className="flex-1 py-2.5 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition-colors">Cancel</button>
+                                        <button onClick={handleSaveSettlement} className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg shadow-green-200 transition-all transform active:scale-[0.98]">
+                                            Save Settlement
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                         )}
                     </div>
-                )
-            }
-        </div >
+                )}
+        </div>
     );
 };
 

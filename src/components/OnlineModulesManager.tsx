@@ -7,6 +7,7 @@ import ConfirmationModal from './ConfirmationModal';
 
 const OnlineModulesManager = () => {
     // Helper to render Quiz Editor
+    // Helper to render Quiz Editor
     const renderQuizEditor = (quiz: Quiz | undefined, onUpdate: (q: Quiz) => void, onDelete?: () => void) => {
         if (!quiz) return null;
         return (
@@ -22,15 +23,16 @@ const OnlineModulesManager = () => {
                         <div className="flex justify-between items-start gap-2">
                             <div className="flex-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Question {qIdx + 1}</label>
-                                <input
+                                <textarea
                                     value={q.question}
                                     onChange={(e) => {
                                         const newQuestions = [...quiz.questions];
                                         newQuestions[qIdx].question = e.target.value;
                                         onUpdate({ ...quiz, questions: newQuestions });
                                     }}
-                                    className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-200 text-sm font-medium"
+                                    className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-200 text-sm font-medium resize-none"
                                     placeholder="Enter question here..."
+                                    rows={2}
                                 />
                             </div>
                             <button
@@ -44,9 +46,10 @@ const OnlineModulesManager = () => {
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Answer Options</label>
                             {q.options.map((opt, optIdx) => (
-                                <div key={optIdx} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${q.correctAnswer === optIdx ? 'bg-green-50 border-green-200' : 'bg-white border-slate-200'}`}>
+                                <div key={optIdx} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${q.correctAnswer === optIdx ? 'bg-green-50 border-green-200 ring-1 ring-green-200' : 'bg-white border-slate-200'}`}>
                                     <input
                                         type="radio"
                                         name={`correct-${q.id}`}
@@ -56,7 +59,7 @@ const OnlineModulesManager = () => {
                                             newQuestions[qIdx].correctAnswer = optIdx;
                                             onUpdate({ ...quiz, questions: newQuestions });
                                         }}
-                                        className="accent-green-600 w-4 h-4 cursor-pointer"
+                                        className="accent-green-600 w-4 h-4 cursor-pointer shrink-0"
                                     />
                                     <input
                                         value={opt}
@@ -66,10 +69,42 @@ const OnlineModulesManager = () => {
                                             onUpdate({ ...quiz, questions: newQuestions });
                                         }}
                                         className="flex-1 px-3 py-1.5 rounded-md border border-slate-200 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all bg-white"
-                                        placeholder={`Option ${String.fromCharCode(65 + optIdx)}`}
+                                        placeholder={`Option ${optIdx + 1}`}
                                     />
+                                    <button
+                                        onClick={() => {
+                                            const newQuestions = [...quiz.questions];
+                                            // Provide at least 2 options
+                                            if (newQuestions[qIdx].options.length <= 2) {
+                                                alert("Minimum 2 options required");
+                                                return;
+                                            }
+                                            newQuestions[qIdx].options.splice(optIdx, 1);
+                                            // Adjust correct answer index if needed
+                                            if (q.correctAnswer === optIdx) {
+                                                newQuestions[qIdx].correctAnswer = 0; // Reset to first if deleted
+                                            } else if (q.correctAnswer > optIdx) {
+                                                newQuestions[qIdx].correctAnswer--;
+                                            }
+                                            onUpdate({ ...quiz, questions: newQuestions });
+                                        }}
+                                        className="text-slate-400 hover:text-red-500 p-1"
+                                        title="Remove Option"
+                                    >
+                                        <X size={14} />
+                                    </button>
                                 </div>
                             ))}
+                            <button
+                                onClick={() => {
+                                    const newQuestions = [...quiz.questions];
+                                    newQuestions[qIdx].options.push('');
+                                    onUpdate({ ...quiz, questions: newQuestions });
+                                }}
+                                className="text-xs text-blue-600 font-bold hover:text-blue-800 flex items-center gap-1 mt-2 pl-1"
+                            >
+                                <Plus size={14} /> Add Option
+                            </button>
                         </div>
                     </div>
                 ))}
@@ -82,7 +117,7 @@ const OnlineModulesManager = () => {
                                 {
                                     id: Date.now(),
                                     question: '',
-                                    options: ['', '', '', ''],
+                                    options: ['', ''],
                                     correctAnswer: 0
                                 }
                             ]
@@ -109,8 +144,9 @@ const OnlineModulesManager = () => {
 
     // ... (existing rendering logic)
 
+    const [users, setUsers] = useState<any[]>([]); // User list for mapping
     const [progressData, setProgressData] = useState<{ userId: number | string; courseId: number; completedModuleIds: number[] }[]>([]);
-    const [allQuizResults, setAllQuizResults] = useState<QuizResult[]>([]);
+    const [allQuizResults, setAllQuizResults] = useState<any[]>([]);
 
     const [confirmConfig, setConfirmConfig] = useState<{
         isOpen: boolean;
@@ -128,7 +164,7 @@ const OnlineModulesManager = () => {
         const fetchData = async () => {
             // Fetch Courses first (Critical)
             try {
-                const resCourses = await fetch(`${API_BASE_URL}/api/courses-json`);
+                const resCourses = await fetch(`${API_BASE_URL}/api/courses`);
                 if (resCourses.ok) {
                     const coursesData = await resCourses.json();
                     setCourses(coursesData);
@@ -138,6 +174,12 @@ const OnlineModulesManager = () => {
                 setPopup({ type: 'error', message: `Failed to load courses: ${e instanceof Error ? e.message : String(e)}`, isOpen: true });
             }
 
+            // Fetch Users for Name Mapping
+            try {
+                const resUsers = await fetch(`${API_BASE_URL}/api/users`);
+                if (resUsers.ok) setUsers(await resUsers.json());
+            } catch (e) { console.warn("Users fetch failed", e); }
+
             // Fetch secondary data independently
             try {
                 const resProgress = await fetch(`${API_BASE_URL}/api/progress`);
@@ -145,7 +187,8 @@ const OnlineModulesManager = () => {
             } catch (e) { console.warn("Progress fetch failed", e); }
 
             try {
-                const resQuiz = await fetch(`${API_BASE_URL}/api/quiz/all-results`);
+                // Use admin endpoint which is guaranteed to exist
+                const resQuiz = await fetch(`${API_BASE_URL}/api/admin/quiz-reports`);
                 if (resQuiz.ok) setAllQuizResults(await resQuiz.json());
             } catch (e) { console.warn("Quiz stats fetch failed", e); }
         };
@@ -235,7 +278,7 @@ const OnlineModulesManager = () => {
                     <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                         <div className="flex flex-col">
                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                {courses.find(c => c.id === editingCourse.id) ? 'Managing Modul' : 'Creating Modul'}
+                                {editorTab === 'grades' ? 'Staff Performance' : (courses.find(c => c.id === editingCourse.id) ? 'Managing Modul' : 'Creating Modul')}
                             </span>
                             <h2 className="font-bold text-xl text-slate-800">{editingCourse.title}</h2>
                         </div>
@@ -245,20 +288,30 @@ const OnlineModulesManager = () => {
                     </div>
 
                     {/* Tabs */}
-                    <div className="px-6 border-b border-slate-100 flex gap-6">
+                    {/* Tabs - Hidden based on user feedback to simplify. Context is determined by entry button. */}
+                    {/* If we want to allow switching, we can keep it. User said "masukkan saja dalam modl dimana kan ada view". 
+                        The 'View' button sets tab to 'grades'. So we just render logic based on editorTab. 
+                        Maybe we hide the tabs if they just want a dedicated view? 
+                        Let's keep tabs but maybe style them differently or logic is fine?
+                        User says "tidak perlu dibuatkan fitur baru" implies they just want to see it in the existing view.
+                        Action: We will just ensure the 'View' button opens this modal in 'grades' mode effectively. 
+                        The current implementation ALREADY does this via handleViewScores. 
+                        Perhaps the user wants the TAB UI gone so it looks like a dedicated 'Score View'?
+                        Let's hide the tabs if the intention is strict separation, OR keep them for flexibility. 
+                        Given "tidak perlu dibuatkan fitur baru", maybe they mean the 'View' *icon* on the card should just open the grades. 
+                        My previous code ALREADY added a view button. 
+                        So I will just ensure the Tabs are only visible if we are in a context that allows swapping, 
+                        or just simplify the header to say "Staff Grades" when in grades mode.
+                    */}
+                    <div className={`px-6 border-b border-slate-100 flex gap-6 ${editorTab === 'grades' ? 'hidden' : ''}`}>
                         <button
                             onClick={() => setEditorTab('content')}
                             className={`py-4 text-sm font-bold border-b-2 transition-colors ${editorTab === 'content' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                         >
                             Course Content
                         </button>
-                        <button
-                            onClick={() => setEditorTab('grades')}
-                            className={`py-4 text-sm font-bold border-b-2 transition-colors ${editorTab === 'grades' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                        >
-                            Staff Grades
-                        </button>
                     </div>
+                    {/* If in grade mode, we might want a different header title or just rely on render logic */}
 
                     <div className="flex-1 overflow-y-auto p-6 bg-white">
                         {editorTab === 'content' ? (
@@ -499,67 +552,89 @@ const OnlineModulesManager = () => {
                                 </section>
                             </div>
                         ) : (
-                            <div className="h-full">
+                            <div className="h-full flex flex-col">
                                 {/* GRADEBOOK MATRIX VIEW for this Course */}
-                                <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                <div className="bg-slate-50 rounded-xl border border-slate-200 flex-1 flex flex-col overflow-hidden">
                                     <div className="p-4 border-b border-slate-200 bg-white">
                                         <h3 className="font-bold text-slate-700">Staff Performance Matrix</h3>
                                         <p className="text-sm text-slate-500">View how staff members are performing across all modules in this course.</p>
                                     </div>
-                                    <div className="overflow-x-auto">
+                                    <div className="overflow-auto flex-1">
                                         <table className="w-full text-left border-collapse">
                                             <thead className="bg-slate-50 text-slate-600 text-xs uppercase tracking-wider font-semibold">
                                                 <tr>
                                                     <th className="p-4 border-b border-slate-100 min-w-[200px] sticky left-0 bg-slate-50 z-10 border-r border-slate-200">Staff Name</th>
+                                                    <th className="p-4 border-b border-slate-100 min-w-[150px]">Branch</th>
                                                     {editingCourse.modules.map((mod, idx) => (
                                                         <th key={mod.id} className="p-4 border-b border-slate-100 text-center whitespace-nowrap min-w-[100px]">
                                                             Mod {idx + 1}
                                                         </th>
                                                     ))}
-                                                    <th className="p-4 border-b border-slate-100 text-center">Avg</th>
+                                                    <th className="p-4 border-b border-slate-100 text-center min-w-[100px] bg-yellow-50/50">Assessment</th>
+                                                    <th className="p-4 border-b border-slate-100 text-center min-w-[80px]">Avg</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 bg-white">
                                                 {(() => {
-                                                    // Filter progress for this course
-                                                    const courseProgress = progressData.filter(p => p.courseId === editingCourse.id);
-                                                    if (courseProgress.length === 0) {
+                                                    // 1. Get all unique user IDs relevant to this course (from progress OR quiz results)
+                                                    const courseProgress = progressData.filter(p => p.courseId == editingCourse.id);
+                                                    const courseQuizResults = allQuizResults.filter(q => q.course_id == editingCourse.id || q.courseId == editingCourse.id);
+
+                                                    const relevantUserIds = new Set([
+                                                        ...courseProgress.map(p => String(p.userId)),
+                                                        ...courseQuizResults.map(q => String(q.student_id || q.studentId))
+                                                    ]);
+
+                                                    if (relevantUserIds.size === 0) {
                                                         return (
                                                             <tr>
-                                                                <td colSpan={editingCourse.modules.length + 2} className="p-8 text-center text-slate-400">
+                                                                <td colSpan={editingCourse.modules.length + 4} className="p-8 text-center text-slate-400">
                                                                     No staff has started this course yet.
                                                                 </td>
                                                             </tr>
                                                         );
                                                     }
 
-                                                    return courseProgress.map(record => {
-                                                        const completedIds = record.completedModuleIds || [];
-                                                        const progressPercent = Math.round((completedIds.length / editingCourse.modules.length) * 100);
+                                                    return Array.from(relevantUserIds).map(userId => {
+                                                        // Resolve User Details
+                                                        const user = users.find(u => String(u.id) === userId);
+                                                        const userName = user ? user.name : (courseQuizResults.find(q => String(q.student_id || q.studentId) === userId)?.student_name || userId);
+                                                        const branch = user?.branch || '-';
+
+                                                        // Get Progress Record
+                                                        const progress = courseProgress.find(p => String(p.userId) === userId);
+                                                        const completedIds = progress?.completedModuleIds || [];
+
+                                                        let totalScore = 0;
+                                                        let scoreCount = 0;
 
                                                         return (
-                                                            <tr key={record.userId} className="hover:bg-blue-50/50 transition-colors">
+                                                            <tr key={userId} className="hover:bg-blue-50/50 transition-colors">
                                                                 <td className="p-4 font-medium text-slate-800 sticky left-0 bg-white hover:bg-blue-50/50 border-r border-slate-100">
-                                                                    {record.userId}
-                                                                    {/* DEBUG Removed */}
+                                                                    {userName}
                                                                 </td>
+                                                                <td className="p-4 text-xs text-slate-500">
+                                                                    {branch}
+                                                                </td>
+                                                                {/* Modules Columns */}
                                                                 {editingCourse.modules.map(mod => {
                                                                     const isCompleted = completedIds.includes(mod.id);
-                                                                    // Find score if available
-                                                                    const result = allQuizResults.find(r => r.studentId == record.userId && r.courseId == editingCourse.id && r.moduleId == mod.id);
+                                                                    // Find score if available (module_id matches)
+                                                                    const result = courseQuizResults.find(r => String(r.student_id || r.studentId) === userId && (r.module_id == mod.id || r.moduleId == mod.id));
 
-                                                                    // If we have a result, show score. If simply completed (e.g. video watch) and no quiz result found/needed, show Done?
-                                                                    // User req: "buat dalam bentuk angka skor".
-                                                                    // So if there is a quiz result, show score.
+                                                                    if (result) {
+                                                                        totalScore += result.score;
+                                                                        scoreCount++;
+                                                                    }
 
                                                                     return (
                                                                         <td key={mod.id} className="p-4 text-center border-l border-dashed border-slate-100">
                                                                             {result ? (
-                                                                                <span className={`px-2 py-1 rounded text-xs font-bold ${result.score >= 60 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${result.score >= 80 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                                                                     {result.score}
                                                                                 </span>
                                                                             ) : isCompleted ? (
-                                                                                <span className="px-2 py-1 rounded text-xs font-bold bg-green-100 text-green-700">
+                                                                                <span className="px-2 py-1 rounded text-xs font-bold bg-blue-100 text-blue-600">
                                                                                     Done
                                                                                 </span>
                                                                             ) : (
@@ -568,8 +643,28 @@ const OnlineModulesManager = () => {
                                                                         </td>
                                                                     );
                                                                 })}
-                                                                <td className="p-4 text-center font-bold text-slate-700 border-l border-slate-100">
-                                                                    {progressPercent}%
+
+                                                                {/* Assessment Column */}
+                                                                <td className="p-4 text-center border-l border-orange-100 bg-orange-50/10">
+                                                                    {(() => {
+                                                                        // Find assessment result (module_id is NULL)
+                                                                        const result = courseQuizResults.find(r => String(r.student_id || r.studentId) === userId && (r.module_id == null || r.moduleId == null));
+                                                                        if (result) {
+                                                                            totalScore += result.score;
+                                                                            scoreCount++;
+                                                                            return (
+                                                                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${result.score >= 80 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                                                    {result.score}
+                                                                                </span>
+                                                                            );
+                                                                        }
+                                                                        return <span className="text-slate-300">-</span>;
+                                                                    })()}
+                                                                </td>
+
+                                                                {/* Average Column */}
+                                                                <td className="p-4 text-center font-bold text-slate-700 border-l border-slate-200">
+                                                                    {scoreCount > 0 ? Math.round(totalScore / scoreCount) : '-'}
                                                                 </td>
                                                             </tr>
                                                         );
@@ -638,7 +733,7 @@ const OnlineModulesManager = () => {
                                 <button
                                     onClick={() => handleViewScores(course)}
                                     className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                    title="View Grades"
+                                    title="View Staff Grades"
                                 >
                                     <BookOpen size={20} />
                                 </button>

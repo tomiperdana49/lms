@@ -27,7 +27,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
     const [suggestions, setSuggestions] = useState<BookData[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
-    const [bookDatabase, setBookDatabase] = useState<any[]>([]); // Dynamic book list
+    const [bookDatabase, setBookDatabase] = useState<BookData[]>([]); // Dynamic book list
     const [selectedLog, setSelectedLog] = useState<ReadingLogEntry | null>(null);
 
     // --- Form State ---
@@ -282,24 +282,14 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
             return;
         }
 
-        const newLog: Partial<ReadingLogEntry> = {
-            id: Date.now(),
-            title: startFormData.title,
-            category: startFormData.category,
-            location: startFormData.location,
-            source: startFormData.source,
-            date: new Date().toISOString(),
-            startDate: new Date().toISOString(),
-            status: 'Reading',
-            userName: user.name,
-            evidenceUrl: startFormData.evidenceUrl
-        };
-
         try {
-            const res = await fetch(`${API_BASE_URL}/api/logs`, {
+            const res = await fetch(`${API_BASE_URL}/api/books/borrow`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newLog)
+                body: JSON.stringify({
+                    ...startFormData,
+                    userName: user.name
+                })
             });
 
             if (res.ok) {
@@ -307,10 +297,13 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                 setLogs([savedLog, ...logs]);
                 setStartFormData({ title: '', category: '', location: '', source: '', evidenceUrl: '' });
                 setNotification({ show: true, type: 'success', message: "Buku berhasil dipinjam!" });
+            } else {
+                const err = await res.json();
+                setNotification({ show: true, type: 'error', message: err.error || "Gagal meminjam buku." });
             }
         } catch (err) {
             console.error(err);
-            setNotification({ show: true, type: 'error', message: "Error saving log." });
+            setNotification({ show: true, type: 'error', message: "Error connecting to server." });
         } finally {
             setIsLoading(false);
         }
@@ -344,44 +337,36 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
             return;
         }
 
-        const newLog: Partial<ReadingLogEntry> = {
-            ...selectedLog,
-            status: 'Finished',
-            finishDate: new Date().toISOString(),
-            link: finishFormData.link,
-            review: "-",
-            duration: 1,
-            readingDuration: 1,
-            evidenceUrl: finishFormData.evidenceUrl,
-            hrApprovalStatus: 'Pending' // Force Pending upon finish
-        };
-
         try {
-            const res = await fetch(`${API_BASE_URL}/api/logs`, {
-                method: 'POST', // Assuming POST handles update/replace logic on backend or we should use PUT if id exists? 
-                // Original code used POST for both. Let's stick to original behavior: 
-                // Original: if finish, DELETE old, SAVE new.
+            const res = await fetch(`${API_BASE_URL}/api/books/return`, {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newLog)
+                body: JSON.stringify({
+                    id: selectedLog.id,
+                    review: "-", // Review text is effectively replaced by link review, or we could add a field
+                    link: finishFormData.link,
+                    evidenceUrl: finishFormData.evidenceUrl,
+                    readingDuration: 1 // Placeholder for now, or calculate
+                })
             });
 
             if (res.ok) {
                 const savedLog = await res.json();
 
-                // Remove old 'Reading' log
-                await fetch(`${API_BASE_URL}/api/logs/${selectedLog.id}`, { method: 'DELETE' });
-
-                let updatedLogs = logs.filter(l => l.id !== selectedLog.id);
-                updatedLogs = [savedLog, ...updatedLogs];
+                // Update local state: Replace the old log with the new 'Finished' one
+                const updatedLogs = logs.map(l => l.id === selectedLog.id ? savedLog : l);
 
                 setLogs(updatedLogs);
                 setYearReadCount(prev => prev + 1);
                 handleCancelFinish();
                 setNotification({ show: true, type: 'success', message: "Buku berhasil diselesaikan!" });
+            } else {
+                const err = await res.json();
+                setNotification({ show: true, type: 'error', message: err.error || "Gagal menyelesaikan buku." });
             }
         } catch (err) {
             console.error(err);
-            setNotification({ show: true, type: 'error', message: "Error completing book." });
+            setNotification({ show: true, type: 'error', message: "Error connecting to server." });
         } finally {
             setIsLoading(false);
         }

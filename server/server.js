@@ -4,14 +4,71 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
-import pool, { initDB } from './db.js';
-import { sendMeetingInvite } from './emailService.js';
+import { query } from './db.js';
+import nodemailer from 'nodemailer';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 3003;
+
+app.use(cors());
+app.use(express.json());
+// Increase payload limit for large JSON (guests list etc)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// --- MAILER SETUP ---
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: false, // true for 465, false for other ports
+    auth: {
+        user: process.env.SMTP_USER, // e.g. 'user@gmail.com'
+        pass: process.env.SMTP_PASS  // e.g. 'password'
+    }
+});
+
+const sendMeetingInvite = async (meeting, recipients) => {
+    if (!recipients || recipients.length === 0) return;
+    if (!process.env.SMTP_USER) {
+        console.log('Skipping email: SMTP_USER not configured in .env');
+        return;
+    }
+
+    const mailOptions = {
+        from: `"LMS Internal Training" <${process.env.SMTP_USER}>`,
+        to: recipients.join(', '), // Send to all guests
+        subject: `Invitation: ${meeting.title}`,
+        html: `
+            <div style="font-family: Arial, sans-serif; color: #333;">
+                <h2 style="color: #4F46E5;">You are invited to: ${meeting.title}</h2>
+                <p><strong>Date:</strong> ${new Date(meeting.date).toLocaleDateString()}</p>
+                <p><strong>Time:</strong> ${meeting.time}</p>
+                <p><strong>Host:</strong> ${meeting.host}</p>
+                <p><strong>Type:</strong> ${meeting.type}</p>
+                ${meeting.location ? `<p><strong>Location:</strong> ${meeting.location}</p>` : ''}
+                ${meeting.meetLink ? `<p><strong>Link:</strong> <a href="${meeting.meetLink}">${meeting.meetLink}</a></p>` : ''}
+                
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+                
+                <p><strong>Description:</strong><br/>${meeting.description || 'No description provided.'}</p>
+                
+                <p style="margin-top: 30px; font-size: 12px; color: #888;">
+                    This is an automated message from LMS Nusa.
+                </p>
+            </div>
+        `
+    };
+
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log('Message sent: %s', info.messageId);
+    } catch (error) {
+        console.error('Error sending email:', error);
+    }
+};
 const UPLOADS_DIR = path.join(__dirname, '../uploads');
 
 // Ensure Uploads Directory Exists
@@ -59,7 +116,7 @@ app.post('/api/login', async (req, res) => {
 
         if (users.length > 0) {
             const user = users[0];
-            res.json({ success: true, user: { name: user.name, role: user.role, email: user.email } });
+            res.json({ success: true, user: { id: user.id, name: user.name, role: user.role, email: user.email, branch: user.branch } });
         } else {
             res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
@@ -84,14 +141,15 @@ app.post('/api/auth/google', async (req, res) => {
             const name = email.split('@')[0].replace('.', ' ');
             const avatar = `https://ui-avatars.com/api/?name=${name}&background=random`;
             const role = 'STAFF'; // Default
+            const branch = 'Headquarters'; // Default branch
 
-            await query('INSERT INTO users (id, email, password, name, role, avatar) VALUES (?, ?, ?, ?, ?, ?)',
-                [id, email, 'google-oauth-placeholder', name, role, avatar]);
+            await query('INSERT INTO users (id, email, password, name, role, avatar, branch) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [id, email, 'google-oauth-placeholder', name, role, avatar, branch]);
 
-            user = { id, email, name, role, avatar };
+            user = { id, email, name, role, avatar, branch };
         }
 
-        res.json({ success: true, user: { name: user.name, role: user.role, email: user.email } });
+        res.json({ success: true, user: { id: user.id, name: user.name, role: user.role, email: user.email, branch: user.branch } });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Database error' });
@@ -226,6 +284,14 @@ app.delete('/api/logs/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+const getLocalTime = () => {
+    const now = new Date();
+    const offset = 7 * 60; // UTC+7 (Western Indonesia Time)
+    const localTime = new Date(now.getTime() + offset * 60 * 1000);
+    return localTime;
+};
+
+
 app.put('/api/logs/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -275,6 +341,73 @@ app.put('/api/logs/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- NEW BOOKS BORROW/RETURN ENDPOINTS ---
+app.post('/api/books/borrow', async (req, res) => {
+    try {
+        const { title, category, location, source, evidenceUrl, userName } = req.body;
+
+        // Validation
+        if (!title || !category || !userName) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        const now = new Date();
+        const result = await query(
+            'INSERT INTO reading_logs (title, category, location, source, user_name, evidence_url, start_date, date, status, hr_approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [title, category, location, source, userName, evidenceUrl, now, now, 'Reading', 'Pending']
+        );
+
+        const newLogs = await query('SELECT * FROM reading_logs WHERE id = ?', [result.insertId]);
+        const newLog = newLogs[0];
+
+        res.json({
+            ...newLog,
+            userName: newLog.user_name,
+            startDate: newLog.start_date,
+            evidenceUrl: newLog.evidence_url,
+            hrApprovalStatus: newLog.hr_approval_status
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/books/return', async (req, res) => {
+    try {
+        const { id, review, link, evidenceUrl, readingDuration } = req.body;
+
+        if (!id) return res.status(400).json({ error: 'Log ID is required' });
+
+        const now = new Date(); // Finish date
+
+        await query(
+            'UPDATE reading_logs SET status = ?, finish_date = ?, review = ?, link = ?, evidence_url = ?, reading_duration = ?, hr_approval_status = ? WHERE id = ?',
+            ['Finished', now, review, link || '', evidenceUrl, readingDuration || 0, 'Pending', id]
+        );
+
+        const updatedLogs = await query('SELECT * FROM reading_logs WHERE id = ?', [id]);
+        if (updatedLogs.length === 0) return res.status(404).json({ error: 'Log not found' });
+
+        const updated = updatedLogs[0];
+
+        res.json({
+            ...updated,
+            userName: updated.user_name,
+            readingDuration: updated.reading_duration,
+            startDate: updated.start_date,
+            finishDate: updated.finish_date,
+            evidenceUrl: updated.evidence_url,
+            hrApprovalStatus: updated.hr_approval_status,
+            incentiveAmount: updated.incentive_amount,
+            rejectionReason: updated.rejection_reason
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- TRAINING REQUESTS ---
 app.get('/api/training', async (req, res) => {
     try {
@@ -296,7 +429,10 @@ app.get('/api/training', async (req, res) => {
             costTraining: r.cost_training || 0,
             costTransport: r.cost_transport || 0,
             costAccommodation: r.cost_accommodation || 0,
-            costOthers: r.cost_others || 0
+            costOthers: r.cost_others || 0,
+            additionalCost: r.additional_cost || 0,
+            justification: r.justification,
+            evidenceUrl: r.evidence_url
         }));
         res.json(mapped);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -307,7 +443,7 @@ app.post('/api/training', async (req, res) => {
         const reqData = req.body;
         const submittedAt = new Date();
         const result = await query(
-            'INSERT INTO training_requests (title, vendor, cost, date, status, submitted_at, employee_name, employee_role, cost_training, cost_transport, cost_accommodation, cost_others) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO training_requests (title, vendor, cost, date, status, submitted_at, employee_name, employee_role, cost_training, cost_transport, cost_accommodation, cost_others, justification, evidence_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 reqData.title,
                 reqData.vendor,
@@ -320,7 +456,9 @@ app.post('/api/training', async (req, res) => {
                 reqData.costTraining || 0,
                 reqData.costTransport || 0,
                 reqData.costAccommodation || 0,
-                reqData.costOthers || 0
+                reqData.costOthers || 0,
+                reqData.reason || '', // Map 'reason' from frontend to 'justification'
+                reqData.evidenceUrl || ''
             ]
         );
         const newReq = await query('SELECT * FROM training_requests WHERE id = ?', [result.insertId]);
@@ -372,8 +510,28 @@ app.post('/api/training/:id/approve', async (req, res) => {
             }
             else if (newStatus === 'PENDING_HR') {
                 newStatus = 'APPROVED';
-                updateSql = 'UPDATE training_requests SET status = ?, hr_name = ?, hr_approved_at = ? WHERE id = ?';
-                params = [newStatus, approverName, now, id];
+
+                // Check if cost updates are provided (HR editing costs)
+                // We expect these in req.body: cost, costTraining, costTransport, costAccommodation, costOthers
+                const { cost, costTraining, costTransport, costAccommodation, costOthers } = req.body;
+
+                if (cost !== undefined) {
+                    updateSql = 'UPDATE training_requests SET status = ?, hr_name = ?, hr_approved_at = ?, cost = ?, cost_training = ?, cost_transport = ?, cost_accommodation = ?, cost_others = ? WHERE id = ?';
+                    params = [
+                        newStatus,
+                        approverName,
+                        now,
+                        cost,
+                        costTraining || 0,
+                        costTransport || 0,
+                        costAccommodation || 0,
+                        costOthers || 0,
+                        id
+                    ];
+                } else {
+                    updateSql = 'UPDATE training_requests SET status = ?, hr_name = ?, hr_approved_at = ? WHERE id = ?';
+                    params = [newStatus, approverName, now, id];
+                }
             }
         }
 
@@ -388,7 +546,18 @@ app.post('/api/training/:id/approve', async (req, res) => {
             submittedAt: r.submitted_at,
             rejectionReason: r.rejection_reason,
             supervisorName: r.supervisor_name,
-            hrName: r.hr_name
+            supervisorApprovedAt: r.supervisor_approved_at,
+            hrName: r.hr_name,
+            hrApprovedAt: r.hr_approved_at,
+            employeeName: r.employee_name,
+            employeeRole: r.employee_role,
+            costTraining: r.cost_training,
+            costTransport: r.cost_transport,
+            costAccommodation: r.cost_accommodation,
+            costOthers: r.cost_others,
+            additionalCost: r.additional_cost,
+            justification: r.justification,
+            evidenceUrl: r.evidence_url
         });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -399,7 +568,8 @@ app.get('/api/meetings', async (req, res) => {
         const meetings = await query('SELECT * FROM meetings');
         const mapped = meetings.map(m => ({
             ...m,
-            guests: m.guests_json ? (typeof m.guests_json === 'string' ? JSON.parse(m.guests_json) : m.guests_json) : undefined
+            guests: m.guests_json ? (typeof m.guests_json === 'string' ? JSON.parse(m.guests_json) : m.guests_json) : undefined,
+            costReport: m.cost_report_json ? (typeof m.cost_report_json === 'string' ? JSON.parse(m.cost_report_json) : m.cost_report_json) : undefined
         }));
         res.json(mapped);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -413,8 +583,8 @@ app.post('/api/meetings', async (req, res) => {
         if (!guests.emails) guests.emails = [];
 
         const result = await query(
-            'INSERT INTO meetings (title, date, time, location, agenda, guests_json) VALUES (?, ?, ?, ?, ?, ?)',
-            [m.title, new Date(m.date), m.time, m.location, m.agenda, JSON.stringify(guests)]
+            'INSERT INTO meetings (title, date, time, location, agenda, guests_json, cost_report_json) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [m.title, new Date(m.date), m.time, m.location, m.agenda, JSON.stringify(guests), null]
         );
 
         const newMeeting = { ...m, id: result.insertId, guests };
@@ -424,6 +594,43 @@ app.post('/api/meetings', async (req, res) => {
         }
 
         res.json(newMeeting);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/meetings/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const m = req.body;
+
+        // Prepare guests JSON
+        let guests = m.guests || { status: 'Awaiting', count: 0, emails: [] };
+
+        // Prepare Cost Report JSON
+        let costReport = m.costReport || null;
+
+        await query(
+            'UPDATE meetings SET title = ?, date = ?, time = ?, location = ?, agenda = ?, guests_json = ?, cost_report_json = ? WHERE id = ?',
+            [
+                m.title,
+                new Date(m.date),
+                m.time,
+                m.location,
+                m.agenda,
+                JSON.stringify(guests),
+                costReport ? JSON.stringify(costReport) : null,
+                id
+            ]
+        );
+
+        const updated = await query('SELECT * FROM meetings WHERE id = ?', [id]);
+        const r = updated[0];
+
+        res.json({
+            ...r,
+            guests: r.guests_json ? (typeof r.guests_json === 'string' ? JSON.parse(r.guests_json) : r.guests_json) : undefined,
+            costReport: r.cost_report_json ? (typeof r.cost_report_json === 'string' ? JSON.parse(r.cost_report_json) : r.cost_report_json) : undefined
+        });
+
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -458,11 +665,15 @@ app.get('/api/courses', async (req, res) => {
 
         const combined = courses.map(c => ({
             ...c,
-            modules: modules.filter(m => m.course_id === c.id).map(m => ({
+            assessment: c.assessment_data ? (typeof c.assessment_data === 'string' ? JSON.parse(c.assessment_data) : c.assessment_data) : undefined,
+            modules: (modules || []).filter(m => m.course_id === c.id).map(m => ({
                 id: m.id,
                 title: m.title,
                 duration: m.duration,
-                locked: !!m.is_locked // convert 0/1 to boolean
+                locked: !!m.is_locked, // convert 0/1 to boolean
+                videoId: m.video_id,
+                videoType: m.video_type || 'youtube',
+                quiz: m.quiz_data ? (typeof m.quiz_data === 'string' ? JSON.parse(m.quiz_data) : m.quiz_data) : undefined
             }))
         }));
 
@@ -474,8 +685,8 @@ app.post('/api/courses', async (req, res) => {
     try {
         const c = req.body;
         const result = await query(
-            'INSERT INTO courses (title, category, description, duration) VALUES (?, ?, ?, ?)',
-            [c.title, c.category || 'General', c.description, c.duration || 0]
+            'INSERT INTO courses (title, category, description, duration, assessment_data) VALUES (?, ?, ?, ?, ?)',
+            [c.title, c.category || 'General', c.description, c.duration || 0, c.assessment ? JSON.stringify(c.assessment) : null]
         );
         const courseId = result.insertId;
 
@@ -483,15 +694,23 @@ app.post('/api/courses', async (req, res) => {
         if (c.modules && c.modules.length > 0) {
             for (const mod of c.modules) {
                 await query(
-                    'INSERT INTO course_modules (course_id, title, duration, video_id, video_type, is_locked) VALUES (?, ?, ?, ?, ?, ?)',
-                    [courseId, mod.title, mod.duration, mod.videoId || '', mod.videoType || 'youtube', mod.locked ? 1 : 0]
+                    'INSERT INTO course_modules (course_id, title, duration, video_id, video_type, is_locked, quiz_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [
+                        courseId,
+                        mod.title,
+                        mod.duration,
+                        mod.videoId || '',
+                        mod.videoType || 'youtube',
+                        mod.locked ? 1 : 0,
+                        mod.quiz ? JSON.stringify(mod.quiz) : null
+                    ]
                 );
             }
         }
 
         // Return full object
         const newCourse = await query('SELECT * FROM courses WHERE id=?', [courseId]);
-        // simplified return for now
+        // simplified return for now - frontend will likely refetch or use its own state
         res.json({ ...newCourse[0], modules: c.modules || [] });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -503,8 +722,8 @@ app.put('/api/courses/:id', async (req, res) => {
 
         // 1. Update Course details
         await query(
-            'UPDATE courses SET title = ?, category = ?, description = ?, duration = ? WHERE id = ?',
-            [c.title, c.category, c.description, c.duration, id]
+            'UPDATE courses SET title = ?, category = ?, description = ?, duration = ?, assessment_data = ? WHERE id = ?',
+            [c.title, c.category, c.description, c.duration, c.assessment ? JSON.stringify(c.assessment) : null, id]
         );
 
         // 2. Update Modules
@@ -515,8 +734,16 @@ app.put('/api/courses/:id', async (req, res) => {
         if (c.modules && c.modules.length > 0) {
             for (const mod of c.modules) {
                 await query(
-                    'INSERT INTO course_modules (course_id, title, duration, video_id, video_type, is_locked) VALUES (?, ?, ?, ?, ?, ?)',
-                    [id, mod.title, mod.duration, mod.videoId || '', mod.videoType || 'youtube', mod.locked ? 1 : 0]
+                    'INSERT INTO course_modules (course_id, title, duration, video_id, video_type, is_locked, quiz_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [
+                        id,
+                        mod.title,
+                        mod.duration,
+                        mod.videoId || '',
+                        mod.videoType || 'youtube',
+                        mod.locked ? 1 : 0,
+                        mod.quiz ? JSON.stringify(mod.quiz) : null
+                    ]
                 );
             }
         }
@@ -622,6 +849,90 @@ app.post('/api/progress/time', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- QUIZ & ASSESSMENT ---
+app.post('/api/quiz/submit', async (req, res) => {
+    try {
+        const { studentId, studentName, courseId, moduleId, score } = req.body;
+        const now = new Date();
+
+        // 1. Save Result
+        await query(
+            'INSERT INTO quiz_results (student_id, student_name, course_id, module_id, score, date) VALUES (?, ?, ?, ?, ?, ?)',
+            [studentId, studentName, courseId, moduleId, score, now]
+        );
+
+        // 2. If Passed (>= 80), mark module as complete
+        if (score >= 80 && moduleId) {
+            // Find progress
+            const rows = await query('SELECT * FROM progress WHERE user_id = ? AND course_id = ?', [studentId, courseId]);
+            let completedModuleIds = [];
+            let recordId = null;
+
+            if (rows.length > 0) {
+                recordId = rows[0].id;
+                completedModuleIds = typeof rows[0].completed_module_ids === 'string'
+                    ? JSON.parse(rows[0].completed_module_ids)
+                    : rows[0].completed_module_ids || [];
+            }
+
+            if (!completedModuleIds.includes(moduleId)) {
+                completedModuleIds.push(moduleId);
+                const jsonIds = JSON.stringify(completedModuleIds);
+                if (recordId) {
+                    await query('UPDATE progress SET completed_module_ids = ?, last_access = ? WHERE id = ?', [jsonIds, now, recordId]);
+                } else {
+                    await query('INSERT INTO progress (user_id, course_id, completed_module_ids, last_access) VALUES (?, ?, ?, ?)',
+                        [studentId, courseId, jsonIds, now]);
+                }
+            }
+        }
+
+        res.json({ success: true, score });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/quiz/results/:userId/:courseId', async (req, res) => {
+    try {
+        const { userId, courseId } = req.params;
+        const results = await query('SELECT * FROM quiz_results WHERE student_id = ? AND course_id = ?', [userId, courseId]);
+        const mapped = results.map(r => ({
+            id: r.id,
+            studentId: r.student_id,
+            studentName: r.student_name,
+            courseId: r.course_id,
+            moduleId: r.module_id,
+            score: r.score,
+            date: r.date
+        }));
+        res.json(mapped);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Admin Report Endpoint
+app.get('/api/admin/quiz-reports', async (req, res) => {
+    try {
+        const sql = `
+            SELECT 
+                qr.id,
+                qr.student_id,
+                COALESCE(u.name, qr.student_name) as student_name,
+                u.branch,
+                c.title as course_title,
+                cm.title as module_title,
+                qr.score,
+                qr.date,
+                qr.module_id
+            FROM quiz_results qr
+            LEFT JOIN users u ON qr.student_id = u.id
+            LEFT JOIN courses c ON qr.course_id = c.id
+            LEFT JOIN course_modules cm ON qr.module_id = cm.id
+            ORDER BY qr.date DESC
+        `;
+        const results = await query(sql);
+        res.json(results);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // --- INCENTIVES ---
 // --- INCENTIVES ---
 app.get('/api/incentives', async (req, res) => {
@@ -635,7 +946,9 @@ app.get('/api/incentives', async (req, res) => {
             evidenceUrl: i.evidence_url,
             startDate: i.start_date,
             endDate: i.end_date,
-            monthlyAmount: i.monthly_amount
+            monthlyAmount: i.monthly_amount,
+            paymentType: i.payment_type,
+            approvedDate: i.approved_date
         }));
         res.json(mapped);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -691,6 +1004,14 @@ app.put('/api/incentives/:id', async (req, res) => {
             sql += 'reward = ?, ';
             params.push(updates.reward);
         }
+        if (updates.paymentType) {
+            sql += 'payment_type = ?, ';
+            params.push(updates.paymentType);
+        }
+        if (updates.status === 'Active') {
+            sql += 'approved_date = ?, ';
+            params.push(new Date());
+        }
         // Remove trailing comma
         sql = sql.slice(0, -2);
         sql += ' WHERE id = ?';
@@ -709,7 +1030,10 @@ app.put('/api/incentives/:id', async (req, res) => {
             evidenceUrl: r.evidence_url,
             startDate: r.start_date,
             endDate: r.end_date,
-            monthlyAmount: r.monthly_amount
+            monthlyAmount: r.monthly_amount,
+            monthlyAmount: r.monthly_amount,
+            paymentType: r.payment_type,
+            approvedDate: r.approved_date
         });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -718,5 +1042,34 @@ app.put('/api/incentives/:id', async (req, res) => {
 if (fs.existsSync(DIST_DIR)) {
     app.get(/(.*)/, (req, res) => res.sendFile(path.join(DIST_DIR, 'index.html')));
 }
+
+// --- SETTLEMENT UPDATE ---
+app.put('/api/training/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { cost, costTraining, costTransport, costAccommodation, costOthers, additionalCost, settlementNote } = req.body;
+
+        await query(
+            'UPDATE training_requests SET cost = ?, cost_training = ?, cost_transport = ?, cost_accommodation = ?, cost_others = ?, additional_cost = ?, settlement_note = ? WHERE id = ?',
+            [cost, costTraining || 0, costTransport || 0, costAccommodation || 0, costOthers || 0, additionalCost || 0, settlementNote || '', id]
+        );
+
+        const updated = await query('SELECT * FROM training_requests WHERE id = ?', [id]);
+        const r = updated[0];
+
+        res.json({
+            ...r,
+            submittedAt: r.submitted_at,
+            employeeName: r.employee_name,
+            employeeRole: r.employee_role,
+            costTraining: r.cost_training,
+            costTransport: r.cost_transport,
+            costAccommodation: r.cost_accommodation,
+            costOthers: r.cost_others,
+            additionalCost: r.additional_cost,
+            settlementNote: r.settlement_note
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT} with MySQL`));

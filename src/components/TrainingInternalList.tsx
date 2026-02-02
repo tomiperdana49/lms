@@ -51,7 +51,10 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
 
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
+
     const [meetingToDelete, setMeetingToDelete] = useState<number | null>(null);
+    const [confirmMarkPaid, setConfirmMarkPaid] = useState<boolean>(false);
+
 
     // Reporting State
     const [isReportOpen, setIsReportOpen] = useState(false);
@@ -118,23 +121,34 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
             // Monthly
             const monthIdx = new Date(`${selectedPeriod} 1, ${year}`).getMonth();
             if (!isNaN(monthIdx)) {
-                start = new Date(year, monthIdx, 1);
-                end = new Date(year, monthIdx + 1, 0, 23, 59, 59);
+                // Period: 26th of previous month to 25th of current month
+                start = new Date(year, monthIdx - 1, 26);
+                end = new Date(year, monthIdx, 25, 23, 59, 59, 999);
             }
         }
         return [start, end];
     };
 
+    // List View State
+    const [listType, setListType] = useState<'active' | 'history'>('active');
+    const toggleView = (view: 'list' | 'recap') => setViewMode(view);
+
     // --- Filtered Data ---
     const filteredMeetings = meetings.filter(m => {
+
         // PERMISSION CHECK: Non-HR can ONLY see meetings they are invited to
         if (userRole !== 'HR' && userRole !== 'HR_ADMIN') {
             if (!userEmail) return false; // Guest without email sees nothing
             const invites = m.guests?.emails || [];
-            // Check if userEmail matches any invite (case-insensitive usually, but strict here)
-            // Also simpler check: email string match
             const isInvited = invites.some(email => email.toLowerCase() === userEmail.toLowerCase());
             if (!isInvited) return false;
+        }
+
+        // Active vs History Filter (Only applies to List View, Recap shows all valid for period)
+        if (viewMode === 'list') {
+            const isPaid = m.costReport?.isPaid;
+            if (listType === 'active' && isPaid) return false;
+            if (listType === 'history' && !isPaid) return false;
         }
 
         const d = new Date(m.date);
@@ -266,18 +280,46 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
         setReportingId(meeting.id);
         setReportData({
             trainerIncentive: meeting.costReport?.trainerIncentive || 0,
+            audienceFee: meeting.costReport?.audienceFee || 0,
             snackCost: meeting.costReport?.snackCost || 0,
             lunchCost: meeting.costReport?.lunchCost || 0,
             otherCost: meeting.costReport?.otherCost || 0,
             participantsCount: meeting.costReport?.participantsCount || meeting.guests?.count || 0,
-            isFinalized: true
+            attendees: meeting.costReport?.attendees || [],
+            isFinalized: true,
+            isPaid: meeting.costReport?.isPaid || false,
+            evidenceLink: meeting.costReport?.evidenceLink || ''
         });
         setIsReportOpen(true);
+    };
+
+    const toggleAttendee = (email: string) => {
+        const currentAttendees = reportData.attendees || [];
+        const newAttendees = currentAttendees.includes(email)
+            ? currentAttendees.filter(e => e !== email)
+            : [...currentAttendees, email];
+
+        setReportData({
+            ...reportData,
+            attendees: newAttendees,
+            participantsCount: newAttendees.length
+        });
     };
 
     const handleSaveReport = async (e: FormEvent) => {
         e.preventDefault();
         if (!reportingId) return;
+
+        // Validation
+        if ((reportData.participantsCount || 0) <= 0) {
+            setNotification({ show: true, type: 'error', message: 'Participants count must be at least 1.' });
+            return;
+        }
+
+        if (!reportData.evidenceLink || reportData.evidenceLink.trim() === '') {
+            setNotification({ show: true, type: 'error', message: 'Evidence Link is required.' });
+            return;
+        }
 
         // Optimistic update
         const updatedMeetings = meetings.map(m => m.id === reportingId ? { ...m, costReport: { ...reportData, isFinalized: true } } : m);
@@ -304,6 +346,27 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
 
     const handleSave = async (e: FormEvent) => {
         e.preventDefault();
+
+        // Validation
+        if (!formData.title || !formData.date || !formData.startTime || !formData.endTime || !formData.host || !formData.type) {
+            setNotification({ show: true, type: 'error', message: 'Please fill in all required fields (Title, Date, Time, Host, Type).' });
+            return;
+        }
+
+        if (formData.type === 'Offline' && !formData.location) {
+            setNotification({ show: true, type: 'error', message: 'Please specify a Location for offline meetings.' });
+            return;
+        }
+
+        // UX Fix: Auto-add email if user typed it but forgot to press Enter
+        let finalEmails = [...invitedEmails];
+        if (inviteEmail && inviteEmail.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail.trim())) {
+            const pendingEmail = inviteEmail.trim();
+            if (!finalEmails.includes(pendingEmail)) {
+                finalEmails.push(pendingEmail);
+            }
+        }
+
         const dateObj = new Date(formData.date);
         const meetingData = {
             title: formData.title,
@@ -316,8 +379,8 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
             description: formData.description,
             guests: {
                 status: 'Awaiting',
-                count: invitedEmails.length,
-                emails: invitedEmails
+                count: finalEmails.length,
+                emails: finalEmails
             },
             meetLink: formData.meetLink
         };
@@ -430,8 +493,14 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                 totalParticipants += pCount;
 
                 if (m.costReport) {
-                    totalCost += (m.costReport.trainerIncentive + m.costReport.snackCost + m.costReport.lunchCost + m.costReport.otherCost);
-                    totalTrainerIncentive += m.costReport.trainerIncentive;
+                    totalCost += (
+                        (m.costReport.trainerIncentive || 0) +
+                        (m.costReport.snackCost || 0) +
+                        (m.costReport.lunchCost || 0) +
+                        (m.costReport.otherCost || 0) +
+                        ((m.costReport.audienceFee || 0) * (m.costReport.participantsCount || 0))
+                    );
+                    totalTrainerIncentive += m.costReport.trainerIncentive || 0;
                 }
             });
 
@@ -476,32 +545,47 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                     <p className="text-slate-500 mt-1">Manage sharing sessions, townhalls, and internal training.</p>
                 </div>
                 <div className="flex gap-3">
-                    <div className="bg-slate-50 p-1 rounded-xl border border-slate-200 flex">
-                        <button
-                            onClick={() => setViewMode('list')}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'list' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            List View
-                        </button>
-                        {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                    <div className="flex items-center gap-2">
+                        <div className="flex bg-slate-100 p-1 rounded-lg mr-2">
                             <button
-                                onClick={() => setViewMode('recap')}
-                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'recap' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}
+                                onClick={() => setListType('active')}
+                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${listType === 'active' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             >
-                                Recapitulation
+                                Active
                             </button>
-                        )}
-                    </div>
+                            <button
+                                onClick={() => setListType('history')}
+                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${listType === 'history' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                History (Paid)
+                            </button>
+                        </div>
 
-                    {viewMode === 'list' && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
-                        <button
-                            onClick={() => { setIsEditing(false); resetForm(); setIsCreateOpen(true); }}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/20 flex items-center gap-2 transition-all"
-                        >
-                            <Plus size={18} /> New Session
-                        </button>
-                    )}
+                        <div className="flex bg-slate-100 p-1 rounded-lg">
+                            <button
+                                onClick={() => toggleView('list')}
+                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                List View
+                            </button>
+                            <button
+                                onClick={() => toggleView('recap')}
+                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'recap' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Recap
+                            </button>
+                        </div>
+                    </div>
                 </div>
+
+                {viewMode === 'list' && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                    <button
+                        onClick={() => { setIsEditing(false); resetForm(); setIsCreateOpen(true); }}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/20 flex items-center gap-2 transition-all"
+                    >
+                        <Plus size={18} /> New Session
+                    </button>
+                )}
             </div>
 
             {/* Global Filter Bar */}
@@ -876,7 +960,7 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
             {/* Financial Report Modal */}
             {
                 isReportOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
                             <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
                                 <div>
@@ -887,51 +971,170 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                             </div>
                             <div className="p-6 space-y-5 overflow-y-auto">
                                 <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Attendance Checklist</label>
+                                    <div className={`bg-slate-50 rounded-xl border border-slate-200 p-3 max-h-[150px] overflow-y-auto space-y-2 ${reportData.isPaid ? 'opacity-60 pointer-events-none' : ''}`}>
+                                        {(meetings.find(m => m.id === reportingId)?.guests?.emails || []).length === 0 ? (
+                                            <p className="text-xs text-slate-400 italic text-center py-2">No invited guests found.</p>
+                                        ) : (
+                                            (meetings.find(m => m.id === reportingId)?.guests?.emails || []).map(email => (
+                                                <label key={email} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-100 cursor-pointer hover:border-blue-200 transition-colors">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                                                        checked={(reportData.attendees || []).includes(email)}
+                                                        onChange={() => toggleAttendee(email)}
+                                                    />
+                                                    <span className="text-sm text-slate-700 font-medium truncate">{email}</span>
+                                                </label>
+                                            ))
+                                        )}
+                                    </div>
+                                    <div className="flex justify-between items-center mt-2 px-1">
+                                        <span className="text-xs text-slate-400">Checked: {(reportData.attendees || []).length} / {meetings.find(m => m.id === reportingId)?.guests?.emails?.length || 0}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const allEmails = meetings.find(m => m.id === reportingId)?.guests?.emails || [];
+                                                setReportData({ ...reportData, attendees: allEmails, participantsCount: allEmails.length });
+                                            }}
+                                            className="text-[10px] font-bold text-blue-600 hover:underline"
+                                        >
+                                            Select All
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Actual Participants</label>
                                     <input
                                         type="number"
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed outline-none font-bold"
                                         value={reportData.participantsCount}
-                                        onChange={e => setReportData({ ...reportData, participantsCount: Number(e.target.value) })}
+                                        readOnly
                                     />
                                 </div>
+
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Trainer Incentive (IDR)</label>
-                                    <input
-                                        type="number"
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                                        value={reportData.trainerIncentive}
-                                        onChange={e => setReportData({ ...reportData, trainerIncentive: Number(e.target.value) })}
-                                    />
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 flex items-center gap-1">
+                                        Evidence Link <span className="text-slate-400 font-normal normal-case">(Drive / Materials)</span>
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-2.5 text-slate-400"><FileText size={18} /></span>
+                                        <input
+                                            type="text"
+                                            placeholder="https://drive.google.com/..."
+                                            className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-700 disabled:bg-slate-50 disabled:text-slate-500"
+                                            value={reportData.evidenceLink || ''}
+                                            onChange={e => setReportData({ ...reportData, evidenceLink: e.target.value })}
+                                            disabled={reportData.isPaid}
+                                        />
+                                        {reportData.evidenceLink && (
+                                            <a
+                                                href={reportData.evidenceLink}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="absolute right-3 top-2.5 text-blue-600 hover:text-blue-800"
+                                                title="Open Link"
+                                            >
+                                                <ArrowRight size={18} />
+                                            </a>
+                                        )}
+                                    </div>
                                 </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Trainer Incentive</label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-2.5 text-slate-500 font-bold">Rp</span>
+                                            <input
+                                                type="text"
+                                                className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-700"
+                                                value={(reportData.trainerIncentive || 0).toLocaleString('id-ID')}
+                                                onChange={e => {
+                                                    const val = parseInt(e.target.value.replace(/\./g, '')) || 0;
+                                                    setReportData({ ...reportData, trainerIncentive: val });
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Audience Fee (Per Person)</label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-2.5 text-slate-500 font-bold">Rp</span>
+                                            <input
+                                                type="text"
+                                                className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-700"
+                                                value={(reportData.audienceFee || 0).toLocaleString('id-ID')}
+                                                onChange={e => {
+                                                    const val = parseInt(e.target.value.replace(/\./g, '')) || 0;
+                                                    setReportData({ ...reportData, audienceFee: val });
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div className="grid grid-cols-3 gap-3">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Snack Cost</label>
-                                        <input
-                                            type="number"
-                                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                                            value={reportData.snackCost}
-                                            onChange={e => setReportData({ ...reportData, snackCost: Number(e.target.value) })}
-                                        />
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-2.5 text-xs text-slate-500 font-bold">Rp</span>
+                                            <input
+                                                type="text"
+                                                className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-700 text-sm"
+                                                value={(reportData.snackCost || 0).toLocaleString('id-ID')}
+                                                onChange={e => {
+                                                    const val = parseInt(e.target.value.replace(/\./g, '')) || 0;
+                                                    setReportData({ ...reportData, snackCost: val });
+                                                }}
+                                            />
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Lunch Cost</label>
-                                        <input
-                                            type="number"
-                                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                                            value={reportData.lunchCost}
-                                            onChange={e => setReportData({ ...reportData, lunchCost: Number(e.target.value) })}
-                                        />
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-2.5 text-xs text-slate-500 font-bold">Rp</span>
+                                            <input
+                                                type="text"
+                                                className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-700 text-sm"
+                                                value={(reportData.lunchCost || 0).toLocaleString('id-ID')}
+                                                onChange={e => {
+                                                    const val = parseInt(e.target.value.replace(/\./g, '')) || 0;
+                                                    setReportData({ ...reportData, lunchCost: val });
+                                                }}
+                                            />
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Other Cost</label>
-                                        <input
-                                            type="number"
-                                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                                            value={reportData.otherCost}
-                                            onChange={e => setReportData({ ...reportData, otherCost: Number(e.target.value) })}
-                                        />
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-2.5 text-xs text-slate-500 font-bold">Rp</span>
+                                            <input
+                                                type="text"
+                                                className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-700 text-sm"
+                                                value={(reportData.otherCost || 0).toLocaleString('id-ID')}
+                                                onChange={e => {
+                                                    const val = parseInt(e.target.value.replace(/\./g, '')) || 0;
+                                                    setReportData({ ...reportData, otherCost: val });
+                                                }}
+                                            />
+                                        </div>
                                     </div>
+                                </div>
+                            </div >
+                            <div className="mt-4 p-4 bg-slate-100 rounded-xl border border-slate-200">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm font-bold text-slate-600 uppercase">Total Estimated Cost</span>
+                                    <span className="text-xl font-bold text-indigo-600">
+                                        {formatCurrency(
+                                            (reportData.trainerIncentive || 0) +
+                                            (reportData.snackCost || 0) +
+                                            (reportData.lunchCost || 0) +
+                                            (reportData.otherCost || 0) +
+                                            ((reportData.audienceFee || 0) * reportData.participantsCount)
+                                        )}
+                                    </span>
                                 </div>
                             </div>
                             <div className="p-5 border-t border-slate-100 bg-slate-50 flex gap-3">
@@ -943,15 +1146,59 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                 </button>
                                 <button
                                     onClick={handleSaveReport}
-                                    className="flex-[2] py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all"
+                                    disabled={reportData.isPaid}
+                                    className={`flex-[2] py-3 text-white font-bold rounded-xl shadow-lg transition-all ${reportData.isPaid ? 'bg-slate-400 cursor-not-allowed shadow-none' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20'}`}
                                 >
-                                    Save Report
+                                    {reportData.isPaid ? 'Report Locked (Paid)' : 'Save Report'}
                                 </button>
+
+                                {!reportData.isPaid && (
+                                    <button
+                                        onClick={(e) => { e.preventDefault(); setConfirmMarkPaid(true); }}
+                                        className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <DollarSign size={18} /> Mark Paid
+                                    </button>
+                                )}
                             </div>
-                        </div>
-                    </div>
+                        </div >
+                    </div >
                 )
             }
+
+            {/* Confirm Paid Modal */}
+            <ConfirmationModal
+                isOpen={confirmMarkPaid}
+                onClose={() => setConfirmMarkPaid(false)}
+                onConfirm={async () => {
+                    const updatedData = { ...reportData, isFinalized: true, isPaid: true };
+
+                    // Optimistic update
+                    const updatedMeetings = meetings.map(m => m.id === reportingId ? { ...m, costReport: updatedData } : m);
+                    setMeetings(updatedMeetings);
+                    setIsReportOpen(false);
+                    setNotification({ show: true, type: 'success', message: 'Report marked as PAID and locked.' });
+
+                    // Persist
+                    try {
+                        const m = meetings.find(x => x.id === reportingId);
+                        if (m) {
+                            const body = { ...m, costReport: updatedData };
+                            await fetch(`${API_BASE_URL}/api/meetings/${reportingId}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(body)
+                            });
+                        }
+                    } catch (err) {
+                        console.error(err);
+                    }
+                }}
+                title="Confirm Payment"
+                message="Are you sure you want to mark this as PAID? This will lock the report and costs cannot be changed anymore."
+                confirmText="Yes, Mark Paid"
+                variant="success"
+            />
 
             {/* Recap Detail Modal */}
             {
@@ -979,6 +1226,7 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                             <th className="px-4 py-3 text-right">Trainer Inc.</th>
                                             <th className="px-4 py-3 text-right">Total Cost</th>
                                             <th className="px-4 py-3 text-center">Status</th>
+                                            <th className="px-4 py-3 text-center">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -1001,16 +1249,34 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                                     {formatCurrency(m.costReport?.trainerIncentive || 0)}
                                                 </td>
                                                 <td className="px-4 py-3 text-right font-mono text-slate-700">
-                                                    {formatCurrency((m.costReport?.trainerIncentive || 0) + (m.costReport?.snackCost || 0) + (m.costReport?.lunchCost || 0) + (m.costReport?.otherCost || 0))}
+                                                    {formatCurrency(
+                                                        (m.costReport?.trainerIncentive || 0) +
+                                                        (m.costReport?.snackCost || 0) +
+                                                        (m.costReport?.lunchCost || 0) +
+                                                        (m.costReport?.otherCost || 0) +
+                                                        ((m.costReport?.audienceFee || 0) * (m.costReport?.participantsCount || 0))
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
-                                                    {m.costReport?.isFinalized ? (
-                                                        <div className="flex items-center justify-center gap-1 text-green-600 font-bold text-xs uppercase">
+                                                    {m.costReport?.isPaid ? (
+                                                        <div className="flex items-center justify-center gap-1 text-emerald-700 font-black text-xs uppercase bg-emerald-100 px-2 py-1 rounded-full">
+                                                            <CheckCircle size={14} /> PAID
+                                                        </div>
+                                                    ) : m.costReport?.isFinalized ? (
+                                                        <div className="flex items-center justify-center gap-1 text-blue-600 font-bold text-xs uppercase">
                                                             <CheckCircle size={14} /> Reported
                                                         </div>
                                                     ) : (
                                                         <span className="text-orange-500 font-bold text-xs uppercase">Pending</span>
                                                     )}
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <button
+                                                        onClick={() => openReportModal(m)}
+                                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline"
+                                                    >
+                                                        View Details
+                                                    </button>
                                                 </td>
                                             </tr>
                                         ))}
