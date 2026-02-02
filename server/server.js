@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
-import { query } from './db.js';
+import pool, { initDB } from './db.js';
 import nodemailer from 'nodemailer';
 
 const __filename = fileURLToPath(import.meta.url);
