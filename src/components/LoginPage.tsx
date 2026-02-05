@@ -11,7 +11,7 @@ interface LoginPageProps {
 }
 
 const LoginPage = ({ onLogin }: LoginPageProps) => {
-    const [email, setEmail] = useState('');
+    const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -27,13 +27,16 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
         setIsLoading(true);
 
         try {
+            console.log("Attempting login with:", { identifier, password }); // DEBUG
             const response = await fetch(`${API_BASE_URL}/api/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify({ identifier, password })
             });
 
+            console.log("Response status:", response.status); // DEBUG
             const data = await response.json();
+            console.log("Response data:", data); // DEBUG
 
             if (data.success) {
                 setNotification({
@@ -49,15 +52,16 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                 setNotification({
                     show: true,
                     type: 'error',
-                    message: data.message || 'Login failed. Please check your credentials.'
+                    message: `Login Failed: ${data.message} (Status: ${response.status})`
                 });
                 setIsLoading(false);
             }
-        } catch {
+        } catch (err) {
+            console.error("Login Error:", err);
             setNotification({
                 show: true,
                 type: 'error',
-                message: 'Unable to connect to server. Please check your internet connection.'
+                message: `Connection Error: ${err instanceof Error ? err.message : 'Unknown error'}`
             });
             setIsLoading(false);
         }
@@ -117,15 +121,15 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                 <div className="p-8">
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Email / Employee ID</label>
                             <div className="relative">
                                 <Mail className="absolute left-3 top-3 text-slate-400" size={18} />
                                 <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
+                                    type="text"
+                                    value={identifier}
+                                    onChange={(e) => setIdentifier(e.target.value)}
                                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                                    placeholder="yourname@nusa.com"
+                                    placeholder="Email or Employee ID..."
                                     required
                                 />
                             </div>

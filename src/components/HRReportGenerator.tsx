@@ -9,15 +9,16 @@ const HRReportGenerator = () => {
     const [meetings, setMeetings] = useState<Meeting[]>([]);
     const [incentives, setIncentives] = useState<Incentive[]>([]);
     const [logs, setLogs] = useState<ReadingLogEntry[]>([]);
+    const [employees, setEmployees] = useState<any[]>([]);
 
     // Filter State
     const [year, setYear] = useState<number>(new Date().getFullYear());
     const [selectedBranch, setSelectedBranch] = useState<string>('All');
+    const [branchesList, setBranchesList] = useState<string[]>([]);
 
     // Detail Modal State
     const [detailMonth, setDetailMonth] = useState<string | null>(null);
 
-    const branchesList = ["Medan-HO", "Medan-Cabang", "Jakarta", "Bali", "Binjai", "Tanjung Morawa"];
     const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
     const [refreshing, setRefreshing] = useState(false);
@@ -25,17 +26,19 @@ const HRReportGenerator = () => {
     const fetchData = async () => {
         setRefreshing(true);
         try {
-            const [reqRes, meetRes, incRes, logsRes] = await Promise.all([
+            const [reqRes, meetRes, incRes, logsRes, empRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/api/training`),
                 fetch(`${API_BASE_URL}/api/meetings`),
                 fetch(`${API_BASE_URL}/api/incentives`),
-                fetch(`${API_BASE_URL}/api/logs`)
+                fetch(`${API_BASE_URL}/api/logs`),
+                fetch(`${API_BASE_URL}/api/employees`)
             ]);
 
             if (reqRes.ok) setRequests(await reqRes.json());
             if (meetRes.ok) setMeetings(await meetRes.json());
             if (incRes.ok) setIncentives(await incRes.json());
             if (logsRes.ok) setLogs(await logsRes.json());
+            if (empRes.ok) setEmployees(await empRes.json());
         } catch (err) {
             console.error("Failed to fetch report data", err);
         } finally {
@@ -43,8 +46,21 @@ const HRReportGenerator = () => {
         }
     };
 
+    const fetchBranches = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/branches`);
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    setBranchesList(data.map((b: any) => b.name));
+                }
+            }
+        } catch (err) { console.error(err); }
+    };
+
     useEffect(() => {
         fetchData();
+        fetchBranches();
     }, []);
 
     const formatCurrency = (amount: number) => {
@@ -52,7 +68,7 @@ const HRReportGenerator = () => {
     };
 
     // Helper to safety parse numbers
-    const safeNum = (val: any) => {
+    const safeNum = (val: string | number | undefined | null) => {
         if (typeof val === 'number') return val;
         if (!val) return 0;
 
@@ -70,9 +86,9 @@ const HRReportGenerator = () => {
 
     // Aggregation Logic
     // Helper for Incentive Period (26th Prev Month - 25th Curr Month)
-    const getPeriodRange = (year: number, monthIdx: number) => {
-        const start = new Date(year, monthIdx - 1, 26);
-        const end = new Date(year, monthIdx, 25, 23, 59, 59, 999);
+    const getPeriodRange = (yearIdx: number, monthIdx: number) => {
+        const start = new Date(yearIdx, monthIdx - 1, 26);
+        const end = new Date(yearIdx, monthIdx, 25, 23, 59, 59, 999);
         return { start, end };
     };
 
@@ -123,23 +139,21 @@ const HRReportGenerator = () => {
         });
 
         // 4. Certificate Incentive (Incentives)
-        // Status: Active (Committed), Paid (Actual), Pending (Potential - OPTIONAL, usually HR only cares about Approved)
-        // We will track Active and Paid.
         incentives.filter(i => ['Active', 'Paid'].includes(i.status)).forEach(i => {
+            if (selectedBranch !== 'All') {
+                const emp = employees.find(e => e.id_employee === i.employee_id);
+                if (emp?.branch_name !== selectedBranch) return;
+            }
             const isOneTime = i.paymentType === 'One-Time';
             const iStart = new Date(i.startDate);
             const iEnd = new Date(i.endDate);
             const dateToUse = i.approvedDate ? new Date(i.approvedDate) : iStart;
 
             if (isOneTime) {
-                // One-Time: Count in the month of Approval/Payment
-                // Check if the relevant date falls in this month's range
                 if (isInPeriod(dateToUse.toISOString(), range)) {
                     certIncentive += safeNum(i.reward);
                 }
             } else {
-                // Recurring: Count if period overlaps with active duration
-                // (Start of Period <= End of Incentive) AND (End of Period >= Start of Incentive)
                 if (range.start <= iEnd && range.end >= iStart) {
                     certIncentive += safeNum(i.reward);
                 }
@@ -175,7 +189,6 @@ const HRReportGenerator = () => {
         meetings.forEach(m => {
             if (selectedBranch !== 'All' && m.location !== selectedBranch) return;
             if (m.costReport && isInPeriod(m.date, range)) {
-                // Safe sum using helper
                 const total = safeNum(m.costReport.trainerIncentive) +
                     safeNum(m.costReport.snackCost) +
                     safeNum(m.costReport.lunchCost) +
@@ -236,6 +249,10 @@ const HRReportGenerator = () => {
 
         // Incentives
         incentives.filter(i => ['Active', 'Paid'].includes(i.status)).forEach(i => {
+            if (selectedBranch !== 'All') {
+                const emp = employees.find(e => e.id_employee === i.employee_id);
+                if (emp?.branch_name !== selectedBranch) return;
+            }
             const isOneTime = i.paymentType === 'One-Time';
             const iStart = new Date(i.startDate);
             const iEnd = new Date(i.endDate);
@@ -251,7 +268,7 @@ const HRReportGenerator = () => {
 
             if (shouldInclude) {
                 txs.push({
-                    date: isOneTime ? dateToUse.toISOString() : range.end.toISOString(), // For recurring, log it at end of period
+                    date: isOneTime ? dateToUse.toISOString() : range.end.toISOString(),
                     category: `Cert. Incentive (${isOneTime ? 'One-Time' : 'Recurring'})`,
                     item: i.courseName,
                     pic: i.employeeName,
@@ -264,12 +281,34 @@ const HRReportGenerator = () => {
         return txs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     };
 
+    const handleExport = () => {
+        const headers = ["Month", "Internal Training", "Reading Incentives", "External Training", "Cert. Incentives", "Grand Total"];
+        const rows = monthlyData.map(row => [
+            row.month,
+            row.internalTraining,
+            row.readingIncentive,
+            row.externalTraining,
+            row.certIncentive,
+            row.total
+        ]);
+
+        const csvContent = "data:text/csv;charset=utf-8,"
+            + headers.join(",") + "\n"
+            + rows.map(r => r.join(",")).join("\n");
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `L&D_Report_${year}_${selectedBranch}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const details = detailMonth !== null ? getDetailTransactions(months.indexOf(detailMonth)) : [];
 
     return (
         <div className="p-6 bg-slate-50 min-h-screen font-sans animate-fade-in relative">
-
-            {/* Header */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -302,13 +341,15 @@ const HRReportGenerator = () => {
                         <option value="All">All Branches</option>
                         {branchesList.map(b => <option key={b} value={b}>{b}</option>)}
                     </select>
-                    <button className="flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors shadow-lg shadow-green-200">
+                    <button
+                        onClick={handleExport}
+                        className="flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors shadow-lg shadow-green-200"
+                    >
                         <Download size={18} /> Export CSV
                     </button>
                 </div>
             </div>
 
-            {/* Main Monthly Summary Table */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <table className="w-full text-left">
                     <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
@@ -335,14 +376,15 @@ const HRReportGenerator = () => {
                                     <button
                                         onClick={() => setDetailMonth(row.month)}
                                         className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                        title="View Details"
                                     >
                                         <Eye size={18} />
                                     </button>
                                 </td>
                             </tr>
                         ))}
-                        <tr className="bg-slate-100 font-bold border-t border-slate-300">
+                    </tbody>
+                    <tfoot className="bg-slate-100 font-bold border-t border-slate-300">
+                        <tr>
                             <td className="p-4">TOTAL YEAR</td>
                             <td className="p-4 text-right">{formatCurrency(monthlyData.reduce((a, b) => a + b.internalTraining, 0))}</td>
                             <td className="p-4 text-right">{formatCurrency(monthlyData.reduce((a, b) => a + b.readingIncentive, 0))}</td>
@@ -351,20 +393,18 @@ const HRReportGenerator = () => {
                             <td className="p-4 text-right text-lg border-l border-slate-300 bg-slate-200">{formatCurrency(monthlyData.reduce((a, b) => a + b.total, 0))}</td>
                             <td></td>
                         </tr>
-                    </tbody>
+                    </tfoot>
                 </table>
             </div>
 
-            {/* Detail Modal */}
             {detailMonth && (
                 <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in backdrop-blur-sm">
                     <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                             <div>
                                 <h2 className="text-xl font-bold text-slate-800">Transaction Details - {detailMonth} {year}</h2>
-                                <p className="text-sm text-slate-500">Breakdown of all expenses for this period.</p>
                             </div>
-                            <button onClick={() => setDetailMonth(null)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
+                            <button onClick={() => setDetailMonth(null)} className="p-2 text-slate-400 hover:text-red-500 rounded-full transition-colors">
                                 <XCircle size={24} />
                             </button>
                         </div>
@@ -377,14 +417,14 @@ const HRReportGenerator = () => {
                             ) : (
                                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                                     <table className="w-full text-left">
-                                        <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 font-bold border-b border-slate-100">
+                                        <thead className="bg-slate-50 text-xs uppercase text-slate-500 font-bold border-b border-slate-100">
                                             <tr>
                                                 <th className="p-4">Date</th>
                                                 <th className="p-4">Category</th>
-                                                <th className="p-4">Activity / Item</th>
+                                                <th className="p-4">Item</th>
                                                 <th className="p-4">PIC</th>
-                                                <th className="p-4 w-1/3">Cost Breakdown</th>
-                                                <th className="p-4 text-right">Total Amount</th>
+                                                <th className="p-4">Details</th>
+                                                <th className="p-4 text-right">Amount</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 text-sm">
@@ -401,14 +441,14 @@ const HRReportGenerator = () => {
                                                     </td>
                                                     <td className="p-4 font-semibold text-slate-700">{tx.item}</td>
                                                     <td className="p-4 text-slate-600">{tx.pic || '-'}</td>
-                                                    <td className="p-4 text-slate-500 italic text-xs leading-relaxed">{tx.details}</td>
+                                                    <td className="p-4 text-slate-500 italic text-xs">{tx.details}</td>
                                                     <td className="p-4 text-right font-bold text-slate-800">{formatCurrency(tx.amount)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                         <tfoot className="bg-slate-50 font-bold border-t border-slate-200 text-right">
                                             <tr>
-                                                <td colSpan={5} className="p-4 text-slate-600">TOTAL {detailMonth.toUpperCase()}</td>
+                                                <td colSpan={5} className="p-4 text-slate-600">TOTAL</td>
                                                 <td className="p-4 text-slate-900 text-base">{formatCurrency(details.reduce((a, b) => a + b.amount, 0))}</td>
                                             </tr>
                                         </tfoot>
@@ -416,9 +456,8 @@ const HRReportGenerator = () => {
                                 </div>
                             )}
                         </div>
-
                         <div className="p-4 border-t border-slate-100 bg-white text-right">
-                            <button onClick={() => setDetailMonth(null)} className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-900 transition-colors">Close Details</button>
+                            <button onClick={() => setDetailMonth(null)} className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-900 transition-colors">Close</button>
                         </div>
                     </div>
                 </div>

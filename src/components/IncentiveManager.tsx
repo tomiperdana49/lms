@@ -1,5 +1,5 @@
 import React, { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
-import { Award, Plus, CheckCircle, XCircle, Clock, History, Image as ImageIcon, BarChart2 } from 'lucide-react';
+import { Award, Plus, CheckCircle, XCircle, Clock, History, Image as ImageIcon, BarChart2, Trash2 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { User, Incentive } from '../types';
 import PopupNotification from './PopupNotification';
@@ -61,6 +61,9 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
 
     // Accordion State for Active List
     const [expandedEmployees, setExpandedEmployees] = useState<string[]>([]);
+    const [branches, setBranches] = useState<string[]>(['All Branches']);
+    const [employees, setEmployees] = useState<any[]>([]);
+    const [selectedBranchSummary, setSelectedBranchSummary] = useState('All Branches');
 
     const toggleEmployee = (name: string) => {
         setExpandedEmployees(prev =>
@@ -85,6 +88,33 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
     const openConfirm = (title: string, message: string, onConfirm: () => void) => {
         setConfirmConfig({ isOpen: true, title, message, onConfirm });
     };
+
+    const fetchBranches = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/branches`);
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    setBranches(['All Branches', ...data.map((b: any) => b.name)]);
+                }
+            }
+        } catch (err) { console.error(err); }
+    };
+
+    const fetchEmployees = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/employees`);
+            if (res.ok) {
+                const data = await res.json();
+                setEmployees(data);
+            }
+        } catch (err) { console.error(err); }
+    };
+
+    useEffect(() => {
+        fetchBranches();
+        fetchEmployees();
+    }, []);
     // --- Summary Logic State (Moved to top level to avoid hook errors) ---
     const [summaryYear, setSummaryYear] = useState(new Date().getFullYear());
 
@@ -153,8 +183,9 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
     // HR Actions
     const openApprovalModal = (inc: Incentive) => {
         setApprovalModal({ isOpen: true, id: inc.id, incentive: inc });
-        setApprovalReward(''); // Reset
-        setApprovalPaymentType(null); // Default to empty
+        // Pre-fill if editing existing active incentive, else empty
+        setApprovalReward(inc.reward ? String(inc.reward) : '');
+        setApprovalPaymentType(inc.paymentType || null);
     };
 
     const confirmApproval = async () => {
@@ -178,11 +209,19 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                 const updated = await res.json();
                 setIncentives(incentives.map(i => i.id === approvalModal.id ? updated : i));
                 setApprovalModal({ isOpen: false, id: null, incentive: null });
+                setNotification({ show: true, type: 'success', message: "Incentive updated successfully." });
             }
         } catch (err) {
             console.error(err);
+            setNotification({ show: true, type: 'error', message: "Error updating incentive." });
         }
     };
+
+    // ... DENY/CANCEL/PAID logic unchanged ...
+
+    // ... in RENDER ...
+    // Active List Actions: Add Edit Button
+    // ... (removed misplaced code)
 
     const denyRequest = (id: number) => {
         openConfirm('Deny Request', 'Are you sure you want to deny this request?', async () => {
@@ -196,25 +235,42 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                 if (res.ok) {
                     const updated = await res.json();
                     setIncentives(incentives.map(i => i.id === id ? updated : i));
+                    setNotification({ show: true, type: 'success', message: 'Incentive request denied.' });
+                } else {
+                    setNotification({ show: true, type: 'error', message: 'Failed to deny request.' });
                 }
-            } catch (err) { console.error(err); }
+            } catch (err) {
+                console.error(err);
+                setNotification({ show: true, type: 'error', message: 'Error denying request.' });
+            }
         });
     };
 
     const markCanceled = (id: number) => {
-        openConfirm('Cancel Incentive', 'Are you sure you want to cancel this incentive?', async () => {
+        openConfirm('Cancel Incentive', 'Are you sure you want to cancel this incentive? This will stop future payments but preserve history.', async () => {
             try {
+                // Set End Date to NOW to "terminate" it effectively from today
+                const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
                 const res = await fetch(`${API_BASE_URL}/api/incentives/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: 'Canceled' })
+                    body: JSON.stringify({
+                        status: 'Canceled',
+                        endDate: today
+                    })
                 });
 
                 if (res.ok) {
                     const updated = await res.json();
                     setIncentives(incentives.map(i => i.id === id ? updated : i));
+                    setNotification({ show: true, type: 'success', message: 'Incentive canceled.' });
+                } else {
+                    setNotification({ show: true, type: 'error', message: 'Failed to cancel incentive.' });
                 }
-            } catch (err) { console.error(err); }
+            } catch (err) {
+                console.error(err);
+                setNotification({ show: true, type: 'error', message: 'Error canceling incentive.' });
+            }
         });
     };
 
@@ -230,8 +286,31 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                 if (res.ok) {
                     const updated = await res.json();
                     setIncentives(incentives.map(i => i.id === id ? updated : i));
+                    setNotification({ show: true, type: 'success', message: 'Incentive marked as PAID.' });
+                } else {
+                    setNotification({ show: true, type: 'error', message: 'Failed to mark as paid.' });
                 }
-            } catch (err) { console.error(err); }
+            } catch (err) {
+                console.error(err);
+                setNotification({ show: true, type: 'error', message: 'Error updating payment status.' });
+            }
+        });
+    };
+
+    const handleDeleteIncentive = (id: number) => {
+        openConfirm('Delete Incentive', 'Are you sure you want to permanently delete this incentive record? This action cannot be undone.', async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/incentives/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    setIncentives(incentives.filter(i => i.id !== id));
+                    setNotification({ show: true, type: 'success', message: 'Incentive record deleted.' });
+                } else {
+                    setNotification({ show: true, type: 'error', message: 'Failed to delete incentive.' });
+                }
+            } catch (err) {
+                console.error(err);
+                setNotification({ show: true, type: 'error', message: 'Error deleting record.' });
+            }
         });
     };
 
@@ -253,6 +332,7 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
             const newIncentive = {
                 ...formData,
                 employeeName: user?.name || 'Unknown',
+                employee_id: user?.employee_id || null,
                 status: 'Pending',
                 reward: '', // Defined by HR later
                 monthlyAmount: 0
@@ -280,42 +360,11 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
 
     // --- filtering ---
     // --- filtering ---
-    const getOneTimePaymentDate = (dateStr: string) => {
-        const d = new Date(dateStr);
-        // Period cut-off: 25th. If submitted/approved after 25th, it belongs to NEXT month's period
-        // But the PAYMENT DATE (when it's "done") is effectively the 25th of the payment month.
-        // Example: Jan 20 -> Paid in Jan (Period ends Jan 25). Expired after Jan 25.
-        // Example: Jan 27 -> Paid in Feb (Period ends Feb 25). Expired after Feb 25.
-
-        // Let's set the "Expiry Date" for One-Time as the 26th of the Payment Month (start of next period).
-        // If current date >= 26th of Payment Month, it is HISTORY.
-
-        let paymentMonth = d.getMonth();
-        let paymentYear = d.getFullYear();
-
-        if (d.getDate() > 25) {
-            paymentMonth += 1;
-            if (paymentMonth > 11) {
-                paymentMonth = 0;
-                paymentYear += 1;
-            }
-        }
-
-        // history cut-off: End of the Payment Month (e.g. 31st 23:59)
-        // User request: "tgl 31 pukul 23.59"
-        // new Date(y, m+1, 0) gives last day of month m.
-        return new Date(paymentYear, paymentMonth + 1, 0, 23, 59, 59);
-    };
-
-    const isOneTimeHistory = (inc: Incentive) => {
-        if (inc.paymentType !== 'One-Time') return false; // Recurring follows status
-        // Use approvedDate if available, otherwise startDate (legacy)
-        const dateToUse = inc.approvedDate || inc.startDate;
-        const cutOff = getOneTimePaymentDate(dateToUse);
-        return new Date() >= cutOff;
-    };
-
-    const myIncentives = incentives.filter(i => i.employeeName === user?.name);
+    const myIncentives = incentives.filter(i => {
+        const matchesId = user?.employee_id && i.employee_id === user.employee_id;
+        const matchesName = user?.name && i.employeeName === user.name;
+        return matchesId || matchesName;
+    });
     const pendingVerification = incentives.filter(i => i.status === 'Pending');
 
     // Active: Status 'Active'
@@ -342,9 +391,15 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
     // State moved to top level
 
 
-    // Helper to parse currency string "Rp 100.000" -> 100000
+    // Helper to parse currency string
     const parseReward = (rewardStr: string) => {
         if (!rewardStr) return 0;
+        // Check for standard decimal format (e.g. "250000.00" from DB)
+        // Only use parseFloat if it looks like a clean number (digits and optional dot)
+        if (/^\d+(\.\d+)?$/.test(rewardStr)) {
+            return parseFloat(rewardStr);
+        }
+        // Fallback for formatted strings (e.g. "Rp 250.000")
         return parseInt(rewardStr.replace(/[^0-9]/g, '')) || 0;
     };
 
@@ -356,8 +411,9 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
 
         const tree: Record<string, Record<string, Record<string, Incentive[]>>> = {};
 
-        // Filter for active/paid incentives
-        const actives = incentives.filter(i => ['Active', 'Paid'].includes(i.status));
+        // Filter for active/paid/pending incentives
+        // Canceled items excluded to avoid phantom budget projections (no cancellation_date available).
+        const actives = incentives.filter(i => ['Active', 'Paid', 'Pending'].includes(i.status));
 
         const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -391,16 +447,24 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                 }
 
                 if (shouldInclude) {
+                    const emp = employees.find(e =>
+                        (inc.employee_id && e.id_employee === inc.employee_id) ||
+                        (inc.employeeName && e.full_name && e.full_name.trim().toLowerCase() === inc.employeeName.trim().toLowerCase())
+                    );
+                    const branch = emp?.branch_name || 'Others';
+
+                    if (selectedBranchSummary !== 'All Branches' && branch !== selectedBranchSummary) return;
+
                     if (!tree[month]) tree[month] = {};
 
-                    const branch = 'General';
                     // Safe access to employeeName
-                    const user = inc.employeeName || 'Unknown';
+                    const empName = inc.employeeName || 'Unknown';
+                    const empId = inc.employee_id || empName;
 
                     if (!tree[month][branch]) tree[month][branch] = {};
-                    if (!tree[month][branch][user]) tree[month][branch][user] = [];
+                    if (!tree[month][branch][empId]) tree[month][branch][empId] = [];
 
-                    tree[month][branch][user].push(inc);
+                    tree[month][branch][empId].push(inc);
                 }
             });
         });
@@ -496,15 +560,29 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
             {/* Content Table */}
             {activeTab === 'summary' ? (
                 <div className="space-y-8 animate-in slide-in-from-right-4">
-                    <div className="flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                        <span className="font-bold text-slate-600">Year:</span>
-                        <select
-                            value={summaryYear}
-                            onChange={(e) => setSummaryYear(parseInt(e.target.value))}
-                            className="px-4 py-2 rounded-lg border border-slate-300 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500"
-                        >
-                            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-                        </select>
+                    <div className="flex flex-wrap items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-600">Year:</span>
+                            <select
+                                value={summaryYear}
+                                onChange={(e) => setSummaryYear(parseInt(e.target.value))}
+                                className="px-4 py-2 rounded-lg border border-slate-300 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500"
+                            >
+                                {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                            </select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-600">Branch:</span>
+                            <select
+                                value={selectedBranchSummary}
+                                onChange={(e) => setSelectedBranchSummary(e.target.value)}
+                                className="px-4 py-2 rounded-lg border border-slate-300 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                            >
+                                {branches.map(b => (
+                                    <option key={b} value={b}>{b}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     {activeMonths.map(month => (
@@ -517,7 +595,7 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                                     <thead className="bg-slate-50 text-slate-500 font-semibold uppercase text-xs">
                                         <tr>
                                             <th className="px-4 py-2 w-1/4">Employee Name</th>
-                                            <th className="px-4 py-2 w-24 text-center">Active Certs</th>
+                                            <th className="px-4 py-2 w-24 text-center">Total Certs</th>
                                             <th className="px-4 py-2">Details</th>
                                             <th className="px-4 py-2 text-right">Total Payout</th>
                                         </tr>
@@ -530,8 +608,8 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                                                 return (
                                                     <tr key={`${branch}-${idx}`} className="hover:bg-slate-50">
                                                         <td className="px-4 py-3 font-bold text-slate-700">
-                                                            <div>{employee}</div>
-                                                            <div className="text-[10px] uppercase font-bold text-slate-400">{branch}</div>
+                                                            <div>{incs[0].employeeName || employee}</div>
+                                                            <div className="text-[10px] uppercase font-bold text-slate-400">{branch} (ID: {employee})</div>
                                                         </td>
                                                         <td className="px-4 py-3 text-center">
                                                             <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-full text-xs font-bold">
@@ -586,24 +664,24 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 bg-white">
-                            {(
-                                activeTab === 'active' ? (
-                                    // Grouped View for Active List
-                                    (function () {
-                                        // Group by Employee
-                                        const grouped: Record<string, Incentive[]> = {};
-                                        activeIncentives.forEach(inc => {
-                                            const name = inc.employeeName || 'Unknown';
-                                            if (!grouped[name]) grouped[name] = [];
-                                            grouped[name].push(inc);
-                                        });
+                            {activeTab === 'active' ? (
+                                (function () {
+                                    const grouped: Record<string, Incentive[]> = {};
+                                    activeIncentives.forEach(inc => {
+                                        // Group by name for visual consistency since IDs might be missing
+                                        const key = inc.employeeName || inc.employee_id || 'Unknown';
+                                        if (!grouped[key]) grouped[key] = [];
+                                        grouped[key].push(inc);
+                                    });
 
-                                        return Object.entries(grouped).map(([employeeName, employeeIncentives]) => (
-                                            <React.Fragment key={employeeName}>
-                                                {/* Group Header Row */}
+                                    return Object.entries(grouped).map(([employeeKey, employeeIncentives]) => {
+                                        const employeeName = employeeIncentives[0].employeeName || 'Unknown';
+                                        const employeeId = employeeIncentives[0].employee_id;
+                                        return (
+                                            <React.Fragment key={employeeKey}>
                                                 <tr
                                                     className="bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors border-b border-slate-200"
-                                                    onClick={() => toggleEmployee(employeeName)}
+                                                    onClick={() => toggleEmployee(employeeKey)}
                                                 >
                                                     <td colSpan={isHR ? 9 : 8} className="px-6 py-4">
                                                         <div className="flex items-center justify-between">
@@ -612,11 +690,11 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                                                                     {employeeName.charAt(0)}
                                                                 </div>
                                                                 <div>
-                                                                    <span className="font-bold text-slate-700 text-sm block">{employeeName}</span>
+                                                                    <span className="font-bold text-slate-700 text-sm block">{employeeName} {employeeId ? `(${employeeId})` : ''}</span>
                                                                     <span className="text-xs text-slate-500 font-medium">{employeeIncentives.length} Active Certificate(s)</span>
                                                                 </div>
                                                             </div>
-                                                            <div className={`text-slate-400 transform transition-transform duration-300 ${expandedEmployees.includes(employeeName) ? 'rotate-180' : ''}`}>
+                                                            <div className={`text-slate-400 transform transition-transform duration-300 ${expandedEmployees.includes(employeeKey) ? 'rotate-180' : ''}`}>
                                                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                                     <polyline points="6 9 12 15 18 9"></polyline>
                                                                 </svg>
@@ -625,17 +703,12 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                                                     </td>
                                                 </tr>
 
-                                                {/* Expanded Rows */}
-                                                {expandedEmployees.includes(employeeName) && employeeIncentives.map(inc => (
-                                                    <tr key={inc.id} className="bg-white border-b border-slate-100 hover:bg-blue-50/50 transition-colors animate-in slide-in-from-top-2 fade-in duration-200">
+                                                {expandedEmployees.includes(employeeKey) && employeeIncentives.map(inc => (
+                                                    <tr key={inc.id} className="bg-white border-b border-slate-100 hover:bg-blue-50/50 transition-colors">
                                                         <td className="px-6 py-4 pl-16 font-bold text-slate-700 opacity-50 text-xs">↳</td>
                                                         <td className="px-6 py-4 text-sm text-slate-600 font-medium">{inc.courseName}</td>
-                                                        <td className="px-6 py-4 text-xs text-slate-500 font-medium">
-                                                            {new Date(inc.startDate).toLocaleDateString()}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-xs text-slate-500 font-medium">
-                                                            {new Date(inc.endDate).toLocaleDateString()}
-                                                        </td>
+                                                        <td className="px-6 py-4 text-xs text-slate-500 font-medium">{new Date(inc.startDate).toLocaleDateString()}</td>
+                                                        <td className="px-6 py-4 text-xs text-slate-500 font-medium">{new Date(inc.endDate).toLocaleDateString()}</td>
                                                         <td className="px-6 py-4 text-sm text-slate-600">
                                                             <div className="flex flex-col gap-1">
                                                                 <span className="italic text-slate-500">"{inc.description || '-'}"</span>
@@ -658,16 +731,26 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                                                         </td>
                                                         <td className="px-6 py-4">
                                                             {(() => {
+                                                                if (inc.status === 'Paid') {
+                                                                    const dateToUse = inc.approvedDate || inc.startDate;
+                                                                    const d = new Date(dateToUse);
+                                                                    if (d.getDate() > 25) d.setMonth(d.getMonth() + 1);
+                                                                    const periodLabel = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+                                                                    return (
+                                                                        <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-bold w-fit flex items-center gap-1">
+                                                                            <CheckCircle size={12} /> Paid in {periodLabel}
+                                                                        </span>
+                                                                    );
+                                                                }
                                                                 if (inc.status === 'Active') {
                                                                     if (inc.paymentType === 'One-Time') {
                                                                         const dateToUse = inc.approvedDate || inc.startDate;
                                                                         const d = new Date(dateToUse);
                                                                         if (d.getDate() > 25) d.setMonth(d.getMonth() + 1);
                                                                         const periodLabel = d.toLocaleString('default', { month: 'long', year: 'numeric' });
-                                                                        const isHistory = isOneTimeHistory(inc);
                                                                         return (
-                                                                            <span className={`px-2 py-1 rounded text-xs font-bold w-fit flex items-center gap-1 ${isHistory ? 'bg-slate-200 text-slate-500' : 'bg-purple-100 text-purple-700'}`}>
-                                                                                <Clock size={12} /> Paid in {periodLabel}
+                                                                            <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-bold w-fit flex items-center gap-1">
+                                                                                <Clock size={12} /> Pending Payout ({periodLabel})
                                                                             </span>
                                                                         );
                                                                     }
@@ -680,43 +763,35 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                                                             <td className="px-6 py-4 text-right">
                                                                 <div className="flex items-center justify-end gap-2">
                                                                     {inc.paymentType === 'One-Time' && (
-                                                                        <button
-                                                                            onClick={(e) => { e.stopPropagation(); markAsPaid(inc.id); }}
-                                                                            className="px-3 py-1 bg-teal-500 text-white rounded-lg text-xs font-bold hover:bg-teal-600 shadow-sm flex items-center gap-1"
-                                                                            title="Mark as Paid"
-                                                                        >
+                                                                        <button onClick={(e) => { e.stopPropagation(); markAsPaid(inc.id); }} className="px-3 py-1 bg-teal-500 text-white rounded-lg text-xs font-bold hover:bg-teal-600 shadow-sm flex items-center gap-1">
                                                                             <CheckCircle size={14} /> Mark Paid
                                                                         </button>
                                                                     )}
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); markCanceled(inc.id); }}
-                                                                        className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200"
-                                                                    >
-                                                                        Cancel
-                                                                    </button>
+                                                                    <button onClick={(e) => { e.stopPropagation(); openApprovalModal(inc); }} className="px-3 py-1 bg-amber-100 text-amber-700 rounded-lg text-xs font-bold hover:bg-amber-200">Edit</button>
+                                                                    <button onClick={(e) => { e.stopPropagation(); markCanceled(inc.id); }} className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200">Cancel</button>
+                                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteIncentive(inc.id); }} className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title="Delete Permanent"><Trash2 size={16} /></button>
                                                                 </div>
                                                             </td>
                                                         )}
                                                     </tr>
                                                 ))}
                                             </React.Fragment>
-                                        ));
-                                    })()
-
-                                ) : (
+                                        );
+                                    });
+                                })()
+                            ) : (
+                                (
                                     activeTab === 'pending' ? pendingVerification :
                                         activeTab === 'history' ? historyIncentives :
                                             activeTab === 'request' ? myIncentives : []
                                 ).map(inc => (
                                     <tr key={inc.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4 font-bold text-slate-700">{inc.employeeName}</td>
+                                        <td className="px-6 py-4 font-bold text-slate-700">
+                                            {inc.employeeName} {inc.employee_id ? `(${inc.employee_id})` : ''}
+                                        </td>
                                         <td className="px-6 py-4 text-sm text-slate-600">{inc.courseName}</td>
-                                        <td className="px-6 py-4 text-xs text-slate-500 font-medium">
-                                            {new Date(inc.startDate).toLocaleDateString()}
-                                        </td>
-                                        <td className="px-6 py-4 text-xs text-slate-500 font-medium">
-                                            {new Date(inc.endDate).toLocaleDateString()}
-                                        </td>
+                                        <td className="px-6 py-4 text-xs text-slate-500 font-medium">{new Date(inc.startDate).toLocaleDateString()}</td>
+                                        <td className="px-6 py-4 text-xs text-slate-500 font-medium">{new Date(inc.endDate).toLocaleDateString()}</td>
                                         <td className="px-6 py-4 text-sm text-slate-600">
                                             <div className="flex flex-col gap-1">
                                                 <span className="italic">"{inc.description || '-'}"</span>
@@ -741,14 +816,19 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                                         </td>
                                         <td className="px-6 py-4">
                                             {(() => {
-                                                if (inc.status === 'Pending') {
-                                                    return <span className="bg-blue-50 text-blue-600 border border-blue-100 px-2 py-1 rounded text-xs font-bold w-fit">Processing by HR</span>;
-                                                }
-                                                if (inc.status === 'Expired') {
-                                                    return <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold w-fit">Expired</span>;
-                                                }
-                                                if (inc.status === 'Canceled') {
-                                                    return <span className="bg-slate-100 text-slate-500 px-2 py-1 rounded text-xs font-bold w-fit">Canceled</span>;
+                                                if (inc.status === 'Pending') return <span className="bg-blue-50 text-blue-600 border border-blue-100 px-2 py-1 rounded text-xs font-bold w-fit">Processing</span>;
+                                                if (inc.status === 'Expired') return <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold w-fit">Expired</span>;
+                                                if (inc.status === 'Canceled') return <span className="bg-slate-100 text-slate-500 px-2 py-1 rounded text-xs font-bold w-fit">Canceled</span>;
+                                                if (inc.status === 'Paid') {
+                                                    const dateToUse = inc.approvedDate || inc.startDate;
+                                                    const d = new Date(dateToUse);
+                                                    if (d.getDate() > 25) d.setMonth(d.getMonth() + 1);
+                                                    const periodLabel = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+                                                    return (
+                                                        <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-bold w-fit flex items-center gap-1">
+                                                            <CheckCircle size={12} /> Paid in {periodLabel}
+                                                        </span>
+                                                    );
                                                 }
                                                 if (inc.status === 'Active') {
                                                     if (inc.paymentType === 'One-Time') {
@@ -756,10 +836,9 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                                                         const d = new Date(dateToUse);
                                                         if (d.getDate() > 25) d.setMonth(d.getMonth() + 1);
                                                         const periodLabel = d.toLocaleString('default', { month: 'long', year: 'numeric' });
-                                                        const isHistory = isOneTimeHistory(inc);
                                                         return (
-                                                            <span className={`px-2 py-1 rounded text-xs font-bold w-fit flex items-center gap-1 ${isHistory ? 'bg-slate-200 text-slate-500' : 'bg-purple-100 text-purple-700'}`}>
-                                                                <Clock size={12} /> Paid in {periodLabel}
+                                                            <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-bold w-fit flex items-center gap-1">
+                                                                <Clock size={12} /> Pending Payout ({periodLabel})
                                                             </span>
                                                         );
                                                     }
@@ -773,27 +852,17 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                                                 <div className="flex justify-end gap-2">
                                                     {inc.status === 'Pending' && (
                                                         <>
-                                                            <button
-                                                                onClick={() => openApprovalModal(inc)}
-                                                                className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-bold hover:bg-green-600 shadow-lg shadow-green-500/20"
-                                                            >
-                                                                Approve
-                                                            </button>
-                                                            <button
-                                                                onClick={() => denyRequest(inc.id)}
-                                                                className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title="Deny"
-                                                            >
-                                                                <XCircle size={18} />
-                                                            </button>
+                                                            <button onClick={() => openApprovalModal(inc)} className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-bold hover:bg-green-600 shadow-lg shadow-green-500/20">Approve</button>
+                                                            <button onClick={() => denyRequest(inc.id)} className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title="Deny"><XCircle size={18} /></button>
+                                                            <button onClick={() => handleDeleteIncentive(inc.id)} className="p-1.5 bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200" title="Delete"><Trash2 size={18} /></button>
                                                         </>
                                                     )}
                                                     {inc.status === 'Active' && (
-                                                        <button
-                                                            onClick={() => markCanceled(inc.id)}
-                                                            className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200"
-                                                        >
-                                                            Cancel Incentive
-                                                        </button>
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <button onClick={(e) => { e.stopPropagation(); openApprovalModal(inc); }} className="px-3 py-1 bg-amber-100 text-amber-700 rounded-lg text-xs font-bold hover:bg-amber-200">Edit</button>
+                                                            <button onClick={(e) => { e.stopPropagation(); markCanceled(inc.id); }} className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200">Cancel</button>
+                                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteIncentive(inc.id); }} className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title="Delete Permanent"><Trash2 size={16} /></button>
+                                                        </div>
                                                     )}
                                                 </div>
                                             </td>
@@ -860,8 +929,14 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95">
                         <div className="p-6 bg-slate-50 border-b border-slate-100">
-                            <h2 className="font-bold text-lg text-slate-800">Approve Incentive</h2>
-                            <p className="text-xs text-slate-500">Set the monthly reward for {approvalModal.incentive?.employeeName}</p>
+                            <h2 className="font-bold text-lg text-slate-800">
+                                {approvalModal.incentive?.status === 'Active' ? 'Update Incentive' : 'Approve Incentive'}
+                            </h2>
+                            <p className="text-xs text-slate-500">
+                                {approvalModal.incentive?.status === 'Active'
+                                    ? `Modify details for ${approvalModal.incentive?.employeeName}`
+                                    : `Set the monthly reward for ${approvalModal.incentive?.employeeName}`}
+                            </p>
                         </div>
                         <div className="p-6 space-y-4">
                             <div>
@@ -911,7 +986,7 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                                         }`}
                                     disabled={!approvalReward || !approvalPaymentType}
                                 >
-                                    Confirm
+                                    {approvalModal.incentive?.status === 'Active' ? 'Update' : 'Confirm'}
                                 </button>
                             </div>
                         </div>

@@ -57,10 +57,14 @@ CREATE TABLE IF NOT EXISTS meetings (
     title VARCHAR(255) NOT NULL,
     date DATE NOT NULL,
     time VARCHAR(50),
+    host VARCHAR(255),
     location VARCHAR(255),
+    type VARCHAR(50) DEFAULT 'Offline',
+    meetLink VARCHAR(255),
     agenda TEXT,
     guests_json JSON,
-    cost_report_json JSON
+    cost_report_json JSON,
+    employee_id VARCHAR(50)
 );
 
 CREATE TABLE IF NOT EXISTS courses (
@@ -68,7 +72,8 @@ CREATE TABLE IF NOT EXISTS courses (
     title VARCHAR(255) NOT NULL,
     category VARCHAR(255),
     description TEXT,
-    duration INT
+    duration VARCHAR(50),
+    assessment_data JSON
 );
 
 CREATE TABLE IF NOT EXISTS course_modules (
@@ -76,7 +81,10 @@ CREATE TABLE IF NOT EXISTS course_modules (
     course_id INT,
     title VARCHAR(255),
     duration VARCHAR(50),
+    video_id VARCHAR(255),
+    video_type VARCHAR(50) DEFAULT 'youtube',
     is_locked BOOLEAN DEFAULT TRUE,
+    quiz_data JSON,
     FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
 );
 

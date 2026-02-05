@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
-import type { ReadingLogEntry, User } from '../types';
+import type { ReadingLogEntry, User, Employee } from '../types';
 
 interface AdminReadingLogProps {
     onBack: () => void;
@@ -14,6 +14,7 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
     const [filterYear, setFilterYear] = useState(new Date().getFullYear());
     const [filterPeriod, setFilterPeriod] = useState('all');
     const [selectedBranch, setSelectedBranch] = useState('All Branches');
+    const [branches, setBranches] = useState<string[]>(['All Branches']);
 
     // View Mode State
     const [viewMode, setViewMode] = useState<'verification' | 'recap'>('recap');
@@ -58,7 +59,17 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
         }))
     ];
 
-    const branches = ['All Branches', 'Jakarta', 'Surabaya', 'Semarang', 'Manado', 'Medan', 'Bandung', 'Jogja', 'Bali', 'Binjai', 'Tanjung Morawa'];
+    const fetchBranches = () => {
+        fetch(`${API_BASE_URL}/api/branches`)
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data)) {
+                    const names = ['All Branches', ...data.map((b: any) => b.name)];
+                    setBranches(names);
+                }
+            })
+            .catch(err => console.error(err));
+    };
 
     const fetchLogs = () => {
         fetch(`${API_BASE_URL}/api/logs`)
@@ -71,14 +82,22 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
     };
 
     const fetchUsers = () => {
-        fetch(`${API_BASE_URL}/api/users`)
-            .then(res => {
-                if (!res.ok) throw new Error("Failed to fetch users");
-                return res.json();
-            })
+        // Fetch from employees to get a more complete list (SimAsset)
+        fetch(`${API_BASE_URL}/api/employees`)
+            .then(res => res.json())
             .then(data => {
-                if (Array.isArray(data)) setUsers(data);
-                else setUsers([]);
+                if (Array.isArray(data)) {
+                    // Map Employee to User structure for compatibility
+                    const mapped: User[] = data.map((emp: Employee) => ({
+                        id: emp.id_employee,
+                        employee_id: emp.id_employee,
+                        name: emp.full_name,
+                        email: emp.email,
+                        branch: emp.branch_name,
+                        role: emp.job_position?.includes('HR') ? 'HR' : (emp.job_position?.includes('Supervisor') ? 'SUPERVISOR' : 'STAFF')
+                    }));
+                    setUsers(mapped);
+                }
             })
             .catch(err => console.error(err));
     };
@@ -86,6 +105,7 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
     useEffect(() => {
         fetchLogs();
         fetchUsers();
+        fetchBranches();
     }, []);
 
     // --- Actions ---
@@ -155,7 +175,9 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
             formData: {
                 title: log.title,
                 date: log.date,
-                link: log.link,
+                startDate: log.startDate,
+                finishDate: log.finishDate,
+                link: log.link || log.review,
                 evidenceUrl: log.evidenceUrl,
                 category: log.category
                 // Add other fields if needed
@@ -178,6 +200,21 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                 setEditLogModal({ open: false, log: null, formData: {} });
             }
         } catch (err) { console.error(err); }
+    };
+
+    const handleDeleteLog = async (id: number) => {
+        if (!window.confirm('Are you sure you want to delete this reading log entry?')) return;
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/logs/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                setAllLogs(allLogs.filter(log => log.id !== id));
+            } else {
+                alert('Failed to delete reading log');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Error deleting reading log');
+        }
     };
 
     const handleEditClick = (user: User) => {
@@ -214,17 +251,19 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
     const getUserStats = (user: User) => {
         const [start, end] = getPeriodDates();
 
-        // Filter logs for this user in the selected period AND branch
+        // Filter logs for this user in the selected period
         const userLogs = allLogs.filter(l => {
-            // Match user by name (ideal would be ID but keeping consistent with current data)
-            if (l.userName !== user.name) return false;
+            // Match user by ID (primary) or Name (fallback)
+            if (user.employee_id && l.employee_id && l.employee_id === user.employee_id) {
+                // Match
+            } else if (l.userName && user.name && l.userName.trim().toLowerCase() === user.name.trim().toLowerCase()) {
+                // Match
+            } else {
+                return false;
+            }
+
             // Only finished logs count towards stats
             if (l.status !== 'Finished') return false;
-
-            // Branch Filter
-            if (selectedBranch !== 'All Branches') {
-                if (!l.location || !l.location.toLowerCase().includes(selectedBranch.toLowerCase())) return false;
-            }
 
             const dateToCheck = l.status === 'Finished' && l.finishDate ? l.finishDate : l.date;
             const logDate = new Date(dateToCheck);
@@ -245,18 +284,25 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
     };
 
     // Filter Users for Recap Table
-    const filteredUsers = users.filter(user =>
-        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredUsers = users.filter(user => {
+        const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            user.email.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesBranch = selectedBranch === 'All Branches' || user.branch === selectedBranch;
+        return matchesSearch && matchesBranch;
+    });
 
     const verificationLogs = allLogs
         .filter(l => l.status === 'Finished')
         .filter(l => {
-            // Branch Filter
-            if (selectedBranch !== 'All Branches') {
-                if (!l.location || !l.location.toLowerCase().includes(selectedBranch.toLowerCase())) return false;
-            }
+            // Branch Filter (Employee Database Mapping)
+            // Need to match log to an employee to get their branch
+            const emp = users.find(u =>
+                (l.employee_id && u.employee_id === l.employee_id) ||
+                (l.userName && u.name && l.userName.trim().toLowerCase() === u.name.trim().toLowerCase())
+            );
+            const empBranch = emp?.branch || 'Others';
+
+            if (selectedBranch !== 'All Branches' && empBranch !== selectedBranch) return false;
 
             // Period & Year Filter
             // Use finishDate for Finished logs to match Incentive Period
@@ -375,7 +421,7 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                     const remaining = 5 - stats.verifiedCount;
 
                                     return (
-                                        <tr key={user.name} className="hover:bg-slate-50 transition-colors group">
+                                        <tr key={user.employee_id || user.email} className="hover:bg-slate-50 transition-colors group">
                                             <td className="px-6 py-4">
                                                 <div>
                                                     <p className="font-bold text-slate-800">{user.name}</p>
@@ -455,8 +501,9 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                             <thead className="bg-slate-50 text-slate-500 font-semibold uppercase text-xs">
                                 <tr>
                                     <th className="px-6 py-4">Employee</th>
-                                    <th className="px-6 py-4">Book Title</th>
-                                    <th className="px-6 py-4">Date Finished</th>
+                                    <th className="px-6 py-4">Book Title / Source</th>
+                                    <th className="px-6 py-4">Start Date</th>
+                                    <th className="px-6 py-4">Finish Date</th>
                                     <th className="px-6 py-4">Evidence & Links</th>
                                     <th className="px-6 py-4">Status</th>
                                     <th className="px-6 py-4 text-center">Action</th>
@@ -473,12 +520,23 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="flex flex-col">
+                                                <div className="flex flex-col gap-1">
                                                     <span className="font-semibold text-slate-800 text-sm">{log.title}</span>
                                                     <span className="text-xs text-slate-500">{log.category}</span>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit ${log.source === 'Buku Pribadi'
+                                                        ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                                                        : 'bg-blue-100 text-blue-700 border border-blue-200'
+                                                        }`}>
+                                                        {log.source === 'Buku Pribadi' ? 'Pribadi' : 'Office'}
+                                                    </span>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-sm text-slate-600">{new Date(log.date).toLocaleDateString()}</td>
+                                            <td className="px-6 py-4 text-sm text-slate-600">
+                                                {log.startDate ? new Date(log.startDate).toLocaleDateString() : '-'}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-slate-600">
+                                                {log.finishDate ? new Date(log.finishDate).toLocaleDateString() : new Date(log.date).toLocaleDateString()}
+                                            </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex flex-col gap-1">
                                                     {log.evidenceUrl ? (
@@ -487,8 +545,8 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                                         </a>
                                                     ) : <span className="text-slate-400 text-xs italic">No photo</span>}
 
-                                                    {log.link ? (
-                                                        <a href={log.link} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-green-600 hover:underline text-xs font-bold">
+                                                    {log.link || log.review ? (
+                                                        <a href={log.link || log.review} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-green-600 hover:underline text-xs font-bold">
                                                             <ExternalLink size={14} /> Goodreads / Review
                                                         </a>
                                                     ) : <span className="text-slate-400 text-xs italic">No link</span>}
@@ -529,6 +587,13 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                                             title="Reject"
                                                         >
                                                             <XCircle size={18} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteLog(log.id)}
+                                                            className="p-2 bg-slate-100 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-slate-200"
+                                                            title="Delete Permanently"
+                                                        >
+                                                            <Trash2 size={18} />
                                                         </button>
                                                     </div>
                                                 ) : (
@@ -594,8 +659,8 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                                             </a>
                                                         ) : <span className="text-slate-300 text-xs">-</span>}
 
-                                                        {log.link ? (
-                                                            <a href={log.link} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-green-600 hover:underline text-xs font-bold">
+                                                        {log.link || log.review ? (
+                                                            <a href={log.link || log.review} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-green-600 hover:underline text-xs font-bold">
                                                                 <ExternalLink size={14} /> Review
                                                             </a>
                                                         ) : <span className="text-slate-300 text-xs">-</span>}
@@ -741,11 +806,20 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Date</label>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Date Finished</label>
                                     <input
                                         type="date"
-                                        value={editLogModal.formData.date ? new Date(editLogModal.formData.date).toISOString().split('T')[0] : ''}
-                                        onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, date: e.target.value } }))}
+                                        value={editLogModal.formData.finishDate ? new Date(editLogModal.formData.finishDate).toISOString().split('T')[0] : (editLogModal.formData.date ? new Date(editLogModal.formData.date).toISOString().split('T')[0] : '')}
+                                        onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, finishDate: e.target.value, date: e.target.value } }))}
+                                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Start Date</label>
+                                    <input
+                                        type="date"
+                                        value={editLogModal.formData.startDate ? new Date(editLogModal.formData.startDate).toISOString().split('T')[0] : ''}
+                                        onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, startDate: e.target.value } }))}
                                         className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                                     />
                                 </div>

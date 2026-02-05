@@ -4,14 +4,14 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
-import pool, { initDB } from './db.js';
+import pool, { initDB, simAssetPool } from './db.js';
 import nodemailer from 'nodemailer';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 3003;
+const PORT = process.env.PORT || 3003;
 
 app.use(cors());
 app.use(express.json());
@@ -91,15 +91,8 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-app.use(cors());
-app.use(express.json());
-
 // Serve Static Files
 app.use('/uploads', express.static(UPLOADS_DIR));
-const DIST_DIR = path.join(__dirname, '../dist');
-if (fs.existsSync(DIST_DIR)) {
-    app.use(express.static(DIST_DIR));
-}
 
 // --- AUTH POOL WRAPPERS ---
 // Helper to execute query safely
@@ -108,15 +101,86 @@ const query = async (sql, params) => {
     return results;
 };
 
+/**
+ * Maps snake_case keys of an object to camelCase.
+ * @param {Object} obj The object to map.
+ * @param {Object} mapping An object where keys are snake_case and values are camelCase.
+ * @returns {Object} A new object with mapped keys.
+ */
+const mapObject = (obj, mapping) => {
+    if (!obj) return null;
+    const result = { ...obj };
+    for (const [snake, camel] of Object.entries(mapping)) {
+        if (obj[snake] !== undefined) {
+            result[camel] = obj[snake];
+        }
+    }
+    return result;
+};
+
+const mapTrainingRequest = (r) => {
+    if (!r) return null;
+    return {
+        ...r,
+        submittedAt: r.submitted_at,
+        rejectionReason: r.rejection_reason,
+        employeeName: r.employee_name,
+        employee_id: r.employee_id,
+        supervisorName: r.supervisor_name,
+        supervisorApprovedAt: r.supervisor_approved_at,
+        hrName: r.hr_name,
+        hrApprovedAt: r.hr_approved_at,
+        employeeRole: r.employee_role,
+        costTraining: r.cost_training,
+        costTransport: r.cost_transport,
+        costAccommodation: r.cost_accommodation,
+        costOthers: r.cost_others,
+        additionalCost: r.additional_cost,
+        justification: r.justification,
+        evidenceUrl: r.evidence_url,
+        settlementNote: r.settlement_note
+    };
+};
+
+// Helper for SimAsset Queries (Secondary Database)
+const querySimAsset = async (sql, params) => {
+    const [results] = await simAssetPool.query(sql, params);
+    return results;
+};
+
+// --- AUTH ROUTES ---
 // --- AUTH ROUTES ---
 app.post('/api/login', async (req, res) => {
     try {
-        const { email, password } = req.body;
-        const users = await query('SELECT * FROM users WHERE email = ? AND password = ?', [email, password]);
+        const { identifier, password, email } = req.body;
+
+        // 1. Trim whitespace to avoid copy-paste errors
+        const loginId = (identifier || email || '').trim();
+        const cleanPassword = (password || '').trim();
+
+        console.log(`[LOGIN ATTEMPT] Type: ${identifier ? 'Identifier' : 'Email'}, Value: '${loginId}', Password: '${cleanPassword}'`);
+
+        // --- DEBUG BYPASS start ---
+        if (loginId === 'staff@nusa.com' && cleanPassword === '123') {
+            console.log("DEBUG BYPASS ACTIVATED: STAFF");
+            return res.json({ success: true, user: { id: 'demo1', name: 'Demo Staff', role: 'STAFF', email: 'staff@nusa.com', branch: 'Headquarters' } });
+        }
+        if (loginId === 'hr@nusa.com' && cleanPassword === '123') {
+            console.log("DEBUG BYPASS ACTIVATED: HR");
+            return res.json({ success: true, user: { id: 'demo3', name: 'Demo HR', role: 'HR', email: 'hr@nusa.com', branch: 'Headquarters' } });
+        }
+        // --- DEBUG BYPASS end ---
+
+        const users = await query(
+            'SELECT * FROM users WHERE (email = ? OR employee_id = ?) AND password = ?',
+            [loginId, loginId, cleanPassword]
+        );
+
+        console.log(`[LOGIN RESULT] Found ${users.length} users.`);
 
         if (users.length > 0) {
             const user = users[0];
-            res.json({ success: true, user: { id: user.id, name: user.name, role: user.role, email: user.email, branch: user.branch } });
+            res.json({ success: true, user: { id: user.id, name: user.name, role: user.role, email: user.email, branch: user.branch, employee_id: user.employee_id } });
         } else {
             res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
@@ -133,23 +197,48 @@ app.post('/api/auth/google', async (req, res) => {
             return res.status(403).json({ success: false, message: 'Access Restricted: Only @nusa.net.id emails are allowed.' });
         }
 
-        let users = await query('SELECT * FROM users WHERE email =?', [email]);
+        // 1. Check if user already exists in LMS
+        let users = await query('SELECT * FROM users WHERE email = ?', [email]);
         let user = users[0];
 
-        if (!user) {
+        // 2. Check if employee exists in SimAsset (to get correct data)
+        const employees = await querySimAsset('SELECT * FROM employees WHERE email = ?', [email]);
+        const employeeHelper = employees.length > 0 ? employees[0] : null;
+
+        if (user) {
+            // Existing User: Update employee_id if missing and available
+            if (!user.employee_id && employeeHelper) {
+                await query('UPDATE users SET employee_id = ? WHERE id = ?', [employeeHelper.id_employee, user.id]);
+                user.employee_id = employeeHelper.id_employee; // Update local obj for response
+            }
+        } else {
+            // New User: Create with linked data
             const id = Date.now().toString();
-            const name = email.split('@')[0].replace('.', ' ');
+            // Use Employee Name if available, otherwise format from email
+            const name = employeeHelper ? employeeHelper.full_name : email.split('@')[0].replace('.', ' ');
             const avatar = `https://ui-avatars.com/api/?name=${name}&background=random`;
-            const role = 'STAFF'; // Default
-            const branch = 'Headquarters'; // Default branch
+            // Auto-assign HR role if job_position contains 'HR' (Optional smart feature), otherwise STAFF
+            const role = (employeeHelper && employeeHelper.job_position && employeeHelper.job_position.includes('HR')) ? 'HR' : 'STAFF';
+            const branch = 'Headquarters';
+            const employeeId = employeeHelper ? employeeHelper.id_employee : null;
 
-            await query('INSERT INTO users (id, email, password, name, role, avatar, branch) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [id, email, 'google-oauth-placeholder', name, role, avatar, branch]);
+            await query('INSERT INTO users (id, email, password, name, role, avatar, branch, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [id, email, 'google-oauth-placeholder', name, role, avatar, branch, employeeId]);
 
-            user = { id, email, name, role, avatar, branch };
+            user = { id, email, name, role, avatar, branch, employee_id: employeeId };
         }
 
-        res.json({ success: true, user: { id: user.id, name: user.name, role: user.role, email: user.email, branch: user.branch } });
+        res.json({
+            success: true,
+            user: {
+                id: user.id,
+                name: user.name,
+                role: user.role,
+                email: user.email,
+                branch: user.branch,
+                employee_id: user.employee_id
+            }
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Database error' });
@@ -171,6 +260,32 @@ app.get('/api/users', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// SIMASSET integration routes moved up
+app.get('/api/employees', async (req, res) => {
+    console.log("[API] GET /api/employees - Fetching data from SimAsset");
+    try {
+        const employees = await querySimAsset(`
+            SELECT e.*, b.name as branch_name 
+            FROM employees e
+            LEFT JOIN branches b ON e.branch_id = b.id_branch
+            WHERE e.deleted_at IS NULL
+            ORDER BY e.full_name ASC
+        `);
+        console.log(`[API] Success: Found ${employees.length} employees`);
+        res.json(employees);
+    } catch (err) {
+        console.error("[API] Error in /api/employees:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/branches', async (req, res) => {
+    try {
+        const branches = await querySimAsset('SELECT id_branch, name FROM branches WHERE deleted_at IS NULL ORDER BY name ASC');
+        res.json(branches);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/users', async (req, res) => {
     try {
         const newUser = { ...req.body, id: Date.now().toString() };
@@ -178,8 +293,8 @@ app.post('/api/users', async (req, res) => {
         const existing = await query('SELECT * FROM users WHERE email = ?', [newUser.email]);
         if (existing.length > 0) return res.status(400).json({ message: 'User already exists' });
 
-        await query('INSERT INTO users (id, email, password, name, role) VALUES (?, ?, ?, ?, ?)',
-            [newUser.id, newUser.email, newUser.password || '123', newUser.name, newUser.role]);
+        await query('INSERT INTO users (id, email, password, name, role, employee_id) VALUES (?, ?, ?, ?, ?, ?)',
+            [newUser.id, newUser.email, newUser.password || '123', newUser.name, newUser.role, newUser.employee_id || null]);
 
         res.json(newUser);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -189,9 +304,24 @@ app.put('/api/users/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
+
+        // Sanitize updates to only allowed fields
+        const allowedFields = ['name', 'email', 'password', 'role', 'branch', 'avatar', 'employee_id'];
+        const filteredUpdates = {};
+
+        Object.keys(updates).forEach(key => {
+            if (allowedFields.includes(key)) {
+                filteredUpdates[key] = updates[key];
+            }
+        });
+
+        if (Object.keys(filteredUpdates).length === 0) {
+            return res.json({ message: 'No valid fields to update' });
+        }
+
         // Construct dynamic update query
-        const fields = Object.keys(updates).map(k => `${k} = ?`).join(', ');
-        const values = Object.values(updates);
+        const fields = Object.keys(filteredUpdates).map(k => `${k} = ?`).join(', ');
+        const values = Object.values(filteredUpdates);
 
         await query(`UPDATE users SET ${fields} WHERE id = ?`, [...values, id]);
 
@@ -200,21 +330,15 @@ app.put('/api/users/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- BOOKS ROUTE (STATIC JSON) ---
-app.get('/api/books', (req, res) => {
+app.delete('/api/users/:id', async (req, res) => {
     try {
-        const booksPath = path.join(__dirname, 'books.json');
-        if (fs.existsSync(booksPath)) {
-            const books = fs.readFileSync(booksPath, 'utf8');
-            res.json(JSON.parse(books));
-        } else {
-            res.status(404).json({ message: 'Books file not found' });
-        }
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Failed to load books' });
-    }
+        const { id } = req.params;
+        await query('DELETE FROM users WHERE id = ?', [id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+
 
 // --- READING LOGS ROUTES ---
 app.get('/api/logs', async (req, res) => {
@@ -224,6 +348,7 @@ app.get('/api/logs', async (req, res) => {
         const mappedLogs = logs.map(log => ({
             ...log,
             userName: log.user_name,
+            employee_id: log.employee_id,
             readingDuration: log.reading_duration,
             startDate: log.start_date,
             finishDate: log.finish_date,
@@ -239,10 +364,8 @@ app.get('/api/logs', async (req, res) => {
 app.post('/api/logs', async (req, res) => {
     try {
         const log = req.body;
-        // Fix: Ensure we use the correct column names for INSERT
-        // Note: For POST, we might be receiving camelCase from frontend, so we map it to snake_case for DB
         const result = await query(
-            'INSERT INTO reading_logs (title, author, category, date, duration, review, status, user_name, evidence_url, start_date, finish_date, reading_duration, hr_approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO reading_logs (title, author, category, date, duration, review, status, user_name, employee_id, evidence_url, start_date, finish_date, reading_duration, hr_approval_status, link) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 log.title,
                 log.author || '',
@@ -252,11 +375,13 @@ app.post('/api/logs', async (req, res) => {
                 log.review || '',
                 log.status || 'Reading',
                 log.userName,
+                log.employee_id,
                 log.evidenceUrl || '',
                 log.startDate ? new Date(log.startDate) : new Date(),
                 log.finishDate ? new Date(log.finishDate) : null,
                 log.readingDuration || 0,
-                log.hrApprovalStatus || 'Pending'
+                log.hrApprovalStatus || 'Pending',
+                log.link || ''
             ]
         );
         const newLogs = await query('SELECT * FROM reading_logs WHERE id = ?', [result.insertId]);
@@ -302,6 +427,7 @@ app.put('/api/logs/:id', async (req, res) => {
         // We need to construct snake_case update
         const dbUpdates = {};
         if (updates.userName !== undefined) dbUpdates.user_name = updates.userName;
+        if (updates.employee_id !== undefined) dbUpdates.employee_id = updates.employee_id;
         if (updates.readingDuration !== undefined) dbUpdates.reading_duration = updates.readingDuration;
         if (updates.startDate !== undefined) dbUpdates.start_date = new Date(updates.startDate);
         if (updates.finishDate !== undefined) dbUpdates.finish_date = new Date(updates.finishDate);
@@ -353,8 +479,8 @@ app.post('/api/books/borrow', async (req, res) => {
 
         const now = new Date();
         const result = await query(
-            'INSERT INTO reading_logs (title, category, location, source, user_name, evidence_url, start_date, date, status, hr_approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [title, category, location, source, userName, evidenceUrl, now, now, 'Reading', 'Pending']
+            'INSERT INTO reading_logs (title, category, location, source, user_name, employee_id, evidence_url, start_date, date, status, hr_approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [title, category, location, source, userName, req.body.employee_id, evidenceUrl, now, now, 'Reading', 'Pending']
         );
 
         const newLogs = await query('SELECT * FROM reading_logs WHERE id = ?', [result.insertId]);
@@ -375,16 +501,25 @@ app.post('/api/books/borrow', async (req, res) => {
 
 app.post('/api/books/return', async (req, res) => {
     try {
-        const { id, review, link, evidenceUrl, readingDuration } = req.body;
+        const { id, review, link, evidenceUrl, readingDuration, startDate, finishDate } = req.body;
 
         if (!id) return res.status(400).json({ error: 'Log ID is required' });
 
-        const now = new Date(); // Finish date
+        const finishDateObj = finishDate ? new Date(finishDate) : new Date();
 
-        await query(
-            'UPDATE reading_logs SET status = ?, finish_date = ?, review = ?, link = ?, evidence_url = ?, reading_duration = ?, hr_approval_status = ? WHERE id = ?',
-            ['Finished', now, review, link || '', evidenceUrl, readingDuration || 0, 'Pending', id]
-        );
+        // Prepare SQL and params. If startDate is provided, update it too.
+        let sql = 'UPDATE reading_logs SET status = ?, finish_date = ?, review = ?, link = ?, evidence_url = ?, reading_duration = ?, hr_approval_status = ?';
+        const params = ['Finished', finishDateObj, review, link || '', evidenceUrl, readingDuration || 0, 'Pending'];
+
+        if (startDate) {
+            sql += ', start_date = ?';
+            params.push(new Date(startDate));
+        }
+
+        sql += ' WHERE id = ?';
+        params.push(id);
+
+        await query(sql, params);
 
         const updatedLogs = await query('SELECT * FROM reading_logs WHERE id = ?', [id]);
         if (updatedLogs.length === 0) return res.status(404).json({ error: 'Log not found' });
@@ -416,24 +551,7 @@ app.get('/api/training', async (req, res) => {
         // For now, let's map in code if strictly needed, but snake_case vs camelCase might be an issue.
         // Frontend likely expects camelCase.
         // Map snake_case DB columns to camelCase for frontend
-        const mapped = requests.map(r => ({
-            ...r,
-            submittedAt: r.submitted_at,
-            rejectionReason: r.rejection_reason,
-            employeeName: r.employee_name, // Map DB column to frontend prop
-            supervisorName: r.supervisor_name,
-            supervisorApprovedAt: r.supervisor_approved_at,
-            hrName: r.hr_name,
-            hrApprovedAt: r.hr_approved_at,
-            employeeRole: r.employee_role, // Map DB column to frontend prop
-            costTraining: r.cost_training || 0,
-            costTransport: r.cost_transport || 0,
-            costAccommodation: r.cost_accommodation || 0,
-            costOthers: r.cost_others || 0,
-            additionalCost: r.additional_cost || 0,
-            justification: r.justification,
-            evidenceUrl: r.evidence_url
-        }));
+        const mapped = requests.map(mapTrainingRequest);
         res.json(mapped);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -443,7 +561,7 @@ app.post('/api/training', async (req, res) => {
         const reqData = req.body;
         const submittedAt = new Date();
         const result = await query(
-            'INSERT INTO training_requests (title, vendor, cost, date, status, submitted_at, employee_name, employee_role, cost_training, cost_transport, cost_accommodation, cost_others, justification, evidence_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO training_requests (title, vendor, cost, date, status, submitted_at, employee_name, employee_id, employee_role, cost_training, cost_transport, cost_accommodation, cost_others, justification, evidence_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 reqData.title,
                 reqData.vendor,
@@ -452,27 +570,19 @@ app.post('/api/training', async (req, res) => {
                 reqData.status || 'PENDING_SUPERVISOR',
                 submittedAt,
                 reqData.employeeName,
+                reqData.employee_id,
                 reqData.employeeRole,
                 reqData.costTraining || 0,
                 reqData.costTransport || 0,
                 reqData.costAccommodation || 0,
                 reqData.costOthers || 0,
-                reqData.reason || '', // Map 'reason' from frontend to 'justification'
+                reqData.reason || '',
                 reqData.evidenceUrl || ''
             ]
         );
         const newReq = await query('SELECT * FROM training_requests WHERE id = ?', [result.insertId]);
         const r = newReq[0];
-        res.json({
-            ...r,
-            submittedAt: r.submitted_at,
-            employeeName: r.employee_name,
-            employeeRole: r.employee_role,
-            costTraining: r.cost_training,
-            costTransport: r.cost_transport,
-            costAccommodation: r.cost_accommodation,
-            costOthers: r.cost_others
-        });
+        res.json(mapTrainingRequest(newReq[0]));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -541,24 +651,7 @@ app.post('/api/training/:id/approve', async (req, res) => {
 
         const updated = await query('SELECT * FROM training_requests WHERE id = ?', [id]);
         const r = updated[0];
-        res.json({
-            ...r,
-            submittedAt: r.submitted_at,
-            rejectionReason: r.rejection_reason,
-            supervisorName: r.supervisor_name,
-            supervisorApprovedAt: r.supervisor_approved_at,
-            hrName: r.hr_name,
-            hrApprovedAt: r.hr_approved_at,
-            employeeName: r.employee_name,
-            employeeRole: r.employee_role,
-            costTraining: r.cost_training,
-            costTransport: r.cost_transport,
-            costAccommodation: r.cost_accommodation,
-            costOthers: r.cost_others,
-            additionalCost: r.additional_cost,
-            justification: r.justification,
-            evidenceUrl: r.evidence_url
-        });
+        res.json(mapTrainingRequest(updated[0]));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -568,6 +661,7 @@ app.get('/api/meetings', async (req, res) => {
         const meetings = await query('SELECT * FROM meetings');
         const mapped = meetings.map(m => ({
             ...m,
+            description: m.agenda, // Map agenda to description for frontend
             guests: m.guests_json ? (typeof m.guests_json === 'string' ? JSON.parse(m.guests_json) : m.guests_json) : undefined,
             costReport: m.cost_report_json ? (typeof m.cost_report_json === 'string' ? JSON.parse(m.cost_report_json) : m.cost_report_json) : undefined
         }));
@@ -583,8 +677,8 @@ app.post('/api/meetings', async (req, res) => {
         if (!guests.emails) guests.emails = [];
 
         const result = await query(
-            'INSERT INTO meetings (title, date, time, location, agenda, guests_json, cost_report_json) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [m.title, new Date(m.date), m.time, m.location, m.agenda, JSON.stringify(guests), null]
+            'INSERT INTO meetings (title, date, time, host, location, type, meetLink, agenda, guests_json, cost_report_json, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [m.title, new Date(m.date), m.time, m.host || 'HR Team', m.location, m.type || 'Offline', m.meetLink || '', m.description || m.agenda || '', JSON.stringify(guests), null, m.employee_id]
         );
 
         const newMeeting = { ...m, id: result.insertId, guests };
@@ -609,15 +703,19 @@ app.put('/api/meetings/:id', async (req, res) => {
         let costReport = m.costReport || null;
 
         await query(
-            'UPDATE meetings SET title = ?, date = ?, time = ?, location = ?, agenda = ?, guests_json = ?, cost_report_json = ? WHERE id = ?',
+            'UPDATE meetings SET title = ?, date = ?, time = ?, host = ?, location = ?, type = ?, meetLink = ?, agenda = ?, guests_json = ?, cost_report_json = ?, employee_id = ? WHERE id = ?',
             [
                 m.title,
                 new Date(m.date),
                 m.time,
+                m.host || 'HR Team',
                 m.location,
-                m.agenda,
+                m.type || 'Offline',
+                m.meetLink || '',
+                m.description || m.agenda || '',
                 JSON.stringify(guests),
                 costReport ? JSON.stringify(costReport) : null,
+                m.employee_id,
                 id
             ]
         );
@@ -627,6 +725,7 @@ app.put('/api/meetings/:id', async (req, res) => {
 
         res.json({
             ...r,
+            description: r.agenda,
             guests: r.guests_json ? (typeof r.guests_json === 'string' ? JSON.parse(r.guests_json) : r.guests_json) : undefined,
             costReport: r.cost_report_json ? (typeof r.cost_report_json === 'string' ? JSON.parse(r.cost_report_json) : r.cost_report_json) : undefined
         });
@@ -712,7 +811,10 @@ app.post('/api/courses', async (req, res) => {
         const newCourse = await query('SELECT * FROM courses WHERE id=?', [courseId]);
         // simplified return for now - frontend will likely refetch or use its own state
         res.json({ ...newCourse[0], modules: c.modules || [] });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) {
+        console.error("ERROR CREATING COURSE:", err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.put('/api/courses/:id', async (req, res) => {
@@ -757,11 +859,31 @@ app.put('/api/courses/:id', async (req, res) => {
     }
 });
 
+app.delete('/api/courses/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await query('DELETE FROM courses WHERE id = ?', [id]);
+        res.json({ success: true, message: 'Course deleted successfully' });
+    } catch (err) {
+        console.error("ERROR DELETING COURSE:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- PROGRESS ---
 app.get('/api/progress/:userId/:courseId', async (req, res) => {
     try {
         const { userId, courseId } = req.params;
-        const rows = await query('SELECT * FROM progress WHERE user_id = ? AND course_id = ?', [userId, courseId]);
+
+        // 1. Find user's employee_id for better lookup
+        const userRows = await query('SELECT employee_id FROM users WHERE id = ? OR employee_id = ?', [userId, userId]);
+        const employeeId = userRows.length > 0 ? userRows[0].employee_id : null;
+
+        // 2. Search using BOTH identifiers
+        const rows = await query(
+            'SELECT * FROM progress WHERE (user_id = ? OR (employee_id IS NOT NULL AND employee_id = ?)) AND course_id = ?',
+            [userId, employeeId, courseId]
+        );
 
         if (rows.length === 0) {
             return res.json({ userId, courseId, completedModuleIds: [] });
@@ -780,15 +902,28 @@ app.get('/api/progress/:userId/:courseId', async (req, res) => {
             moduleProgress: typeof record.module_progress === 'string' ? JSON.parse(record.module_progress) : record.module_progress || {},
             lastAccess: record.last_access
         });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) {
+        console.error("GET PROGRESS ERROR:", err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.post('/api/progress/complete', async (req, res) => {
     try {
-        const { userId, courseId, moduleId } = req.body;
+        const { userId, courseId, moduleId, employee_id } = req.body;
 
-        // Find existing
-        const rows = await query('SELECT * FROM progress WHERE user_id = ? AND course_id = ?', [userId, courseId]);
+        // Verify if we have an employeeId from users table if not provided
+        let effectiveEmpId = employee_id;
+        if (!effectiveEmpId) {
+            const userRows = await query('SELECT employee_id FROM users WHERE id = ?', [userId]);
+            if (userRows.length > 0) effectiveEmpId = userRows[0].employee_id;
+        }
+
+        // Search using BOTH
+        const rows = await query(
+            'SELECT * FROM progress WHERE (user_id = ? OR (employee_id IS NOT NULL AND employee_id = ?)) AND course_id = ?',
+            [userId, effectiveEmpId, courseId]
+        );
 
         let completedModuleIds = [];
         let recordId = null;
@@ -808,21 +943,32 @@ app.post('/api/progress/complete', async (req, res) => {
         const now = new Date();
 
         if (recordId) {
-            await query('UPDATE progress SET completed_module_ids = ?, last_access = ? WHERE id = ?', [jsonIds, now, recordId]);
+            await query('UPDATE progress SET completed_module_ids = ?, last_access = ?, employee_id = ? WHERE id = ?',
+                [jsonIds, now, effectiveEmpId, recordId]);
         } else {
-            await query('INSERT INTO progress (user_id, course_id, completed_module_ids, last_access) VALUES (?, ?, ?, ?)',
-                [userId, courseId, jsonIds, now]);
+            await query('INSERT INTO progress (user_id, course_id, completed_module_ids, last_access, employee_id) VALUES (?, ?, ?, ?, ?)',
+                [userId, courseId, jsonIds, now, effectiveEmpId]);
         }
 
         res.json({ success: true, completedModuleIds });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) {
+        console.error("COMPLETE PROGRESS ERROR:", err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.post('/api/progress/time', async (req, res) => {
     try {
         const { userId, courseId, moduleId, timestamp } = req.body;
 
-        const rows = await query('SELECT * FROM progress WHERE user_id = ? AND course_id = ?', [userId, courseId]);
+        // Robust Lookup
+        const userRows = await query('SELECT employee_id FROM users WHERE id = ? OR employee_id = ?', [userId, userId]);
+        const employeeId = userRows.length > 0 ? userRows[0].employee_id : null;
+
+        const rows = await query(
+            'SELECT * FROM progress WHERE (user_id = ? OR (employee_id IS NOT NULL AND employee_id = ?)) AND course_id = ?',
+            [userId, employeeId, courseId]
+        );
         let moduleProgress = {};
         let recordId = null;
 
@@ -838,15 +984,18 @@ app.post('/api/progress/time', async (req, res) => {
         const now = new Date();
 
         if (recordId) {
-            await query('UPDATE progress SET module_progress = ?, last_access = ? WHERE id = ?', [jsonProgress, now, recordId]);
+            await query('UPDATE progress SET module_progress = ?, last_access = ?, employee_id = ? WHERE id = ?',
+                [jsonProgress, now, employeeId, recordId]);
         } else {
-            // Should rarely happen if they haven't started, but possible
-            await query('INSERT INTO progress (user_id, course_id, module_progress, last_access) VALUES (?, ?, ?, ?)',
-                [userId, courseId, jsonProgress, now]);
+            await query('INSERT INTO progress (user_id, course_id, module_progress, last_access, employee_id) VALUES (?, ?, ?, ?, ?)',
+                [userId, courseId, jsonProgress, now, employeeId]);
         }
 
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) {
+        console.error("TIME LOG ERROR:", err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // --- QUIZ & ASSESSMENT ---
@@ -863,8 +1012,16 @@ app.post('/api/quiz/submit', async (req, res) => {
 
         // 2. If Passed (>= 80), mark module as complete
         if (score >= 80 && moduleId) {
-            // Find progress
-            const rows = await query('SELECT * FROM progress WHERE user_id = ? AND course_id = ?', [studentId, courseId]);
+            // Find user's employee_id for better lookup
+            const userRows = await query('SELECT employee_id FROM users WHERE id = ? OR employee_id = ?', [studentId, studentId]);
+            const employeeId = userRows.length > 0 ? userRows[0].employee_id : null;
+
+            // Find progress robustly
+            const rows = await query(
+                'SELECT * FROM progress WHERE (user_id = ? OR (employee_id IS NOT NULL AND employee_id = ?)) AND course_id = ?',
+                [studentId, employeeId, courseId]
+            );
+
             let completedModuleIds = [];
             let recordId = null;
 
@@ -879,10 +1036,11 @@ app.post('/api/quiz/submit', async (req, res) => {
                 completedModuleIds.push(moduleId);
                 const jsonIds = JSON.stringify(completedModuleIds);
                 if (recordId) {
-                    await query('UPDATE progress SET completed_module_ids = ?, last_access = ? WHERE id = ?', [jsonIds, now, recordId]);
+                    await query('UPDATE progress SET completed_module_ids = ?, last_access = ?, employee_id = ? WHERE id = ?',
+                        [jsonIds, now, employeeId, recordId]);
                 } else {
-                    await query('INSERT INTO progress (user_id, course_id, completed_module_ids, last_access) VALUES (?, ?, ?, ?)',
-                        [studentId, courseId, jsonIds, now]);
+                    await query('INSERT INTO progress (user_id, course_id, completed_module_ids, last_access, employee_id) VALUES (?, ?, ?, ?, ?)',
+                        [studentId, courseId, jsonIds, now, employeeId]);
                 }
             }
         }
@@ -894,7 +1052,15 @@ app.post('/api/quiz/submit', async (req, res) => {
 app.get('/api/quiz/results/:userId/:courseId', async (req, res) => {
     try {
         const { userId, courseId } = req.params;
-        const results = await query('SELECT * FROM quiz_results WHERE student_id = ? AND course_id = ?', [userId, courseId]);
+
+        // Find user's employee_id for better lookup
+        const userRows = await query('SELECT employee_id FROM users WHERE id = ? OR employee_id = ?', [userId, userId]);
+        const employeeId = userRows.length > 0 ? userRows[0].employee_id : null;
+
+        const results = await query(
+            'SELECT * FROM quiz_results WHERE (student_id = ? OR (employee_id IS NOT NULL AND employee_id = ?)) AND course_id = ? ORDER BY date DESC',
+            [userId, employeeId, courseId]
+        );
         const mapped = results.map(r => ({
             id: r.id,
             studentId: r.student_id,
@@ -917,6 +1083,7 @@ app.get('/api/admin/quiz-reports', async (req, res) => {
                 qr.student_id,
                 COALESCE(u.name, qr.student_name) as student_name,
                 u.branch,
+                u.employee_id,
                 c.title as course_title,
                 cm.title as module_title,
                 qr.score,
@@ -957,11 +1124,11 @@ app.get('/api/incentives', async (req, res) => {
 app.post('/api/incentives', async (req, res) => {
     try {
         const i = req.body;
-        // Insert with new columns
         const result = await query(
-            'INSERT INTO incentives (employee_name, course_name, description, start_date, end_date, evidence_url, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO incentives (employee_name, employee_id, course_name, description, start_date, end_date, evidence_url, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 i.employeeName,
+                i.employee_id,
                 i.courseName,
                 i.description || '',
                 new Date(i.startDate),
@@ -971,18 +1138,15 @@ app.post('/api/incentives', async (req, res) => {
             ]
         );
         const newInc = await query('SELECT * FROM incentives WHERE id = ?', [result.insertId]);
-        const r = newInc[0];
-
-        // Return mapped
-        res.json({
-            ...r,
-            employeeName: r.employee_name,
-            courseName: r.course_name,
-            evidenceUrl: r.evidence_url,
-            startDate: r.start_date,
-            endDate: r.end_date,
-            monthlyAmount: r.monthly_amount
-        });
+        const mapping = {
+            employee_name: 'employeeName',
+            course_name: 'courseName',
+            evidence_url: 'evidenceUrl',
+            start_date: 'startDate',
+            end_date: 'endDate',
+            monthly_amount: 'monthlyAmount'
+        };
+        res.json(mapObject(newInc[0], mapping));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -991,8 +1155,6 @@ app.put('/api/incentives/:id', async (req, res) => {
         const { id } = req.params;
         const updates = req.body;
 
-        // Build update manually since we need to map keys potentially, 
-        // OR just expect specific fields. For simplicity in this specialized endpoint:
         let sql = 'UPDATE incentives SET ';
         const params = [];
 
@@ -1012,36 +1174,134 @@ app.put('/api/incentives/:id', async (req, res) => {
             sql += 'approved_date = ?, ';
             params.push(new Date());
         }
-        // Remove trailing comma
+        if (updates.endDate) {
+            sql += 'end_date = ?, ';
+            params.push(updates.endDate);
+        }
+
+        // --- Robus ID Sync ---
+        // If we don't have an employee_id in the record, try to find it from the users table by name
+        const currentRes = await query('SELECT employee_name, employee_id FROM incentives WHERE id = ?', [id]);
+        const current = currentRes[0];
+        if (current && !current.employee_id) {
+            const userRows = await query('SELECT employee_id FROM users WHERE name = ?', [current.employee_name]);
+            if (userRows.length > 0 && userRows[0].employee_id) {
+                sql += 'employee_id = ?, ';
+                params.push(userRows[0].employee_id);
+            }
+        }
+
         sql = sql.slice(0, -2);
         sql += ' WHERE id = ?';
         params.push(id);
 
-        if (params.length > 1) { // At least one field + id
+        if (params.length > 1) {
             await query(sql, params);
         }
 
         const updated = await query('SELECT * FROM incentives WHERE id = ?', [id]);
-        const r = updated[0];
-        res.json({
-            ...r,
-            employeeName: r.employee_name,
-            courseName: r.course_name,
-            evidenceUrl: r.evidence_url,
-            startDate: r.start_date,
-            endDate: r.end_date,
-            monthlyAmount: r.monthly_amount,
-            monthlyAmount: r.monthly_amount,
-            paymentType: r.payment_type,
-            approvedDate: r.approved_date
-        });
+        const mapping = {
+            employee_name: 'employeeName',
+            course_name: 'courseName',
+            evidence_url: 'evidenceUrl',
+            start_date: 'startDate',
+            end_date: 'endDate',
+            monthly_amount: 'monthlyAmount',
+            payment_type: 'paymentType',
+            approved_date: 'approvedDate'
+        };
+        res.json(mapObject(updated[0], mapping));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Fallback
-if (fs.existsSync(DIST_DIR)) {
-    app.get(/(.*)/, (req, res) => res.sendFile(path.join(DIST_DIR, 'index.html')));
-}
+app.delete('/api/incentives/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await query('DELETE FROM incentives WHERE id = ?', [id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+
+
+// 2. Assets (Generic)
+app.get('/api/assets', async (req, res) => {
+    try {
+        const { category } = req.query;
+        let sql = `
+            SELECT a.*, c.name as category_name, sc.name as sub_category_name 
+            FROM assets a
+            LEFT JOIN sub_categories sc ON a.sub_category_id = sc.id
+            LEFT JOIN categories c ON sc.category_id = c.id
+            WHERE a.deleted_at IS NULL
+        `;
+        const params = [];
+
+        if (category) {
+            sql += ' AND c.name = ?';
+            params.push(category);
+        }
+
+        sql += ' ORDER BY a.name ASC';
+
+        const assets = await querySimAsset(sql, params);
+        res.json(assets);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 3. SimAsset Borrowing History (Specific Logic for Books)
+app.get('/api/simasset/books-history', async (req, res) => {
+    try {
+        const { employeeId, title, startDate, endDate } = req.query;
+
+        // Base query - Joining assets, holders, and categories
+        let sql = `
+            SELECT 
+                a.asset_uuid, 
+                a.code, 
+                a.name as title, 
+                ah.asset_holder_uuid, 
+                ah.employee_id, 
+                ah.assigned_at, 
+                ah.returned_at,
+                c.name as category
+            FROM assets a
+            LEFT JOIN sub_categories sc ON a.sub_category_id = sc.id
+            LEFT JOIN categories c ON sc.category_id = c.id 
+            LEFT JOIN asset_holders ah ON a.id = ah.asset_id 
+            WHERE c.name = 'Buku' 
+            AND a.deleted_at IS NULL 
+            AND ah.employee_id IS NOT NULL
+        `;
+
+        const params = [];
+
+        if (employeeId) {
+            sql += ' AND ah.employee_id = ?';
+            params.push(employeeId);
+        }
+
+        if (title) {
+            sql += ' AND a.name LIKE ?';
+            params.push(`%${title}%`);
+        }
+
+        if (startDate) {
+            if (endDate) {
+                sql += ' AND date(ah.assigned_at) BETWEEN ? AND ?';
+                params.push(startDate, endDate);
+            } else {
+                sql += ' AND date(ah.assigned_at) >= ?';
+                params.push(startDate);
+            }
+        }
+
+        sql += ' ORDER BY ah.assigned_at DESC';
+
+        const history = await querySimAsset(sql, params);
+        res.json(history);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // --- SETTLEMENT UPDATE ---
 app.put('/api/training/:id', async (req, res) => {
@@ -1057,19 +1317,27 @@ app.put('/api/training/:id', async (req, res) => {
         const updated = await query('SELECT * FROM training_requests WHERE id = ?', [id]);
         const r = updated[0];
 
-        res.json({
-            ...r,
-            submittedAt: r.submitted_at,
-            employeeName: r.employee_name,
-            employeeRole: r.employee_role,
-            costTraining: r.cost_training,
-            costTransport: r.cost_transport,
-            costAccommodation: r.cost_accommodation,
-            costOthers: r.cost_others,
-            additionalCost: r.additional_cost,
-            settlementNote: r.settlement_note
-        });
+        res.json(mapTrainingRequest(updated[0]));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.delete('/api/training/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await query('DELETE FROM training_requests WHERE id = ?', [id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+const DIST_DIR = path.join(__dirname, '../dist');
+if (fs.existsSync(DIST_DIR)) {
+    app.use(express.static(DIST_DIR));
+}
+
+// Fallback
+if (fs.existsSync(DIST_DIR)) {
+    app.get(/(.*)/, (req, res) => res.sendFile(path.join(DIST_DIR, 'index.html')));
+}
+
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT} with MySQL`));
+

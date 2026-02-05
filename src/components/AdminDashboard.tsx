@@ -20,7 +20,6 @@ import UserManagement from './UserManagement';
 import AdminReadingLog from './AdminReadingLog';
 import TrainingInternalList from './TrainingInternalList';
 import OnlineModulesManager from './OnlineModulesManager';
-
 import TrainingExternalManager from './TrainingExternalManager';
 import HRReportGenerator from './HRReportGenerator';
 import IncentiveManager from './IncentiveManager';
@@ -261,6 +260,7 @@ const AdminDashboard = ({ user, onLogout }: AdminDashboardProps) => {
                     <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 mt-4">Main</p>
                     <SidebarItem view="overview" icon={LayoutDashboard} label="Overview" currentView={currentView} setCurrentView={handleSetView} />
                     <SidebarItem view="calendar" icon={Calendar} label="Calendar" currentView={currentView} setCurrentView={handleSetView} />
+
 
                     <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 mt-6">Management</p>
                     <SidebarItem view="users" icon={Users} label="User Management" currentView={currentView} setCurrentView={handleSetView} />

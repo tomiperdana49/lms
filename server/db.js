@@ -4,17 +4,33 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+dotenv.config({ path: path.join(__dirname, '../.env') });
+
+// --- LMS POOL ---
 const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'lms_db',
-    multipleStatements: true // Enable multiple statements for schema execution
+    multipleStatements: true,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+});
+
+// --- SIMASSET POOL ---
+export const simAssetPool = mysql.createPool({
+    host: process.env.SIMAS_HOST || process.env.DB_HOST,
+    user: process.env.SIMAS_USER || process.env.DB_USER,
+    password: process.env.SIMAS_PASSWORD || process.env.DB_PASSWORD,
+    database: process.env.SIMAS_NAME || 'simasset',
+    port: process.env.SIMAS_PORT ? parseInt(process.env.SIMAS_PORT) : 3306,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
 });
 
 export const initDB = async () => {
@@ -42,6 +58,21 @@ export const initDB = async () => {
         try {
             await connection.query("ALTER TABLE course_modules ADD COLUMN video_type VARCHAR(50) DEFAULT 'youtube'");
             console.log("Added video_type column.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE course_modules ADD COLUMN quiz_data JSON");
+            console.log("Added quiz_data column to course_modules.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE courses MODIFY COLUMN duration VARCHAR(50)");
+            console.log("Modified courses.duration to VARCHAR(50).");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE courses ADD COLUMN assessment_data JSON");
+            console.log("Added assessment_data column to courses.");
         } catch (e) { /* Ignore if exists */ }
 
         try {
@@ -94,6 +125,30 @@ export const initDB = async () => {
 
             console.log('Data seeding completed.');
         }
+
+        // Standardize employee_id across all tables
+        const trackingTables = ['reading_logs', 'training_requests', 'quiz_results', 'progress', 'incentives', 'meetings'];
+        for (const table of trackingTables) {
+            try {
+                await connection.query(`ALTER TABLE ${table} ADD COLUMN employee_id VARCHAR(50)`);
+                console.log(`Added employee_id column to ${table}.`);
+            } catch (e) { /* Ignore if exists */ }
+        }
+
+        try {
+            await connection.query("ALTER TABLE meetings ADD COLUMN type VARCHAR(50) DEFAULT 'Offline'");
+            console.log("Added type column to meetings.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE meetings ADD COLUMN meetLink VARCHAR(255)");
+            console.log("Added meetLink column to meetings.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE meetings ADD COLUMN host VARCHAR(255)");
+            console.log("Added host column to meetings.");
+        } catch (e) { /* Ignore if exists */ }
 
         connection.release();
     } catch (err) {

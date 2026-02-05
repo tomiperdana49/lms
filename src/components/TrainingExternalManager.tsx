@@ -7,7 +7,8 @@ import {
     Printer,
     DollarSign,
     Calendar,
-    Info
+    Info,
+    Trash2
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { TrainingRequest } from '../types';
@@ -40,13 +41,36 @@ const StatusBadge = ({ status }: { status: string }) => {
 const TrainingExternalManager = ({ userRole, userName }: { userRole: string; userName?: string }) => {
     // --- Data State ---
     const [requests, setRequests] = useState<TrainingRequest[]>([]);
+    const [employees, setEmployees] = useState<any[]>([]);
 
     // --- Filter State ---
     const [viewMode, setViewMode] = useState<'list' | 'recap'>('list');
     const [selectedYear, setSelectedYear] = useState<number | 'All'>(new Date().getFullYear());
     const [selectedPeriod, setSelectedPeriod] = useState<string>('All Year');
     const [selectedBranch, setSelectedBranch] = useState<string>('All Branches');
+    const [branches, setBranches] = useState<string[]>(['All Branches']);
     const [searchQuery, setSearchQuery] = useState('');
+
+    // --- Data Loading ---
+    useEffect(() => {
+        const loadInitialData = async () => {
+            const [trainRes, empRes, branchRes] = await Promise.all([
+                fetch(`${API_BASE_URL}/api/training`),
+                fetch(`${API_BASE_URL}/api/employees`),
+                fetch(`${API_BASE_URL}/api/branches`)
+            ]);
+
+            if (trainRes.ok) setRequests(await trainRes.json());
+            if (empRes.ok) setEmployees(await empRes.json());
+            if (branchRes.ok) {
+                const bData = await branchRes.json();
+                if (Array.isArray(bData)) {
+                    setBranches(['All Branches', ...bData.map((b: any) => b.name)]);
+                }
+            }
+        };
+        loadInitialData();
+    }, []);
 
     // --- Modal State ---
     const [selectedRequest, setSelectedRequest] = useState<TrainingRequest | null>(null);
@@ -142,9 +166,15 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
         if (selectedYear !== 'All' && d.getFullYear() !== selectedYear) return false;
         if (d < start || d > end) return false;
 
-        // Branch Filter
-        const branch = req.location || 'Online';
-        if (selectedBranch !== 'All Branches' && !branch.includes(selectedBranch)) return false;
+        // Branch Filter (Updated to use Employee Branch)
+        // Match req -> employee (ID or Name) -> Branch
+        const emp = employees.find(e =>
+            (req.employee_id && e.id_employee === req.employee_id) ||
+            (req.employeeName && e.full_name && e.full_name.trim().toLowerCase() === req.employeeName.trim().toLowerCase())
+        );
+        const empBranch = emp?.branch_name || 'Others';
+
+        if (selectedBranch !== 'All Branches' && empBranch !== selectedBranch) return false;
 
         // Search Filter
         const lowerSearch = searchQuery.toLowerCase();
@@ -156,14 +186,6 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
     });
 
     const [isProcessing, setIsProcessing] = useState(false);
-
-    // --- Effects & Actions ---
-    useEffect(() => {
-        fetch(`${API_BASE_URL}/api/training`)
-            .then(res => res.json())
-            .then(data => setRequests(data))
-            .catch(err => console.error(err));
-    }, []);
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(amount);
@@ -217,6 +239,21 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
             alert("An error occurred. Please check your connection.");
         } finally {
             setIsProcessing(false);
+        }
+    };
+
+    const handleDeleteRequest = async (id: number) => {
+        if (!window.confirm("Are you sure you want to permanently delete this training request? This action cannot be undone.")) return;
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/training/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                setRequests(requests.filter(r => r.id !== id));
+            } else {
+                alert("Failed to delete request.");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Error deleting request.");
         }
     };
 
@@ -388,9 +425,15 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
             if (selectedYear !== 'All' && d.getFullYear() !== selectedYear) return;
             if (d < start || d > end) return;
 
-            // Branch Filter
-            const branch = req.location || 'Online';
-            if (selectedBranch !== 'All Branches' && !branch.includes(selectedBranch)) return;
+            // Branch Filter (Employee Database Mapping)
+            const emp = employees.find(e =>
+                (req.employee_id && e.id_employee === req.employee_id) ||
+                (req.employeeName && e.full_name && e.full_name.trim().toLowerCase() === req.employeeName.trim().toLowerCase())
+            );
+            const empBranch = emp?.branch_name || 'Others';
+
+            if (selectedBranch !== 'All Branches' && empBranch !== selectedBranch) return;
+
 
             // Search
             const searchLower = searchQuery.toLowerCase();
@@ -468,14 +511,9 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                         onChange={(e) => setSelectedBranch(e.target.value)}
                         className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                     >
-                        <option value="All Branches">All Branches</option>
-                        <option value="Medan-HO">Medan-HO</option>
-                        <option value="Medan-Cabang">Medan-Cabang</option>
-                        <option value="Jakarta">Jakarta</option>
-                        <option value="Bali">Bali</option>
-                        <option value="Binjai">Binjai</option>
-                        <option value="Tanjung Morawa">Tanjung Morawa</option>
-                        <option value="Online">Online Only</option>
+                        {branches.map(b => (
+                            <option key={b} value={b}>{b === 'Online' ? 'Online Only' : b}</option>
+                        ))}
                     </select>
 
                     <select
@@ -557,6 +595,17 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                             <button onClick={() => handleAction(req.id, 'approve')} className="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 shadow-sm">Final Approve</button>
                                             <button onClick={() => { setSelectedRequest(req); setIsRejectMode(true); }} className="px-3 py-1.5 bg-white border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-50">Reject</button>
                                         </div>
+                                    )}
+
+                                    {/* Admin/HR Delete Button for History/All */}
+                                    {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                                        <button
+                                            onClick={() => handleDeleteRequest(req.id)}
+                                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-slate-100"
+                                            title="Delete Permanently"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
                                     )}
                                 </div>
                             </div>
@@ -741,7 +790,7 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                                             <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">Rp</span>
                                                             <input
                                                                 type="text"
-                                                                value={new Intl.NumberFormat('id-ID').format((breakdownCost as any)[item.field])}
+                                                                value={new Intl.NumberFormat('id-ID').format((breakdownCost as Record<string, number>)[item.field])}
                                                                 onChange={(e) => {
                                                                     const val = Number(e.target.value.replace(/\D/g, ''));
                                                                     setBreakdownCost(prev => ({ ...prev, [item.field]: val }));

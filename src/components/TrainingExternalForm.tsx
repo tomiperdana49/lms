@@ -28,6 +28,7 @@ interface TrainingRequest {
     rejectionReason?: string;
     employeeName?: string;
     employeeRole?: string;
+    employee_id?: string;
 }
 
 const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role: string }; onNavigate?: (page: string) => void }) => {
@@ -121,7 +122,9 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
             .then(res => res.json())
             // Filter: Only show My Requests
             .then((data: TrainingRequest[]) => {
-                const myRequests = data.filter(req => req.employeeName === user.name);
+                const myRequests = data.filter(req =>
+                    req.employee_id === (user as any).employee_id || (!req.employee_id && req.employeeName === user.name)
+                );
                 setRequests(myRequests);
             })
             .catch(err => console.error("Failed to fetch requests", err));
@@ -153,6 +156,7 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
             isBonded: isBondRequired,
             userName: user.name || 'Unknown',
             employeeName: user.name || 'Unknown',
+            employee_id: (user as any).employee_id,
             employeeRole: user.role || 'STAFF'
         };
 

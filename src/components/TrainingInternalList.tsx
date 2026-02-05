@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent, type KeyboardEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import {
     Users,
     MapPin,
@@ -14,7 +14,7 @@ import {
     CheckCircle
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
-import type { Role, Meeting, CostReport } from '../types';
+import type { Role, Meeting, CostReport, Employee } from '../types';
 import PopupNotification from './PopupNotification';
 import ConfirmationModal from './ConfirmationModal';
 
@@ -67,6 +67,7 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
         isFinalized: false
     });
     const [reportingId, setReportingId] = useState<number | null>(null);
+    const [employees, setEmployees] = useState<Employee[]>([]);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -75,6 +76,7 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
         startTime: '',
         endTime: '',
         host: '',
+        host_id: '',
         type: 'Online' as 'Online' | 'Offline' | 'Hybrid',
         location: '',
         meetLink: '',
@@ -82,14 +84,15 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
     });
 
     // Email Invites State
-    const [inviteEmail, setInviteEmail] = useState('');
     const [invitedEmails, setInvitedEmails] = useState<string[]>([]);
+    const [invitedEmployeeIds, setInvitedEmployeeIds] = useState<string[]>([]);
 
     // --- Filter State ---
     const [viewMode, setViewMode] = useState<'list' | 'recap'>('list');
     const [selectedYear, setSelectedYear] = useState<number | 'All'>(new Date().getFullYear());
     const [selectedPeriod, setSelectedPeriod] = useState<string>('All Year'); // Default to All Year for easier initial view
     const [selectedBranch, setSelectedBranch] = useState<string>('All Branches');
+    const [branches, setBranches] = useState<string[]>(['All Branches']);
     const [searchQuery, setSearchQuery] = useState(''); // Unified search term
 
     // Recap Detail Modal
@@ -158,9 +161,14 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
         if (selectedYear !== 'All' && d.getFullYear() !== selectedYear) return false;
         if (d < start || d > end) return false;
 
-        // Branch
-        const branchName = m.location || 'Online';
-        if (selectedBranch !== 'All Branches' && !branchName.includes(selectedBranch)) return false;
+        // Branch Filter (Host Database Mapping)
+        const hostEmp = employees.find(e =>
+            (m.employee_id && e.id_employee === m.employee_id) ||
+            (m.host && e.full_name && e.full_name.trim().toLowerCase() === m.host.trim().toLowerCase())
+        );
+        const hostBranch = hostEmp?.branch_name || 'Others';
+
+        if (selectedBranch !== 'All Branches' && hostBranch !== selectedBranch) return false;
 
         // Search
         const lower = searchQuery.toLowerCase();
@@ -183,11 +191,17 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
             }
         }
 
+        let host = m.host;
+        if ((!host || host === 'Admin' || host === 'HR Team') && m.employee_id) {
+            const emp = employees.find(e => e.id_employee === m.employee_id);
+            if (emp) host = emp.full_name;
+        }
+
         return {
             ...m,
-            host: m.host || 'Admin',
-            type: m.type || (m.location && m.location.toLowerCase().includes('meet') ? 'Online' : 'Offline'),
-            description: m.description || 'No description provided.',
+            host: host || m.host || 'Admin',
+            type: m.type || (m.location && (m.location.toLowerCase().includes('meet') || m.location.toLowerCase().includes('http')) ? 'Online' : 'Offline'),
+            description: m.description || m.agenda || 'No description provided.',
             shortDate: shortDate || 'TBD',
             guests: m.guests || { status: 'Awaiting', count: 0, emails: [] }
         } as ExtendedMeeting;
@@ -231,48 +245,86 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
             .catch(err => console.error("Failed to fetch meetings", err));
     }, []);
 
-    const handleInviteKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-        if (['Enter', ','].includes(e.key)) {
-            e.preventDefault();
-            const email = inviteEmail.trim();
-            if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                if (!invitedEmails.includes(email)) {
-                    setInvitedEmails([...invitedEmails, email]);
-                }
-                setInviteEmail('');
-            }
-        }
-    };
+    useEffect(() => {
+        fetch(`${API_BASE_URL}/api/employees`)
+            .then(res => res.json())
+            .then(data => setEmployees(data))
+            .catch(err => console.error("Failed to fetch employees", err));
+    }, []);
 
-    const removeEmail = (emailToRemove: string) => {
-        setInvitedEmails(invitedEmails.filter(email => email !== emailToRemove));
-    };
+    useEffect(() => {
+        fetch(`${API_BASE_URL}/api/branches`)
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data)) {
+                    setBranches(['All Branches', ...data.map((b: any) => b.name)]);
+                }
+            })
+            .catch(err => console.error("Failed to fetch branches", err));
+    }, []);
+
 
     const openEditModal = (meeting: ExtendedMeeting) => {
         setSelectedMeeting(null);
         setEditId(meeting.id);
         setIsEditing(true);
 
+        // Helper to format Date string to YYYY-MM-DD
+        const formatDate = (dateStr: any) => {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '';
+            return d.toISOString().split('T')[0];
+        };
+
+        // Helper to format Time string (handles HH:mm and potential legacy formats)
+        const formatTime = (t: string) => {
+            if (!t) return '';
+            const trimmed = t.trim();
+            // If already HH:mm, use as is
+            if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+                const [h, m] = trimmed.split(':');
+                return `${h.padStart(2, '0')}:${m}`;
+            }
+            // Fallback: try to parse with Date
+            const d = new Date(`2000-01-01 ${trimmed}`);
+            if (!isNaN(d.getTime())) {
+                return d.toTimeString().split(' ')[0].substring(0, 5);
+            }
+            return trimmed;
+        };
+
         // Populate form
         let start = '', end = '';
         if (meeting.time && meeting.time.includes(' - ')) {
             const parts = meeting.time.split(' - ');
-            start = parts[0] ? parts[0].trim() : '';
-            end = parts[1] ? parts[1].trim() : '';
+            start = formatTime(parts[0]);
+            end = formatTime(parts[1]);
+        } else if (meeting.time) {
+            start = formatTime(meeting.time);
+        }
+
+        // Find Host ID if missing (fallback for legacy data)
+        let hostId = meeting.employee_id || '';
+        if (!hostId && meeting.host) {
+            const foundEmp = employees.find(e => e.full_name && e.full_name.trim().toLowerCase() === meeting.host.trim().toLowerCase());
+            if (foundEmp) hostId = foundEmp.id_employee;
         }
 
         setFormData({
             title: meeting.title,
-            date: meeting.date,
+            date: formatDate(meeting.date),
             startTime: start || '',
             endTime: end || '',
             host: meeting.host,
-            type: meeting.type,
+            host_id: hostId,
+            type: meeting.type || 'Offline',
             location: meeting.location || '',
             meetLink: meeting.meetLink || '',
-            description: meeting.description
+            description: (meeting.description && meeting.description !== 'No description provided.') ? meeting.description : (meeting.agenda || '')
         });
         setInvitedEmails(meeting.guests?.emails || []);
+        setInvitedEmployeeIds((meeting.guests as any).employee_ids || []);
         setIsCreateOpen(true);
     };
 
@@ -286,6 +338,7 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
             otherCost: meeting.costReport?.otherCost || 0,
             participantsCount: meeting.costReport?.participantsCount || meeting.guests?.count || 0,
             attendees: meeting.costReport?.attendees || [],
+            attendee_ids: meeting.costReport?.attendee_ids || [],
             isFinalized: true,
             isPaid: meeting.costReport?.isPaid || false,
             evidenceLink: meeting.costReport?.evidenceLink || ''
@@ -293,16 +346,38 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
         setIsReportOpen(true);
     };
 
-    const toggleAttendee = (email: string) => {
+    const toggleAttendee = (email: string, employeeId?: string) => {
         const currentAttendees = reportData.attendees || [];
-        const newAttendees = currentAttendees.includes(email)
-            ? currentAttendees.filter(e => e !== email)
-            : [...currentAttendees, email];
+        const currentAttendeeIds = reportData.attendee_ids || [];
+
+        let newAttendees = [...currentAttendees];
+        let newAttendeeIds = [...currentAttendeeIds];
+
+        if (employeeId) {
+            newAttendeeIds = currentAttendeeIds.includes(employeeId)
+                ? currentAttendeeIds.filter(id => id !== employeeId)
+                : [...currentAttendeeIds, employeeId];
+
+            // Sync email if found
+            const emp = employees.find(e => e.id_employee === employeeId);
+            if (emp && emp.email) {
+                if (newAttendeeIds.includes(employeeId)) {
+                    if (!newAttendees.includes(emp.email)) newAttendees.push(emp.email);
+                } else {
+                    newAttendees = newAttendees.filter(e => e !== emp.email);
+                }
+            }
+        } else {
+            newAttendees = currentAttendees.includes(email)
+                ? currentAttendees.filter(e => e !== email)
+                : [...currentAttendees, email];
+        }
 
         setReportData({
             ...reportData,
             attendees: newAttendees,
-            participantsCount: newAttendees.length
+            attendee_ids: newAttendeeIds,
+            participantsCount: Math.max(newAttendees.length, newAttendeeIds.length)
         });
     };
 
@@ -358,14 +433,7 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
             return;
         }
 
-        // UX Fix: Auto-add email if user typed it but forgot to press Enter
-        let finalEmails = [...invitedEmails];
-        if (inviteEmail && inviteEmail.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail.trim())) {
-            const pendingEmail = inviteEmail.trim();
-            if (!finalEmails.includes(pendingEmail)) {
-                finalEmails.push(pendingEmail);
-            }
-        }
+        const finalEmails = [...new Set(invitedEmails)];
 
         const dateObj = new Date(formData.date);
         const meetingData = {
@@ -374,13 +442,15 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
             time: `${formData.startTime} - ${formData.endTime}`,
             shortDate: `${dateObj.getDate()} ${dateObj.toLocaleString('default', { month: 'short' }).toUpperCase()}`,
             host: formData.host || 'HR Team',
+            employee_id: formData.host_id,
             type: formData.type,
             location: formData.location,
             description: formData.description,
             guests: {
                 status: 'Awaiting',
-                count: finalEmails.length,
-                emails: finalEmails
+                count: Math.max(finalEmails.length, invitedEmployeeIds.length),
+                emails: finalEmails,
+                employee_ids: invitedEmployeeIds
             },
             meetLink: formData.meetLink
         };
@@ -445,9 +515,9 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
     };
 
     const resetForm = () => {
-        setFormData({ title: '', date: '', startTime: '', endTime: '', host: '', type: 'Online', location: '', meetLink: '', description: '' });
+        setFormData({ title: '', date: '', startTime: '', endTime: '', host: '', host_id: '', type: 'Online', location: '', meetLink: '', description: '' });
         setInvitedEmails([]);
-        setInviteEmail('');
+        setInvitedEmployeeIds([]);
         setIsEditing(false);
         setEditId(null);
     };
@@ -463,10 +533,15 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
             if (selectedYear !== 'All' && d.getFullYear() !== selectedYear) return;
             if (d < start || d > end) return;
 
-            // Branch Filter (Location)
-            const branchName = m.location || 'Online';
-            // Simple logic: if Selected != All, and branchName doesn't include selected string, skip
-            if (selectedBranch !== 'All Branches' && !branchName.includes(selectedBranch)) return;
+            // Branch Filter (Host Database Mapping)
+            const hostEmp = employees.find(e =>
+                (m.employee_id && e.id_employee === m.employee_id) ||
+                (m.host && e.full_name && e.full_name.trim().toLowerCase() === m.host.trim().toLowerCase())
+            );
+            const hostBranch = hostEmp?.branch_name || 'Others';
+
+            if (selectedBranch !== 'All Branches' && hostBranch !== selectedBranch) return;
+
 
             // Search Filter
             if (searchQuery) {
@@ -475,7 +550,12 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                     !m.title.toLowerCase().includes(lower)) return;
             }
 
-            const hostName = m.host;
+            let hostName = m.host;
+            // Robust check: if host is Admin/Generic, try to resolve from employee_id or the found hostEmp
+            if ((hostName === 'Admin' || hostName === 'HR Team') && (m.employee_id || hostEmp)) {
+                hostName = hostEmp?.full_name || hostName;
+            }
+
             if (!hosts[hostName]) hosts[hostName] = [];
             hosts[hostName].push(m);
         });
@@ -498,7 +578,7 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                         (m.costReport.snackCost || 0) +
                         (m.costReport.lunchCost || 0) +
                         (m.costReport.otherCost || 0) +
-                        ((m.costReport.audienceFee || 0) * (m.costReport.participantsCount || 0))
+                        ((m.costReport.audienceFee || 0) * (Math.max(m.costReport.participantsCount || 0, m.costReport.attendee_ids?.length || 0)))
                     );
                     totalTrainerIncentive += m.costReport.trainerIncentive || 0;
                 }
@@ -506,13 +586,14 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
 
             return {
                 host,
+                host_id: hostMeetings[0].employee_id,
                 sessions,
                 totalParticipants,
                 totalCost,
                 totalTrainerIncentive,
                 meetings: hostMeetings
             };
-        }).sort((a, b) => b.totalCost - a.totalCost); // Sort by highest cost? or sessions?
+        }).sort((a, b) => b.totalCost - a.totalCost);
     };
 
     const formatCurrency = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
@@ -607,14 +688,7 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                         onChange={(e) => setSelectedBranch(e.target.value)}
                         className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                     >
-                        <option value="All Branches">All Branches</option>
-                        <option value="Medan-HO">Medan-HO</option>
-                        <option value="Medan-Cabang">Medan-Cabang</option>
-                        <option value="Jakarta">Jakarta</option>
-                        <option value="Bali">Bali</option>
-                        <option value="Binjai">Binjai</option>
-                        <option value="Tanjung Morawa">Tanjung Morawa</option>
-                        <option value="Online">Online Only</option>
+                        {branches.map(b => <option key={b} value={b}>{b === 'Online' ? 'Online Only' : b}</option>)}
                     </select>
 
                     <select
@@ -845,13 +919,27 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Host Name</label>
-                                        <input
-                                            required
-                                            placeholder="Who is presenting?"
-                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600"
-                                            value={formData.host}
-                                            onChange={e => setFormData({ ...formData, host: e.target.value })}
-                                        />
+                                        <div className="relative">
+                                            <select
+                                                required
+                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-semibold text-slate-700 appearance-none"
+                                                value={formData.host_id}
+                                                onChange={e => {
+                                                    const emp = employees.find(emp => emp.id_employee === e.target.value);
+                                                    setFormData({ ...formData, host_id: e.target.value, host: emp?.full_name || '' });
+                                                }}
+                                            >
+                                                <option value="">Select Host...</option>
+                                                {employees.map(emp => (
+                                                    <option key={emp.id_employee} value={emp.id_employee}>
+                                                        {emp.full_name} ({emp.id_employee})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <div className="absolute right-4 top-3.5 pointer-events-none text-slate-400">
+                                                <Users size={16} />
+                                            </div>
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Event Type</label>
@@ -903,22 +991,57 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                 {/* Email Invites */}
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Invite Participants</label>
-                                    <div className="w-full px-3 py-2 rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500 bg-white transition-all min-h-[50px] flex flex-wrap gap-2">
-                                        {invitedEmails.map(email => (
-                                            <span key={email} className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 animate-in zoom-in-95">
-                                                {email}
-                                                <button onClick={() => removeEmail(email)} className="hover:text-indigo-900"><X size={12} /></button>
-                                            </span>
-                                        ))}
-                                        <input
-                                            className="flex-1 min-w-[120px] outline-none text-sm py-1"
-                                            placeholder={invitedEmails.length > 0 ? "" : "Type email and press Enter..."}
-                                            value={inviteEmail}
-                                            onChange={e => setInviteEmail(e.target.value)}
-                                            onKeyDown={handleInviteKeyDown}
-                                        />
+                                    <div className="flex flex-col gap-3">
+                                        <select
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-sm font-semibold text-slate-700"
+                                            onChange={(e) => {
+                                                const id = e.target.value;
+                                                if (!id) return;
+                                                const emp = employees.find(emp => emp.id_employee === id);
+                                                if (emp && !invitedEmployeeIds.includes(id)) {
+                                                    setInvitedEmployeeIds([...invitedEmployeeIds, id]);
+                                                    if (emp.email && !invitedEmails.includes(emp.email)) {
+                                                        setInvitedEmails([...invitedEmails, emp.email]);
+                                                    }
+                                                }
+                                                e.target.value = "";
+                                            }}
+                                        >
+                                            <option value="">Search Employee...</option>
+                                            {employees
+                                                .filter(e => !invitedEmployeeIds.includes(e.id_employee))
+                                                .map(emp => (
+                                                    <option key={emp.id_employee} value={emp.id_employee}>
+                                                        {emp.full_name} ({emp.id_employee})
+                                                    </option>
+                                                ))
+                                            }
+                                        </select>
+
+                                        <div className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 min-h-[50px] flex flex-wrap gap-2">
+                                            {invitedEmployeeIds.map(id => {
+                                                const emp = employees.find(e => e.id_employee === id);
+                                                return (
+                                                    <span key={id} className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1">
+                                                        {emp?.full_name || id}
+                                                        <button
+                                                            onClick={() => {
+                                                                setInvitedEmployeeIds(invitedEmployeeIds.filter(x => x !== id));
+                                                                if (emp?.email) setInvitedEmails(invitedEmails.filter(x => x !== emp.email));
+                                                            }}
+                                                            className="hover:text-indigo-900"
+                                                        >
+                                                            <X size={12} />
+                                                        </button>
+                                                    </span>
+                                                );
+                                            })}
+                                            {invitedEmails.length === 0 && invitedEmployeeIds.length === 0 && (
+                                                <span className="text-slate-400 text-xs py-1 px-1 italic">No participants added yet.</span>
+                                            )}
+                                        </div>
                                     </div>
-                                    <p className="text-[10px] text-slate-400 mt-1.5 pl-1">Press <kbd className="font-sans px-1 py-0.5 rounded border border-slate-300 bg-slate-50">Enter</kbd> to add email</p>
+                                    <p className="text-[10px] text-slate-400 mt-1.5 pl-1">Select employees from the list to invite them to this session.</p>
                                 </div>
 
                                 {/* Description */}
@@ -973,29 +1096,59 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Attendance Checklist</label>
                                     <div className={`bg-slate-50 rounded-xl border border-slate-200 p-3 max-h-[150px] overflow-y-auto space-y-2 ${reportData.isPaid ? 'opacity-60 pointer-events-none' : ''}`}>
-                                        {(meetings.find(m => m.id === reportingId)?.guests?.emails || []).length === 0 ? (
-                                            <p className="text-xs text-slate-400 italic text-center py-2">No invited guests found.</p>
-                                        ) : (
-                                            (meetings.find(m => m.id === reportingId)?.guests?.emails || []).map(email => (
-                                                <label key={email} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-100 cursor-pointer hover:border-blue-200 transition-colors">
-                                                    <input
-                                                        type="checkbox"
-                                                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
-                                                        checked={(reportData.attendees || []).includes(email)}
-                                                        onChange={() => toggleAttendee(email)}
-                                                    />
-                                                    <span className="text-sm text-slate-700 font-medium truncate">{email}</span>
-                                                </label>
-                                            ))
-                                        )}
+                                        {(() => {
+                                            const meeting = meetings.find(m => m.id === reportingId);
+                                            const invitedEmailsList = meeting?.guests?.emails || [];
+                                            const invitedEmployeeIdsList = (meeting?.guests as any)?.employee_ids || [];
+
+                                            if (invitedEmailsList.length === 0 && invitedEmployeeIdsList.length === 0) {
+                                                return <p className="text-xs text-slate-400 italic text-center py-2">No invited guests found.</p>;
+                                            }
+
+                                            // Combined checklist
+                                            return (
+                                                <div className="space-y-2">
+                                                    {invitedEmployeeIdsList.map((id: string) => {
+                                                        const emp = employees.find(e => e.id_employee === id);
+                                                        return (
+                                                            <label key={id} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-100 cursor-pointer hover:border-indigo-200 transition-colors">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                                    checked={(reportData.attendee_ids || []).includes(id)}
+                                                                    onChange={() => toggleAttendee("", id)}
+                                                                />
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-sm text-slate-700 font-bold">{emp?.full_name || id}</span>
+                                                                    <span className="text-[10px] text-slate-400">{id} {emp?.branch_name ? `• ${emp.branch_name}` : ''}</span>
+                                                                </div>
+                                                            </label>
+                                                        );
+                                                    })}
+                                                    {invitedEmailsList.filter((email: string) => !employees.some(emp => emp.email === email)).map((email: string) => (
+                                                        <label key={email} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-100 cursor-pointer hover:border-slate-200 transition-colors">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                                checked={(reportData.attendees || []).includes(email)}
+                                                                onChange={() => toggleAttendee(email)}
+                                                            />
+                                                            <span className="text-sm text-slate-700 font-medium truncate">{email}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                     <div className="flex justify-between items-center mt-2 px-1">
-                                        <span className="text-xs text-slate-400">Checked: {(reportData.attendees || []).length} / {meetings.find(m => m.id === reportingId)?.guests?.emails?.length || 0}</span>
+                                        <span className="text-xs text-slate-400">Checked: {Math.max((reportData.attendees || []).length, (reportData.attendee_ids || []).length)} / {Math.max(meetings.find(m => m.id === reportingId)?.guests?.emails?.length || 0, (meetings.find(m => m.id === reportingId)?.guests as any)?.employee_ids?.length || 0)}</span>
                                         <button
                                             type="button"
                                             onClick={() => {
-                                                const allEmails = meetings.find(m => m.id === reportingId)?.guests?.emails || [];
-                                                setReportData({ ...reportData, attendees: allEmails, participantsCount: allEmails.length });
+                                                const meeting = meetings.find(m => m.id === reportingId);
+                                                const allEmails = meeting?.guests?.emails || [];
+                                                const allIds = (meeting?.guests as any)?.employee_ids || [];
+                                                setReportData({ ...reportData, attendees: allEmails, attendee_ids: allIds, participantsCount: Math.max(allEmails.length, allIds.length) });
                                             }}
                                             className="text-[10px] font-bold text-blue-600 hover:underline"
                                         >
@@ -1410,10 +1563,24 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                                     if (!selectedMeeting) return;
                                                     try {
                                                         const parts = selectedMeeting.time.split(' - ');
-                                                        const start = parts[0] ? parts[0].trim() : '09:00';
-                                                        const end = parts[1] ? parts[1].trim() : '10:00';
-                                                        const startDate = new Date(`${selectedMeeting.date}T${start}`);
-                                                        const endDate = new Date(`${selectedMeeting.date}T${end}`);
+                                                        const startRaw = parts[0] ? parts[0].trim() : '09:00';
+                                                        const endRaw = parts[1] ? parts[1].trim() : '10:00';
+
+                                                        // Robust Date Extraction
+                                                        const baseDate = new Date(selectedMeeting.date).toISOString().split('T')[0];
+
+                                                        // Ensure HH:mm format
+                                                        const formatT = (t: string) => {
+                                                            const match = t.match(/(\d{1,2}):(\d{2})/);
+                                                            if (!match) return "00:00";
+                                                            return `${match[1].padStart(2, '0')}:${match[2]}`;
+                                                        };
+
+                                                        const startDate = new Date(`${baseDate}T${formatT(startRaw)}`);
+                                                        const endDate = new Date(`${baseDate}T${formatT(endRaw)}`);
+
+                                                        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) throw new Error("Invalid Date");
+
                                                         const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
                                                         const text = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:${selectedMeeting.title}\nDESCRIPTION:${selectedMeeting.description}\nLOCATION:${selectedMeeting.type === 'Online' ? selectedMeeting.meetLink : selectedMeeting.location}\nDTSTART:${fmt(startDate)}\nDTEND:${fmt(endDate)}\nEND:VEVENT\nEND:VCALENDAR`;
                                                         const blob = new Blob([text], { type: 'text/calendar' });
@@ -1436,10 +1603,24 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                                     if (!selectedMeeting) return;
                                                     try {
                                                         const parts = selectedMeeting.time.split(' - ');
-                                                        const start = parts[0] ? parts[0].trim() : '09:00';
-                                                        const end = parts[1] ? parts[1].trim() : '10:00';
-                                                        const startDate = new Date(`${selectedMeeting.date}T${start}`);
-                                                        const endDate = new Date(`${selectedMeeting.date}T${end}`);
+                                                        const startRaw = parts[0] ? parts[0].trim() : '09:00';
+                                                        const endRaw = parts[1] ? parts[1].trim() : '10:00';
+
+                                                        // Robust Date Extraction
+                                                        const baseDate = new Date(selectedMeeting.date).toISOString().split('T')[0];
+
+                                                        // Ensure HH:mm format
+                                                        const formatT = (t: string) => {
+                                                            const match = t.match(/(\d{1,2}):(\d{2})/);
+                                                            if (!match) return "00:00";
+                                                            return `${match[1].padStart(2, '0')}:${match[2]}`;
+                                                        };
+
+                                                        const startDate = new Date(`${baseDate}T${formatT(startRaw)}`);
+                                                        const endDate = new Date(`${baseDate}T${formatT(endRaw)}`);
+
+                                                        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) throw new Error("Invalid Date");
+
                                                         const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
                                                         const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(selectedMeeting.title)}&details=${encodeURIComponent(selectedMeeting.description)}&location=${encodeURIComponent(selectedMeeting.type === 'Online' ? (selectedMeeting.meetLink || 'Online') : (selectedMeeting.location || ''))}&dates=${fmt(startDate)}/${fmt(endDate)}`;
                                                         window.open(url, '_blank');
