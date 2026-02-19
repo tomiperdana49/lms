@@ -20,7 +20,7 @@ function App() {
   const [activePage, setActivePage] = useState<Page>('dashboard');
 
   // REPLACE THIS WITH YOUR ACTUAL GOOGLE CLIENT ID
-  const GOOGLE_CLIENT_ID = "735607886412-vgmgsm981577uhg72etjeoh30jjp8trs.apps.googleusercontent.com";
+  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "735607886412-vgmgsm981577uhg72etjeoh30jjp8trs.apps.googleusercontent.com";
 
   // If not logged in, show Login Page
   if (!user) {

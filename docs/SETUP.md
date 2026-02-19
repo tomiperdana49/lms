@@ -28,6 +28,10 @@
     DB_USER=root
     DB_PASSWORD=your_password
     DB_NAME=lms_db
+    PORT=3001
+
+    # Frontend Configuration
+    VITE_API_BASE_URL=http://localhost:3001
 
     # Database Configuration (SimAsset Integration)
     SIMAS_HOST=localhost
@@ -43,7 +47,7 @@
     SMTP_PASS=your_app_password
 
     # Google OAuth (Optional - required for real login)
-    GOOGLE_CLIENT_ID=your_google_client_id
+    VITE_GOOGLE_CLIENT_ID=your_google_client_id
     ```
 
     **Note:** 
@@ -56,7 +60,7 @@
     ```bash
     npm run server
     ```
-    This starts the Express server on port `3003`. It will automatically initialize the database tables if they don't exist.
+    This starts the Express server on port `3001` (as configured in `.env`). It will automatically initialize the database tables if they don't exist.
 
 2.  **Start the Frontend Development Server:**
     ```bash
