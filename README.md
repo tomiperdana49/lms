@@ -1,73 +1,43 @@
-# React + TypeScript + Vite
+# LMS (Learning Management System)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A comprehensive Learning Management System built with React, TypeScript, and Express.js, designed to manage employee training, reading logs, and internal courses.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **User Management:** Google OAuth authentication and role-based access control (Staff, Supervisor, HR).
+- **Training Requests:** Workflow for submitting and approving external training requests.
+- **Reading Logs:** Track employee reading habits, reviews, and verify evidence.
+- **Internal Courses:** Video-based courses with progress tracking and quizzes.
+- **Meeting Scheduler:** Organize meetings, invite guests, and track costs.
+- **Incentives:** Manage financial rewards for completed training and reading.
+- **SimAsset Integration:** Syncs employee data and asset borrowing history from an external system.
 
-## React Compiler
+## Documentation
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- [Setup Guide](docs/SETUP.md) - Installation and configuration instructions.
+- [Database Schema](docs/DATABASE.md) - Detailed database structure.
+- [API Documentation](docs/API.md) - Backend API endpoints.
+- [Frontend Architecture](docs/FRONTEND.md) - Overview of the React application structure.
 
-## Expanding the ESLint configuration
+## Tech Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Frontend:** React, TypeScript, Vite, Tailwind CSS
+- **Backend:** Node.js, Express.js
+- **Database:** MySQL (mysql2)
+- **Email:** Nodemailer (Gmail SMTP)
+- **Auth:** Google OAuth 2.0
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Quick Start
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+1.  Clone the repository.
+2.  Install dependencies: `npm install`
+3.  Configure `.env` (see [Setup Guide](docs/SETUP.md)).
+4.  Run the development server: `npm run dev:full`
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Project Structure
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- `src/`: Frontend source code (React components).
+- `server/`: Backend source code (Express server, database logic).
+- `simasset_databases_sql/`: Database dumps for the external SimAsset system.
+- `scripts/`: Utility scripts for data migration and testing.
+- `docs/`: Project documentation.
