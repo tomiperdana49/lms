@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from './components/DashboardLayout';
 import DashboardHome from './components/DashboardHome';
 import ReadingLogPage from './components/ReadingLogPage';
@@ -11,13 +11,49 @@ import LoginPage from './components/LoginPage';
 import UserManagement from './components/UserManagement';
 import AdminDashboard from './components/AdminDashboard';
 import IncentiveManager from './components/IncentiveManager';
+import PinjamBukuForm from './components/PinjamBukuForm';
 import type { Page, Role, User } from './types';
 
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 function App() {
-  const [user, setUser] = useState<User | null>(null);
-  const [activePage, setActivePage] = useState<Page>('dashboard');
+  const [user, setUser] = useState<User | null>(() => {
+    const savedUser = localStorage.getItem('lms_user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+  
+  const [activePage, setActivePage] = useState<Page>(() => {
+    if (window.location.pathname === '/pinjam-buku') return 'pinjam-buku';
+    
+    const savedPage = localStorage.getItem('lms_active_page');
+    
+    // Prevent auto-redirecting to /pinjam-buku when user specifically visits root /
+    if (window.location.pathname === '/' && savedPage === 'pinjam-buku') {
+      return 'dashboard';
+    }
+    
+    return (savedPage as Page) || 'dashboard';
+  });
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('lms_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('lms_user');
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (activePage) {
+      localStorage.setItem('lms_active_page', activePage);
+      // Synchronize URL without appending to history
+      if (activePage === 'pinjam-buku' && window.location.pathname !== '/pinjam-buku') {
+        window.history.replaceState(null, '', '/pinjam-buku');
+      } else if (activePage !== 'pinjam-buku' && window.location.pathname === '/pinjam-buku') {
+        window.history.replaceState(null, '', '/');
+      }
+    }
+  }, [activePage]);
 
   // REPLACE THIS WITH YOUR ACTUAL GOOGLE CLIENT ID
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "735607886412-vgmgsm981577uhg72etjeoh30jjp8trs.apps.googleusercontent.com";
@@ -32,10 +68,21 @@ function App() {
   }
 
   // Mock logout for demo
-  const handleLogout = () => setUser(null);
+  const handleLogout = () => {
+    setUser(null);
+    setActivePage('dashboard');
+    localStorage.removeItem('lms_user');
+    localStorage.removeItem('lms_active_page');
+  };
 
   // We use the logged-in user's role
   const userRole: Role = user.role;
+
+  if (activePage === 'pinjam-buku') {
+    return (
+        <PinjamBukuForm user={user!} onClose={() => setActivePage('dashboard')} />
+    );
+  }
 
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
@@ -43,8 +90,9 @@ function App() {
         activePage={activePage}
         onNavigate={setActivePage}
         userRole={userRole}
+        user={user!}
         onLogout={handleLogout}
-        onRoleChange={(role) => setUser({ ...user, role })}
+        onRoleChange={(role) => setUser({ ...user!, role })}
       >
         {activePage === 'dashboard' && <DashboardHome onNavigate={setActivePage} userRole={userRole} userEmail={user?.email} userName={user?.name} />}
         {activePage === 'reading-log' && (

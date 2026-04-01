@@ -15,9 +15,10 @@ interface Notification {
 interface NotificationPanelProps {
     userEmail?: string;
     userName?: string;
+    userRole?: string;
 }
 
-const NotificationPanel = ({ userEmail, userName }: NotificationPanelProps) => {
+const NotificationPanel = ({ userEmail, userName, userRole }: NotificationPanelProps) => {
     const [notifications, setNotifications] = useState<Notification[]>([]);
 
     useEffect(() => {
@@ -25,13 +26,15 @@ const NotificationPanel = ({ userEmail, userName }: NotificationPanelProps) => {
             if (!userEmail || !userName) return; // Wait for user details
 
             try {
-                const [meetingsRes, trainingRes] = await Promise.all([
+                const [meetingsRes, trainingRes, logsRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/api/meetings`),
-                    fetch(`${API_BASE_URL}/api/training`)
+                    fetch(`${API_BASE_URL}/api/training`),
+                    fetch(`${API_BASE_URL}/api/logs`)
                 ]);
 
                 const meetings = await meetingsRes.json();
                 const training = await trainingRes.json();
+                const logs = await logsRes.json();
 
                 // 1. Transform Meetings to Notifications
                 // Filter: Only include meetings where the user is invited (in guest list)
@@ -59,8 +62,23 @@ const NotificationPanel = ({ userEmail, userName }: NotificationPanelProps) => {
                         isRead: t.status !== 'PENDING_SUPERVISOR'
                     }));
 
+                // 3. Transform Reading Logs to Notifications for HR
+                let readingNotifs: Notification[] = [];
+                if (userRole === 'HR' || userRole === 'HR_ADMIN') {
+                    readingNotifs = logs
+                        .filter((l: any) => l.status === 'Finished' && l.hrApprovalStatus === 'Pending')
+                        .map((l: any) => ({
+                            id: l.id + 100000,
+                            title: `Klaim Baca Buku`,
+                            message: `${l.userName || 'Karyawan'} menyelesaikan buku "${l.title}". Menunggu verifikasi HR.`,
+                            time: new Date(l.date || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                            type: 'INFO',
+                            isRead: false
+                        }));
+                }
+
                 // Combine and Sort by latest
-                const all = [...meetingNotifs, ...trainingNotifs].sort((a, b) => b.id - a.id);
+                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs].sort((a, b) => b.id - a.id);
                 setNotifications(all);
             } catch (error) {
                 console.error("Failed to fetch notifications", error);
@@ -68,7 +86,7 @@ const NotificationPanel = ({ userEmail, userName }: NotificationPanelProps) => {
         };
 
         fetchNotifications();
-    }, [userEmail, userName]);
+    }, [userEmail, userName, userRole]);
 
     const getIcon = (type: Notification['type']) => {
         switch (type) {

@@ -80,6 +80,31 @@ export const initDB = async () => {
             console.log("Added link column to reading_logs.");
         } catch (e) { /* Ignore if exists */ }
 
+        try {
+            await connection.query("ALTER TABLE reading_logs ADD COLUMN approved_by VARCHAR(255)");
+            console.log("Added approved_by column to reading_logs.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE reading_logs ADD COLUMN sn VARCHAR(255)");
+            console.log("Added sn column to reading_logs.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE reading_logs ADD COLUMN approved_at DATETIME");
+            console.log("Added approved_at column to reading_logs.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE reading_logs ADD COLUMN planned_finish_date DATETIME");
+            console.log("Added planned_finish_date column to reading_logs.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("UPDATE reading_logs SET planned_finish_date = finish_date WHERE planned_finish_date IS NULL AND finish_date IS NOT NULL");
+            console.log("Migrated NULL planned_finish_date to match finish_date.");
+        } catch (e) { /* Ignore */ }
+
         // 3. Seed Data if Users table is empty
 
         const [rows] = await connection.query('SELECT COUNT(*) as count FROM users');

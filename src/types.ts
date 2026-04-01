@@ -18,9 +18,13 @@ export interface ReadingLogEntry {
     incentiveAmount?: number; // New: Approved incentive amount
     rejectionReason?: string; // New: Reason for rejection
     employee_id?: string;
+    approvedBy?: string;
+    sn?: string;
+    approvedAt?: string;
+    plannedFinishDate?: string;
 }
 
-export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'external-approval' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives';
+export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'external-approval' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives' | 'pinjam-buku';
 export type Role = 'STAFF' | 'SUPERVISOR' | 'HR' | 'HR_ADMIN';
 export type AdminView = 'users' | 'logs' | 'approval' | 'meetings' | 'courses' | 'assets' | 'employees';
 

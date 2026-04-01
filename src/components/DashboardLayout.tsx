@@ -13,18 +13,19 @@ import {
     LogOut,
     Award
 } from 'lucide-react';
-import type { Page, Role } from '../types';
+import type { Page, Role, User } from '../types';
 
 interface DashboardLayoutProps {
     children: ReactNode;
     activePage: Page;
     onNavigate: (page: Page) => void;
     userRole: Role;
-    onRoleChange: (role: Role) => void; // Keeping for compatibility, but might be less used
+    user: User;
+    onRoleChange: (role: Role) => void; 
     onLogout: () => void;
 }
 
-const DashboardLayout = ({ children, activePage, onNavigate, userRole, onLogout }: DashboardLayoutProps) => {
+const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onLogout }: DashboardLayoutProps) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
@@ -39,15 +40,15 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, onLogout 
         { icon: Award, label: 'Incentives', id: 'incentives' },
     ];
 
-    const getRoleLabel = (role: Role) => {
-        switch (role) {
-            case 'STAFF': return 'Staff';
-            case 'SUPERVISOR': return 'Supervisor';
-            case 'HR':
-            case 'HR_ADMIN': return 'HR Super Admin';
-            default: return 'User';
-        }
+    const getInitials = (name: string) => {
+        return name
+            .split(' ')
+            .map(n => (n && n[0]) || '')
+            .join('')
+            .toUpperCase()
+            .substring(0, 2);
     };
+
 
     return (
         <div className="min-h-screen bg-gray-50 flex font-sans text-slate-800">
@@ -148,15 +149,15 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, onLogout 
 
                         <div className="flex items-center gap-3 pl-6 border-l border-gray-200">
                             <div className="text-right hidden sm:block">
-                                <p className="text-sm font-semibold text-slate-800">Demo User</p>
-                                <p className="text-xs text-blue-600 font-bold">{getRoleLabel(userRole)}</p>
+                                <p className="text-sm font-semibold text-slate-800">{user?.name || 'User'}</p>
+                                <p className="text-xs text-blue-600 font-bold">{user?.branch || 'Nusanet'}</p>
                             </div>
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white
-                                ${(userRole === 'HR' || userRole === 'HR_ADMIN') ? 'bg-gradient-to-tr from-purple-500 to-pink-600' :
+                                ${userRole === 'HR' || userRole === 'HR_ADMIN' ? 'bg-gradient-to-tr from-purple-500 to-pink-600' :
                                     userRole === 'SUPERVISOR' ? 'bg-gradient-to-tr from-orange-500 to-red-500' :
                                         'bg-gradient-to-tr from-blue-500 to-teal-500'}
                             `}>
-                                {(userRole === 'HR' || userRole === 'HR_ADMIN') ? 'HR' : userRole === 'SUPERVISOR' ? 'SV' : 'ST'}
+                                {user?.name ? getInitials(user.name) : 'U'}
                             </div>
                         </div>
                     </div>

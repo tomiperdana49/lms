@@ -93,6 +93,7 @@ const upload = multer({ storage: storage });
 
 // Serve Static Files
 app.use('/uploads', express.static(UPLOADS_DIR));
+app.use('/api/uploads', express.static(UPLOADS_DIR));
 
 // --- AUTH POOL WRAPPERS ---
 // Helper to execute query safely
@@ -158,31 +159,164 @@ app.post('/api/login', async (req, res) => {
         const loginId = (identifier || email || '').trim();
         const cleanPassword = (password || '').trim();
 
-        console.log(`[LOGIN ATTEMPT] Type: ${identifier ? 'Identifier' : 'Email'}, Value: '${loginId}', Password: '${cleanPassword}'`);
+        console.log(`[LOGIN ATTEMPT] Value: '${loginId}'`);
 
         // --- DEBUG BYPASS start ---
         if (loginId === 'staff@nusa.com' && cleanPassword === '123') {
-            console.log("DEBUG BYPASS ACTIVATED: STAFF");
             return res.json({ success: true, user: { id: 'demo1', name: 'Demo Staff', role: 'STAFF', email: 'staff@nusa.com', branch: 'Headquarters' } });
         }
         if (loginId === 'hr@nusa.com' && cleanPassword === '123') {
-            console.log("DEBUG BYPASS ACTIVATED: HR");
             return res.json({ success: true, user: { id: 'demo3', name: 'Demo HR', role: 'HR', email: 'hr@nusa.com', branch: 'Headquarters' } });
+        }
+        if (loginId === 'spv@nusa.com' && cleanPassword === '123') {
+            return res.json({ success: true, user: { id: 'demo2', name: 'Demo Supervisor', role: 'SUPERVISOR', email: 'spv@nusa.com', branch: 'Headquarters' } });
         }
         // --- DEBUG BYPASS end ---
 
-        const users = await query(
+        // 2. First try: Local database check (including legacy users and demo accounts in DB)
+        const localUsers = await query(
             'SELECT * FROM users WHERE (email = ? OR employee_id = ?) AND password = ?',
             [loginId, loginId, cleanPassword]
         );
 
-        console.log(`[LOGIN RESULT] Found ${users.length} users.`);
+        if (localUsers.length > 0) {
+            console.log(`[LOGIN SUCCESS] Local user found for ${loginId}`);
+            const user = localUsers[0];
+            return res.json({ success: true, user: { id: user.id, name: user.name, role: user.role, email: user.email, branch: user.branch, employee_id: user.employee_id } });
+        }
 
-        if (users.length > 0) {
-            const user = users[0];
-            res.json({ success: true, user: { id: user.id, name: user.name, role: user.role, email: user.email, branch: user.branch, employee_id: user.employee_id } });
-        } else {
-            res.status(401).json({ success: false, message: 'Invalid credentials' });
+        // 3. Second try: Nusanet OAuth API (for those not yet in LMS or using Nusanet account)
+        const baseUrl = process.env.NUSANET_BASE_URL || 'https://nusanet.app.nusawork.com';
+        const authUrl = process.env.NUSANET_AUTH_URL || `${baseUrl}/auth/api/oauth/token`;
+        const clientId = process.env.NUSANET_CLIENT_ID || '4';
+        const clientSecret = process.env.NUSANET_CLIENT_SECRET || 'hltSSRhqOAqfA6VRsQIpa9Xfw9m3Ro8LXuTh4Omn';
+
+        try {
+            console.log(`[NUSANET AUTH] Attempting for ${loginId}`);
+            const authResponse = await fetch(authUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'application/json',
+                    'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+                },
+                body: new URLSearchParams({
+                    grant_type: 'password',
+                    client_id: clientId,
+                    client_secret: clientSecret,
+                    username: loginId,
+                    password: cleanPassword
+                })
+            });
+
+            const authData = await authResponse.json();
+            console.log(`[NUSANET AUTH] Response for ${loginId}:`, authData);
+
+            if (authResponse.ok && authData.access_token) {
+                console.log(`[NUSANET AUTH] Success for ${loginId}`);
+                const accessToken = authData.access_token;
+
+                // 3.1 Fetch User Session info (to get ID)
+                let nusanetUserId = null;
+                try {
+                    const sessionUrl = `${baseUrl}/auth/api/client/users/email/${loginId}`;
+                    const sessionResponse = await fetch(sessionUrl, {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    const sessionData = await sessionResponse.json();
+                    nusanetUserId = sessionData.id || sessionData.uid || (sessionData.data ? sessionData.data.id : null);
+                    console.log(`[NUSANET PROFILE] Found User ID: ${nusanetUserId}`);
+                } catch (e) { console.error("[NUSANET PROFILE] Error fetching session info:", e); }
+
+                // 3.2 Fetch Full Employee Detail (if ID found)
+                let fullName = loginId.split('@')[0].replace('.', ' ');
+                let employeeId = null;
+                let branchName = 'Headquarters';
+
+                if (nusanetUserId) {
+                    try {
+                        const profileUrl = `${baseUrl}/emp/api/v1.1/employee/${nusanetUserId}`;
+                        const profileResponse = await fetch(profileUrl, {
+                            headers: { 'Authorization': `Bearer ${accessToken}` }
+                        });
+                        const profileData = await profileResponse.json();
+                        // Adjust data mapping based on common Nusanet response structures
+                        const p = profileData.data || profileData;
+                        console.log(`[NUSANET PROFILE] Full Data:`, JSON.stringify(p, null, 2)); // Debug log for structure
+
+                        // Extract name from 'user' object or top level
+                        if (p.user && typeof p.user === 'object') {
+                            fullName = p.user.name || p.user.full_name || fullName;
+                        } else {
+                            fullName = p.full_name || p.name || fullName;
+                        }
+
+                        employeeId = p.id_employee || p.employee_id || null;
+
+                        // Use organization_name as branch if available
+                        branchName = p.organization_name || p.branch_name || (p.branch ? p.branch.name : 'Headquarters');
+
+                        console.log(`[NUSANET PROFILE] Fetched detail for: ${fullName} (${employeeId}) at ${branchName}`);
+                    } catch (e) { console.error("[NUSANET PROFILE] Error fetching full profile:", e); }
+                }
+
+                // Determine LMS role from Nusanet roles
+                let lmsRole = 'STAFF';
+                if (authData.role && authData.role.role_name) {
+                    const roles = Array.isArray(authData.role.role_name) ? authData.role.role_name : [authData.role.role_name];
+                    if (roles.some(r => r.toUpperCase().includes('ADMIN') || r.toUpperCase().includes('HR'))) {
+                        lmsRole = 'HR';
+                    } else if (roles.some(r => r.toUpperCase().includes('SPV') || r.toUpperCase().includes('SUPERVISOR'))) {
+                        lmsRole = 'SUPERVISOR';
+                    }
+                }
+
+                // Check SimAsset for ID if not found in Nusanet profile
+                if (!employeeId) {
+                    const employees = await querySimAsset('SELECT * FROM employees WHERE email = ?', [loginId]);
+                    if (employees.length > 0) {
+                        employeeId = employees[0].id_employee;
+                        if (!fullName || fullName.includes(' ')) fullName = employees[0].full_name;
+                    }
+                }
+
+                // Find or Sync local record
+                let users = await query('SELECT * FROM users WHERE email = ?', [loginId]);
+                let user = users[0];
+                const avatar = `https://ui-avatars.com/api/?name=${fullName}&background=random`;
+
+                if (!user) {
+                    console.log(`[NUSANET AUTH] Creating new local record for ${loginId}`);
+                    const id = Date.now().toString();
+                    await query('INSERT INTO users (id, email, password, name, role, avatar, branch, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                        [id, loginId, 'nusanet-oauth-placeholder', fullName, lmsRole, avatar, branchName, employeeId]);
+
+                    user = { id, email: loginId, name: fullName, role: lmsRole, avatar, branch: branchName, employee_id: employeeId };
+                } else {
+                    console.log(`[NUSANET AUTH] Syncing existing user data for ${loginId}`);
+                    await query('UPDATE users SET name = ?, role = ?, branch = ?, employee_id = ? WHERE id = ?',
+                        [fullName, lmsRole, branchName, employeeId, user.id]);
+                    user = { ...user, name: fullName, role: lmsRole, branch: branchName, employee_id: employeeId };
+                }
+
+                return res.json({
+                    success: true,
+                    user: {
+                        id: user.id,
+                        name: user.name,
+                        role: user.role,
+                        email: user.email,
+                        branch: user.branch,
+                        employee_id: user.employee_id
+                    }
+                });
+            } else {
+                console.log(`[NUSANET AUTH] Failed: ${authData.message || 'Unknown error'}`);
+                return res.status(401).json({ success: false, message: authData.message || 'Invalid credentials' });
+            }
+        } catch (authErr) {
+            console.error(`[NUSANET AUTH] Error:`, authErr);
+            return res.status(500).json({ error: 'Authentication service error' });
         }
     } catch (err) {
         console.error(err);
@@ -340,6 +474,34 @@ app.delete('/api/users/:id', async (req, res) => {
 
 
 
+// --- SIMAS PROXY ROUTES ---
+app.get('/api/simas/books', async (req, res) => {
+    try {
+        const { branchId, sn } = req.query;
+        let url = process.env.SIMAS_API_URL || 'https://simas.nusa.id/api/v2/book?hasHolder=false&branchId=020';
+
+        if (branchId) {
+            url += `&branchId=${branchId}`;
+        }
+        if (sn) {
+            url += `&sn=${sn}`;
+        }
+
+        const apiKey = process.env.SIMAS_API_KEY || '';
+        const response = await fetch(url, {
+            headers: { 'x-api-key': apiKey }
+        });
+        if (!response.ok) {
+            return res.status(response.status).json({ error: 'Failed to fetch from SIMAS' });
+        }
+        const data = await response.json();
+        res.json(data);
+    } catch (err) {
+        console.error("SIMAS Fetch Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- READING LOGS ROUTES ---
 app.get('/api/logs', async (req, res) => {
     try {
@@ -355,7 +517,11 @@ app.get('/api/logs', async (req, res) => {
             evidenceUrl: log.evidence_url,
             hrApprovalStatus: log.hr_approval_status,
             incentiveAmount: log.incentive_amount,
-            rejectionReason: log.rejection_reason
+            rejectionReason: log.rejection_reason,
+            approvedBy: log.approved_by,
+            sn: log.sn,
+            approvedAt: log.approved_at,
+            plannedFinishDate: log.planned_finish_date
         }));
         res.json(mappedLogs);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -364,8 +530,9 @@ app.get('/api/logs', async (req, res) => {
 app.post('/api/logs', async (req, res) => {
     try {
         const log = req.body;
+        console.log("[POST LOG] Received:", JSON.stringify(log, null, 2));
         const result = await query(
-            'INSERT INTO reading_logs (title, author, category, date, duration, review, status, user_name, employee_id, evidence_url, start_date, finish_date, reading_duration, hr_approval_status, link) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO reading_logs (title, author, category, date, duration, review, status, user_name, employee_id, evidence_url, start_date, finish_date, reading_duration, hr_approval_status, link, sn, planned_finish_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 log.title,
                 log.author || '',
@@ -381,7 +548,9 @@ app.post('/api/logs', async (req, res) => {
                 log.finishDate ? new Date(log.finishDate) : null,
                 log.readingDuration || 0,
                 log.hrApprovalStatus || 'Pending',
-                log.link || ''
+                log.link || '',
+                log.sn || '',
+                log.finishDate ? new Date(log.finishDate) : null
             ]
         );
         const newLogs = await query('SELECT * FROM reading_logs WHERE id = ?', [result.insertId]);
@@ -397,7 +566,10 @@ app.post('/api/logs', async (req, res) => {
             evidenceUrl: newLog.evidence_url,
             hrApprovalStatus: newLog.hr_approval_status,
             incentiveAmount: newLog.incentive_amount,
-            rejectionReason: newLog.rejection_reason
+            rejectionReason: newLog.rejection_reason,
+            sn: newLog.sn,
+            approvedAt: newLog.approved_at,
+            plannedFinishDate: newLog.planned_finish_date
         });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -435,6 +607,16 @@ app.put('/api/logs/:id', async (req, res) => {
         if (updates.hrApprovalStatus !== undefined) dbUpdates.hr_approval_status = updates.hrApprovalStatus;
         if (updates.incentiveAmount !== undefined) dbUpdates.incentive_amount = updates.incentiveAmount;
         if (updates.rejectionReason !== undefined) dbUpdates.rejection_reason = updates.rejectionReason;
+        if (updates.approvedBy !== undefined) dbUpdates.approved_by = updates.approvedBy;
+        if (updates.sn !== undefined) dbUpdates.sn = updates.sn;
+        if (updates.approvedBy !== undefined) dbUpdates.approved_by = updates.approvedBy;
+        if (updates.approvedAt !== undefined) dbUpdates.approved_at = updates.approvedAt;
+        if (updates.plannedFinishDate !== undefined) dbUpdates.planned_finish_date = updates.plannedFinishDate;
+        
+        // Auto set approved_at if status changes to Approved
+        if (updates.hrApprovalStatus === 'Approved') {
+            dbUpdates.approved_at = new Date();
+        }
         if (updates.status !== undefined) dbUpdates.status = updates.status;
         if (updates.review !== undefined) dbUpdates.review = updates.review;
         if (updates.link !== undefined) dbUpdates.link = updates.link;
@@ -535,7 +717,11 @@ app.post('/api/books/return', async (req, res) => {
             evidenceUrl: updated.evidence_url,
             hrApprovalStatus: updated.hr_approval_status,
             incentiveAmount: updated.incentive_amount,
-            rejectionReason: updated.rejection_reason
+            rejectionReason: updated.rejection_reason,
+            sn: updated.sn,
+            approvedBy: updated.approved_by,
+            approvedAt: updated.approved_at,
+            plannedFinishDate: updated.planned_finish_date
         });
     } catch (err) {
         console.error(err);

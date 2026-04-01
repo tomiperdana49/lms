@@ -10,6 +10,7 @@ interface ConfirmationModalProps {
     confirmText?: string;
     cancelText?: string;
     variant?: 'danger' | 'warning' | 'info' | 'success';
+    hideConfirm?: boolean;
 }
 
 const ConfirmationModal = ({
@@ -20,7 +21,8 @@ const ConfirmationModal = ({
     message,
     confirmText = 'Confirm',
     cancelText = 'Cancel',
-    variant = 'danger'
+    variant = 'danger',
+    hideConfirm = false
 }: ConfirmationModalProps) => {
     if (!isOpen) return null;
 
@@ -42,20 +44,22 @@ const ConfirmationModal = ({
                     <div className="flex gap-3 w-full">
                         <button
                             onClick={onClose}
-                            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+                            className={`flex-1 py-2.5 rounded-xl border border-slate-200 font-bold transition-colors ${hideConfirm ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg' : 'text-slate-600 hover:bg-slate-50'}`}
                         >
                             {cancelText}
                         </button>
-                        <button
-                            onClick={() => { onConfirm(); onClose(); }}
-                            className={`flex-1 py-2.5 rounded-xl text-white font-bold shadow-lg transition-colors ${variant === 'danger' ? 'bg-red-600 hover:bg-red-700 shadow-red-200' :
-                                    variant === 'warning' ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-200' :
-                                        variant === 'success' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' :
-                                            'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
-                                }`}
-                        >
-                            {confirmText}
-                        </button>
+                        {!hideConfirm && (
+                            <button
+                                onClick={() => { onConfirm(); onClose(); }}
+                                className={`flex-1 py-2.5 rounded-xl text-white font-bold shadow-lg transition-colors ${variant === 'danger' ? 'bg-red-600 hover:bg-red-700 shadow-red-200' :
+                                        variant === 'warning' ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-200' :
+                                            variant === 'success' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' :
+                                                'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
+                                    }`}
+                            >
+                                {confirmText}
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>

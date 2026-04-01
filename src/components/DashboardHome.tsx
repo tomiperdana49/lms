@@ -147,7 +147,7 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName }: DashboardH
 
                 {/* --- Right Column: Notifications (3 cols) --- */}
                 <div className="lg:col-span-3 h-full overflow-hidden">
-                    <NotificationPanel userEmail={userEmail} userName={userName} />
+                    <NotificationPanel userEmail={userEmail} userName={userName} userRole={userRole} />
                 </div>
 
             </div>
