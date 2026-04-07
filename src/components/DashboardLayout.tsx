@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import {
     LayoutDashboard,
     Library,
@@ -11,26 +11,64 @@ import {
     Bell,
     Search,
     LogOut,
-    Award
+    Award,
+    Shield,
+    ChevronDown,
+    ChevronUp,
+    FileText,
+    TrendingUp
 } from 'lucide-react';
 import type { Page, Role, User } from '../types';
 
 interface DashboardLayoutProps {
     children: ReactNode;
     activePage: Page;
-    onNavigate: (page: Page) => void;
+    onNavigate: (page: Page, view?: string) => void;
     userRole: Role;
     user: User;
     onRoleChange: (role: Role) => void; 
     onLogout: () => void;
+    adminView?: string;
 }
 
-const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onLogout }: DashboardLayoutProps) => {
+const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onLogout, adminView }: DashboardLayoutProps) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isAdminOpen, setIsAdminOpen] = useState(() => {
+        const saved = localStorage.getItem('lms_admin_sidebar_open');
+        if (saved !== null) return saved === 'true';
+        return activePage === 'admin-dashboard';
+    });
 
+    // Sync admin sidebar state to localStorage
+    useEffect(() => {
+        localStorage.setItem('lms_admin_sidebar_open', String(isAdminOpen));
+    }, [isAdminOpen]);
+
+    // Force open if navigated from outside
+    useEffect(() => {
+        if (activePage === 'admin-dashboard') {
+            setIsAdminOpen(true);
+        }
+    }, [activePage]);
+    
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+    
+    // List sub-menu admin agar sama dengan gambar
+    const adminSubItems = [
+        { icon: LayoutDashboard, label: 'Overview', id: 'admin-dashboard', view: 'overview' },
+        { icon: Calendar, label: 'Calendar', id: 'admin-dashboard', view: 'calendar' },
+        { header: 'MANAGEMENT' },
+        { icon: Users, label: 'User Management', id: 'admin-dashboard', view: 'users' },
+        { icon: BookOpen, label: 'Online Modules Management', id: 'admin-dashboard', view: 'courses' },
+        { icon: FileText, label: 'Reading Logs', id: 'admin-dashboard', view: 'logs' },
+        { icon: FileText, label: 'Training Requests', id: 'admin-dashboard', view: 'training' },
+        { icon: Award, label: 'Quiz Reports', id: 'admin-dashboard', view: 'quiz-reports' },
+        { icon: TrendingUp, label: 'HR Reports', id: 'admin-dashboard', view: 'reports' },
+        { icon: Award, label: 'Incentives', id: 'admin-dashboard', view: 'incentives' },
+        { icon: Users, label: 'Training Internal', id: 'admin-dashboard', view: 'meetings' },
+    ];
 
-    const menuItems: { icon: React.ElementType; label: string; id: Page | string }[] = [
+    const menuItems = [
         { icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard' },
         { icon: Library, label: 'Reading Log', id: 'reading-log' },
         { icon: BookOpen, label: 'Online Modules', id: 'courses' },
@@ -84,20 +122,68 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                 key={item.label}
                                 onClick={() => {
                                     onNavigate(item.id as Page);
-                                    setIsSidebarOpen(false); // Close on mobile
+                                    setIsSidebarOpen(false);
                                 }}
                                 className={`
-                  w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left
-                  ${activePage === item.id
+                                    w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left
+                                    ${activePage === item.id
                                         ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
                                         : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                                     }
-                `}
+                                `}
                             >
                                 <item.icon size={20} />
                                 <span className="font-medium">{item.label}</span>
                             </button>
                         ))}
+
+                        {/* Admin Panel Expandable */}
+                        {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                            <div className="pt-2">
+                                <button
+                                    onClick={() => setIsAdminOpen(!isAdminOpen)}
+                                    className={`
+                                        w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors text-left
+                                        ${activePage === 'admin-dashboard' || isAdminOpen
+                                            ? 'bg-slate-800 text-white'
+                                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                        }
+                                    `}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <Shield size={20} />
+                                        <span className="font-medium">Admin Panel</span>
+                                    </div>
+                                    {isAdminOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                </button>
+
+                                {/* SUB-MENU (Accordion) */}
+                                {isAdminOpen && (
+                                    <div className="mt-2 ml-4 space-y-1 border-l border-slate-700">
+                                        <p className="px-6 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 mt-4">Main</p>
+                                        {adminSubItems.map((sub, idx) => (
+                                            sub.header ? (
+                                                <p key={idx} className="px-6 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 mt-6">{sub.header}</p>
+                                            ) : (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => {
+                                                        onNavigate(sub.id as Page, sub.view);
+                                                        setIsSidebarOpen(false);
+                                                    }}
+                                                    className={`w-full flex items-center gap-3 px-6 py-2 text-sm transition-colors text-left
+                                                        ${activePage === 'admin-dashboard' && sub.view === adminView ? 'text-white font-semibold' : 'text-slate-400 hover:text-white'}
+                                                    `}
+                                                >
+                                                    {sub.icon && <sub.icon size={16} className="opacity-70" />}
+                                                    <span>{sub.label}</span>
+                                                </button>
+                                            )
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </nav>
 
                     {/* Logout Button (Sidebar Bottom) */}
@@ -149,8 +235,9 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
 
                         <div className="flex items-center gap-3 pl-6 border-l border-gray-200">
                             <div className="text-right hidden sm:block">
-                                <p className="text-sm font-semibold text-slate-800">{user?.name || 'User'}</p>
-                                <p className="text-xs text-blue-600 font-bold">{user?.branch || 'Nusanet'}</p>
+                                <p className="text-sm font-semibold text-slate-800 leading-tight">{user?.name || 'User'}</p>
+                                {user?.employee_id && <p className="text-[10px] text-slate-500 font-medium leading-tight">{user.employee_id}</p>}
+                                <p className="text-xs text-blue-600 font-bold leading-tight mt-0.5">{user?.branch || 'Nusanet'}</p>
                             </div>
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white
                                 ${userRole === 'HR' || userRole === 'HR_ADMIN' ? 'bg-gradient-to-tr from-purple-500 to-pink-600' :

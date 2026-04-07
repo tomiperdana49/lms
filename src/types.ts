@@ -1,5 +1,5 @@
 export interface ReadingLogEntry {
-    id: number;
+    id: number | string;
     title: string;
     category: string;
     link?: string;
@@ -14,7 +14,8 @@ export interface ReadingLogEntry {
     startDate?: string;
     finishDate?: string;
     evidenceUrl?: string;
-    hrApprovalStatus?: 'Pending' | 'Approved' | 'Rejected'; // New: HR verification
+    returnEvidenceUrl?: string;
+    hrApprovalStatus?: 'Pending' | 'Approved' | 'Rejected' | 'Draft'; // New: HR verification
     incentiveAmount?: number; // New: Approved incentive amount
     rejectionReason?: string; // New: Reason for rejection
     employee_id?: string;
@@ -24,7 +25,7 @@ export interface ReadingLogEntry {
     plannedFinishDate?: string;
 }
 
-export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'external-approval' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives' | 'pinjam-buku';
+export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'external-approval' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives';
 export type Role = 'STAFF' | 'SUPERVISOR' | 'HR' | 'HR_ADMIN';
 export type AdminView = 'users' | 'logs' | 'approval' | 'meetings' | 'courses' | 'assets' | 'employees';
 

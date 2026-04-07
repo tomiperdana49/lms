@@ -101,6 +101,16 @@ export const initDB = async () => {
         } catch (e) { /* Ignore if exists */ }
 
         try {
+            await connection.query("ALTER TABLE reading_logs ADD COLUMN location VARCHAR(100)");
+            console.log("Added location column to reading_logs.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE reading_logs ADD COLUMN source VARCHAR(100)");
+            console.log("Added source column to reading_logs.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
             await connection.query("UPDATE reading_logs SET planned_finish_date = finish_date WHERE planned_finish_date IS NULL AND finish_date IS NOT NULL");
             console.log("Migrated NULL planned_finish_date to match finish_date.");
         } catch (e) { /* Ignore */ }
@@ -173,6 +183,16 @@ export const initDB = async () => {
         try {
             await connection.query("ALTER TABLE meetings ADD COLUMN host VARCHAR(255)");
             console.log("Added host column to meetings.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE reading_logs ADD COLUMN location VARCHAR(100)");
+            console.log("Added location column to reading_logs.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE reading_logs ADD COLUMN source VARCHAR(100)");
+            console.log("Added source column to reading_logs.");
         } catch (e) { /* Ignore if exists */ }
 
         connection.release();

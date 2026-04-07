@@ -1,4 +1,4 @@
-import { BookOpen, Users, Briefcase, Calendar as CalendarIcon, Video, GraduationCap, Shield, Award } from 'lucide-react';
+import { BookOpen, Users, Briefcase, Calendar as CalendarIcon, Video, GraduationCap, Award } from 'lucide-react';
 import type { Page, Role } from '../types';
 import LMSCalendar from './LMSCalendar';
 
@@ -64,20 +64,7 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName }: DashboardH
         }
     ];
 
-    const adminItems = [];
-    if (userRole === 'HR' || userRole === 'HR_ADMIN') {
-        adminItems.push({
-            title: 'Admin Panel',
-            subtitle: 'Centralized Management',
-            icon: <Shield size={24} />,
-            page: 'admin-dashboard' as Page,
-            color: 'text-indigo-600',
-            bg: 'bg-indigo-50',
-            fullWidth: true
-        });
-    }
-
-    const menuItems = [...baseMenuItems, ...adminItems];
+    const menuItems = [...baseMenuItems];
 
     return (
         <div className="max-w-[1600px] mx-auto pt-4 px-4 h-[calc(100vh-100px)] flex flex-col">

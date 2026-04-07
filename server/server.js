@@ -502,6 +502,91 @@ app.get('/api/simas/books', async (req, res) => {
     }
 });
 
+app.post('/api/simas/sync', async (req, res) => {
+    try {
+        const { employee_id, user_name } = req.body;
+        if (!employee_id) return res.json({ success: true, message: 'No employee_id provided' });
+
+        const baseUrl = process.env.SIMAS_API_BASE_URL || 'https://simas.nusa.id/';
+        let url = `${baseUrl}api/v2/book/loan`;
+        const apiKey = process.env.SIMAS_API_KEY || '';
+        const response = await fetch(url, { headers: { 'x-api-key': apiKey } });
+        
+        if (!response.ok) return res.status(response.status).json({ error: 'Failed to fetch from SIMAS loans' });
+        
+        const dataJson = await response.json();
+        if (dataJson.success && dataJson.data && dataJson.data.length > 0) {
+            const simasData = dataJson.data[0];
+            if (simasData[employee_id]) {
+                const empLoans = simasData[employee_id].bookLoans;
+                if (empLoans) {
+                    for (const uuid of Object.keys(empLoans)) {
+                        const b = empLoans[uuid];
+                        if (!b.loanHistory || !b.loanHistory.loaning) continue;
+
+                        const sn = b.code;
+                        const startDateRaw = b.loanHistory.loaning.loanPeriod;
+                        const startDate = new Date(startDateRaw);
+                        const isReturned = b.loanHistory.return && b.loanHistory.return.returnTime;
+                        const finishDateRaw = isReturned ? b.loanHistory.return.returnTime : null;
+
+                        // Check if exists
+                        const existing = await query('SELECT * FROM reading_logs WHERE source = ? AND employee_id = ? AND sn = ? AND DATE(start_date) = ?', 
+                            ['SIMAS', employee_id, sn, startDateRaw]);
+
+                        if (existing.length === 0) {
+                            // Insert
+                            await query(
+                                'INSERT IGNORE INTO reading_logs (title, author, category, date, review, status, user_name, employee_id, evidence_url, return_evidence_url, start_date, finish_date, hr_approval_status, link, sn, location, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                                [
+                                    b.name,
+                                    '',
+                                    b.subCategory || 'Lainnya',
+                                    startDate,
+                                    isReturned ? (b.loanHistory.return.linkReview || '') : '',
+                                    isReturned ? 'Finished' : 'Reading',
+                                    user_name,
+                                    employee_id,
+                                    b.loanHistory.loaning.loanPhoto || '',
+                                    isReturned ? (b.loanHistory.return.returnPhoto || '') : '',
+                                    startDate,
+                                    finishDateRaw ? new Date(finishDateRaw) : null,
+                                    isReturned ? 'Draft' : 'Pending', 
+                                    isReturned ? (b.loanHistory.return.linkReview || '') : '',
+                                    sn,
+                                    'Kantor',
+                                    'SIMAS'
+                                ]
+                            );
+                        } else {
+                            // Exists. Check if we need to update (e.g. was Reading and now Finished)
+                            const log = existing[0];
+                            if (log.status === 'Reading' && isReturned) {
+                                await query(
+                                    'UPDATE reading_logs SET status = ?, finish_date = ?, return_evidence_url = ?, link = ?, review = ?, hr_approval_status = ? WHERE id = ?',
+                                    [
+                                        'Finished',
+                                        new Date(finishDateRaw),
+                                        b.loanHistory.return.returnPhoto || '',
+                                        b.loanHistory.return.linkReview || '',
+                                        b.loanHistory.return.linkReview || '',
+                                        'Draft',
+                                        log.id
+                                    ]
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error("SIMAS Sync Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- READING LOGS ROUTES ---
 app.get('/api/logs', async (req, res) => {
     try {
@@ -515,6 +600,7 @@ app.get('/api/logs', async (req, res) => {
             startDate: log.start_date,
             finishDate: log.finish_date,
             evidenceUrl: log.evidence_url,
+            returnEvidenceUrl: log.return_evidence_url,
             hrApprovalStatus: log.hr_approval_status,
             incentiveAmount: log.incentive_amount,
             rejectionReason: log.rejection_reason,
@@ -532,7 +618,7 @@ app.post('/api/logs', async (req, res) => {
         const log = req.body;
         console.log("[POST LOG] Received:", JSON.stringify(log, null, 2));
         const result = await query(
-            'INSERT INTO reading_logs (title, author, category, date, duration, review, status, user_name, employee_id, evidence_url, start_date, finish_date, reading_duration, hr_approval_status, link, sn, planned_finish_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO reading_logs (title, author, category, date, duration, review, status, user_name, employee_id, evidence_url, start_date, finish_date, reading_duration, hr_approval_status, link, sn, planned_finish_date, location, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 log.title,
                 log.author || '',
@@ -550,7 +636,9 @@ app.post('/api/logs', async (req, res) => {
                 log.hrApprovalStatus || 'Pending',
                 log.link || '',
                 log.sn || '',
-                log.finishDate ? new Date(log.finishDate) : null
+                log.finishDate ? new Date(log.finishDate) : null,
+                log.location || '',
+                log.source || ''
             ]
         );
         const newLogs = await query('SELECT * FROM reading_logs WHERE id = ?', [result.insertId]);
@@ -612,6 +700,8 @@ app.put('/api/logs/:id', async (req, res) => {
         if (updates.approvedBy !== undefined) dbUpdates.approved_by = updates.approvedBy;
         if (updates.approvedAt !== undefined) dbUpdates.approved_at = updates.approvedAt;
         if (updates.plannedFinishDate !== undefined) dbUpdates.planned_finish_date = updates.plannedFinishDate;
+        if (updates.location !== undefined) dbUpdates.location = updates.location;
+        if (updates.source !== undefined) dbUpdates.source = updates.source;
         
         // Auto set approved_at if status changes to Approved
         if (updates.hrApprovalStatus === 'Approved') {

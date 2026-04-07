@@ -11,7 +11,6 @@ import LoginPage from './components/LoginPage';
 import UserManagement from './components/UserManagement';
 import AdminDashboard from './components/AdminDashboard';
 import IncentiveManager from './components/IncentiveManager';
-import PinjamBukuForm from './components/PinjamBukuForm';
 import type { Page, Role, User } from './types';
 
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -23,16 +22,12 @@ function App() {
   });
   
   const [activePage, setActivePage] = useState<Page>(() => {
-    if (window.location.pathname === '/pinjam-buku') return 'pinjam-buku';
-    
     const savedPage = localStorage.getItem('lms_active_page');
-    
-    // Prevent auto-redirecting to /pinjam-buku when user specifically visits root /
-    if (window.location.pathname === '/' && savedPage === 'pinjam-buku') {
-      return 'dashboard';
-    }
-    
     return (savedPage as Page) || 'dashboard';
+  });
+
+  const [adminView, setAdminView] = useState<string>(() => {
+    return localStorage.getItem('lms_admin_view') || 'overview';
   });
 
   useEffect(() => {
@@ -46,14 +41,14 @@ function App() {
   useEffect(() => {
     if (activePage) {
       localStorage.setItem('lms_active_page', activePage);
-      // Synchronize URL without appending to history
-      if (activePage === 'pinjam-buku' && window.location.pathname !== '/pinjam-buku') {
-        window.history.replaceState(null, '', '/pinjam-buku');
-      } else if (activePage !== 'pinjam-buku' && window.location.pathname === '/pinjam-buku') {
-        window.history.replaceState(null, '', '/');
-      }
     }
   }, [activePage]);
+
+  useEffect(() => {
+    if (adminView) {
+      localStorage.setItem('lms_admin_view', adminView);
+    }
+  }, [adminView]);
 
   // REPLACE THIS WITH YOUR ACTUAL GOOGLE CLIENT ID
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "735607886412-vgmgsm981577uhg72etjeoh30jjp8trs.apps.googleusercontent.com";
@@ -78,21 +73,20 @@ function App() {
   // We use the logged-in user's role
   const userRole: Role = user.role;
 
-  if (activePage === 'pinjam-buku') {
-    return (
-        <PinjamBukuForm user={user!} onClose={() => setActivePage('dashboard')} />
-    );
-  }
 
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <DashboardLayout
         activePage={activePage}
-        onNavigate={setActivePage}
+        onNavigate={(page, view) => {
+          setActivePage(page);
+          if (view) setAdminView(view);
+        }}
         userRole={userRole}
         user={user!}
         onLogout={handleLogout}
         onRoleChange={(role) => setUser({ ...user!, role })}
+        adminView={adminView}
       >
         {activePage === 'dashboard' && <DashboardHome onNavigate={setActivePage} userRole={userRole} userEmail={user?.email} userName={user?.name} />}
         {activePage === 'reading-log' && (
@@ -128,7 +122,7 @@ function App() {
           <AdminDashboard
             user={user!}
             onNavigate={setActivePage}
-            onLogout={handleLogout}
+            initialView={adminView}
           />
         )}
       </DashboardLayout>

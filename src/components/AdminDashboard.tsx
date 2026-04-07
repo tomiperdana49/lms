@@ -1,18 +1,12 @@
 import { useState, useEffect } from 'react';
 import type { ElementType } from 'react';
 import {
-    LayoutDashboard,
     Users,
     BookOpen,
-    FileText,
     Calendar,
-    LogOut,
     TrendingUp,
     AlertCircle,
-    ChevronRight,
-    Award,
-    Menu,
-    X
+    ChevronRight
 } from 'lucide-react';
 import type { Page, User, ReadingLogEntry } from '../types';
 import { API_BASE_URL } from '../config';
@@ -29,25 +23,10 @@ import QuizReportList from './QuizReportList';
 interface AdminDashboardProps {
     user: User;
     onNavigate: (page: Page) => void;
-    onLogout: () => void;
+    initialView?: string;
 }
 
 type AdminView = 'overview' | 'users' | 'logs' | 'training' | 'meetings' | 'courses' | 'reports' | 'incentives' | 'calendar' | 'quiz-reports';
-
-const SidebarItem = ({ view, icon: Icon, label, currentView, setCurrentView }: { view: AdminView, icon: ElementType, label: string, currentView: AdminView, setCurrentView: (v: AdminView) => void }) => (
-    <button
-        onClick={() => setCurrentView(view)}
-        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium
-            ${currentView === view
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
-                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
-            }
-        `}
-    >
-        <Icon size={20} />
-        <span>{label}</span>
-    </button>
-);
 
 interface StatCardProps {
     label: string;
@@ -77,15 +56,22 @@ const StatCard = ({ label, value, icon: Icon, color, trend }: StatCardProps) => 
     </div>
 );
 
-const AdminDashboard = ({ user, onLogout }: AdminDashboardProps) => {
-    const [currentView, setCurrentView] = useState<AdminView>('overview');
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+const AdminDashboard = ({ user, initialView }: AdminDashboardProps) => {
+    const [currentView, setCurrentView] = useState<AdminView>((initialView as AdminView) || 'overview');
+    
+    // Sinkronkan view jika prop berubah dari sidebar utama
+    useEffect(() => {
+        if (initialView) {
+            setCurrentView(initialView as AdminView);
+        }
+    }, [initialView]);
 
-    // Auto-close sidebar on view change (mobile)
-    const handleSetView = (view: AdminView) => {
-        setCurrentView(view);
-        setIsSidebarOpen(false);
-    };
+    // Save to localStorage for persistence on reload
+    useEffect(() => {
+        if (currentView) {
+            localStorage.setItem('lms_admin_view', currentView);
+        }
+    }, [currentView]);
 
     const [stats, setStats] = useState({
         totalUsers: 0,
@@ -234,79 +220,17 @@ const AdminDashboard = ({ user, onLogout }: AdminDashboardProps) => {
                 );
         }
     };
-
     return (
-        <div className="min-h-screen bg-slate-50 flex">
-            {/* Mobile Overlay */}
-            {isSidebarOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-40 md:hidden animate-fade-in"
-                    onClick={() => setIsSidebarOpen(false)}
-                />
-            )}
-
-            {/* Sidebar */}
-            <aside className={`w-64 bg-white border-r border-slate-200 fixed h-full z-50 flex flex-col transition-transform duration-300 md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                    <h1 className="text-xl font-bold text-blue-600 flex items-center gap-2">
-                        <LayoutDashboard className="fill-blue-600" /> Admin Panel
-                    </h1>
-                    <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-slate-400 hover:text-slate-600">
-                        <X size={24} />
-                    </button>
+        <main className="flex-1 p-4 md:p-8">
+            {/* Mobile Header (Simplified) */}
+            <div className="md:hidden flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                    <h1 className="text-xl font-bold text-slate-800">Admin Panel</h1>
                 </div>
+            </div>
 
-                <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-                    <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 mt-4">Main</p>
-                    <SidebarItem view="overview" icon={LayoutDashboard} label="Overview" currentView={currentView} setCurrentView={handleSetView} />
-                    <SidebarItem view="calendar" icon={Calendar} label="Calendar" currentView={currentView} setCurrentView={handleSetView} />
-
-
-                    <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 mt-6">Management</p>
-                    <SidebarItem view="users" icon={Users} label="User Management" currentView={currentView} setCurrentView={handleSetView} />
-                    <SidebarItem view="courses" icon={BookOpen} label="Online Modules Management" currentView={currentView} setCurrentView={handleSetView} />
-                    <SidebarItem view="logs" icon={FileText} label="Reading Logs" currentView={currentView} setCurrentView={handleSetView} />
-                    <SidebarItem view="training" icon={FileText} label="Training Requests" currentView={currentView} setCurrentView={handleSetView} />
-                    <SidebarItem view="quiz-reports" icon={Award} label="Quiz Reports" currentView={currentView} setCurrentView={handleSetView} />
-                    <SidebarItem view="reports" icon={TrendingUp} label="HR Reports" currentView={currentView} setCurrentView={handleSetView} />
-                    <SidebarItem view="incentives" icon={Award} label="Incentives" currentView={currentView} setCurrentView={handleSetView} />
-                    <SidebarItem view="meetings" icon={Users} label="Training Internal" currentView={currentView} setCurrentView={handleSetView} />
-                </nav>
-
-                <div className="p-4 border-t border-slate-100">
-                    <div className="flex items-center gap-3 px-4 py-3 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">
-                            {user.name.charAt(0)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-slate-800 truncate">{user.name}</p>
-                            <p className="text-xs text-slate-500 truncate">{user.role}</p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={onLogout}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-                    >
-                        <LogOut size={18} /> Sign Out
-                    </button>
-                </div>
-            </aside>
-
-            {/* Main Content */}
-            <main className="flex-1 md:ml-64 p-4 md:p-8">
-                {/* Mobile Header (Simplified) */}
-                <div className="md:hidden flex justify-between items-center mb-6">
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg">
-                            <Menu size={24} />
-                        </button>
-                        <h1 className="text-xl font-bold text-slate-800">Admin Panel</h1>
-                    </div>
-                </div>
-
-                {renderContent()}
-            </main>
-        </div>
+            {renderContent()}
+        </main>
     );
 };
 
