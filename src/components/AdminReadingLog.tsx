@@ -19,9 +19,7 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
     // View Mode State - Default to verification as previously requested
     const [viewMode, setViewMode] = useState<'verification' | 'recap'>('verification');
 
-    // Detail Modal State (Recap View)
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
 
     // Verification Modal State
     const [verifyModal, setVerifyModal] = useState<{ open: boolean; log: ReadingLogEntry | null; category: 'comic' | 'text'; reward: number }>({
@@ -214,10 +212,7 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
         }
     };
 
-    const handleEditClick = (user: User) => {
-        setSelectedUser(user);
-        setIsModalOpen(true);
-    };
+
 
     const formatCurrency = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
 
@@ -363,7 +358,7 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                                 <div className="flex items-center gap-2 text-slate-600">{isEligible ? <span className="flex items-center gap-1 text-green-600 font-bold text-xs"><CheckCircle size={14} /> Eligible</span> : <span className="flex items-center gap-1 text-slate-400 text-xs font-medium"><Clock size={14} /> {remaining > 0 ? `${remaining} more to go` : 'Pending'}</span>}{stats.totalIncentive > 0 && <span className="ml-2 text-green-600 font-bold text-sm bg-green-50 px-2 py-0.5 rounded border border-green-100">{formatCurrency(stats.totalIncentive)}</span>}</div>
                                             </td>
                                             <td className="px-6 py-4 text-center">
-                                                <button onClick={() => handleEditClick(user)} className="p-2 bg-slate-100 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="View Details"><Edit size={18} /></button>
+                                                <span className="text-slate-400 text-xs italic">No actions yet</span>
                                             </td>
                                         </tr>
                                     );

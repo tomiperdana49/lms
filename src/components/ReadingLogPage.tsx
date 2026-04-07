@@ -551,7 +551,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                         {log.hrApprovalStatus === 'Draft' ? (
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); handleClaimIncentive(log.id); }}
-                                                                className="px-3 py-1 text-xs font-bold rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-600 hover:text-white transition-all shadow-sm border border-amber-200"
+                                                                className="px-4 py-1.5 text-xs font-bold rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition-all shadow-md"
                                                                 title="Klik untuk kirim klaim ke HRD"
                                                             >
                                                                 Klaim Insentif
