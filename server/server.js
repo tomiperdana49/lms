@@ -405,15 +405,23 @@ app.post('/api/auth/google', async (req, res) => {
         const detectedRole = jobPos.includes('HR') ? 'HR' : (jobPos.includes('SUPERVISOR') || jobPos.includes('SPV') || jobPos.includes('MANAGER') ? 'SUPERVISOR' : 'STAFF');
 
         if (user) {
-            // Existing User: Sync employee_id and role if needed
-            const needsUpdate = !user.employee_id && employeeHelper || user.role !== detectedRole;
+            // Role protection: Only auto-update role if it's an upgrade or the current role is STAFF.
+            // This preserves manual overrides made by HR in the LMS.
+            let finalRole = user.role;
+            if (detectedRole === 'HR') {
+                finalRole = 'HR';
+            } else if (detectedRole === 'SUPERVISOR' && user.role === 'STAFF') {
+                finalRole = 'SUPERVISOR';
+            }
+
+            const needsUpdate = !user.employee_id && employeeHelper || user.role !== finalRole;
 
             if (needsUpdate) {
-                console.log(`[GOOGLE AUTH] Updating existing user ${email}: role=${detectedRole}, empId=${employeeHelper?.id_employee}`);
+                console.log(`[GOOGLE AUTH] Updating existing user ${email}: role=${finalRole}, empId=${employeeHelper?.id_employee}`);
                 await query('UPDATE users SET employee_id = ?, role = ? WHERE id = ?',
-                    [employeeHelper?.id_employee || user.employee_id, detectedRole, user.id]);
+                    [employeeHelper?.id_employee || user.employee_id, finalRole, user.id]);
                 user.employee_id = employeeHelper?.id_employee || user.employee_id;
-                user.role = detectedRole;
+                user.role = finalRole;
             }
         } else {
             // New User: Create with linked data

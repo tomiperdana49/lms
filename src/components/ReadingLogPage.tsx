@@ -191,7 +191,13 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         return { month, year };
     };
 
-    const isEligibleForBonus = readingLogs.filter(l => l.hrApprovalStatus === 'Approved').length >= 5;
+    const currentYear = new Date().getFullYear();
+    const approvedThisYearCount = readingLogs.filter(l => 
+        l.hrApprovalStatus === 'Approved' && 
+        new Date(l.finishDate || l.date).getFullYear() === currentYear
+    ).length;
+
+    const isEligibleForBonus = approvedThisYearCount >= 5;
 
     const categories = [
         "Biografi", "Bisnis & Ekonomi", "Fiksi", "Komik/Manga",
@@ -564,13 +570,15 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                 {log.status === 'Finished' && (
                                                     <div className="flex flex-col items-end">
                                                         {log.hrApprovalStatus === 'Draft' ? (
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleClaimIncentive(log.id); }}
-                                                                className="px-4 py-1.5 text-xs font-bold rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition-all shadow-md"
-                                                                title="Klik untuk kirim klaim ke HRD"
-                                                            >
-                                                                Klaim Insentif
-                                                            </button>
+                                                            approvedThisYearCount < 5 ? (
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleClaimIncentive(log.id); }}
+                                                                    className="px-4 py-1.5 text-xs font-bold rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition-all shadow-md"
+                                                                    title="Klik untuk kirim klaim ke HRD"
+                                                                >
+                                                                    Klaim Insentif
+                                                                </button>
+                                                            ) : null
                                                         ) : (
                                                             <div className={`px-3 py-1 text-xs font-bold rounded-lg ${log.hrApprovalStatus === 'Approved' ? 'bg-blue-100 text-blue-700' : log.hrApprovalStatus === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
                                                                 {log.hrApprovalStatus === 'Pending' ? 'Under Review' : (log.hrApprovalStatus || 'Waiting HR')}
