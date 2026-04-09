@@ -178,12 +178,6 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                             />
                         </div>
 
-                        <div className="text-center text-xs text-slate-400 mt-4">
-                            <p>Demo Accounts:</p>
-                            <p>Staff: staff@nusa.com / 123</p>
-                            <p>Supervisor: spv@nusa.com / 123</p>
-                            <p>HR: hr@nusa.com / 123</p>
-                        </div>
                     </form>
                 </div>
             </div>
