@@ -459,7 +459,7 @@ app.post('/api/auth/google', async (req, res) => {
 // --- UPLOAD ROUTE ---
 app.post('/api/upload', upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-    const fileUrl = `/uploads/${req.file.filename}`;
+    const fileUrl = `/api/uploads/${req.file.filename}`;
     res.json({ success: true, fileUrl });
 });
 

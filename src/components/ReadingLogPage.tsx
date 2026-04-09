@@ -13,7 +13,15 @@ interface ReadingLogPageProps {
 const getFullImageUrl = (path: string) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
-    const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+    
+    let cleanPath = path.startsWith('/') ? path.slice(1) : path;
+    
+    // If path starts with 'api/' and API_BASE_URL already contains '/api'
+    if (cleanPath.startsWith('api/') && API_BASE_URL.toLowerCase().endsWith('/api')) {
+        const root = API_BASE_URL.substring(0, API_BASE_URL.length - 4);
+        return `${root}/${cleanPath}`;
+    }
+    
     return `${API_BASE_URL}/${cleanPath}`;
 };
 
@@ -21,6 +29,11 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
     const [readingLogs, setReadingLogs] = useState<ReadingLogEntry[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [yearReadCount, setYearReadCount] = useState(0);
+
+    const [privateFile, setPrivateFile] = useState<File | null>(null);
+    const [privatePreview, setPrivatePreview] = useState<string>('');
+    const [claimFile, setClaimFile] = useState<File | null>(null);
+    const [claimPreview, setClaimPreview] = useState<string>('');
 
     const [privateReportForm, setPrivateReportForm] = useState({
         title: '',
@@ -147,35 +160,33 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         }
     };
 
-    const handleFileChange = async (e: ChangeEvent<HTMLInputElement>, target: 'privateReport' | 'claimFinish') => {
+    const handleFileChange = (e: ChangeEvent<HTMLInputElement>, target: 'privateReport' | 'claimFinish') => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
-            const data = new FormData();
-            data.append('file', file);
-
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/upload`, {
-                    method: 'POST',
-                    body: data
-                });
-
-                if (res.ok) {
-                    const result = await res.json();
-                    if (target === 'privateReport') {
-                        setPrivateReportForm(prev => ({ ...prev, evidenceUrl: result.fileUrl }));
-                    } else {
-                        setClaimForm(prev => ({ ...prev, evidenceUrl: result.fileUrl }));
-                    }
-                    setNotification({ show: true, type: 'success', message: "Foto berhasil diupload!" });
-                } else {
-                    const errText = await res.text();
-                    setNotification({ show: true, type: 'error', message: `Upload gagal: ${errText}` });
-                }
-            } catch (err) {
-                console.error("Upload error:", err);
-                setNotification({ show: true, type: 'error', message: "Error uploading photo." });
+            const previewUrl = URL.createObjectURL(file);
+            
+            if (target === 'privateReport') {
+                setPrivateFile(file);
+                setPrivatePreview(previewUrl);
+                setPrivateReportForm(prev => ({ ...prev, evidenceUrl: 'pending' })); // placeholder
+            } else {
+                setClaimFile(file);
+                setClaimPreview(previewUrl);
+                setClaimForm(prev => ({ ...prev, evidenceUrl: 'pending' })); // placeholder
             }
         }
+    };
+
+    const uploadFileToServer = async (file: File): Promise<string> => {
+        const data = new FormData();
+        data.append('file', file);
+        const res = await fetch(`${API_BASE_URL}/api/upload`, {
+            method: 'POST',
+            body: data
+        });
+        if (!res.ok) throw new Error('Upload failed');
+        const result = await res.json();
+        return result.fileUrl;
     };
 
     const getIncentivePeriod = (dateStr: string) => {
@@ -248,28 +259,47 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
     const submitPrivateReportData = async () => {
         setIsLoading(true);
-        const { title, category, startDate, finishDate, link, evidenceUrl } = privateReportForm;
+        const { title, category, startDate, finishDate, link } = privateReportForm;
         try {
+            // 1. Simpan data ke Database terlebih dahulu (tanpa gambar)
             const res = await fetch(`${API_BASE_URL}/api/logs`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     title, category, startDate: new Date(startDate), finishDate: new Date(finishDate),
-                    link: link, review: '-', evidenceUrl, status: 'Finished', hrApprovalStatus: 'Draft',
+                    link: link, review: '-', evidenceUrl: '', status: 'Finished', hrApprovalStatus: 'Draft',
                     location: 'Pribadi', source: 'Buku Pribadi', userName: user.name, employee_id: user.employee_id, date: new Date()
                 })
             });
 
-            if (res.ok) {
-                const savedLog = await res.json();
-                setReadingLogs([savedLog, ...readingLogs]);
-                setPrivateReportForm({ title: '', category: '', startDate: '', finishDate: '', link: '', evidenceUrl: '' });
-                setYearReadCount(prev => prev + 1);
-                window.location.reload();
-            } else {
-                const err = await res.json();
-                setNotification({ show: true, type: 'error', message: err.error || "Gagal mengirim laporan." });
+            if (!res.ok) throw new Error('Gagal menyimpan data ke database');
+            const newLog = await res.json();
+            const logId = newLog.id;
+
+            // 2. Jika data berhasil tersimpan, baru simpan/upload gambar
+            if (privateFile) {
+                try {
+                    const uploadedUrl = await uploadFileToServer(privateFile);
+                    
+                    // 3. Update database dengan URL gambar yang sudah diupload
+                    await fetch(`${API_BASE_URL}/api/logs/${logId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ evidenceUrl: uploadedUrl })
+                    });
+                } catch (uploadErr) {
+                    console.error("Gagal upload gambar, tapi data sudah tersimpan:", uploadErr);
+                    setNotification({ show: true, type: 'error', message: "Data tersimpan, tapi foto gagal diupload. Silakan edit menu detail untuk upload ulang." });
+                }
             }
+
+            setReadingLogs([newLog, ...readingLogs]);
+            setPrivateReportForm({ title: '', category: '', startDate: '', finishDate: '', link: '', evidenceUrl: '' });
+            setYearReadCount(prev => prev + 1);
+            setNotification({ show: true, type: 'success', message: "Laporan bacaan pribadi berhasil disimpan!" });
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
         } catch (err) {
             console.error(err);
             setNotification({ show: true, type: 'error', message: "Error connecting to server." });
@@ -280,9 +310,9 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
     const handlePrivateReportSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        const { title, category, startDate, finishDate, evidenceUrl } = privateReportForm;
+        const { title, category, startDate, finishDate } = privateReportForm;
 
-        if (!title || !category || !startDate || !finishDate || !evidenceUrl) {
+        if (!title || !category || !startDate || !finishDate || !privateFile) {
             setNotification({ show: true, type: 'error', message: 'Mohon lengkapi semua field wajib: Judul, Kategori, Tgl Mulai/Selesai, dan Bukti Foto.' });
             return;
         }
@@ -333,16 +363,18 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         try {
             let res;
             if (selectedLog) {
+                // 1. Update data return ke Database (tanpa gambar dulu)
                 res = await fetch(`${API_BASE_URL}/api/books/return`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        id: selectedLog.id, review: '-', link: claimForm.link, evidenceUrl: claimForm.evidenceUrl,
+                        id: selectedLog.id, review: '-', link: claimForm.link, evidenceUrl: '',
                         readingDuration: 0, startDate: claimForm.startDate ? new Date(claimForm.startDate) : undefined,
                         finishDate: claimForm.finishDate ? new Date(claimForm.finishDate) : new Date()
                     })
                 });
             } else {
+                // 1. Simpan data log baru ke Database (tanpa gambar dulu)
                 res = await fetch(`${API_BASE_URL}/api/logs`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -350,18 +382,37 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                         title: claimForm.title, category: claimForm.category,
                         startDate: claimForm.startDate ? new Date(claimForm.startDate) : undefined,
                         finishDate: claimForm.finishDate ? new Date(claimForm.finishDate) : new Date(),
-                        link: claimForm.link, evidenceUrl: claimForm.evidenceUrl,
+                        link: claimForm.link, evidenceUrl: '',
                         status: 'Finished', hrApprovalStatus: 'Pending', userName: user.name, employee_id: user.employee_id,
                         source: 'Office/Other', date: new Date()
                     })
                 });
             }
-            if (res.ok) {
-                window.location.reload();
-            } else {
-                const err = await res.json();
-                setNotification({ show: true, type: 'error', message: err.error || "Gagal menyimpan data." });
+
+            if (!res.ok) throw new Error('Gagal menyimpan klaim ke database');
+            const savedData = await res.json();
+            const logId = selectedLog ? selectedLog.id : savedData.id;
+
+            // 2. Jika data berhasil tersimpan, baru simpan/upload gambar
+            if (claimFile) {
+                try {
+                    const uploadedUrl = await uploadFileToServer(claimFile);
+                    
+                    // 3. Update database dengan URL gambar
+                    await fetch(`${API_BASE_URL}/api/logs/${logId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ evidenceUrl: uploadedUrl })
+                    });
+                } catch (uploadErr) {
+                    console.error("Gagal upload gambar klaim:", uploadErr);
+                    setNotification({ show: true, type: 'error', message: "Klaim tersimpan, tapi bukti foto gagal diupload." });
+                }
             }
+            setNotification({ show: true, type: 'success', message: "Klaim berhasil disimpan!" });
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
         } catch (err) {
             console.error(err);
             setNotification({ show: true, type: 'error', message: "Error connecting to server." });
@@ -373,7 +424,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
     const handleClaimSubmit = async (e: FormEvent) => {
         e.preventDefault();
 
-        if (!claimForm.evidenceUrl || !claimForm.startDate || !claimForm.finishDate || !claimForm.link) {
+        if (!claimFile || !claimForm.startDate || !claimForm.finishDate || !claimForm.link) {
             setNotification({ show: true, type: 'error', message: 'Mohon lengkapi semua field wajib: Tgl Mulai, Tgl Selesai, Bukti Foto, dan Link Review.' });
             return;
         }
@@ -477,12 +528,12 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                             <input type="file" onChange={(e) => handleFileChange(e, 'privateReport')} className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" />
                                             <Upload size={18} className="text-slate-500" />
                                         </div>
-                                        <span className={`text-xs ${privateReportForm.evidenceUrl ? 'text-green-600 font-bold' : 'text-slate-400'}`}>{privateReportForm.evidenceUrl ? 'Foto Terupload' : 'Upload foto cover'}</span>
+                                        <span className={`text-xs ${privateFile ? 'text-green-600 font-bold' : 'text-slate-400'}`}>{privateFile ? 'Foto Terpilih' : 'Pilih foto cover'}</span>
                                     </div>
-                                    {privateReportForm.evidenceUrl && (
+                                    {privatePreview && (
                                         <div className="relative w-full h-48 rounded-xl overflow-hidden border border-slate-200 shadow-sm group">
-                                            <img src={getFullImageUrl(privateReportForm.evidenceUrl)} alt="Evidence" className="w-full h-full object-cover" />
-                                            <button type="button" onClick={() => setPrivateReportForm(prev => ({ ...prev, evidenceUrl: '' }))} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"><XCircle size={16} /></button>
+                                            <img src={privatePreview} alt="Preview" className="w-full h-full object-cover" />
+                                            <button type="button" onClick={() => { setPrivateFile(null); setPrivatePreview(''); }} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"><XCircle size={16} /></button>
                                         </div>
                                     )}
                                 </div>
@@ -642,12 +693,12 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 <div className="space-y-3">
                                     <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50 transition-colors relative">
                                         <input type="file" onChange={(e) => handleFileChange(e, 'claimFinish')} className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" />
-                                        {claimForm.evidenceUrl ? (<div className="flex items-center justify-center gap-2 text-green-600 font-bold"><CheckCircle size={18} /> Foto Terupload</div>) : (<span className="text-slate-500 text-sm">Klik untuk upload bukti</span>)}
+                                        {claimFile ? (<div className="flex items-center justify-center gap-2 text-green-600 font-bold"><CheckCircle size={18} /> Foto Terpilih</div>) : (<span className="text-slate-500 text-sm">Klik untuk pilih bukti</span>)}
                                     </div>
-                                    {claimForm.evidenceUrl && (
+                                    {claimPreview && (
                                         <div className="relative w-full h-48 rounded-xl overflow-hidden border border-slate-200 shadow-sm group">
-                                            <img src={getFullImageUrl(claimForm.evidenceUrl)} alt="Evidence" className="w-full h-full object-cover" />
-                                            <button type="button" onClick={() => setClaimForm(prev => ({ ...prev, evidenceUrl: '' }))} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"><XCircle size={16} /></button>
+                                            <img src={claimPreview} alt="Preview" className="w-full h-full object-cover" />
+                                            <button type="button" onClick={() => { setClaimFile(null); setClaimPreview(''); }} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"><XCircle size={16} /></button>
                                         </div>
                                     )}
                                 </div>
