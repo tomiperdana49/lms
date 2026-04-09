@@ -282,6 +282,15 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
         return matchesSearch && matchesBranch;
     });
 
+    const approvedCounts = allLogs.reduce((acc: Record<string, number>, log) => {
+        if (log.hrApprovalStatus === 'Approved') {
+            const y = new Date(log.finishDate || log.date).getFullYear();
+            const key = `${log.employee_id || log.userName || 'unknown'}_${y}`;
+            acc[key] = (acc[key] || 0) + 1;
+        }
+        return acc;
+    }, {});
+
     const verificationLogs = allLogs
         .filter(l => l.status === 'Finished' && l.hrApprovalStatus !== 'Cancelled')
         .filter(l => {
@@ -464,13 +473,27 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                         </td>
                                         <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${log.hrApprovalStatus === 'Approved' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : log.hrApprovalStatus === 'Rejected' ? 'bg-red-100 text-red-700 border-red-200' : log.hrApprovalStatus === 'Pending' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{log.hrApprovalStatus === 'Pending' ? 'Under Review' : (log.hrApprovalStatus || 'Draft')}</span>{log.incentiveAmount && <div className="text-[10px] font-bold text-green-600 mt-1">{formatCurrency(log.incentiveAmount)}</div>}</td>
                                         <td className="px-6 py-4 text-center">
-                                            {(log.hrApprovalStatus === 'Pending' || log.hrApprovalStatus === 'Draft' || !log.hrApprovalStatus) ? (
-                                                <div className="flex justify-center gap-2">
-                                                    <button onClick={() => handleEditLogClick(log)} className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors" title="Edit Details"><Edit size={18} /></button>
-                                                    <button onClick={() => handleVerifyClick(log)} className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors" title="Verify & Reward"><CheckCircle size={18} /></button>
-                                                    <button onClick={() => handleRejectClick(log)} className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors" title="Reject"><XCircle size={18} /></button>
-                                                </div>
-                                            ) : <span className="text-xs text-slate-400 italic">No actions</span>}
+                                            {log.hrApprovalStatus === 'Pending' ? (
+                                                (() => {
+                                                    const y = new Date(log.finishDate || log.date).getFullYear();
+                                                    const key = `${log.employee_id || log.userName || ''}_${y}`;
+                                                    const count = approvedCounts[key] || 0;
+                                                    
+                                                    if (count < 5) {
+                                                        return (
+                                                            <div className="flex justify-center gap-2">
+                                                                <button onClick={() => handleEditLogClick(log)} className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors" title="Edit Details"><Edit size={18} /></button>
+                                                                <button onClick={() => handleVerifyClick(log)} className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors" title="Verify & Reward"><CheckCircle size={18} /></button>
+                                                                <button onClick={() => handleRejectClick(log)} className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors" title="Reject"><XCircle size={18} /></button>
+                                                            </div>
+                                                        );
+                                                    } else {
+                                                        return <span className="text-xs text-orange-500 font-bold italic">Limit Exceeded (5/{y})</span>;
+                                                    }
+                                                })()
+                                            ) : (
+                                                <span className="text-xs text-slate-400 italic">No actions</span>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}

@@ -28,7 +28,6 @@ const getFullImageUrl = (path: string) => {
 const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
     const [readingLogs, setReadingLogs] = useState<ReadingLogEntry[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [yearReadCount, setYearReadCount] = useState(0);
 
     const [privateFile, setPrivateFile] = useState<File | null>(null);
     const [privatePreview, setPrivatePreview] = useState<string>('');
@@ -99,12 +98,6 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
             myLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
             setReadingLogs(myLogs);
 
-            // Yearly count
-            const currentYear = new Date().getFullYear();
-            const thisYearLogs = myLogs.filter((log: ReadingLogEntry) =>
-                new Date(log.date).getFullYear() === currentYear && log.status === 'Finished'
-            );
-            setYearReadCount(thisYearLogs.length);
         } catch (error) {
             console.error("Failed to fetch logs", error);
         }
@@ -124,10 +117,6 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
             try {
                 const res = await fetch(`${API_BASE_URL}/api/logs/${id}`, { method: 'DELETE' });
                 if (res.ok) {
-                    const deletedLog = readingLogs.find(l => l.id === id);
-                    if (deletedLog && deletedLog.status === 'Finished') {
-                        setYearReadCount(prev => Math.max(0, prev - 1));
-                    }
                     setReadingLogs(readingLogs.map(l => l.id === id ? { ...l, status: 'Cancelled', hrApprovalStatus: 'Cancelled' } : l));
                     setNotification({ show: true, type: 'success', message: "Laporan berhasil dibatalkan." });
                 }
@@ -202,13 +191,13 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         return { month, year };
     };
 
-    const currentYear = new Date().getFullYear();
-    const approvedThisYearCount = readingLogs.filter(l => 
-        l.hrApprovalStatus === 'Approved' && 
-        new Date(l.finishDate || l.date).getFullYear() === currentYear
-    ).length;
+    const getApprovedCountByYear = (year: number) => {
+        return readingLogs.filter(l => 
+            l.hrApprovalStatus === 'Approved' && 
+            new Date(l.finishDate || l.date).getFullYear() === year
+        ).length;
+    };
 
-    const isEligibleForBonus = approvedThisYearCount >= 5;
 
     const categories = [
         "Biografi", "Bisnis & Ekonomi", "Fiksi", "Komik/Manga",
@@ -241,6 +230,9 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         // Status Filter
         if (filterStatus === 'Reading') {
             if (log.status !== filterStatus) return false;
+        } else if (filterStatus === 'Finished') {
+            // Selesai Baca (sudah selesai tapi belum diajukan/draft)
+            if (log.status !== 'Finished' || (log.hrApprovalStatus !== 'Draft' && !!log.hrApprovalStatus)) return false;
         } else if (filterStatus === 'Approved') {
             if (log.hrApprovalStatus !== 'Approved') return false;
         } else if (filterStatus === 'Pending') {
@@ -295,7 +287,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
             setReadingLogs([newLog, ...readingLogs]);
             setPrivateReportForm({ title: '', category: '', startDate: '', finishDate: '', link: '', evidenceUrl: '' });
-            setYearReadCount(prev => prev + 1);
+            // setYearReadCount(prev => prev + 1); // No longer needed, dynamic calculation
             setNotification({ show: true, type: 'success', message: "Laporan bacaan pribadi berhasil disimpan!" });
             setTimeout(() => {
                 window.location.reload();
@@ -470,24 +462,30 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                         <p className="text-blue-100 opacity-90">Track your progress and incentives</p>
                     </div>
                     <div className="text-right">
-                        <div className="text-4xl font-black">{yearReadCount}</div>
-                        <div className="text-sm font-medium text-blue-100 uppercase tracking-wider">Books This Year</div>
+                        <div className="text-4xl font-black">{readingLogs.filter(l => new Date(l.finishDate || l.date).getFullYear() === filterYear).length}</div>
+                        <div className="text-sm font-medium text-blue-100 uppercase tracking-wider">Books In {filterYear}</div>
                     </div>
                 </div>
                 <div className="grid md:grid-cols-2 gap-4">
-                    <div className={`p-4 rounded-xl border ${isEligibleForBonus ? 'bg-green-500/20 border-green-400/30' : 'bg-white/10 border-white/20'}`}>
-                        <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-lg ${isEligibleForBonus ? 'bg-green-500' : 'bg-slate-500'}`}>
-                                <Trophy size={20} className="text-white" />
+                    {(() => {
+                        const approvedCount = getApprovedCountByYear(filterYear);
+                        const isEligible = approvedCount >= 5;
+                        return (
+                            <div className={`p-4 rounded-xl border ${isEligible ? 'bg-green-500/20 border-green-400/30' : 'bg-white/10 border-white/20'}`}>
+                                <div className="flex items-center gap-3">
+                                    <div className={`p-2 rounded-lg ${isEligible ? 'bg-green-500' : 'bg-slate-500'}`}>
+                                        <Trophy size={20} className="text-white" />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-white">Bonus Incentive Status ({filterYear})</p>
+                                        <p className="text-sm text-blue-100">
+                                            {isEligible ? `Eligible! 5+ Verified Books in ${filterYear}.` : `${approvedCount}/5 Books Verified by HR`}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <p className="font-bold text-white">Bonus Incentive Status</p>
-                                <p className="text-sm text-blue-100">
-                                    {isEligibleForBonus ? "Eligible! 5+ Verified Books." : `${readingLogs.filter(l => l.hrApprovalStatus === 'Approved').length}/5 Books Verified by HR`}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                        );
+                    })()}
                 </div>
             </div>
 
@@ -555,6 +553,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer">
                                     <option value="all">All Status</option>
                                     <option value="Reading">Sedang Baca</option>
+                                    <option value="Finished">Selesai Baca</option>
                                     <option value="Approved">Approved</option>
                                     <option value="Pending">Under Review</option>
                                 </select>
@@ -621,15 +620,21 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                 {log.status === 'Finished' && (
                                                     <div className="flex flex-col items-end">
                                                         {log.hrApprovalStatus === 'Draft' ? (
-                                                            approvedThisYearCount < 5 ? (
-                                                                <button
-                                                                    onClick={(e) => { e.stopPropagation(); handleClaimIncentive(log.id); }}
-                                                                    className="px-4 py-1.5 text-xs font-bold rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition-all shadow-md"
-                                                                    title="Klik untuk kirim klaim ke HRD"
-                                                                >
-                                                                    Klaim Insentif
-                                                                </button>
-                                                            ) : null
+                                                            (() => {
+                                                                const logYear = new Date(log.finishDate || log.date).getFullYear();
+                                                                if (getApprovedCountByYear(logYear) < 5) {
+                                                                    return (
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleClaimIncentive(log.id); }}
+                                                                            className="px-4 py-1.5 text-xs font-bold rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition-all shadow-md"
+                                                                            title="Klik untuk kirim klaim ke HRD"
+                                                                        >
+                                                                            Klaim Insentif
+                                                                        </button>
+                                                                    );
+                                                                }
+                                                                return null;
+                                                            })()
                                                         ) : (
                                                             <div className={`px-3 py-1 text-xs font-bold rounded-lg ${log.hrApprovalStatus === 'Approved' ? 'bg-blue-100 text-blue-700' : log.hrApprovalStatus === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
                                                                 {log.hrApprovalStatus === 'Pending' ? 'Under Review' : (log.hrApprovalStatus || 'Waiting HR')}
