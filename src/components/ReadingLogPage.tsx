@@ -107,18 +107,22 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
     };
 
     const handleDelete = async (id: number | string) => {
-        openConfirm('Hapus Laporan', 'Apakah Anda yakin ingin menghapus laporan bacaan ini secara permanen? Tindakan ini tidak dapat dibatalkan.', async () => {
+        openConfirm('Batalkan Laporan', 'Apakah Anda yakin ingin membatalkan laporan bacaan ini? Data akan tetap tersimpan namun status berubah menjadi Cancelled.', async () => {
             try {
                 const res = await fetch(`${API_BASE_URL}/api/logs/${id}`, { method: 'DELETE' });
                 if (res.ok) {
-                    setReadingLogs(readingLogs.filter(l => l.id !== id));
-                    setNotification({ show: true, type: 'success', message: "Laporan berhasil dihapus." });
+                    const deletedLog = readingLogs.find(l => l.id === id);
+                    if (deletedLog && deletedLog.status === 'Finished') {
+                        setYearReadCount(prev => Math.max(0, prev - 1));
+                    }
+                    setReadingLogs(readingLogs.map(l => l.id === id ? { ...l, status: 'Cancelled', hrApprovalStatus: 'Cancelled' } : l));
+                    setNotification({ show: true, type: 'success', message: "Laporan berhasil dibatalkan." });
                 }
             } catch (err) {
-                console.error("Failed to delete log", err);
-                setNotification({ show: true, type: 'error', message: "Failed to delete log." });
+                console.error("Failed to cancel log", err);
+                setNotification({ show: true, type: 'error', message: "Gagal membatalkan laporan." });
             }
-        });
+        }, 'Ya, Batalkan', 'warning');
     };
 
     const handleClaimIncentive = async (id: number | string) => {
@@ -495,7 +499,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                     <option value="all">All Status</option>
                                     <option value="Reading">Sedang Baca</option>
                                     <option value="Approved">Approved</option>
-                                    <option value="Pending">Inprogress</option>
+                                    <option value="Pending">Under Review</option>
                                 </select>
                                 <select value={filterYear} onChange={(e) => setFilterYear(Number(e.target.value))} className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer">
                                     {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
@@ -512,8 +516,10 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 paginatedLogs.map((log) => {
                                     const isMyLog = (!!log.employee_id && !!user.employee_id && log.employee_id === user.employee_id) || (!log.employee_id && log.userName === user.name);
                                     return (
-                                        <div key={log.id} className="p-4 hover:bg-slate-50 transition-colors flex items-start gap-4 group">
-                                            <div className={`p-3 rounded-xl transition-colors ${log.status === 'Finished' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}>{log.status === 'Finished' ? <Trophy size={20} /> : <Book size={20} />}</div>
+                                        <div key={log.id} className={`p-4 hover:bg-slate-50 transition-colors flex items-start gap-4 group ${log.status === 'Cancelled' ? 'opacity-60 bg-slate-50/50' : ''}`}>
+                                            <div className={`p-3 rounded-xl transition-colors ${log.status === 'Finished' ? 'bg-green-50 text-green-600' : log.status === 'Cancelled' ? 'bg-red-50 text-red-400' : 'bg-blue-50 text-blue-600'}`}>
+                                                {log.status === 'Finished' ? <Trophy size={20} /> : log.status === 'Cancelled' ? <XCircle size={20} /> : <Book size={20} />}
+                                            </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <h3 onClick={() => openDetailModal(log)} className="font-semibold text-slate-800 truncate cursor-pointer hover:text-blue-600 transition-colors" title="Lihat Detail">{log.title}</h3>
@@ -533,12 +539,21 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                             {log.startDate && log.finishDate && (<div className="flex items-center gap-2 text-xs text-slate-500"><span>Start: {new Date(log.startDate).toLocaleDateString()}</span><span>•</span><span>Finish: {new Date(log.finishDate).toLocaleDateString()}</span></div>)}
                                                             {log.finishDate && (
                                                                 <div className={`inline-block mt-1 px-2 py-1 text-[10px] font-bold rounded border uppercase tracking-wide ${log.hrApprovalStatus === 'Approved' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                                                                    {log.hrApprovalStatus === 'Approved' ? `Paid In: ${new Date(new Date(log.finishDate).getFullYear(), getIncentivePeriod(log.finishDate || '').month).toLocaleString('default', { month: 'long' })}` : log.hrApprovalStatus === 'Draft' ? '-' : 'inprogress insentive'}
+                                                                    {log.hrApprovalStatus === 'Approved' ? `Paid In: ${new Date(new Date(log.finishDate).getFullYear(), getIncentivePeriod(log.finishDate || '').month).toLocaleString('default', { month: 'long' })}` : log.hrApprovalStatus === 'Draft' ? '-' : 'Under Review'}
                                                                 </div>
                                                             )}
                                                         </div>
                                                     ) : (
-                                                        <div className="flex items-center gap-2 text-xs"><span className="font-semibold text-orange-600">In Progress</span><span className="text-slate-500">Started: {log.date ? new Date(log.date).toLocaleDateString() : 'Unknown'}</span></div>
+                                                        <div className="flex items-center gap-2 text-xs">
+                                                            {log.status === 'Cancelled' ? (
+                                                                <span className="font-semibold text-red-500 uppercase tracking-wider">Laporan Dibatalkan</span>
+                                                            ) : (
+                                                                <>
+                                                                    <span className="font-semibold text-orange-600">In Progress</span>
+                                                                    <span className="text-slate-500">Started: {log.date ? new Date(log.date).toLocaleDateString() : 'Unknown'}</span>
+                                                                </>
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>
@@ -558,15 +573,14 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                             </button>
                                                         ) : (
                                                             <div className={`px-3 py-1 text-xs font-bold rounded-lg ${log.hrApprovalStatus === 'Approved' ? 'bg-blue-100 text-blue-700' : log.hrApprovalStatus === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                                                {log.hrApprovalStatus === 'Pending' ? 'inprogress insentive' : (log.hrApprovalStatus || 'Waiting HR')}
+                                                                {log.hrApprovalStatus === 'Pending' ? 'Under Review' : (log.hrApprovalStatus || 'Waiting HR')}
                                                             </div>
                                                         )}
                                                     </div>
                                                 )}
-                                                {/* HR Actions removed */}
                                             </div>
-                                            {isMyLog && log.status === 'Reading' && <button onClick={() => openClaimModal(log)} className="px-3 py-1 text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200 rounded-lg border border-green-200">Selesai</button>}
-                                            {isMyLog && (log.status === 'Reading' || log.hrApprovalStatus === 'Draft') && <button onClick={() => handleDelete(log.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={18} /></button>}
+                                            {isMyLog && log.status === 'Reading' && false && <button onClick={() => openClaimModal(log)} className="px-3 py-1 text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200 rounded-lg border border-green-200">Selesai</button>}
+                                            {isMyLog && log.hrApprovalStatus === 'Draft' && log.status !== 'Cancelled' && <button onClick={() => handleDelete(log.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={18} /></button>}
                                         </div>
                                     );
                                 })
@@ -665,7 +679,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                                         <div className="text-xs text-slate-500 font-bold uppercase mb-1">Approval HR</div>
                                         <div className={`font-semibold ${viewLog.hrApprovalStatus === 'Approved' ? 'text-blue-600' : viewLog.hrApprovalStatus === 'Rejected' ? 'text-red-500' : 'text-slate-400'}`}>
-                                            {viewLog.hrApprovalStatus === 'Approved' ? 'Approved' : (viewLog.hrApprovalStatus === 'Pending' || !viewLog.hrApprovalStatus ? 'inprogress insentive' : viewLog.hrApprovalStatus === 'Draft' ? '-' : viewLog.hrApprovalStatus === 'Rejected' ? 'Rejected' : viewLog.hrApprovalStatus)}
+                                            {viewLog.hrApprovalStatus === 'Approved' ? 'Approved' : (viewLog.hrApprovalStatus === 'Pending' || !viewLog.hrApprovalStatus ? 'Under Review' : viewLog.hrApprovalStatus === 'Draft' ? '-' : viewLog.hrApprovalStatus === 'Rejected' ? 'Rejected' : viewLog.hrApprovalStatus)}
                                         </div>
                                     </div>
                                 )}

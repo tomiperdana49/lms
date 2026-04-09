@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2, RefreshCw } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry, User, Employee } from '../types';
 
@@ -11,10 +11,20 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
     const [allLogs, setAllLogs] = useState<ReadingLogEntry[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterYear, setFilterYear] = useState<number | string>(new Date().getFullYear());
-    const [filterPeriod, setFilterPeriod] = useState('all');
+    const [startDate, setStartDate] = useState(() => {
+        const now = new Date();
+        const d = new Date(now.getFullYear(), now.getMonth() - 1, 26);
+        return d.toISOString().split('T')[0];
+    });
+    const [endDate, setEndDate] = useState(() => {
+        const now = new Date();
+        const d = new Date(now.getFullYear(), now.getMonth(), 25);
+        return d.toISOString().split('T')[0];
+    });
     const [selectedBranch, setSelectedBranch] = useState('All Branches');
     const [branches, setBranches] = useState<string[]>(['All Branches']);
+    const [filterStatus, setFilterStatus] = useState('all');
+    const [isSyncing, setIsSyncing] = useState(false);
 
     // View Mode State - Default to verification as previously requested
     const [viewMode, setViewMode] = useState<'verification' | 'recap'>('verification');
@@ -49,19 +59,6 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
         log: null
     });
 
-    const periodOptions = [
-        { label: 'All Year', value: 'all' },
-        { label: 'Semester 1 (Jan-Jun)', value: 's1' },
-        { label: 'Semester 2 (Jul-Dec)', value: 's2' },
-        { label: 'Q1 (Jan-Mar)', value: 'q1' },
-        { label: 'Q2 (Apr-Jun)', value: 'q2' },
-        { label: 'Q3 (Jul-Sep)', value: 'q3' },
-        { label: 'Q4 (Oct-Dec)', value: 'q4' },
-        ...[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(m => ({
-            label: new Date(2024, m, 1).toLocaleString('default', { month: 'long' }),
-            value: String(m)
-        }))
-    ];
 
     const fetchBranches = () => {
         fetch(`${API_BASE_URL}/api/branches`)
@@ -108,7 +105,45 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
         fetchBranches();
         fetchLogs();
         fetchUsers();
+
+        // Silent background sync on mount
+        const silentSync = async () => {
+            try {
+                await fetch(`${API_BASE_URL}/api/simas/sync`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ employee_id: 'all' })
+                });
+                fetchLogs(); // Refresh again after sync
+            } catch (err) {
+                console.error("Silent sync failed", err);
+            }
+        };
+        silentSync();
     }, []);
+
+    const handleSyncSIMAS = async () => {
+        if (isSyncing) return;
+        setIsSyncing(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/simas/sync`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ employee_id: 'all' })
+            });
+            if (res.ok) {
+                alert('Sinkronisasi data SIMAS berhasil!');
+                fetchLogs(); // Refresh the list
+            } else {
+                alert('Gagal melakukan sinkronisasi data SIMAS.');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Error saat sinkronisasi data.');
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
     const handleVerifyClick = (log: ReadingLogEntry) => {
         setVerifyModal({
@@ -198,17 +233,17 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
     };
 
     const handleDeleteLog = async (id: number | string) => {
-        if (!window.confirm('Are you sure you want to delete this reading log entry?')) return;
+        if (!window.confirm('Apakah Anda yakin ingin membatalkan laporan ini? Data akan tetap tersimpan namun tidak terhitung dalam laporan.')) return;
         try {
             const res = await fetch(`${API_BASE_URL}/api/logs/${id}`, { method: 'DELETE' });
             if (res.ok) {
-                setAllLogs(allLogs.filter(log => log.id !== id));
+                setAllLogs(allLogs.map(log => log.id === id ? { ...log, status: 'Cancelled', hrApprovalStatus: 'Cancelled' } : log));
             } else {
-                alert('Failed to delete reading log');
+                alert('Gagal membatalkan laporan');
             }
         } catch (error) {
             console.error(error);
-            alert('Error deleting reading log');
+            alert('Error saat membatalkan laporan');
         }
     };
 
@@ -217,22 +252,7 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
     const formatCurrency = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
 
     const getPeriodDates = () => {
-        const y = typeof filterYear === 'number' ? filterYear : new Date().getFullYear();
-        switch (filterPeriod) {
-            case 's1': return [new Date(y, 0, 1), new Date(y, 5, 30, 23, 59, 59)];
-            case 's2': return [new Date(y, 6, 1), new Date(y, 11, 31, 23, 59, 59)];
-            case 'q1': return [new Date(y, 0, 1), new Date(y, 2, 31, 23, 59, 59)];
-            case 'q2': return [new Date(y, 3, 1), new Date(y, 5, 30, 23, 59, 59)];
-            case 'q3': return [new Date(y, 6, 1), new Date(y, 8, 30, 23, 59, 59)];
-            case 'q4': return [new Date(y, 9, 1), new Date(y, 11, 31, 23, 59, 59)];
-            case 'all': return [new Date(y, 0, 1), new Date(y, 11, 31, 23, 59, 59)];
-            default: {
-                const m = parseInt(filterPeriod);
-                const start = new Date(y, m - 1, 26);
-                const end = new Date(y, m, 25, 23, 59, 59);
-                return [start, end];
-            }
-        }
+        return [new Date(startDate), new Date(endDate + 'T23:59:59')];
     };
 
     const getUserStats = (user: User) => {
@@ -263,23 +283,40 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
     });
 
     const verificationLogs = allLogs
-        .filter(l => l.status === 'Finished')
+        .filter(l => l.status === 'Finished' && l.hrApprovalStatus !== 'Cancelled')
         .filter(l => {
+            if (filterStatus !== 'all') {
+                const s = (l.hrApprovalStatus || 'Draft').toLowerCase();
+                const f = filterStatus.toLowerCase();
+                if (s !== f) return false;
+            }
+            
             const emp = users.find(u => (l.employee_id && u.employee_id === l.employee_id) || (l.userName && u.name && l.userName.trim().toLowerCase() === u.name.trim().toLowerCase()));
             const empBranch = emp?.branch || 'Others';
             if (selectedBranch !== 'All Branches' && empBranch !== selectedBranch) return false;
 
-            const dateToCheck = l.status === 'Finished' && l.finishDate ? l.finishDate : l.date;
+            const dateToCheck = l.finishDate || l.date;
             const d = new Date(dateToCheck);
             const [start, end] = getPeriodDates();
             
-            // Apply Period Filter Only if filterYear is NOT 'All'
-            if (filterYear !== 'All') {
-                if (d < start || d > end) return false;
+            if (d < start || d > end) return false;
+
+            // 4. Search Filter
+            const s = searchTerm.trim().toLowerCase();
+            if (s) {
+                const logName = (l.userName || '').toLowerCase();
+                const matchedName = (emp?.name || '').toLowerCase();
+                const matchedEmail = (emp?.email || '').toLowerCase();
+                
+                const matches = logName.includes(s) || 
+                               matchedName.includes(s) || 
+                               matchedEmail.includes(s) ||
+                               (l.title || '').toLowerCase().includes(s);
+                               
+                if (!matches) return false;
             }
 
-            const lowerSearch = searchTerm.toLowerCase();
-            return ((l.userName || '').toLowerCase().includes(lowerSearch) || (l.title || '').toLowerCase().includes(lowerSearch));
+            return true;
         })
         .sort((a, b) => {
             if (a.hrApprovalStatus === 'Pending' && b.hrApprovalStatus !== 'Pending') return -1;
@@ -299,29 +336,45 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                         <h1 className="text-2xl font-bold text-slate-800">Reading Log Management</h1>
                         <p className="text-slate-500">Manage validations and view reading statistics.</p>
                     </div>
-                    <div className="bg-slate-100 p-1 rounded-xl flex shadow-inner">
-                        <button onClick={() => setViewMode('verification')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'verification' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Verification</button>
-                        <button onClick={() => setViewMode('recap')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'recap' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Recapitulation</button>
+                    <div className="flex items-center gap-3">
+                        <button 
+                            onClick={handleSyncSIMAS}
+                            disabled={isSyncing}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm border ${isSyncing ? 'bg-slate-50 text-slate-400 border-slate-200' : 'bg-white text-emerald-600 border-emerald-100 hover:bg-emerald-50 hover:border-emerald-200'}`}
+                            title="Tarik data peminjaman buku terbaru dari SIMAS untuk semua karyawan"
+                        >
+                            <RefreshCw size={18} className={isSyncing ? 'animate-spin' : ''} />
+                            {isSyncing ? 'Syncing...' : 'Sync Data SIMAS'}
+                        </button>
+                        <div className="bg-slate-100 p-1 rounded-xl flex shadow-inner">
+                            <button onClick={() => setViewMode('verification')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'verification' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Verification</button>
+                            <button onClick={() => setViewMode('recap')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'recap' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Recapitulation</button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between mb-6">
-                <div className="relative w-full md:w-96">
-                    <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
-                    <input type="text" placeholder="Search Name, Title..." className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-600" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                </div>
-                <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
-                    <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)} className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center mb-6">
+                <div className="flex flex-wrap gap-2 items-center">
+                    <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)} className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[150px]">
                         {branches.map(b => <option key={b} value={b}>{b}</option>)}
                     </select>
-                    <select value={filterYear} onChange={(e) => setFilterYear(e.target.value === 'All' ? 'All' : Number(e.target.value))} className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                        <option value="All">All Year</option>
-                        {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                    <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-xl border border-slate-100">
+                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-transparent border-none font-bold text-slate-600 text-xs outline-none focus:ring-0" />
+                        <span className="text-slate-400 font-medium text-xs">to</span>
+                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-transparent border-none font-bold text-slate-600 text-xs outline-none focus:ring-0" />
+                    </div>
+                    <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                        <option value="all">All Status</option>
+                        <option value="Draft">Draft</option>
+                        <option value="Pending">Under Review</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Rejected">Rejected</option>
                     </select>
-                    <select value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)} className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[140px]">
-                        {periodOptions.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                    </select>
+                </div>
+                <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
+                    <input type="text" placeholder="Search Name, Title..." className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-600 text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
             </div>
 
@@ -409,9 +462,9 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                                 ) : <span className="text-slate-400 text-xs italic">No link</span>}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${log.hrApprovalStatus === 'Approved' ? 'bg-green-100 text-green-700 border-green-200' : log.hrApprovalStatus === 'Rejected' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>{log.hrApprovalStatus || 'Pending'}</span>{log.incentiveAmount && <div className="text-[10px] font-bold text-green-600 mt-1">{formatCurrency(log.incentiveAmount)}</div>}</td>
+                                        <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${log.hrApprovalStatus === 'Approved' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : log.hrApprovalStatus === 'Rejected' ? 'bg-red-100 text-red-700 border-red-200' : log.hrApprovalStatus === 'Pending' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{log.hrApprovalStatus === 'Pending' ? 'Under Review' : (log.hrApprovalStatus || 'Draft')}</span>{log.incentiveAmount && <div className="text-[10px] font-bold text-green-600 mt-1">{formatCurrency(log.incentiveAmount)}</div>}</td>
                                         <td className="px-6 py-4 text-center">
-                                            {log.hrApprovalStatus === 'Pending' ? (
+                                            {(log.hrApprovalStatus === 'Pending' || log.hrApprovalStatus === 'Draft' || !log.hrApprovalStatus) ? (
                                                 <div className="flex justify-center gap-2">
                                                     <button onClick={() => handleEditLogClick(log)} className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors" title="Edit Details"><Edit size={18} /></button>
                                                     <button onClick={() => handleVerifyClick(log)} className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors" title="Verify & Reward"><CheckCircle size={18} /></button>

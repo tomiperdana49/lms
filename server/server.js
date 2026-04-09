@@ -233,6 +233,7 @@ app.post('/api/login', async (req, res) => {
                 let employeeId = null;
                 let branchName = 'Headquarters';
 
+                let p = {};
                 if (nusanetUserId) {
                     try {
                         const profileUrl = `${baseUrl}/emp/api/v1.1/employee/${nusanetUserId}`;
@@ -241,7 +242,7 @@ app.post('/api/login', async (req, res) => {
                         });
                         const profileData = await profileResponse.json();
                         // Adjust data mapping based on common Nusanet response structures
-                        const p = profileData.data || profileData;
+                        p = profileData.data || profileData;
                         console.log(`[NUSANET PROFILE] Full Data:`, JSON.stringify(p, null, 2)); // Debug log for structure
 
                         // Extract name from 'user' object or top level
@@ -260,8 +261,10 @@ app.post('/api/login', async (req, res) => {
                     } catch (e) { console.error("[NUSANET PROFILE] Error fetching full profile:", e); }
                 }
 
-                // Determine LMS role from Nusanet roles
+                // Determine LMS role from Nusanet roles OR Job Position
                 let lmsRole = 'STAFF';
+
+                // 1. Check Nusanet Roles
                 if (authData.role && authData.role.role_name) {
                     const roles = Array.isArray(authData.role.role_name) ? authData.role.role_name : [authData.role.role_name];
                     if (roles.some(r => r.toUpperCase().includes('ADMIN') || r.toUpperCase().includes('HR'))) {
@@ -269,6 +272,13 @@ app.post('/api/login', async (req, res) => {
                     } else if (roles.some(r => r.toUpperCase().includes('SPV') || r.toUpperCase().includes('SUPERVISOR'))) {
                         lmsRole = 'SUPERVISOR';
                     }
+                }
+
+                // 2. Check Job Position from Profile (More specific for HR Staff)
+                const position = p.job_position || p.job_position_name || p.position_name || '';
+                if (lmsRole === 'STAFF' && position.toUpperCase().includes('HR')) {
+                    console.log(`[NUSANET AUTH] Elevating role to HR based on position: ${position}`);
+                    lmsRole = 'HR';
                 }
 
                 // Check SimAsset for ID if not found in Nusanet profile
@@ -280,9 +290,9 @@ app.post('/api/login', async (req, res) => {
                     }
                 }
 
-                // Find or Sync local record
-                let users = await query('SELECT * FROM users WHERE email = ?', [loginId]);
-                let user = users[0];
+                // 3.3 Find or Sync local record
+                let usersList = await query('SELECT * FROM users WHERE email = ?', [loginId]);
+                let user = usersList[0];
                 const avatar = `https://ui-avatars.com/api/?name=${fullName}&background=random`;
 
                 if (!user) {
@@ -294,9 +304,60 @@ app.post('/api/login', async (req, res) => {
                     user = { id, email: loginId, name: fullName, role: lmsRole, avatar, branch: branchName, employee_id: employeeId };
                 } else {
                     console.log(`[NUSANET AUTH] Syncing existing user data for ${loginId}`);
+                    // Role protection: Only auto-update role if it's an upgrade or the current role is STAFF.
+                    // This preserves manual overrides made by HR in the LMS (e.g. promoting someone to HR manually).
+                    let finalRole = user.role;
+                    if (lmsRole === 'HR') {
+                        finalRole = 'HR';
+                    } else if (lmsRole === 'SUPERVISOR' && user.role === 'STAFF') {
+                        finalRole = 'SUPERVISOR';
+                    }
+                    
                     await query('UPDATE users SET name = ?, role = ?, branch = ?, employee_id = ? WHERE id = ?',
-                        [fullName, lmsRole, branchName, employeeId, user.id]);
-                    user = { ...user, name: fullName, role: lmsRole, branch: branchName, employee_id: employeeId };
+                        [fullName, finalRole, branchName, employeeId, user.id]);
+                    user = { ...user, name: fullName, role: finalRole, branch: branchName, employee_id: employeeId };
+                }
+
+                // 3.4 Sync to employees table if missing (Requested by user)
+                if (employeeId) {
+                    try {
+                        const existingEmp = await querySimAsset('SELECT * FROM employees WHERE id_employee = ?', [employeeId]);
+                        if (existingEmp.length === 0) {
+                            console.log(`[NUSANET AUTH] Auto-creating employee record for ${fullName} (${employeeId})`);
+                            
+                            // Try to find branch_id matching branchName
+                            let bid = null;
+                            try {
+                                const branches = await querySimAsset('SELECT id_branch FROM branches WHERE name LIKE ?', [`%${branchName}%`]);
+                                if (branches.length > 0) {
+                                    bid = branches[0].id_branch;
+                                } else {
+                                    bid = '020'; // Default to HO
+                                }
+                            } catch (e) {
+                                bid = '020';
+                            }
+                            
+                            console.log(`[NUSANET AUTH] Resolved branch_id: ${bid} for ${branchName}`);
+
+                            await querySimAsset(
+                                'INSERT INTO employees (full_name, email, id_employee, job_position, job_level, organization_name, status_join, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                                [
+                                    fullName,
+                                    loginId,
+                                    employeeId,
+                                    p.job_position || p.job_position_name || 'Staff',
+                                    p.job_level_name || 'Staff',
+                                    p.organization_name || 'Nusanet',
+                                    p.employee_status_name || 'Permanent',
+                                    bid
+                                ]
+                            );
+                            console.log(`[NUSANET AUTH] Successfully created employee record for ${fullName}`);
+                        }
+                    } catch (empErr) {
+                        console.error("[NUSANET AUTH] Error auto-creating employee:", empErr.message);
+                    }
                 }
 
                 return res.json({
@@ -339,11 +400,20 @@ app.post('/api/auth/google', async (req, res) => {
         const employees = await querySimAsset('SELECT * FROM employees WHERE email = ?', [email]);
         const employeeHelper = employees.length > 0 ? employees[0] : null;
 
+        // Determine role based on job position
+        const jobPos = (employeeHelper && employeeHelper.job_position) ? employeeHelper.job_position.toUpperCase() : '';
+        const detectedRole = jobPos.includes('HR') ? 'HR' : (jobPos.includes('SUPERVISOR') || jobPos.includes('SPV') || jobPos.includes('MANAGER') ? 'SUPERVISOR' : 'STAFF');
+
         if (user) {
-            // Existing User: Update employee_id if missing and available
-            if (!user.employee_id && employeeHelper) {
-                await query('UPDATE users SET employee_id = ? WHERE id = ?', [employeeHelper.id_employee, user.id]);
-                user.employee_id = employeeHelper.id_employee; // Update local obj for response
+            // Existing User: Sync employee_id and role if needed
+            const needsUpdate = !user.employee_id && employeeHelper || user.role !== detectedRole;
+
+            if (needsUpdate) {
+                console.log(`[GOOGLE AUTH] Updating existing user ${email}: role=${detectedRole}, empId=${employeeHelper?.id_employee}`);
+                await query('UPDATE users SET employee_id = ?, role = ? WHERE id = ?',
+                    [employeeHelper?.id_employee || user.employee_id, detectedRole, user.id]);
+                user.employee_id = employeeHelper?.id_employee || user.employee_id;
+                user.role = detectedRole;
             }
         } else {
             // New User: Create with linked data
@@ -351,15 +421,14 @@ app.post('/api/auth/google', async (req, res) => {
             // Use Employee Name if available, otherwise format from email
             const name = employeeHelper ? employeeHelper.full_name : email.split('@')[0].replace('.', ' ');
             const avatar = `https://ui-avatars.com/api/?name=${name}&background=random`;
-            // Auto-assign HR role if job_position contains 'HR' (Optional smart feature), otherwise STAFF
-            const role = (employeeHelper && employeeHelper.job_position && employeeHelper.job_position.includes('HR')) ? 'HR' : 'STAFF';
             const branch = 'Headquarters';
             const employeeId = employeeHelper ? employeeHelper.id_employee : null;
 
+            console.log(`[GOOGLE AUTH] Creating new user ${email} with role ${detectedRole}`);
             await query('INSERT INTO users (id, email, password, name, role, avatar, branch, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [id, email, 'google-oauth-placeholder', name, role, avatar, branch, employeeId]);
+                [id, email, 'google-oauth-placeholder', name, detectedRole, avatar, branch, employeeId]);
 
-            user = { id, email, name, role, avatar, branch, employee_id: employeeId };
+            user = { id, email, name, role: detectedRole, avatar, branch, employee_id: employeeId };
         }
 
         res.json({
@@ -472,108 +541,80 @@ app.delete('/api/users/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
-
-// --- SIMAS PROXY ROUTES ---
-app.get('/api/simas/books', async (req, res) => {
-    try {
-        const { branchId, sn } = req.query;
-        let url = process.env.SIMAS_API_URL || 'https://simas.nusa.id/api/v2/book?hasHolder=false&branchId=020';
-
-        if (branchId) {
-            url += `&branchId=${branchId}`;
-        }
-        if (sn) {
-            url += `&sn=${sn}`;
-        }
-
-        const apiKey = process.env.SIMAS_API_KEY || '';
-        const response = await fetch(url, {
-            headers: { 'x-api-key': apiKey }
-        });
-        if (!response.ok) {
-            return res.status(response.status).json({ error: 'Failed to fetch from SIMAS' });
-        }
-        const data = await response.json();
-        res.json(data);
-    } catch (err) {
-        console.error("SIMAS Fetch Error:", err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
 app.post('/api/simas/sync', async (req, res) => {
     try {
         const { employee_id, user_name } = req.body;
-        if (!employee_id) return res.json({ success: true, message: 'No employee_id provided' });
-
+        
         const baseUrl = process.env.SIMAS_API_BASE_URL || 'https://simas.nusa.id/';
         let url = `${baseUrl}api/v2/book/loan`;
         const apiKey = process.env.SIMAS_API_KEY || '';
         const response = await fetch(url, { headers: { 'x-api-key': apiKey } });
-        
+
         if (!response.ok) return res.status(response.status).json({ error: 'Failed to fetch from SIMAS loans' });
-        
+
         const dataJson = await response.json();
         if (dataJson.success && dataJson.data && dataJson.data.length > 0) {
             const simasData = dataJson.data[0];
-            if (simasData[employee_id]) {
-                const empLoans = simasData[employee_id].bookLoans;
-                if (empLoans) {
-                    for (const uuid of Object.keys(empLoans)) {
-                        const b = empLoans[uuid];
-                        if (!b.loanHistory || !b.loanHistory.loaning) continue;
+            
+            // Get users to sync
+            let usersToSync = [];
+            if (employee_id && employee_id !== 'all') {
+                usersToSync.push({ employee_id, name: user_name });
+            } else {
+                // Sync all users from DB that have employee_id
+                const allUsers = await query('SELECT employee_id, name FROM users WHERE employee_id IS NOT NULL AND employee_id != ""');
+                usersToSync = allUsers;
+            }
 
-                        const sn = b.code;
-                        const startDateRaw = b.loanHistory.loaning.loanPeriod;
-                        const startDate = new Date(startDateRaw);
-                        const isReturned = b.loanHistory.return && b.loanHistory.return.returnTime;
-                        const finishDateRaw = isReturned ? b.loanHistory.return.returnTime : null;
+            console.log(`[SIMAS SYNC] Found ${usersToSync.length} users to potential sync. SIMAS keys: ${Object.keys(simasData).length}`);
 
-                        // Check if exists
-                        const existing = await query('SELECT * FROM reading_logs WHERE source = ? AND employee_id = ? AND sn = ? AND DATE(start_date) = ?', 
-                            ['SIMAS', employee_id, sn, startDateRaw]);
+            for (const targetUser of usersToSync) {
+                const targetEid = (targetUser.employee_id || '').trim();
+                const targetName = targetUser.name;
 
-                        if (existing.length === 0) {
-                            // Insert
-                            await query(
-                                'INSERT IGNORE INTO reading_logs (title, author, category, date, review, status, user_name, employee_id, evidence_url, return_evidence_url, start_date, finish_date, hr_approval_status, link, sn, location, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                                [
-                                    b.name,
-                                    '',
-                                    b.subCategory || 'Lainnya',
-                                    startDate,
-                                    isReturned ? (b.loanHistory.return.linkReview || '') : '',
-                                    isReturned ? 'Finished' : 'Reading',
-                                    user_name,
-                                    employee_id,
-                                    b.loanHistory.loaning.loanPhoto || '',
-                                    isReturned ? (b.loanHistory.return.returnPhoto || '') : '',
-                                    startDate,
-                                    finishDateRaw ? new Date(finishDateRaw) : null,
-                                    isReturned ? 'Draft' : 'Pending', 
-                                    isReturned ? (b.loanHistory.return.linkReview || '') : '',
-                                    sn,
-                                    'Kantor',
-                                    'SIMAS'
-                                ]
-                            );
-                        } else {
-                            // Exists. Check if we need to update (e.g. was Reading and now Finished)
-                            const log = existing[0];
-                            if (log.status === 'Reading' && isReturned) {
+                if (targetEid && simasData[targetEid]) {
+                    const empLoans = simasData[targetEid].bookLoans;
+                    if (empLoans) {
+                        console.log(`[SIMAS SYNC] Syncing ${targetName} (${targetEid}) - ${Object.keys(empLoans).length} books`);
+                        for (const uuid of Object.keys(empLoans)) {
+                            const b = empLoans[uuid];
+                            if (!b.loanHistory || !b.loanHistory.loaning) continue;
+
+                            const sn = b.code;
+                            const startDateRaw = b.loanHistory.loaning.loanPeriod;
+                            const startDate = new Date(startDateRaw);
+                            const isReturned = b.loanHistory.return && b.loanHistory.return.returnTime;
+                            const finishDateRaw = isReturned ? b.loanHistory.return.returnTime : null;
+
+                            // Check if exists
+                            const existing = await query('SELECT * FROM reading_logs WHERE source = ? AND employee_id = ? AND sn = ? AND (DATE(start_date) = DATE(?) OR start_date = ?)',
+                                ['SIMAS', targetEid, sn, startDateRaw, startDateRaw]);
+
+                            if (existing.length === 0) {
+                                console.log(`[SIMAS SYNC] Inserting new book for ${targetName}: ${b.name}`);
                                 await query(
-                                    'UPDATE reading_logs SET status = ?, finish_date = ?, return_evidence_url = ?, link = ?, review = ?, hr_approval_status = ? WHERE id = ?',
+                                    'INSERT IGNORE INTO reading_logs (title, author, category, date, review, status, user_name, employee_id, evidence_url, return_evidence_url, start_date, finish_date, hr_approval_status, link, sn, location, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                                     [
-                                        'Finished',
-                                        new Date(finishDateRaw),
-                                        b.loanHistory.return.returnPhoto || '',
-                                        b.loanHistory.return.linkReview || '',
-                                        b.loanHistory.return.linkReview || '',
-                                        'Draft',
-                                        log.id
+                                        b.name, '', b.subCategory || 'Lainnya', startDate,
+                                        isReturned ? (b.loanHistory.return.linkReview || '') : '',
+                                        isReturned ? 'Finished' : 'Reading',
+                                        targetName, targetEid, b.loanHistory.loaning.loanPhoto || '',
+                                        isReturned ? (b.loanHistory.return.returnPhoto || '') : '',
+                                        startDate, finishDateRaw ? new Date(finishDateRaw) : null,
+                                        isReturned ? 'Draft' : 'Pending',
+                                        isReturned ? (b.loanHistory.return.linkReview || '') : '',
+                                        sn, 'Kantor', 'SIMAS'
                                     ]
                                 );
+                            } else {
+                                const log = existing[0];
+                                if (log.status !== 'Cancelled' && log.status === 'Reading' && isReturned) {
+                                    console.log(`[SIMAS SYNC] Updating book to Finished for ${targetName}: ${b.name}`);
+                                    await query(
+                                        'UPDATE reading_logs SET status = ?, finish_date = ?, return_evidence_url = ?, link = ?, review = ?, hr_approval_status = ? WHERE id = ?',
+                                        ['Finished', new Date(finishDateRaw), b.loanHistory.return.returnPhoto || '', b.loanHistory.return.linkReview || '', b.loanHistory.return.linkReview || '', 'Draft', log.id]
+                                    );
+                                }
                             }
                         }
                     }
@@ -582,7 +623,7 @@ app.post('/api/simas/sync', async (req, res) => {
         }
         res.json({ success: true });
     } catch (err) {
-        console.error("SIMAS Sync Error:", err);
+        console.error("[SIMAS SYNC ERROR]", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -664,7 +705,8 @@ app.post('/api/logs', async (req, res) => {
 
 app.delete('/api/logs/:id', async (req, res) => {
     try {
-        await query('DELETE FROM reading_logs WHERE id = ?', [req.params.id]);
+        // Soft delete: status Cancelled
+        await query('UPDATE reading_logs SET status = "Cancelled", hr_approval_status = "Cancelled" WHERE id = ?', [req.params.id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -702,7 +744,7 @@ app.put('/api/logs/:id', async (req, res) => {
         if (updates.plannedFinishDate !== undefined) dbUpdates.planned_finish_date = updates.plannedFinishDate;
         if (updates.location !== undefined) dbUpdates.location = updates.location;
         if (updates.source !== undefined) dbUpdates.source = updates.source;
-        
+
         // Auto set approved_at if status changes to Approved
         if (updates.hrApprovalStatus === 'Approved') {
             dbUpdates.approved_at = new Date();

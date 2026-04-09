@@ -21,17 +21,8 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
-// --- SIMASSET POOL ---
-export const simAssetPool = mysql.createPool({
-    host: process.env.SIMAS_HOST || process.env.DB_HOST,
-    user: process.env.SIMAS_USER || process.env.DB_USER,
-    password: process.env.SIMAS_PASSWORD || process.env.DB_PASSWORD,
-    database: process.env.SIMAS_NAME || 'simasset',
-    port: process.env.SIMAS_PORT ? parseInt(process.env.SIMAS_PORT) : 3306,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-});
+// --- SIMASSET POOL (Unified to same DB) ---
+export const simAssetPool = pool;
 
 export const initDB = async () => {
     try {
@@ -109,6 +100,22 @@ export const initDB = async () => {
             await connection.query("ALTER TABLE reading_logs ADD COLUMN source VARCHAR(100)");
             console.log("Added source column to reading_logs.");
         } catch (e) { /* Ignore if exists */ }
+
+        // MIGRATION: Add unique constraint to prevent duplicate syncs
+        try {
+            await connection.query(`
+                DELETE l1 FROM reading_logs l1
+                INNER JOIN reading_logs l2 
+                WHERE l1.id < l2.id 
+                AND l1.source = l2.source 
+                AND l1.employee_id = l2.employee_id 
+                AND l1.sn = l2.sn 
+                AND DATE(l1.start_date) = DATE(l2.start_date)
+                AND l1.source = 'SIMAS'
+            `);
+            await connection.query("ALTER TABLE reading_logs ADD UNIQUE KEY unique_simas_loan (source, employee_id, sn, start_date)");
+            console.log("Added unique_simas_loan constraint.");
+        } catch (e) { /* Ignore if exists or precision issues */ }
 
         try {
             await connection.query("UPDATE reading_logs SET planned_finish_date = finish_date WHERE planned_finish_date IS NULL AND finish_date IS NOT NULL");

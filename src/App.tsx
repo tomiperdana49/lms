@@ -20,7 +20,7 @@ function App() {
     const savedUser = localStorage.getItem('lms_user');
     return savedUser ? JSON.parse(savedUser) : null;
   });
-  
+
   const [activePage, setActivePage] = useState<Page>(() => {
     const savedPage = localStorage.getItem('lms_active_page');
     return (savedPage as Page) || 'dashboard';

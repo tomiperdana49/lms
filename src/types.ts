@@ -15,7 +15,7 @@ export interface ReadingLogEntry {
     finishDate?: string;
     evidenceUrl?: string;
     returnEvidenceUrl?: string;
-    hrApprovalStatus?: 'Pending' | 'Approved' | 'Rejected' | 'Draft'; // New: HR verification
+    hrApprovalStatus?: 'Pending' | 'Approved' | 'Rejected' | 'Draft' | 'Cancelled'; // New: HR verification
     incentiveAmount?: number; // New: Approved incentive amount
     rejectionReason?: string; // New: Reason for rejection
     employee_id?: string;
