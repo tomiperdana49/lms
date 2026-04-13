@@ -613,7 +613,6 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                             {log.hrApprovalStatus === 'Pending' ? (
                                                 (() => {
                                                     const currentSeq = getLogSequence(log);
-                                                    const y = new Date(log.finishDate || log.date).getFullYear();
                                                     
                                                     if (currentSeq <= 5) {
                                                         return (
