@@ -23,6 +23,7 @@ export interface ReadingLogEntry {
     sn?: string;
     approvedAt?: string;
     plannedFinishDate?: string;
+    cancelledAt?: string;
 }
 
 export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'external-approval' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives';

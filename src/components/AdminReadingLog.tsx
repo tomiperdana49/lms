@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2, RefreshCw, BookOpen, Trophy } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry, User, Employee } from '../types';
 
@@ -14,12 +14,18 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
     const [startDate, setStartDate] = useState(() => {
         const now = new Date();
         const d = new Date(now.getFullYear(), now.getMonth() - 1, 26);
-        return d.toISOString().split('T')[0];
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
     });
     const [endDate, setEndDate] = useState(() => {
         const now = new Date();
         const d = new Date(now.getFullYear(), now.getMonth(), 25);
-        return d.toISOString().split('T')[0];
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
     });
     const [selectedBranch, setSelectedBranch] = useState('All Branches');
     const [branches, setBranches] = useState<string[]>(['All Branches']);
@@ -28,6 +34,7 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
 
     // View Mode State - Default to verification as previously requested
     const [viewMode, setViewMode] = useState<'verification' | 'recap'>('verification');
+    const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
 
 
@@ -51,6 +58,13 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
         open: false,
         log: null,
         formData: {}
+    });
+
+    // Recap Modal State
+    const [recapModal, setRecapModal] = useState<{ open: boolean; title: string; logs: ReadingLogEntry[] }>({
+        open: false,
+        title: '',
+        logs: []
     });
 
     // Photo Modal State
@@ -146,11 +160,20 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
     };
 
     const handleVerifyClick = (log: ReadingLogEntry) => {
+        const y = new Date(log.finishDate || log.date).getFullYear();
+        const key = `${log.employee_id || log.userName || 'unknown'}_${y}`;
+        const currentSeq = (approvedCounts[key] || 0) + 1;
+        
+        let reward = log.category?.toLowerCase().includes('komik') ? 50000 : 100000;
+        if (currentSeq === 5) {
+            reward += 500000;
+        }
+
         setVerifyModal({
             open: true,
             log: log,
             category: log.category?.toLowerCase().includes('komik') ? 'comic' : 'text',
-            reward: log.category?.toLowerCase().includes('komik') ? 50000 : 100000
+            reward: reward
         });
     };
 
@@ -237,7 +260,10 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
         try {
             const res = await fetch(`${API_BASE_URL}/api/logs/${id}`, { method: 'DELETE' });
             if (res.ok) {
-                setAllLogs(allLogs.map(log => log.id === id ? { ...log, status: 'Cancelled', hrApprovalStatus: 'Cancelled' } : log));
+                setAllLogs(allLogs.map(log => String(log.id) === String(id) ? { ...log, status: 'Cancelled', hrApprovalStatus: 'Cancelled' as 'Cancelled' } : log));
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
             } else {
                 alert('Gagal membatalkan laporan');
             }
@@ -256,7 +282,6 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
     };
 
     const getUserStats = (user: User) => {
-        const [start, end] = getPeriodDates();
         const userLogs = allLogs.filter(l => {
             if (user.employee_id && l.employee_id && l.employee_id === user.employee_id) { }
             else if (l.userName && user.name && l.userName.trim().toLowerCase() === user.name.trim().toLowerCase()) { }
@@ -265,7 +290,7 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
             if (l.status !== 'Finished') return false;
             const dateToCheck = l.status === 'Finished' && l.finishDate ? l.finishDate : l.date;
             const logDate = new Date(dateToCheck);
-            return logDate >= start && logDate <= end;
+            return logDate.getFullYear() === selectedYear;
         });
 
         const totalBooks = userLogs.length;
@@ -273,6 +298,36 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
         const totalIncentive = userLogs.reduce((sum, l) => sum + (l.incentiveAmount || 0), 0);
 
         return { totalBooks, verifiedCount, totalIncentive, logs: userLogs };
+    };
+
+    const getLogSequence = (log: ReadingLogEntry) => {
+        const y = new Date(log.finishDate || log.date).getFullYear();
+        const userKey = log.employee_id || (log.userName ? log.userName.trim().toLowerCase() : 'unknown');
+        
+        // Filter all logs for this user/year from the global state
+        const userYearLogs = allLogs.filter(l => {
+            const lKey = l.employee_id || (l.userName ? l.userName.trim().toLowerCase() : 'unknown');
+            const lY = new Date(l.finishDate || l.date).getFullYear();
+            return lKey === userKey && lY === y;
+        });
+
+        // Split into categories
+        const approvedLogs = userYearLogs
+            .filter(l => l.hrApprovalStatus === 'Approved')
+            .sort((a, b) => Number(a.id) - Number(b.id));
+
+        const pendingLogs = userYearLogs
+            .filter(l => l.hrApprovalStatus === 'Pending')
+            .sort((a, b) => Number(a.id) - Number(b.id));
+
+        if (log.hrApprovalStatus === 'Approved') {
+            const idx = approvedLogs.findIndex(l => l.id === log.id);
+            return idx !== -1 ? idx + 1 : 0;
+        } else if (log.hrApprovalStatus === 'Pending') {
+            const pIdx = pendingLogs.findIndex(l => l.id === log.id);
+            return approvedLogs.length + (pIdx !== -1 ? pIdx + 1 : 1);
+        }
+        return 0; // Draft or Rejected or Cancelled usually won't need sequence in this table
     };
 
     const filteredUsers = users.filter(user => {
@@ -290,14 +345,22 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
         }
         return acc;
     }, {});
-
     const verificationLogs = allLogs
-        .filter(l => l.status === 'Finished' && l.hrApprovalStatus !== 'Cancelled')
         .filter(l => {
             if (filterStatus !== 'all') {
-                const s = (l.hrApprovalStatus || 'Draft').toLowerCase();
-                const f = filterStatus.toLowerCase();
-                if (s !== f) return false;
+                if (filterStatus === 'Sedang Baca') {
+                    if (l.status !== 'Reading') return false;
+                } else if (filterStatus === 'Selesai Baca') {
+                    if (l.status !== 'Finished' || (l.hrApprovalStatus !== 'Draft' && !!l.hrApprovalStatus)) return false;
+                } else if (filterStatus === 'Approved') {
+                    if (l.hrApprovalStatus !== 'Approved') return false;
+                } else if (filterStatus === 'Under Review') {
+                    if (l.status !== 'Finished' || l.hrApprovalStatus !== 'Pending') return false;
+                } else if (filterStatus === 'Dibatalkan') {
+                    if (l.status !== 'Cancelled') return false;
+                } else if (filterStatus === 'Rejected HRD') {
+                    if (l.hrApprovalStatus !== 'Rejected') return false;
+                }
             }
             
             const emp = users.find(u => (l.employee_id && u.employee_id === l.employee_id) || (l.userName && u.name && l.userName.trim().toLowerCase() === u.name.trim().toLowerCase()));
@@ -330,7 +393,8 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
         .sort((a, b) => {
             if (a.hrApprovalStatus === 'Pending' && b.hrApprovalStatus !== 'Pending') return -1;
             if (a.hrApprovalStatus !== 'Pending' && b.hrApprovalStatus === 'Pending') return 1;
-            return new Date(b.date).getTime() - new Date(a.date).getTime();
+            // Within same status, sort by ID ascending so 1/5 appears first
+            return Number(a.id) - Number(b.id);
         });
 
     return (
@@ -368,18 +432,30 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                     <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)} className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[150px]">
                         {branches.map(b => <option key={b} value={b}>{b}</option>)}
                     </select>
-                    <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-xl border border-slate-100">
-                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-transparent border-none font-bold text-slate-600 text-xs outline-none focus:ring-0" />
-                        <span className="text-slate-400 font-medium text-xs">to</span>
-                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-transparent border-none font-bold text-slate-600 text-xs outline-none focus:ring-0" />
-                    </div>
-                    <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                        <option value="all">All Status</option>
-                        <option value="Draft">Draft</option>
-                        <option value="Pending">Under Review</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Rejected">Rejected</option>
-                    </select>
+                    {viewMode === 'verification' ? (
+                        <>
+                            <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-xl border border-slate-100">
+                                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-transparent border-none font-bold text-slate-600 text-xs outline-none focus:ring-0" />
+                                <span className="text-slate-400 font-medium text-xs">to</span>
+                                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-transparent border-none font-bold text-slate-600 text-xs outline-none focus:ring-0" />
+                            </div>
+                            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                                <option value="all">All Status</option>
+                                <option value="Sedang Baca">Sedang Baca</option>
+                                <option value="Selesai Baca">Selesai Baca</option>
+                                <option value="Approved">Approved</option>
+                                <option value="Under Review">Under Review</option>
+                                <option value="Rejected HRD">Rejected HRD</option>
+                                <option value="Dibatalkan">Dibatalkan</option>
+                            </select>
+                        </>
+                    ) : (
+                        <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))} className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                            {Array.from({ length: Math.max(1, new Date().getFullYear() - 2026 + 1) }, (_, i) => 2026 + i).map(year => (
+                                <option key={year} value={year}>{year}</option>
+                            ))}
+                        </select>
+                    )}
                 </div>
                 <div className="relative flex-1 min-w-[200px]">
                     <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
@@ -396,8 +472,7 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                     <th className="px-6 py-4 w-[30%]">Name / Email</th>
                                     <th className="px-6 py-4 w-[15%]">Role</th>
                                     <th className="px-6 py-4 w-[25%]">Books Read</th>
-                                    <th className="px-6 py-4 w-[20%]">Incentive Status</th>
-                                    <th className="px-6 py-4 text-center">Action</th>
+                                    <th className="px-6 py-4 w-[30%]">Incentive Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
@@ -414,13 +489,27 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                                 <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${user.role === 'HR' || user.role === 'HR_ADMIN' ? 'bg-purple-100 text-purple-700' : user.role === 'SUPERVISOR' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>{user.role?.replace('_', ' ') || 'STAFF'}</span>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2"><span className="text-slate-800 font-bold text-lg">{stats.totalBooks}</span><span className="text-slate-400 text-sm">Books</span>{stats.verifiedCount > 0 && <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-full">{stats.verifiedCount} Verified</span>}</div>
+                                                <div className="flex items-center gap-2">
+                                                    <button 
+                                                        className="group flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg px-3 py-1.5 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:shadow-sm transition-all active:scale-95"
+                                                        onClick={() => setRecapModal({ open: true, title: `Books Read by ${user.name}`, logs: stats.logs })}
+                                                    >
+                                                        <span className="text-slate-800 font-bold text-lg group-hover:text-blue-700 transition-colors">{stats.totalBooks}</span>
+                                                        <span className="text-slate-500 text-sm group-hover:text-blue-600 transition-colors">Books</span>
+                                                    </button>
+                                                    {stats.verifiedCount > 0 && (
+                                                        <button 
+                                                            className="group flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-green-500 rounded-lg px-2.5 py-1.5 bg-green-50 border border-green-200 hover:border-green-400 hover:bg-green-100 hover:shadow-sm transition-all active:scale-95 text-green-700 text-xs font-bold"
+                                                            onClick={() => setRecapModal({ open: true, title: `Verified Books for ${user.name}`, logs: stats.logs.filter(l => l.hrApprovalStatus === 'Approved') })}
+                                                        >
+                                                            <CheckCircle size={14} className="text-green-500 group-hover:text-green-600 transition-colors" />
+                                                            {stats.verifiedCount} Verified
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2 text-slate-600">{isEligible ? <span className="flex items-center gap-1 text-green-600 font-bold text-xs"><CheckCircle size={14} /> Eligible</span> : <span className="flex items-center gap-1 text-slate-400 text-xs font-medium"><Clock size={14} /> {remaining > 0 ? `${remaining} more to go` : 'Pending'}</span>}{stats.totalIncentive > 0 && <span className="ml-2 text-green-600 font-bold text-sm bg-green-50 px-2 py-0.5 rounded border border-green-100">{formatCurrency(stats.totalIncentive)}</span>}</div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span className="text-slate-400 text-xs italic">No actions yet</span>
                                             </td>
                                         </tr>
                                     );
@@ -441,6 +530,7 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                             <thead className="bg-slate-50 text-slate-500 font-semibold uppercase text-xs">
                                 <tr>
                                     <th className="px-6 py-4">Employee</th>
+                                    <th className="px-6 py-4">Book #</th>
                                     <th className="px-6 py-4">Book Title / Source</th>
                                     <th className="px-6 py-4">Start Date</th>
                                     <th className="px-6 py-4">Finish Date</th>
@@ -453,6 +543,37 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                 {verificationLogs.map((log) => (
                                     <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-4"><div><p className="font-bold text-slate-700 text-sm">{log.userName || 'Unknown'}</p><p className="text-xs text-slate-400">Staff</p></div></td>
+                                        <td className="px-6 py-4">
+                                            {(() => {
+                                                const currentSeq = getLogSequence(log);
+                                                if (currentSeq === 0) return <span className="text-slate-400">-</span>;
+                                                const isApproved = log.hrApprovalStatus === 'Approved';
+                                                
+                                                return (
+                                                    <div className="flex flex-col items-center justify-center">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase transition-colors ${
+                                                                isApproved 
+                                                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-100' 
+                                                                    : 'bg-slate-50 text-slate-500 border-slate-100'
+                                                            }`}>
+                                                                {isApproved ? 'Verified' : 'Target'}
+                                                            </span>
+                                                        </div>
+                                                        <span className={`text-sm font-black mt-1 whitespace-nowrap ${currentSeq === 5 ? 'text-orange-600' : currentSeq > 5 ? 'text-red-500' : 'text-slate-700'}`}>
+                                                            {!isApproved ? 'To ' : ''}{currentSeq} / 5
+                                                        </span>
+                                                        <span className="text-[9px] text-slate-400 font-medium mt-0.5">Year {new Date(log.finishDate || log.date).getFullYear()}</span>
+                                                        {currentSeq === 5 && log.hrApprovalStatus === 'Pending' && (
+                                                            <span className="text-[9px] font-extrabold text-white bg-orange-500 px-1.5 rounded-full uppercase mt-1 animate-bounce shadow-sm">Bonus!</span>
+                                                        )}
+                                                        {currentSeq > 5 && (
+                                                            <span className="text-[9px] font-bold text-red-500 uppercase mt-1">Limit!</span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </td>
                                         <td className="px-6 py-4"><div className="flex flex-col gap-1"><span className="font-semibold text-slate-800 text-sm">{log.title}</span><span className="text-xs text-slate-500">{log.category}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit ${log.source === 'Buku Pribadi' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>{log.source === 'Buku Pribadi' ? 'Pribadi' : 'Office'}</span></div></td>
                                         <td className="px-6 py-4 text-sm text-slate-600">{log.startDate ? new Date(log.startDate).toLocaleDateString() : '-'}</td>
                                         <td className="px-6 py-4 text-sm text-slate-600">{log.finishDate ? new Date(log.finishDate).toLocaleDateString() : new Date(log.date).toLocaleDateString()}</td>
@@ -471,15 +592,30 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                                 ) : <span className="text-slate-400 text-xs italic">No link</span>}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${log.hrApprovalStatus === 'Approved' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : log.hrApprovalStatus === 'Rejected' ? 'bg-red-100 text-red-700 border-red-200' : log.hrApprovalStatus === 'Pending' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{log.hrApprovalStatus === 'Pending' ? 'Under Review' : (log.hrApprovalStatus || 'Draft')}</span>{log.incentiveAmount && <div className="text-[10px] font-bold text-green-600 mt-1">{formatCurrency(log.incentiveAmount)}</div>}</td>
+                                        <td className="px-6 py-4">
+                                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${log.hrApprovalStatus === 'Approved' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : log.hrApprovalStatus === 'Rejected' ? 'bg-red-100 text-red-700 border-red-200' : log.hrApprovalStatus === 'Pending' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                                {log.hrApprovalStatus === 'Pending' ? 'Under Review' : (log.hrApprovalStatus || 'Draft')}
+                                            </span>
+                                            {log.incentiveAmount && (
+                                                <div className="text-[10px] font-bold text-green-600 mt-1">
+                                                    {(() => {
+                                                        const seq = getLogSequence(log);
+                                                        if (seq === 5 && log.incentiveAmount > 500000) {
+                                                            const base = log.incentiveAmount - 500000;
+                                                            return `${base.toLocaleString('id-ID')} + 500.000 = ${formatCurrency(log.incentiveAmount)}`;
+                                                        }
+                                                        return formatCurrency(log.incentiveAmount);
+                                                    })()}
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="px-6 py-4 text-center">
                                             {log.hrApprovalStatus === 'Pending' ? (
                                                 (() => {
+                                                    const currentSeq = getLogSequence(log);
                                                     const y = new Date(log.finishDate || log.date).getFullYear();
-                                                    const key = `${log.employee_id || log.userName || ''}_${y}`;
-                                                    const count = approvedCounts[key] || 0;
                                                     
-                                                    if (count < 5) {
+                                                    if (currentSeq <= 5) {
                                                         return (
                                                             <div className="flex justify-center gap-2">
                                                                 <button onClick={() => handleEditLogClick(log)} className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors" title="Edit Details"><Edit size={18} /></button>
@@ -488,7 +624,12 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                                             </div>
                                                         );
                                                     } else {
-                                                        return <span className="text-xs text-orange-500 font-bold italic">Limit Exceeded (5/{y})</span>;
+                                                        return (
+                                                            <div className="flex flex-col items-center">
+                                                                <span className="text-xs text-red-500 font-bold italic">Limit Exceeded ({currentSeq}/5)</span>
+                                                                <button onClick={() => handleRejectClick(log)} className="mt-1 text-[10px] text-red-600 hover:underline flex items-center gap-1"><XCircle size={10}/> Reject Over Limit</button>
+                                                            </div>
+                                                        );
                                                     }
                                                 })()
                                             ) : (
@@ -511,12 +652,43 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                             <button onClick={() => setVerifyModal({ open: false, log: null, category: 'text', reward: 0 })} className="text-slate-400 hover:text-slate-600"><XCircle /></button>
                         </div>
                         <div className="space-y-4">
+                            {(() => {
+                                const y = new Date(verifyModal.log.finishDate || verifyModal.log.date).getFullYear();
+                                const key = `${verifyModal.log.employee_id || verifyModal.log.userName || 'unknown'}_${y}`;
+                                const currentSeq = (approvedCounts[key] || 0) + 1;
+                                if (currentSeq === 5) {
+                                    return (
+                                        <div className="bg-orange-50 border border-orange-200 p-3 rounded-xl flex items-start gap-3 animate-pulse">
+                                            <Trophy size={20} className="text-orange-500 mt-1" />
+                                            <div>
+                                                <p className="text-sm font-bold text-orange-800">Milestone Ke-5 Terdeteksi!</p>
+                                                <p className="text-xs text-orange-600">User ini akan mendapatkan bonus tambahan Rp 500.000.</p>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center gap-2">
+                                        <BookOpen size={16} className="text-blue-500" />
+                                        <p className="text-xs font-bold text-blue-700">Verifikasi Buku Ke-{currentSeq} Tahun {y}</p>
+                                    </div>
+                                );
+                            })()}
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Book Category</label>
                                 <select 
                                     className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                                     value={verifyModal.category}
-                                    onChange={(e) => setVerifyModal(prev => ({ ...prev, category: e.target.value as any, reward: e.target.value === 'comic' ? 50000 : 100000 }))}
+                                    onChange={(e) => {
+                                        const y = new Date(verifyModal.log!.finishDate || verifyModal.log!.date).getFullYear();
+                                        const key = `${verifyModal.log!.employee_id || verifyModal.log!.userName || 'unknown'}_${y}`;
+                                        const isFifth = ((approvedCounts[key] || 0) + 1) === 5;
+                                        setVerifyModal(prev => ({ 
+                                            ...prev, 
+                                            category: e.target.value as any, 
+                                            reward: (e.target.value === 'comic' ? 50000 : 100000) + (isFifth ? 500000 : 0)
+                                        }));
+                                    }}
                                 >
                                     <option value="text">Non-Fiksi Text</option>
                                     <option value="comic">Non-Fiksi Komik/Manga</option>
@@ -526,7 +698,7 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Incentive Amount (Rp)</label>
                                 <input 
                                     type="number"
-                                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-green-700 bg-green-50/30"
                                     value={verifyModal.reward}
                                     onChange={(e) => setVerifyModal(prev => ({ ...prev, reward: Number(e.target.value) }))}
                                 />
@@ -633,6 +805,82 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                     </p>
                                     <img src={photoModal.log.returnEvidenceUrl.startsWith('http') ? photoModal.log.returnEvidenceUrl : `${API_BASE_URL}${photoModal.log.returnEvidenceUrl}`} alt="Pengembalian" className="w-full h-auto max-h-[500px] object-contain rounded-lg border border-slate-200 shadow-sm bg-white" />
                                 </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Recap Logs List Modal */}
+            {recapModal.open && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in" onClick={() => setRecapModal({ ...recapModal, open: false })}>
+                    <div className="bg-white rounded-2xl w-full max-w-3xl flex flex-col max-h-[85vh] animate-in fade-in zoom-in duration-200 shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                <BookOpen size={18} className="text-blue-600" />
+                                {recapModal.title}
+                            </h3>
+                            <button onClick={() => setRecapModal({ ...recapModal, open: false })} className="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-full shadow-sm">
+                                <XCircle size={20} />
+                            </button>
+                        </div>
+                        <div className="p-0 overflow-y-auto w-full">
+                            {recapModal.logs.length === 0 ? (
+                                <div className="p-8 text-center text-slate-500 italic">No books to display.</div>
+                            ) : (
+                                <table className="w-full text-left">
+                                    <thead className="bg-white text-xs uppercase text-slate-500 font-bold border-b border-slate-100 sticky top-0 shadow-sm">
+                                        <tr>
+                                            <th className="px-6 py-3">Book Title / Category</th>
+                                            <th className="px-6 py-3 text-center">Book #</th>
+                                            <th className="px-6 py-3">Period</th>
+                                            <th className="px-6 py-3 text-center">Incentive</th>
+                                            <th className="px-6 py-3">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {recapModal.logs.map(log => (
+                                            <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="font-bold text-slate-700 text-sm whitespace-pre-wrap">{log.title}</div>
+                                                    <div className="text-xs text-slate-400 truncate mt-1">{log.category}</div>
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    {(() => {
+                                                        const seq = getLogSequence(log);
+                                                        if (seq === 0) return '-';
+                                                        return <span className={`text-xs font-black px-2 py-0.5 rounded border whitespace-nowrap ${seq === 5 ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-slate-50 text-slate-700 border-slate-100'}`}>{seq} / 5</span>;
+                                                    })()}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="text-sm font-medium text-slate-600">
+                                                        {log.finishDate ? new Date(log.finishDate).toLocaleDateString() : log.date ? new Date(log.date).toLocaleDateString() : '-'}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    {log.incentiveAmount ? (
+                                                        <div className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-100 whitespace-nowrap">
+                                                            {(() => {
+                                                                const seq = getLogSequence(log);
+                                                                if (seq === 5 && log.incentiveAmount > 500000) {
+                                                                    const base = log.incentiveAmount - 500000;
+                                                                    return `${base.toLocaleString('id-ID')} + 500.000 = ${formatCurrency(log.incentiveAmount)}`;
+                                                                }
+                                                                return formatCurrency(log.incentiveAmount);
+                                                            })()}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-sm text-slate-400 italic">-</div>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase w-fit border ${log.hrApprovalStatus === 'Approved' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : log.hrApprovalStatus === 'Rejected' ? 'bg-red-100 text-red-700 border-red-200' : log.hrApprovalStatus === 'Pending' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                                        {log.hrApprovalStatus || 'Draft'}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             )}
                         </div>
                     </div>

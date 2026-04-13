@@ -549,12 +549,12 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
 
                                 <div className="pl-3 mt-3 flex items-center justify-between text-sm">
                                     <div className="text-slate-500 font-medium w-full">
-                                        <div className="font-bold text-slate-700">Total: Rp {req.cost.toLocaleString('id-ID')}</div>
-                                        <div className="text-[10px] text-slate-400 mt-1 space-y-0.5">
-                                            {(req.costTraining || 0) > 0 && <div>Training: Rp {(req.costTraining || 0).toLocaleString('id-ID')}</div>}
-                                            {(req.costTransport || 0) > 0 && <div>Transport: Rp {(req.costTransport || 0).toLocaleString('id-ID')}</div>}
-                                            {(req.costAccommodation || 0) > 0 && <div>Akomodasi: Rp {(req.costAccommodation || 0).toLocaleString('id-ID')}</div>}
-                                            {(req.costOthers || 0) > 0 && <div>Lainnya: Rp {(req.costOthers || 0).toLocaleString('id-ID')}</div>}
+                                        <div className="font-bold text-slate-700">Total: Rp {Number(req.cost).toLocaleString('id-ID')}</div>
+                                        <div className="text-xs text-slate-500 space-y-0.5">
+                                            {(req.costTraining || 0) > 0 && <div>Training: Rp {Number(req.costTraining || 0).toLocaleString('id-ID')}</div>}
+                                            {(req.costTransport || 0) > 0 && <div>Transport: Rp {Number(req.costTransport || 0).toLocaleString('id-ID')}</div>}
+                                            {(req.costAccommodation || 0) > 0 && <div>Akomodasi: Rp {Number(req.costAccommodation || 0).toLocaleString('id-ID')}</div>}
+                                            {(req.costOthers || 0) > 0 && <div>Lainnya: Rp {Number(req.costOthers || 0).toLocaleString('id-ID')}</div>}
                                         </div>
 
                                         {/* Rejection Reason */}

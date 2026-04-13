@@ -522,8 +522,7 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                         className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                     >
                         <option value="All">All Years</option>
-                        <option value={2024}>2024</option>
-                        <option value={2025}>2025</option>
+                        {Array.from({ length: Math.max(1, new Date().getFullYear() - 2026 + 1) }, (_, i) => 2026 + i).map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
 
                     <select

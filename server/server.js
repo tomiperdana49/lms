@@ -656,7 +656,8 @@ app.get('/api/logs', async (req, res) => {
             approvedBy: log.approved_by,
             sn: log.sn,
             approvedAt: log.approved_at,
-            plannedFinishDate: log.planned_finish_date
+            plannedFinishDate: log.planned_finish_date,
+            cancelledAt: log.cancelled_at
         }));
         res.json(mappedLogs);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -684,7 +685,7 @@ app.post('/api/logs', async (req, res) => {
                 log.readingDuration || 0,
                 log.hrApprovalStatus || 'Pending',
                 log.link || '',
-                log.sn || '',
+                log.sn || null,
                 log.finishDate ? new Date(log.finishDate) : null,
                 log.location || '',
                 log.source || ''
@@ -706,15 +707,33 @@ app.post('/api/logs', async (req, res) => {
             rejectionReason: newLog.rejection_reason,
             sn: newLog.sn,
             approvedAt: newLog.approved_at,
-            plannedFinishDate: newLog.planned_finish_date
+            plannedFinishDate: newLog.planned_finish_date,
+            cancelledAt: newLog.cancelled_at
         });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) {
+        console.error("[POST LOG ERROR]", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.patch('/api/logs/:id/cancel', async (req, res) => {
+    try {
+        const { reason } = req.body;
+        await query(
+            'UPDATE reading_logs SET status = "Cancelled", hr_approval_status = "Cancelled", rejection_reason = ?, cancelled_at = ? WHERE id = ?',
+            [reason || 'Dibatalkan oleh user', new Date(), req.params.id]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error("[CANCEL LOG ERROR]", err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.delete('/api/logs/:id', async (req, res) => {
     try {
         // Soft delete: status Cancelled
-        await query('UPDATE reading_logs SET status = "Cancelled", hr_approval_status = "Cancelled" WHERE id = ?', [req.params.id]);
+        await query('UPDATE reading_logs SET status = "Cancelled", hr_approval_status = "Cancelled", cancelled_at = ? WHERE id = ?', [new Date(), req.params.id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -750,6 +769,7 @@ app.put('/api/logs/:id', async (req, res) => {
         if (updates.approvedBy !== undefined) dbUpdates.approved_by = updates.approvedBy;
         if (updates.approvedAt !== undefined) dbUpdates.approved_at = updates.approvedAt;
         if (updates.plannedFinishDate !== undefined) dbUpdates.planned_finish_date = updates.plannedFinishDate;
+        if (updates.cancelledAt !== undefined) dbUpdates.cancelled_at = updates.cancelledAt;
         if (updates.location !== undefined) dbUpdates.location = updates.location;
         if (updates.source !== undefined) dbUpdates.source = updates.source;
 
@@ -784,7 +804,8 @@ app.put('/api/logs/:id', async (req, res) => {
             evidenceUrl: updated.evidence_url,
             hrApprovalStatus: updated.hr_approval_status,
             incentiveAmount: updated.incentive_amount,
-            rejectionReason: updated.rejection_reason
+            rejectionReason: updated.rejection_reason,
+            cancelledAt: updated.cancelled_at
         });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });

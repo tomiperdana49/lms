@@ -568,7 +568,7 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                                 onChange={(e) => setSummaryYear(parseInt(e.target.value))}
                                 className="px-4 py-2 rounded-lg border border-slate-300 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500"
                             >
-                                {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                                {Array.from({ length: Math.max(1, new Date().getFullYear() - 2026 + 1) }, (_, i) => 2026 + i).map(y => <option key={y} value={y}>{y}</option>)}
                             </select>
                         </div>
                         <div className="flex items-center gap-2">

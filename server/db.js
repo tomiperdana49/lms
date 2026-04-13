@@ -101,6 +101,11 @@ export const initDB = async () => {
             console.log("Added source column to reading_logs.");
         } catch (e) { /* Ignore if exists */ }
 
+        try {
+            await connection.query("ALTER TABLE reading_logs ADD COLUMN cancelled_at DATETIME");
+            console.log("Added cancelled_at column to reading_logs.");
+        } catch (e) { /* Ignore if exists */ }
+
         // MIGRATION: Add unique constraint to prevent duplicate syncs
         try {
             await connection.query(`

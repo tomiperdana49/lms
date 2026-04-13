@@ -4,13 +4,17 @@ import { AlertCircle, CheckCircle } from 'lucide-react';
 interface ConfirmationModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: () => void;
+    onConfirm: (inputValue?: string) => void;
     title: string;
     message: string;
     confirmText?: string;
     cancelText?: string;
     variant?: 'danger' | 'warning' | 'info' | 'success';
     hideConfirm?: boolean;
+    showInput?: boolean;
+    inputPlaceholder?: string;
+    inputValue?: string;
+    onInputChange?: (value: string) => void;
 }
 
 const ConfirmationModal = ({
@@ -22,7 +26,11 @@ const ConfirmationModal = ({
     confirmText = 'Confirm',
     cancelText = 'Cancel',
     variant = 'danger',
-    hideConfirm = false
+    hideConfirm = false,
+    showInput = false,
+    inputPlaceholder = 'Masukkan catatan...',
+    inputValue = '',
+    onInputChange = () => { }
 }: ConfirmationModalProps) => {
     if (!isOpen) return null;
 
@@ -39,7 +47,19 @@ const ConfirmationModal = ({
                     </div>
 
                     <h3 className="text-xl font-bold text-slate-800 mb-2">{title}</h3>
-                    <p className="text-slate-500 mb-6 text-sm">{message}</p>
+                    <p className="text-slate-500 mb-4 text-sm">{message}</p>
+                    
+                    {showInput && (
+                        <div className="w-full mb-6">
+                            <textarea
+                                value={inputValue}
+                                onChange={(e) => onInputChange(e.target.value)}
+                                placeholder={inputPlaceholder}
+                                className="w-full px-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none min-h-[80px]"
+                                required
+                            />
+                        </div>
+                    )}
 
                     <div className="flex gap-3 w-full">
                         <button
@@ -50,7 +70,7 @@ const ConfirmationModal = ({
                         </button>
                         {!hideConfirm && (
                             <button
-                                onClick={() => { onConfirm(); onClose(); }}
+                                onClick={() => { onConfirm(showInput ? inputValue : undefined); onClose(); }}
                                 className={`flex-1 py-2.5 rounded-xl text-white font-bold shadow-lg transition-colors ${variant === 'danger' ? 'bg-red-600 hover:bg-red-700 shadow-red-200' :
                                         variant === 'warning' ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-200' :
                                             variant === 'success' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' :

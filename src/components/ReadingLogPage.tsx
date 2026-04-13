@@ -1,5 +1,5 @@
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
-import { BookOpen, ArrowLeft, Search, Book, Trophy, Trash2, XCircle, CheckCircle, Upload, AlertCircle } from 'lucide-react';
+import { BookOpen, ArrowLeft, Search, Book, Trophy, Trash2, XCircle, CheckCircle, Upload, AlertCircle, Clock } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry, User } from '../types';
 import PopupNotification from './PopupNotification';
@@ -34,11 +34,13 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
     const [claimFile, setClaimFile] = useState<File | null>(null);
     const [claimPreview, setClaimPreview] = useState<string>('');
 
+    const today = new Date().toLocaleDateString('en-CA');
+
     const [privateReportForm, setPrivateReportForm] = useState({
         title: '',
         category: '',
         startDate: '',
-        finishDate: '',
+        finishDate: today,
         link: '',
         evidenceUrl: ''
     });
@@ -48,7 +50,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         title: '',
         category: '',
         startDate: '',
-        finishDate: '',
+        finishDate: today,
         link: '',
         evidenceUrl: ''
     });
@@ -56,21 +58,34 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
     const [detailModalOpen, setDetailModalOpen] = useState(false);
     const [viewLog, setViewLog] = useState<ReadingLogEntry | null>(null);
     const [selectedLog, setSelectedLog] = useState<ReadingLogEntry | null>(null);
-
+    const [cancelNote, setCancelNote] = useState('');
     const [notification, setNotification] = useState<{ show: boolean, type: 'success' | 'error', message: string }>({ show: false, type: 'success', message: '' });
+
     const [confirmConfig, setConfirmConfig] = useState<{
         isOpen: boolean;
         title: string;
         message: string;
-        onConfirm: () => void;
+        onConfirm: (val?: string) => void;
         variant?: 'danger' | 'warning' | 'info' | 'success';
         confirmText?: string;
         cancelText?: string;
         hideConfirm?: boolean;
+        showInput?: boolean;
+        inputPlaceholder?: string;
     }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
 
-    const openConfirm = (title: string, message: string, onConfirm: () => void = () => { }, confirmText = 'Yes, Delete', variant: 'danger' | 'warning' | 'info' | 'success' = 'danger', cancelText = 'Cancel', hideConfirm = false) => {
-        setConfirmConfig({ isOpen: true, title, message, onConfirm, confirmText, variant, cancelText, hideConfirm });
+    const openConfirm = (
+        title: string, 
+        message: string, 
+        onConfirm: (val?: string) => void = () => { }, 
+        confirmText = 'Yes, Delete', 
+        variant: 'danger' | 'warning' | 'info' | 'success' = 'danger', 
+        cancelText = 'Cancel', 
+        hideConfirm = false,
+        showInput = false,
+        inputPlaceholder = 'Masukkan catatan...'
+    ) => {
+        setConfirmConfig({ isOpen: true, title, message, onConfirm, confirmText, variant, cancelText, hideConfirm, showInput, inputPlaceholder });
     };
 
     const fetchLogs = async () => {
@@ -112,19 +127,52 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         setDetailModalOpen(true);
     };
 
-    const handleDelete = async (id: number | string) => {
-        openConfirm('Batalkan Laporan', 'Apakah Anda yakin ingin membatalkan laporan bacaan ini? Data akan tetap tersimpan namun status berubah menjadi Cancelled.', async () => {
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/logs/${id}`, { method: 'DELETE' });
-                if (res.ok) {
-                    setReadingLogs(readingLogs.map(l => l.id === id ? { ...l, status: 'Cancelled', hrApprovalStatus: 'Cancelled' } : l));
-                    setNotification({ show: true, type: 'success', message: "Laporan berhasil dibatalkan." });
+    const handleDelete = (id: number | string) => {
+        setCancelNote('');
+        openConfirm(
+            'Batalkan Laporan', 
+            'Apakah Anda yakin ingin membatalkan laporan bacaan ini? Silakan berikan catatan alasan pembatalan.', 
+            async (reason) => {
+                try {
+                    const finalReason = reason || 'Dibatalkan oleh user';
+                    const res = await fetch(`${API_BASE_URL}/api/logs/${id}/cancel`, { 
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ reason: finalReason })
+                    });
+                    if (res.ok) {
+                        const updatedLogs = readingLogs.map(l => String(l.id) === String(id) ? { 
+                            ...l, 
+                            status: 'Cancelled', 
+                            hrApprovalStatus: 'Cancelled' as 'Cancelled', 
+                            rejectionReason: finalReason 
+                        } : l);
+                        setReadingLogs(updatedLogs);
+                        if (viewLog && String(viewLog.id) === String(id)) {
+                            setViewLog({ 
+                                ...viewLog, 
+                                status: 'Cancelled', 
+                                hrApprovalStatus: 'Cancelled' as 'Cancelled', 
+                                rejectionReason: finalReason 
+                            });
+                        }
+                        setNotification({ show: true, type: 'success', message: "Laporan berhasil dibatalkan." });
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    }
+                } catch (err) {
+                    console.error("Failed to cancel log", err);
+                    setNotification({ show: true, type: 'error', message: "Gagal membatalkan laporan." });
                 }
-            } catch (err) {
-                console.error("Failed to cancel log", err);
-                setNotification({ show: true, type: 'error', message: "Gagal membatalkan laporan." });
-            }
-        }, 'Ya, Batalkan', 'warning');
+            }, 
+            'Ya, Batalkan', 
+            'warning',
+            'Cancel',
+            false,
+            true,
+            'Masukkan alasan pembatalan...'
+        );
     };
 
     const handleClaimIncentive = async (id: number | string) => {
@@ -237,6 +285,10 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
             if (log.hrApprovalStatus !== 'Approved') return false;
         } else if (filterStatus === 'Pending') {
             if (log.status !== 'Finished' || log.hrApprovalStatus !== 'Pending') return false;
+        } else if (filterStatus === 'Cancelled') {
+            if (log.status !== 'Cancelled') return false;
+        } else if (filterStatus === 'Rejected') {
+            if (log.hrApprovalStatus !== 'Rejected') return false;
         }
 
         // Date/Period Filter
@@ -253,12 +305,22 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         setIsLoading(true);
         const { title, category, startDate, finishDate, link } = privateReportForm;
         try {
+            // Set Awal Baca to 09:00
+            const finalStartDate = new Date(startDate);
+            finalStartDate.setHours(9, 0, 0);
+
+            // Merge finishDate with CURRENT TIME
+            const finalFinishDate = new Date(finishDate);
+            const now = new Date();
+            finalFinishDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+
             // 1. Simpan data ke Database terlebih dahulu (tanpa gambar)
             const res = await fetch(`${API_BASE_URL}/api/logs`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    title, category, startDate: new Date(startDate), finishDate: new Date(finishDate),
+                    title, category, startDate: finalStartDate, 
+                    finishDate: finalFinishDate,
                     link: link, review: '-', evidenceUrl: '', status: 'Finished', hrApprovalStatus: 'Draft',
                     location: 'Pribadi', source: 'Buku Pribadi', userName: user.name, employee_id: user.employee_id, date: new Date()
                 })
@@ -286,7 +348,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
             }
 
             setReadingLogs([newLog, ...readingLogs]);
-            setPrivateReportForm({ title: '', category: '', startDate: '', finishDate: '', link: '', evidenceUrl: '' });
+            setPrivateReportForm({ title: '', category: '', startDate: '', finishDate: today, link: '', evidenceUrl: '' });
             // setYearReadCount(prev => prev + 1); // No longer needed, dynamic calculation
             setNotification({ show: true, type: 'success', message: "Laporan bacaan pribadi berhasil disimpan!" });
             setTimeout(() => {
@@ -343,7 +405,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         } else {
             setSelectedLog(null);
             setClaimForm({
-                title: '', category: '', startDate: '', finishDate: '',
+                title: '', category: '', startDate: '', finishDate: today,
                 link: '', evidenceUrl: ''
             });
         }
@@ -462,7 +524,13 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                         <p className="text-blue-100 opacity-90">Track your progress and incentives</p>
                     </div>
                     <div className="text-right">
-                        <div className="text-4xl font-black">{readingLogs.filter(l => new Date(l.finishDate || l.date).getFullYear() === filterYear).length}</div>
+                        <div className="text-4xl font-black">
+                            {readingLogs.filter(l => 
+                                new Date(l.finishDate || l.date).getFullYear() === filterYear && 
+                                l.status === 'Finished' && 
+                                l.hrApprovalStatus !== 'Rejected'
+                            ).length}
+                        </div>
                         <div className="text-sm font-medium text-blue-100 uppercase tracking-wider">Books In {filterYear}</div>
                     </div>
                 </div>
@@ -510,9 +578,9 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                     {categories.map((cat, idx) => <option key={idx} value={cat}>{cat}</option>)}
                                 </select>
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div><label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Awal Baca <span className="text-red-500">*</span></label><input type="date" required value={privateReportForm.startDate} onChange={e => setPrivateReportForm({ ...privateReportForm, startDate: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" /></div>
-                                <div><label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Akhir Baca <span className="text-red-500">*</span></label><input type="date" required value={privateReportForm.finishDate} onChange={e => setPrivateReportForm({ ...privateReportForm, finishDate: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" /></div>
+                             <div className="grid grid-cols-2 gap-3">
+                                <div><label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Awal Baca <span className="text-red-500">*</span></label><input type="date" max={today} required value={privateReportForm.startDate} onChange={e => setPrivateReportForm({ ...privateReportForm, startDate: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Akhir Baca <span className="text-red-500">*</span></label><input type="date" max={today} required value={privateReportForm.finishDate} onChange={e => setPrivateReportForm({ ...privateReportForm, finishDate: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" /></div>
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-1">Link Review</label>
@@ -556,9 +624,11 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                     <option value="Finished">Selesai Baca</option>
                                     <option value="Approved">Approved</option>
                                     <option value="Pending">Under Review</option>
+                                    <option value="Rejected">Rejected HRD</option>
+                                    <option value="Cancelled">Dibatalkan</option>
                                 </select>
                                 <select value={filterYear} onChange={(e) => setFilterYear(Number(e.target.value))} className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer">
-                                    {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                                    {Array.from({ length: Math.max(1, new Date().getFullYear() - 2026 + 1) }, (_, i) => 2026 + i).map(y => <option key={y} value={y}>{y}</option>)}
                                 </select>
                                 <select value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)} className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer">
                                     {periodOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
@@ -587,7 +657,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                 </div>
                                                 <p className="text-sm text-slate-500 truncate">{log.category} • {log.location || 'Medan'}</p>
                                                 {log.status === 'Finished' && log.hrApprovalStatus === 'Approved' && log.incentiveAmount && (
-                                                    <div className="mt-1 flex items-center gap-1.5 text-sm font-bold text-green-600 bg-green-50 w-fit px-2 py-1 rounded-lg border border-green-100"><Trophy size={14} className="text-green-500" /><span>Reward: Rp {log.incentiveAmount.toLocaleString('id-ID')}</span></div>
+                                                    <div className="mt-1 flex items-center gap-1.5 text-sm font-bold text-green-600 bg-green-50 w-fit px-2 py-1 rounded-lg border border-green-100"><Trophy size={14} className="text-green-500" /><span>Reward: Rp {Number(log.incentiveAmount).toLocaleString('id-ID')}</span></div>
                                                 )}
                                                 <div className="mt-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
                                                     {log.status === 'Finished' ? (
@@ -602,7 +672,12 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                     ) : (
                                                         <div className="flex items-center gap-2 text-xs">
                                                             {log.status === 'Cancelled' ? (
-                                                                <span className="font-semibold text-red-500 uppercase tracking-wider">Laporan Dibatalkan</span>
+                                                                <div className="space-y-1">
+                                                                    <span className="font-semibold text-red-500 uppercase tracking-wide text-xs">Laporan Dibatalkan</span>
+                                                                    {log.rejectionReason && (
+                                                                        <div className="text-[11px] text-red-400 italic">" {log.rejectionReason} "</div>
+                                                                    )}
+                                                                </div>
                                                             ) : (
                                                                 <>
                                                                     <span className="font-semibold text-orange-600">In Progress</span>
@@ -686,8 +761,8 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 </>
                             )}
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className="block text-sm font-semibold text-slate-700 mb-1">Tgl Mulai <span className="text-red-500">*</span></label><input type="datetime-local" required disabled={!!selectedLog} value={claimForm.startDate} onChange={e => setClaimForm({ ...claimForm, startDate: e.target.value })} className={`w-full px-4 py-2 border border-slate-200 rounded-xl ${!!selectedLog ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}`} /></div>
-                                <div><label className="block text-sm font-semibold text-slate-700 mb-1">Tgl Selesai <span className="text-red-500">*</span></label><input type="datetime-local" required value={claimForm.finishDate} onChange={e => setClaimForm({ ...claimForm, finishDate: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl" /></div>
+                                <div><label className="block text-sm font-semibold text-slate-700 mb-1">Tgl Mulai <span className="text-red-500">*</span></label><input type="datetime-local" max={new Date().toISOString().slice(0, 16)} required disabled={!!selectedLog} value={claimForm.startDate} onChange={e => setClaimForm({ ...claimForm, startDate: e.target.value })} className={`w-full px-4 py-2 border border-slate-200 rounded-xl ${!!selectedLog ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}`} /></div>
+                                <div><label className="block text-sm font-semibold text-slate-700 mb-1">Tgl Selesai <span className="text-red-500">*</span></label><input type="datetime-local" max={new Date().toISOString().slice(0, 16)} required value={claimForm.finishDate} onChange={e => setClaimForm({ ...claimForm, finishDate: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl" /></div>
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-1">Link Review <span className="text-red-500">*</span></label>
@@ -734,29 +809,36 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                             <button onClick={() => setDetailModalOpen(false)} className="text-slate-400 hover:text-slate-600 flex-shrink-0 mt-1"><XCircle size={24} /></button>
                         </div>
                         <div className="p-6 overflow-y-auto space-y-5">
-                            <div className={`grid gap-4 ${viewLog.status === 'Finished' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                            <div className={`grid gap-4 ${viewLog.status !== 'Reading' ? 'grid-cols-2' : 'grid-cols-1'}`}>
                                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                                     <div className="text-xs text-slate-500 font-bold uppercase mb-1">Status</div>
-                                    <div className={`font-semibold ${viewLog.status === 'Finished' ? 'text-green-600' : 'text-orange-600'}`}>{viewLog.status === 'Finished' ? 'Selesai' : 'Sedang Baca'}</div>
+                                    <div className={`font-semibold ${viewLog.status === 'Finished' ? 'text-green-600' : viewLog.status === 'Cancelled' ? 'text-red-500' : 'text-orange-600'}`}>
+                                        {viewLog.status === 'Finished' ? 'Selesai' : viewLog.status === 'Cancelled' ? 'Dibatalkan' : 'Sedang Baca'}
+                                    </div>
                                 </div>
-                                {viewLog.status === 'Finished' && (
-                                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                {viewLog.status !== 'Reading' && (
+                                    <div className={`${viewLog.hrApprovalStatus === 'Rejected' ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-100'} p-3 rounded-xl border`}>
                                         <div className="text-xs text-slate-500 font-bold uppercase mb-1">Approval HR</div>
-                                        <div className={`font-semibold ${viewLog.hrApprovalStatus === 'Approved' ? 'text-blue-600' : viewLog.hrApprovalStatus === 'Rejected' ? 'text-red-500' : 'text-slate-400'}`}>
-                                            {viewLog.hrApprovalStatus === 'Approved' ? 'Approved' : (viewLog.hrApprovalStatus === 'Pending' || !viewLog.hrApprovalStatus ? 'Under Review' : viewLog.hrApprovalStatus === 'Draft' ? '-' : viewLog.hrApprovalStatus === 'Rejected' ? 'Rejected' : viewLog.hrApprovalStatus)}
+                                        <div className={`font-semibold ${viewLog.hrApprovalStatus === 'Approved' ? 'text-blue-600' : (viewLog.hrApprovalStatus === 'Rejected') ? 'text-red-500' : 'text-slate-400'}`}>
+                                            {(viewLog.hrApprovalStatus === 'Approved' ? 'Approved' : (viewLog.hrApprovalStatus === 'Pending' || !viewLog.hrApprovalStatus ? 'Under Review' : viewLog.hrApprovalStatus === 'Draft' || viewLog.status === 'Cancelled' ? '-' : viewLog.hrApprovalStatus === 'Rejected' ? 'Rejected' : viewLog.hrApprovalStatus))}
                                         </div>
                                     </div>
                                 )}
                             </div>
 
-                            {viewLog.hrApprovalStatus === 'Rejected' && viewLog.rejectionReason && (
+                            {(viewLog.hrApprovalStatus === 'Rejected' || viewLog.status === 'Cancelled') && viewLog.rejectionReason && (
                                 <div className="bg-red-50 p-4 rounded-xl border border-red-100 mb-4 animate-in slide-in-from-top-2 duration-300">
                                     <div className="text-xs text-red-600 font-bold uppercase mb-1 flex items-center gap-1.5">
-                                        <AlertCircle size={14} /> Rejection Note
+                                        <AlertCircle size={14} /> {viewLog.status === 'Cancelled' ? 'Catatan Pembatalan' : 'Rejection Note'}
                                     </div>
                                     <div className="text-sm text-red-800 font-medium italic">
                                         "{viewLog.rejectionReason}"
                                     </div>
+                                    {viewLog.cancelledAt && (
+                                        <div className="mt-2 text-xs text-red-600 opacity-80 font-medium flex items-center gap-1">
+                                            <Clock size={12} /> Dibatalkan pada: {new Date(viewLog.cancelledAt).toLocaleString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -770,11 +852,11 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                     </span>
                                 </div>
 
-                                {viewLog.status === 'Finished' && (
+                                {(viewLog.status === 'Finished' || viewLog.status === 'Cancelled') && viewLog.finishDate && (
                                     <div className="flex justify-between text-sm py-2 border-b border-slate-50">
                                         <span className="text-slate-500">Tanggal Kembali / Selesai</span>
                                         <span className="font-semibold text-slate-700">
-                                            {viewLog.finishDate ? new Date(viewLog.finishDate).toLocaleString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                                            {new Date(viewLog.finishDate).toLocaleString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
                                 )}
@@ -844,7 +926,10 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
             <ConfirmationModal
                 isOpen={confirmConfig.isOpen}
-                onClose={() => setConfirmConfig({ ...confirmConfig, isOpen: false })}
+                onClose={() => {
+                    setConfirmConfig({ ...confirmConfig, isOpen: false });
+                    setCancelNote('');
+                }}
                 onConfirm={confirmConfig.onConfirm}
                 title={confirmConfig.title}
                 message={confirmConfig.message}
@@ -852,6 +937,10 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                 cancelText={confirmConfig.cancelText || "Cancel"}
                 variant={confirmConfig.variant || "danger"}
                 hideConfirm={confirmConfig.hideConfirm || false}
+                showInput={confirmConfig.showInput}
+                inputPlaceholder={confirmConfig.inputPlaceholder}
+                inputValue={cancelNote}
+                onInputChange={(val) => setCancelNote(val)}
             />
         </div>
     );
