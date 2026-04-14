@@ -239,9 +239,9 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         return { month, year };
     };
 
-    const getApprovedCountByYear = (year: number) => {
+    const getQuotaCountByYear = (year: number) => {
         return readingLogs.filter(l => 
-            l.hrApprovalStatus === 'Approved' && 
+            (l.hrApprovalStatus === 'Approved' || l.hrApprovalStatus === 'Pending') && 
             new Date(l.finishDate || l.date).getFullYear() === year
         ).length;
     };
@@ -536,18 +536,19 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                 </div>
                 <div className="grid md:grid-cols-2 gap-4">
                     {(() => {
-                        const approvedCount = getApprovedCountByYear(filterYear);
-                        const isEligible = approvedCount >= 5;
+                        const quotaCount = getQuotaCountByYear(filterYear);
+                        const isMaxed = quotaCount >= 5;
+                        const approvedOnly = readingLogs.filter(l => l.hrApprovalStatus === 'Approved' && new Date(l.finishDate || l.date).getFullYear() === filterYear).length;
                         return (
-                            <div className={`p-4 rounded-xl border ${isEligible ? 'bg-green-500/20 border-green-400/30' : 'bg-white/10 border-white/20'}`}>
+                            <div className={`p-4 rounded-xl border ${approvedOnly >= 5 ? 'bg-green-500/20 border-green-400/30' : 'bg-white/10 border-white/20'}`}>
                                 <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${isEligible ? 'bg-green-500' : 'bg-slate-500'}`}>
+                                    <div className={`p-2 rounded-lg ${approvedOnly >= 5 ? 'bg-green-500' : 'bg-slate-500'}`}>
                                         <Trophy size={20} className="text-white" />
                                     </div>
                                     <div>
-                                        <p className="font-bold text-white">Bonus Incentive Status ({filterYear})</p>
+                                        <p className="font-bold text-white">Annual Limit Status ({filterYear})</p>
                                         <p className="text-sm text-blue-100">
-                                            {isEligible ? `Eligible! 5+ Verified Books in ${filterYear}.` : `${approvedCount}/5 Books Verified by HR`}
+                                            {isMaxed ? `Quota Reached: 5 Books (${approvedOnly} Approved, ${quotaCount - approvedOnly} Pending)` : `${quotaCount}/5 Books Processing/Approved`}
                                         </p>
                                     </div>
                                 </div>
@@ -697,7 +698,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                         {log.hrApprovalStatus === 'Draft' ? (
                                                             (() => {
                                                                 const logYear = new Date(log.finishDate || log.date).getFullYear();
-                                                                if (getApprovedCountByYear(logYear) < 5) {
+                                                                if (getQuotaCountByYear(logYear) < 5) {
                                                                     return (
                                                                         <button
                                                                             onClick={(e) => { e.stopPropagation(); handleClaimIncentive(log.id); }}

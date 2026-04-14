@@ -39,15 +39,8 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
             console.log("Response data:", data); // DEBUG
 
             if (data.success) {
-                setNotification({
-                    show: true,
-                    type: 'success',
-                    message: 'Login successful! Redirecting to dashboard...'
-                });
-
-                setTimeout(() => {
-                    onLogin(data.user);
-                }, 1500);
+                // If login success, go straight to dashboard without showing popup
+                onLogin(data.user);
             } else {
                 setNotification({
                     show: true,
@@ -85,10 +78,8 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
             const data = await response.json();
 
             if (data.success) {
-                setNotification({ show: true, type: 'success', message: `Welcome back, ${data.user.name}!` });
-                setTimeout(() => {
-                    onLogin(data.user);
-                }, 1500);
+                // Google login success - go straight to dashboard
+                onLogin(data.user);
             } else {
                 setNotification({ show: true, type: 'error', message: data.message || 'Google Login Failed' });
                 setIsLoading(false);
