@@ -29,7 +29,7 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
     });
     const [selectedBranch, setSelectedBranch] = useState('All Branches');
     const [branches, setBranches] = useState<string[]>(['All Branches']);
-    const [filterStatus, setFilterStatus] = useState('all');
+    const [filterStatus, setFilterStatus] = useState('Under Review');
     const [isSyncing, setIsSyncing] = useState(false);
 
     // View Mode State - Default to verification as previously requested
@@ -66,7 +66,7 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
         logs: []
     });
 
-    const [recapSort, setRecapSort] = useState<{ key: 'name' | 'totalBooks' | 'verifiedCount' | 'incentive', direction: 'asc' | 'desc' }>({
+    const [recapSort, setRecapSort] = useState<{ key: 'name' | 'totalBooks' | 'verifiedCount' | 'milestone' | 'incentive', direction: 'asc' | 'desc' }>({
         key: 'totalBooks',
         direction: 'desc'
     });
@@ -285,49 +285,25 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
         return [new Date(startDate), new Date(endDate + 'T23:59:59')];
     };
 
-    const getUserStats = (user: User) => {
-        const userKey = user.employee_id || user.name.trim().toLowerCase();
-        const currentYear = new Date(endDate).getFullYear();
-
-        // Data 1 Tahun Full
-        const userYearLogs = allLogs.filter(l => {
-            const lKey = l.employee_id || (l.userName ? l.userName.trim().toLowerCase() : 'unknown');
-            if (lKey !== userKey) return false;
-            const logDate = new Date(l.finishDate || l.date);
-            return logDate.getFullYear() === currentYear;
-        });
-
-        // Data Periode Range
-        const userRangeLogs = allLogs.filter(l => {
-            const lKey = l.employee_id || (l.userName ? l.userName.trim().toLowerCase() : 'unknown');
-            if (lKey !== userKey) return false;
-            const logDate = new Date(l.finishDate || l.date);
-            const start = new Date(startDate);
-            start.setHours(0, 0, 0, 0);
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-            return logDate >= start && logDate <= end;
-        });
-
-        return { 
-            totalBooksYear: userYearLogs.length, 
-            verifiedCountYear: userYearLogs.filter(l => l.hrApprovalStatus === 'Approved').length, 
-            verifiedCountRange: userRangeLogs.filter(l => l.hrApprovalStatus === 'Approved').length,
-            totalIncentiveRange: userRangeLogs.reduce((sum, l) => sum + (l.incentiveAmount || 0), 0), 
-            logsYear: userYearLogs,
-            logsRange: userRangeLogs
-        };
+    const areSameUser = (u1: { employee_id?: any, name?: string }, u2: { employee_id?: any, name?: string, userName?: string }) => {
+        const id1 = u1.employee_id ? String(u1.employee_id).replace(/^0+/, '') : '';
+        const id2 = u2.employee_id ? String(u2.employee_id).replace(/^0+/, '') : '';
+        if (id1 && id2 && id1 === id2) return true;
+        
+        const n1 = (u1.name || '').trim().toLowerCase();
+        const n2 = (u2.name || u2.userName || '').trim().toLowerCase();
+        return n1 !== '' && n1 === n2;
     };
 
     const getLogSequence = (log: ReadingLogEntry) => {
-        const y = new Date(log.finishDate || log.date).getFullYear();
-        const userKey = log.employee_id || (log.userName ? log.userName.trim().toLowerCase() : 'unknown');
+        const logDateObj = new Date(log.finishDate || log.date);
+        const y = logDateObj.getFullYear();
         
         // Filter all logs for this user/year from the global state
         const userYearLogs = allLogs.filter(l => {
-            const lKey = l.employee_id || (l.userName ? l.userName.trim().toLowerCase() : 'unknown');
+            if (!areSameUser({ employee_id: log.employee_id, name: log.userName }, l)) return false;
             const lY = new Date(l.finishDate || l.date).getFullYear();
-            return lKey === userKey && lY === y;
+            return lY === y;
         });
 
         // Split into categories and sort chronologically
@@ -357,6 +333,49 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
             return approvedLogs.length + (pIdx !== -1 ? pIdx + 1 : 1);
         }
         return 0; // Draft or Rejected or Cancelled usually won't need sequence in this table
+    };
+
+    const getUserStats = (user: User) => {
+        const currentYear = new Date(endDate).getFullYear();
+
+        // Data 1 Tahun Full
+        const userYearLogs = allLogs.filter(l => {
+            if (!areSameUser(user, l)) return false;
+            const logDate = new Date(l.finishDate || l.date);
+            return logDate.getFullYear() === currentYear;
+        });
+
+        // Data Periode Range
+        const userRangeLogs = allLogs.filter(l => {
+            if (!areSameUser(user, l)) return false;
+            const logDate = new Date(l.finishDate || l.date);
+            const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            return logDate >= start && logDate <= end;
+        });
+
+        const totalIncentiveRange = userRangeLogs.reduce((sum, l) => {
+            if (l.hrApprovalStatus !== 'Approved') return sum;
+            
+            // Forced conversion and robust fallback
+            const dbAmount = Number(l.incentiveAmount);
+            const amount = (!isNaN(dbAmount) && dbAmount > 0) 
+                ? dbAmount 
+                : (l.category?.toLowerCase() === 'comic' ? 50000 : 100000);
+                
+            return sum + amount;
+        }, 0);
+
+        return { 
+            totalBooksYear: userYearLogs.length, 
+            verifiedCountYear: userYearLogs.filter(l => l.hrApprovalStatus === 'Approved').length, 
+            verifiedCountRange: userRangeLogs.filter(l => l.hrApprovalStatus === 'Approved').length,
+            totalIncentiveRange, 
+            logsYear: userYearLogs,
+            logsRange: userRangeLogs
+        };
     };
 
     const filteredUsers = users.filter(user => {
@@ -501,9 +520,14 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                             Books Read {recapSort.key === 'totalBooks' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
                                         </div>
                                     </th>
-                                    <th className="px-6 py-4 w-[30%] cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setRecapSort({ key: 'incentive', direction: recapSort.key === 'incentive' && recapSort.direction === 'asc' ? 'desc' : 'asc' })}>
+                                    <th className="px-6 py-4 w-[20%] cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setRecapSort({ key: 'milestone', direction: recapSort.key === 'milestone' && recapSort.direction === 'asc' ? 'desc' : 'asc' })}>
                                         <div className="flex items-center gap-1.5">
-                                            Status Bonus {recapSort.key === 'incentive' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                                            Status Bonus {recapSort.key === 'milestone' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                                        </div>
+                                    </th>
+                                    <th className="px-6 py-4 w-[20%] cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setRecapSort({ key: 'incentive', direction: recapSort.key === 'incentive' && recapSort.direction === 'asc' ? 'desc' : 'asc' })}>
+                                        <div className="flex items-center gap-1.5 justify-end">
+                                            Total Incentive {new Date(endDate).toLocaleString('en-US', { month: 'short' })} {recapSort.key === 'incentive' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
                                         </div>
                                     </th>
                                 </tr>
@@ -526,6 +550,9 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                         } else if (recapSort.key === 'verifiedCount') {
                                             valA = a.stats.verifiedCountRange;
                                             valB = b.stats.verifiedCountRange;
+                                        } else if (recapSort.key === 'milestone') {
+                                            valA = a.stats.verifiedCountYear;
+                                            valB = b.stats.verifiedCountYear;
                                         } else if (recapSort.key === 'incentive') {
                                             valA = a.stats.totalIncentiveRange;
                                             valB = b.stats.totalIncentiveRange;
@@ -567,7 +594,7 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-center">
+                                            <td className="px-6 py-4">
                                                 <div className="flex flex-col gap-1 items-start">
                                                     {isEligible ? (
                                                         <span className="flex items-center gap-1.5 text-white bg-green-600 font-black text-[10px] px-2.5 py-1 rounded-full uppercase shadow-sm border border-green-500 animate-pulse">
@@ -583,15 +610,18 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                                             </div>
                                                         </div>
                                                     )}
-                                                    {stats.totalIncentiveRange > 0 && (
-                                                        <div className="mt-1 flex flex-col">
-                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Incentive</span>
-                                                            <span className="text-green-700 font-black text-sm bg-green-50 px-2 py-0.5 rounded border border-green-200">
-                                                                {formatCurrency(stats.totalIncentiveRange)}
-                                                            </span>
-                                                        </div>
-                                                    )}
                                                 </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {stats.totalIncentiveRange > 0 ? (
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="text-green-700 font-black text-sm bg-green-50 px-2.5 py-1 rounded-lg border border-green-200 shadow-sm">
+                                                            {formatCurrency(stats.totalIncentiveRange)}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-slate-300 text-sm font-medium italic text-right">-</div>
+                                                )}
                                             </td>
                                         </tr>
                                     );
