@@ -759,7 +759,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                 log.hrApprovalStatus === 'Pending' ? 'bg-orange-100 text-orange-700 border-orange-200' : 
                                                 'bg-slate-100 text-slate-500 border-slate-200'
                                             }`}>
-                                                {log.status === 'Reading' ? 'Reading' : (log.hrApprovalStatus === 'Pending' ? 'Under Review' : (log.hrApprovalStatus === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus))}
+                                                {log.status === 'Reading' ? 'Reading' : (log.hrApprovalStatus === 'Pending' ? 'Under Review' : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus))}
                                             </span>
                                             {log.incentiveAmount && (
                                                 <div className="text-[10px] font-bold text-green-600 mt-1">
@@ -1109,7 +1109,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                              log.hrApprovalStatus === 'Pending' ? 'bg-orange-100 text-orange-700 border-orange-200' : 
                                                              'bg-slate-100 text-slate-500 border-slate-200'
                                                          }`}>
-                                                             {log.status === 'Reading' ? 'Reading' : (log.hrApprovalStatus === 'Pending' ? 'Under Review' : (log.hrApprovalStatus === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus))}
+                                                             {log.status === 'Reading' ? 'Reading' : (log.hrApprovalStatus === 'Pending' ? 'Under Review' : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus))}
                                                          </div>
                                                      </td>
                                                 </tr>

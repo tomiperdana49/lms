@@ -671,7 +671,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                             {log.startDate && log.finishDate && (<div className="flex items-center gap-2 text-xs text-slate-500"><span>Start: {new Date(log.startDate).toLocaleDateString()}</span><span>•</span><span>Finish: {new Date(log.finishDate).toLocaleDateString()}</span></div>)}
                                                             {log.finishDate && (
                                                                 <div className={`inline-block mt-1 px-2 py-1 text-[10px] font-bold rounded border uppercase tracking-wide ${log.hrApprovalStatus === 'Approved' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                                                                    {log.hrApprovalStatus === 'Approved' ? `Paid In: ${new Date(new Date(log.finishDate).getFullYear(), getIncentivePeriod(log.finishDate || '').month).toLocaleString('default', { month: 'long' })}` : log.hrApprovalStatus === 'Draft' ? '-' : 'Under Review'}
+                                                                    {log.hrApprovalStatus === 'Approved' ? `Paid In: ${new Date(new Date(log.finishDate).getFullYear(), getIncentivePeriod(log.finishDate || '').month).toLocaleString('default', { month: 'long' })}` : (log.hrApprovalStatus as any) === 'Draft' ? '-' : 'Under Review'}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -718,7 +718,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                             })()
                                                         ) : (
                                                             <div className={`px-3 py-1 text-xs font-bold rounded-lg ${log.hrApprovalStatus === 'Approved' ? 'bg-blue-100 text-blue-700' : log.hrApprovalStatus === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                                                {log.hrApprovalStatus === 'Pending' ? 'Under Review' : (log.hrApprovalStatus === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus)}
+                                                                {log.hrApprovalStatus === 'Pending' ? 'Under Review' : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus)}
                                                             </div>
                                                         )}
                                                     </div>
@@ -826,7 +826,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                     <div className={`${viewLog.hrApprovalStatus === 'Rejected' ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-100'} p-3 rounded-xl border`}>
                                         <div className="text-xs text-slate-500 font-bold uppercase mb-1">Approval HR</div>
                                         <div className={`font-semibold ${viewLog.hrApprovalStatus === 'Approved' ? 'text-blue-600' : (viewLog.hrApprovalStatus === 'Rejected') ? 'text-red-500' : 'text-slate-400'}`}>
-                                            {(viewLog.hrApprovalStatus === 'Approved' ? 'Approved' : (viewLog.hrApprovalStatus === 'Pending' ? 'Under Review' : viewLog.hrApprovalStatus === 'Draft' || !viewLog.hrApprovalStatus ? 'Read' : viewLog.status === 'Cancelled' ? '-' : viewLog.hrApprovalStatus === 'Rejected' ? 'Rejected' : viewLog.hrApprovalStatus))}
+                                            {(viewLog.hrApprovalStatus === 'Approved' ? 'Approved' : (viewLog.hrApprovalStatus === 'Pending' ? 'Under Review' : (viewLog.hrApprovalStatus as any) === 'Draft' || !viewLog.hrApprovalStatus ? 'Read' : viewLog.status === 'Cancelled' ? '-' : viewLog.hrApprovalStatus === 'Rejected' ? 'Rejected' : viewLog.hrApprovalStatus))}
                                         </div>
                                     </div>
                                 )}
