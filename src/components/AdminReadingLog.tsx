@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2, RefreshCw, BookOpen, Trophy } from 'lucide-react';
+import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2, RefreshCw, BookOpen, Trophy, ArrowUp, ArrowDown } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry, User, Employee } from '../types';
 
@@ -67,8 +67,8 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
     });
 
     const [recapSort, setRecapSort] = useState<{ key: 'name' | 'totalBooks' | 'verifiedCount' | 'incentive', direction: 'asc' | 'desc' }>({
-        key: 'name',
-        direction: 'asc'
+        key: 'totalBooks',
+        direction: 'desc'
     });
 
     // Photo Modal State
@@ -492,18 +492,18 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                 <tr>
                                     <th className="px-6 py-4 w-[30%] cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setRecapSort({ key: 'name', direction: recapSort.key === 'name' && recapSort.direction === 'asc' ? 'desc' : 'asc' })}>
                                         <div className="flex items-center gap-1.5">
-                                            Name / Email {recapSort.key === 'name' && (recapSort.direction === 'asc' ? '↑' : '↓')}
+                                            Name / Email {recapSort.key === 'name' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
                                         </div>
                                     </th>
                                     <th className="px-6 py-4 w-[15%]">Role</th>
                                     <th className="px-6 py-4 w-[25%] cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setRecapSort({ key: 'totalBooks', direction: recapSort.key === 'totalBooks' && recapSort.direction === 'asc' ? 'desc' : 'asc' })}>
                                         <div className="flex items-center gap-1.5">
-                                            Books Read {recapSort.key === 'totalBooks' && (recapSort.direction === 'asc' ? '↑' : '↓')}
+                                            Books Read {recapSort.key === 'totalBooks' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
                                         </div>
                                     </th>
                                     <th className="px-6 py-4 w-[30%] cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setRecapSort({ key: 'incentive', direction: recapSort.key === 'incentive' && recapSort.direction === 'asc' ? 'desc' : 'asc' })}>
                                         <div className="flex items-center gap-1.5">
-                                            Status Bonus {recapSort.key === 'incentive' && (recapSort.direction === 'asc' ? '↑' : '↓')}
+                                            Status Bonus {recapSort.key === 'incentive' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
                                         </div>
                                     </th>
                                 </tr>
