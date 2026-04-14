@@ -60,6 +60,13 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
         formData: {}
     });
 
+    // Cancel Modal State (Admin)
+    const [cancelModal, setCancelModal] = useState<{ open: boolean; log: ReadingLogEntry | null; reason: string }>({
+        open: false,
+        log: null,
+        reason: ''
+    });
+
     const [recapModal, setRecapModal] = useState<{ open: boolean; title: string; logs: ReadingLogEntry[] }>({
         open: false,
         title: '',
@@ -259,6 +266,31 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
         } catch (err) { console.error(err); }
     };
 
+    const handleCancelClick = (log: ReadingLogEntry) => {
+        setCancelModal({ open: true, log, reason: '' });
+    };
+
+    const handleCancelSubmit = () => {
+        if (!cancelModal.log) return;
+        
+        const finalReason = cancelModal.reason || 'Dibatalkan oleh Admin';
+        fetch(`${API_BASE_URL}/api/logs/${cancelModal.log.id}/cancel`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: finalReason })
+        })
+        .then(res => {
+            if (res.ok) {
+                setAllLogs(allLogs.map(l => l.id === cancelModal.log!.id 
+                    ? { ...l, status: 'Cancelled', hrApprovalStatus: 'Cancelled' as any, rejectionReason: finalReason } 
+                    : l
+                ));
+                setCancelModal({ open: false, log: null, reason: '' });
+            }
+        })
+        .catch(err => console.error(err));
+    };
+
     const handleDeleteLog = async (id: number | string) => {
         if (!window.confirm('Apakah Anda yakin ingin membatalkan laporan ini? Data akan tetap tersimpan namun tidak terhitung dalam laporan.')) return;
         try {
@@ -369,12 +401,12 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
         }, 0);
 
         return { 
-            totalBooksYear: userYearLogs.length, 
-            verifiedCountYear: userYearLogs.filter(l => l.hrApprovalStatus === 'Approved').length, 
-            verifiedCountRange: userRangeLogs.filter(l => l.hrApprovalStatus === 'Approved').length,
+            totalBooksYear: userYearLogs.filter(l => l.status !== 'Cancelled').length, 
+            verifiedCountYear: userYearLogs.filter(l => l.hrApprovalStatus === 'Approved' && l.status !== 'Cancelled').length, 
+            verifiedCountRange: userRangeLogs.filter(l => l.hrApprovalStatus === 'Approved' && l.status !== 'Cancelled').length,
             totalIncentiveRange, 
-            logsYear: userYearLogs,
-            logsRange: userRangeLogs
+            logsYear: userYearLogs.filter(l => l.status !== 'Cancelled'),
+            logsRange: userRangeLogs.filter(l => l.status !== 'Cancelled')
         };
     };
 
@@ -410,6 +442,10 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                     if (l.hrApprovalStatus !== 'Rejected') return false;
                 }
             }
+
+            // Always hide Cancelled logs from standard verification unless filtered for them
+            if (filterStatus === 'all' && l.status === 'Cancelled') return false;
+            if (filterStatus !== 'Dibatalkan' && l.status === 'Cancelled') return false;
             
             const emp = users.find(u => (l.employee_id && u.employee_id === l.employee_id) || (l.userName && u.name && l.userName.trim().toLowerCase() === u.name.trim().toLowerCase()));
             const empBranch = emp?.branch || 'Others';
@@ -481,9 +517,9 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                         {branches.map(b => <option key={b} value={b}>{b}</option>)}
                     </select>
                     <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-xl border border-slate-100">
-                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-transparent border-none font-bold text-slate-600 text-xs outline-none focus:ring-0" />
+                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} onClick={(e) => e.currentTarget.showPicker()} className="bg-transparent border-none font-bold text-slate-600 text-xs outline-none focus:ring-0 cursor-pointer" />
                         <span className="text-slate-400 font-medium text-xs">to</span>
-                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-transparent border-none font-bold text-slate-600 text-xs outline-none focus:ring-0" />
+                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} onClick={(e) => e.currentTarget.showPicker()} className="bg-transparent border-none font-bold text-slate-600 text-xs outline-none focus:ring-0 cursor-pointer" />
                     </div>
                     {viewMode === 'verification' && (
                         <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white">
@@ -723,29 +759,33 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-center">
-                                            {log.hrApprovalStatus === 'Pending' ? (
+                                            {(log.hrApprovalStatus === 'Pending' || (log.status === 'Finished' && (log.hrApprovalStatus === 'Draft' || !log.hrApprovalStatus))) ? (
                                                 (() => {
                                                     const currentSeq = getLogSequence(log);
                                                     
                                                     if (currentSeq <= 5) {
                                                         return (
                                                             <div className="flex justify-center gap-2">
-                                                                <button onClick={() => handleEditLogClick(log)} className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors" title="Edit Details"><Edit size={18} /></button>
-                                                                <button onClick={() => handleVerifyClick(log)} className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors" title="Verify & Reward"><CheckCircle size={18} /></button>
-                                                                <button onClick={() => handleRejectClick(log)} className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors" title="Reject"><XCircle size={18} /></button>
+                                                                <button onClick={() => handleEditLogClick(log)} className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors" title="Edit Details"><Edit size={16} /></button>
+                                                                <button onClick={() => handleVerifyClick(log)} className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors" title="Verify & Reward"><CheckCircle size={16} /></button>
+                                                                <button onClick={() => handleCancelClick(log)} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200 transition-colors" title="Cancel Log"><Trash2 size={16} /></button>
+                                                                <button onClick={() => handleRejectClick(log)} className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors" title="Reject"><XCircle size={16} /></button>
                                                             </div>
                                                         );
                                                     } else {
                                                         return (
                                                             <div className="flex flex-col items-center">
                                                                 <span className="text-xs text-red-500 font-bold italic">Limit Exceeded ({currentSeq}/5)</span>
-                                                                <button onClick={() => handleRejectClick(log)} className="mt-1 text-[10px] text-red-600 hover:underline flex items-center gap-1"><XCircle size={10}/> Reject Over Limit</button>
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    <button onClick={() => handleCancelClick(log)} className="p-1.5 bg-slate-100 text-slate-500 rounded hover:bg-slate-200" title="Cancel Log"><Trash2 size={12} /></button>
+                                                                    <button onClick={() => handleRejectClick(log)} className="text-[10px] text-red-600 hover:underline flex items-center gap-1"><XCircle size={10}/> Reject Over Limit</button>
+                                                                </div>
                                                             </div>
                                                         );
                                                     }
                                                 })()
                                             ) : (
-                                                <span className="text-xs text-slate-400 italic">No actions</span>
+                                                <span className="text-xs text-slate-300 italic">{log.status === 'Cancelled' ? 'Cancelled' : 'No actions'}</span>
                                             )}
                                         </td>
                                     </tr>
@@ -844,6 +884,34 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
                         <div className="mt-6 flex justify-end gap-3">
                             <button onClick={() => setRejectModal({ open: false, log: null, reason: '' })} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Cancel</button>
                             <button onClick={handleRejectSubmit} className="px-4 py-2 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700">Reject Log</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Cancel Modal (Admin) */}
+            {cancelModal.open && cancelModal.log && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-slate-700 flex items-center gap-2"><Trash2 className="text-slate-400" /> Cancel Reading Log</h3>
+                            <button onClick={() => setCancelModal({ open: false, log: null, reason: '' })} className="text-slate-400 hover:text-slate-600"><XCircle /></button>
+                        </div>
+                        <p className="text-sm text-slate-500 mb-4">
+                            Membatalkan laporan ini akan menghapusnya dari statistik buku yang dibaca oleh karyawan.
+                        </p>
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">Alasan Pembatalan</label>
+                            <textarea
+                                className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none min-h-[100px]"
+                                placeholder="Masukkan alasan mengapa laporan ini dibatalkan..."
+                                value={cancelModal.reason}
+                                onChange={(e) => setCancelModal(prev => ({ ...prev, reason: e.target.value }))}
+                            />
+                        </div>
+                        <div className="mt-6 flex justify-end gap-3">
+                            <button onClick={() => setCancelModal({ open: false, log: null, reason: '' })} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Discard</button>
+                            <button onClick={handleCancelSubmit} className="px-4 py-2 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 shadow-lg">Ya, Batalkan Laporan</button>
                         </div>
                     </div>
                 </div>
