@@ -34,7 +34,7 @@ const AdminReadingLog = ({ onBack }: AdminReadingLogProps) => {
 
     // View Mode State - Default to verification as previously requested
     const [viewMode, setViewMode] = useState<'verification' | 'recap'>('verification');
-    const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+
 
 
 
