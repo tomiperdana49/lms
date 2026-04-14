@@ -128,7 +128,7 @@ const AdminDashboard = ({ user, initialView }: AdminDashboardProps) => {
     const renderContent = () => {
         switch (currentView) {
             case 'users': return <UserManagement userRole={user.role} onBack={() => setCurrentView('overview')} />;
-            case 'logs': return <AdminReadingLog onBack={() => setCurrentView('overview')} />;
+            case 'logs': return <AdminReadingLog user={user} onBack={() => setCurrentView('overview')} />;
             case 'training': return <TrainingExternalManager userRole={user.role} userName={user.name} />;
             case 'meetings': return <TrainingInternalList userRole={user.role} />;
             case 'courses': return <OnlineModulesManager />;

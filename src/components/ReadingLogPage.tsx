@@ -138,14 +138,17 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                     const res = await fetch(`${API_BASE_URL}/api/logs/${id}/cancel`, { 
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ reason: finalReason })
+                        body: JSON.stringify({ reason: finalReason, cancelledBy: user.name })
                     });
                     if (res.ok) {
+                        const now = new Date().toISOString();
                         const updatedLogs = readingLogs.map(l => String(l.id) === String(id) ? { 
                             ...l, 
                             status: 'Cancelled', 
                             hrApprovalStatus: 'Cancelled' as 'Cancelled', 
-                            rejectionReason: finalReason 
+                            rejectionReason: finalReason,
+                            cancelledAt: now,
+                            cancelledBy: user.name
                         } : l);
                         setReadingLogs(updatedLogs);
                         if (viewLog && String(viewLog.id) === String(id)) {
@@ -153,7 +156,9 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 ...viewLog, 
                                 status: 'Cancelled', 
                                 hrApprovalStatus: 'Cancelled' as 'Cancelled', 
-                                rejectionReason: finalReason 
+                                rejectionReason: finalReason,
+                                cancelledAt: now,
+                                cancelledBy: user.name
                             });
                         }
                         setNotification({ show: true, type: 'success', message: "Laporan berhasil dibatalkan." });
@@ -621,12 +626,12 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                             <div className="flex items-center gap-2">
                                 <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer">
                                     <option value="all">All Status</option>
-                                    <option value="Reading">Sedang Baca</option>
-                                    <option value="Finished">Selesai Baca</option>
+                                    <option value="Reading">Reading</option>
+                                    <option value="Finished">Read</option>
                                     <option value="Approved">Approved</option>
                                     <option value="Pending">Under Review</option>
                                     <option value="Rejected">Rejected HRD</option>
-                                    <option value="Cancelled">Dibatalkan</option>
+                                    <option value="Cancelled">Cancel</option>
                                 </select>
                                 <select value={filterYear} onChange={(e) => setFilterYear(Number(e.target.value))} className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer">
                                     {Array.from({ length: Math.max(1, new Date().getFullYear() - 2026 + 1) }, (_, i) => 2026 + i).map(y => <option key={y} value={y}>{y}</option>)}
@@ -681,7 +686,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                                 </div>
                                                             ) : (
                                                                 <>
-                                                                    <span className="font-semibold text-orange-600">In Progress</span>
+                                                                    <span className="font-semibold text-orange-600">Reading</span>
                                                                     <span className="text-slate-500">Started: {log.date ? new Date(log.date).toLocaleDateString() : 'Unknown'}</span>
                                                                 </>
                                                             )}
@@ -713,7 +718,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                             })()
                                                         ) : (
                                                             <div className={`px-3 py-1 text-xs font-bold rounded-lg ${log.hrApprovalStatus === 'Approved' ? 'bg-blue-100 text-blue-700' : log.hrApprovalStatus === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                                                {log.hrApprovalStatus === 'Pending' ? 'Under Review' : (log.hrApprovalStatus || 'Waiting HR')}
+                                                                {log.hrApprovalStatus === 'Pending' ? 'Under Review' : (log.hrApprovalStatus === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus)}
                                                             </div>
                                                         )}
                                                     </div>
@@ -814,14 +819,14 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                                     <div className="text-xs text-slate-500 font-bold uppercase mb-1">Status</div>
                                     <div className={`font-semibold ${viewLog.status === 'Finished' ? 'text-green-600' : viewLog.status === 'Cancelled' ? 'text-red-500' : 'text-orange-600'}`}>
-                                        {viewLog.status === 'Finished' ? 'Selesai' : viewLog.status === 'Cancelled' ? 'Dibatalkan' : 'Sedang Baca'}
+                                        {viewLog.status === 'Finished' ? 'Read' : viewLog.status === 'Cancelled' ? 'Cancel' : 'Reading'}
                                     </div>
                                 </div>
                                 {viewLog.status !== 'Reading' && (
                                     <div className={`${viewLog.hrApprovalStatus === 'Rejected' ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-100'} p-3 rounded-xl border`}>
                                         <div className="text-xs text-slate-500 font-bold uppercase mb-1">Approval HR</div>
                                         <div className={`font-semibold ${viewLog.hrApprovalStatus === 'Approved' ? 'text-blue-600' : (viewLog.hrApprovalStatus === 'Rejected') ? 'text-red-500' : 'text-slate-400'}`}>
-                                            {(viewLog.hrApprovalStatus === 'Approved' ? 'Approved' : (viewLog.hrApprovalStatus === 'Pending' || !viewLog.hrApprovalStatus ? 'Under Review' : viewLog.hrApprovalStatus === 'Draft' || viewLog.status === 'Cancelled' ? '-' : viewLog.hrApprovalStatus === 'Rejected' ? 'Rejected' : viewLog.hrApprovalStatus))}
+                                            {(viewLog.hrApprovalStatus === 'Approved' ? 'Approved' : (viewLog.hrApprovalStatus === 'Pending' ? 'Under Review' : viewLog.hrApprovalStatus === 'Draft' || !viewLog.hrApprovalStatus ? 'Read' : viewLog.status === 'Cancelled' ? '-' : viewLog.hrApprovalStatus === 'Rejected' ? 'Rejected' : viewLog.hrApprovalStatus))}
                                         </div>
                                     </div>
                                 )}
@@ -836,8 +841,13 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                         "{viewLog.rejectionReason}"
                                     </div>
                                     {viewLog.cancelledAt && (
-                                        <div className="mt-2 text-xs text-red-600 opacity-80 font-medium flex items-center gap-1">
-                                            <Clock size={12} /> Dibatalkan pada: {new Date(viewLog.cancelledAt).toLocaleString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                        <div className="mt-2 text-xs text-red-600 opacity-80 font-medium space-y-1">
+                                            <div className="flex items-center gap-1">
+                                                <Clock size={12} /> Dibatalkan pada: {new Date(viewLog.cancelledAt).toLocaleString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                            </div>
+                                            <div className="flex items-center gap-1 font-bold">
+                                                <span>• Oleh: {viewLog.cancelledBy || 'Administrator/User'}</span>
+                                            </div>
                                         </div>
                                     )}
                                 </div>

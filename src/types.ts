@@ -24,6 +24,7 @@ export interface ReadingLogEntry {
     approvedAt?: string;
     plannedFinishDate?: string;
     cancelledAt?: string;
+    cancelledBy?: string;
 }
 
 export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'external-approval' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives';

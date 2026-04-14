@@ -609,7 +609,7 @@ app.post('/api/simas/sync', async (req, res) => {
                                         targetName, targetEid, b.loanHistory.loaning.loanPhoto || '',
                                         isReturned ? (b.loanHistory.return.returnPhoto || '') : '',
                                         startDate, finishDateRaw ? new Date(finishDateRaw) : null,
-                                        isReturned ? 'Draft' : 'Pending',
+                                        isReturned ? 'Draft' : null,
                                         isReturned ? (b.loanHistory.return.linkReview || '') : '',
                                         sn, 'Kantor', 'SIMAS'
                                     ]
@@ -639,6 +639,20 @@ app.post('/api/simas/sync', async (req, res) => {
 // --- READING LOGS ROUTES ---
 app.get('/api/logs', async (req, res) => {
     try {
+        // Migration safeguard: Check if column exists
+        try {
+            const columns = await query('SHOW COLUMNS FROM reading_logs LIKE "cancelled_by"');
+            if (columns.length === 0) {
+                console.log("[MIGRATION] Adding missing cancelled_by column...");
+                await query('ALTER TABLE reading_logs ADD cancelled_by VARCHAR(255) DEFAULT NULL');
+                console.log("[MIGRATION] Column added successfully!");
+            }
+        } catch (migErr) { 
+            console.error("[MIGRATION ERROR DETAILS]", migErr.message); 
+            // Attempt to create a test table to check permissions
+            try { await query('CREATE TABLE IF NOT EXISTS migration_test (id INT)'); } catch(e) { console.error("[PERMISSION TEST] Failed to create table:", e.message); }
+        }
+
         const logs = await query('SELECT * FROM reading_logs ORDER BY date DESC');
         // Map snake_case to camelCase
         const mappedLogs = logs.map(log => ({
@@ -657,8 +671,12 @@ app.get('/api/logs', async (req, res) => {
             sn: log.sn,
             approvedAt: log.approved_at,
             plannedFinishDate: log.planned_finish_date,
-            cancelledAt: log.cancelled_at
+            cancelledAt: log.cancelled_at,
+            cancelledBy: log.cancelled_by
         }));
+        if (logs.length > 0) {
+            res.setHeader('X-Debug-Columns', Object.keys(logs[0]).join(','));
+        }
         res.json(mappedLogs);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -718,11 +736,18 @@ app.post('/api/logs', async (req, res) => {
 
 app.patch('/api/logs/:id/cancel', async (req, res) => {
     try {
-        const { reason } = req.body;
-        await query(
-            'UPDATE reading_logs SET status = "Cancelled", hr_approval_status = "Cancelled", rejection_reason = ?, cancelled_at = ? WHERE id = ?',
-            [reason || 'Dibatalkan oleh user', new Date(), req.params.id]
+        const { reason, cancelledBy } = req.body;
+        const finalReason = reason || 'Dibatalkan oleh Admin';
+        const finalBy = cancelledBy || 'System/Admin';
+        
+        console.log(`[CANCEL] ID: ${req.params.id}, Reason: ${finalReason}, By: ${finalBy}`);
+        
+        const result = await query(
+            'UPDATE reading_logs SET status = "Cancelled", hr_approval_status = "Cancelled", rejection_reason = ?, cancelled_at = ?, cancelled_by = ? WHERE id = ?',
+            [finalReason, new Date(), finalBy, req.params.id]
         );
+        
+        console.log(`[CANCEL] Update result:`, result);
         res.json({ success: true });
     } catch (err) {
         console.error("[CANCEL LOG ERROR]", err);
@@ -770,6 +795,7 @@ app.put('/api/logs/:id', async (req, res) => {
         if (updates.approvedAt !== undefined) dbUpdates.approved_at = updates.approvedAt;
         if (updates.plannedFinishDate !== undefined) dbUpdates.planned_finish_date = updates.plannedFinishDate;
         if (updates.cancelledAt !== undefined) dbUpdates.cancelled_at = updates.cancelledAt;
+        if (updates.cancelledBy !== undefined) dbUpdates.cancelled_by = updates.cancelledBy;
         if (updates.location !== undefined) dbUpdates.location = updates.location;
         if (updates.source !== undefined) dbUpdates.source = updates.source;
 
@@ -805,7 +831,8 @@ app.put('/api/logs/:id', async (req, res) => {
             hrApprovalStatus: updated.hr_approval_status,
             incentiveAmount: updated.incentive_amount,
             rejectionReason: updated.rejection_reason,
-            cancelledAt: updated.cancelled_at
+            cancelledAt: updated.cancelled_at,
+            cancelledBy: updated.cancelled_by
         });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1673,6 +1700,20 @@ app.delete('/api/training/:id', async (req, res) => {
         const { id } = req.params;
         await query('DELETE FROM training_requests WHERE id = ?', [id]);
         res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/debug/db', async (req, res) => {
+    try {
+        const columns = await query('SHOW COLUMNS FROM reading_logs');
+        res.json(columns);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/debug/logs', async (req, res) => {
+    try {
+        const logs = await query('SELECT id, title, status, cancelled_at, cancelled_by FROM reading_logs ORDER BY id DESC LIMIT 10');
+        res.json(logs);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
