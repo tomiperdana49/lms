@@ -150,7 +150,7 @@ const OnlineModulesManager = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const resCourses = await fetch(`${API_BASE_URL}/api/courses`);
+                const resCourses = await fetch(`${API_BASE_URL}/api/courses?_t=${Date.now()}`);
                 if (resCourses.ok) {
                     const coursesData = await resCourses.json();
                     setCourses(coursesData);
@@ -198,33 +198,46 @@ const OnlineModulesManager = () => {
         if (!editingCourse) return;
         const isNew = !courses.find(c => c.id === editingCourse.id);
         try {
+            // Intensive logging to verify data BEFORE stringify
+            console.log("--- ATTEMPTING SAVE ---");
+            console.log("Current Editing Course Title:", editingCourse.title);
+            console.log("PreAssessment Object:", editingCourse.preAssessment);
+            console.log("Questions Count:", editingCourse.preAssessment?.questions?.length || 0);
+
+            const payload = JSON.stringify(editingCourse);
+            console.log("FINAL JSON PAYLOAD:", payload);
+
+            let savedCourse: Course;
+
             if (isNew) {
                 const res = await fetch(`${API_BASE_URL}/api/courses`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(editingCourse)
+                    body: payload
                 });
                 if (!res.ok) {
                     const errorData = await res.json().catch(() => ({}));
                     throw new Error(errorData.error || errorData.message || 'Failed to save');
                 }
-                const saved = await res.json();
-                setCourses([...courses, saved]);
+                savedCourse = await res.json();
+                console.log("SAVED NEW COURSE:", savedCourse);
+                setCourses([...courses, savedCourse]);
             } else {
                 const res = await fetch(`${API_BASE_URL}/api/courses/${editingCourse.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(editingCourse)
+                    body: payload
                 });
                 if (!res.ok) {
                     const errorData = await res.json().catch(() => ({}));
                     throw new Error(errorData.error || errorData.message || 'Failed to update');
                 }
-                const saved = await res.json();
-                setCourses(courses.map(c => c.id === saved.id ? saved : c));
+                savedCourse = await res.json();
+                console.log("SAVED UPDATED COURSE:", savedCourse);
+                setCourses(courses.map(c => c.id === savedCourse.id ? savedCourse : c));
             }
             setEditingCourse(null);
-            setPopup({ type: 'success', message: 'Course Saved Successfully!', isOpen: true });
+            setPopup({ type: 'success', message: `Course Saved Successfully! (ID: ${savedCourse.id})`, isOpen: true });
         } catch (err) {
             console.error('Failed to save course', err);
             const msg = err instanceof Error ? err.message : 'Please check the connection.';
@@ -289,11 +302,61 @@ const OnlineModulesManager = () => {
                                 </div>
                             </section>
 
-                            <section className="space-y-4">
+                            {/* Section 2: Course Entry Pre-Test (MANDATORY START) */}
+                            <section className="space-y-4 pt-6 border-t border-slate-100">
+                                <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                                    <span className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-xs">2</span>
+                                    Course Entry Pre-Test
+                                    <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full ml-2 font-bold uppercase tracking-tight">Requirement Level 1</span>
+                                </h3>
+                                <div className="bg-amber-50/20 border border-amber-100 rounded-2xl p-6">
+                                    {!editingCourse.preAssessment ? (
+                                        <button
+                                            onClick={() => setEditingCourse({
+                                                ...editingCourse,
+                                                preAssessment: { id: Date.now(), title: 'Pre-Test: ' + editingCourse.title, questions: [] }
+                                            })}
+                                            className="w-full py-6 border-2 border-dashed border-amber-200 rounded-2xl text-amber-500 font-bold hover:border-amber-400 hover:bg-amber-50 transition-all flex flex-col items-center justify-center gap-2"
+                                        >
+                                            <Plus size={24} />
+                                            <span>Buat Kuis Pre-Test (Wajib dikerjakan sebelum materi dimulai)</span>
+                                        </button>
+                                    ) : (
+                                        <div className="bg-white rounded-2xl shadow-sm border border-amber-200 overflow-hidden">
+                                            <div className="px-6 py-4 bg-amber-50 border-b border-amber-100 flex justify-between items-center">
+                                                <span className="font-bold text-amber-900 text-sm italic">✓ Syarat Masuk Kursus Aktif</span>
+                                                <button
+                                                    onClick={() => {
+                                                        openConfirm('Hapus Pre-Test', 'Hapus kuis syarat masuk ini?', () => {
+                                                            const upd = { ...editingCourse };
+                                                            delete upd.preAssessment;
+                                                            setEditingCourse(upd);
+                                                        });
+                                                    }}
+                                                    className="text-red-500 hover:text-red-700 text-xs font-bold"
+                                                >
+                                                    Hapus Syarat
+                                                </button>
+                                            </div>
+                                            <div className="p-4">
+                                                <QuizEditor
+                                                    quiz={editingCourse.preAssessment}
+                                                    onUpdate={(updatedQuiz) => {
+                                                        console.log("UPDATING PRE-TEST STATE:", updatedQuiz.questions.length);
+                                                        setEditingCourse(prev => prev ? ({ ...prev, preAssessment: updatedQuiz }) : prev);
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </section>
+
+                            <section className="space-y-4 pt-6 border-t border-slate-100">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                                        <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">2</span>
-                                        Courses / Materi
+                                        <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">3</span>
+                                        Daftar Materi (Video & Kuis Modul)
                                     </h3>
                                     <button
                                         onClick={() => {
@@ -387,93 +450,105 @@ const OnlineModulesManager = () => {
                                                 </button>
                                             </div>
 
-                                            <div className="pl-8 pt-2 border-t border-slate-200/50">
-                                                {mod.quiz ? (
-                                                    <QuizEditor
-                                                        quiz={mod.quiz}
-                                                        onUpdate={(updatedQuiz) => {
-                                                            const newMods = [...editingCourse.modules];
-                                                            newMods[idx].quiz = updatedQuiz;
-                                                            setEditingCourse({ ...editingCourse, modules: newMods });
-                                                        }}
-                                                        onDelete={() => {
-                                                            openConfirm('Delete Quiz', 'Delete this quiz? All questions will be lost.', () => {
+                                            <div className="pl-8 pt-2 border-t border-slate-200/50 flex flex-col gap-4">
+                                                {/* Pre-Quiz Section Removed */}
+
+
+                                                <div className="space-y-2">
+                                                    <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-[#5d5dff]">Kuis Materi (Setelah Video)</h5>
+                                                    {mod.quiz ? (
+                                                        <QuizEditor
+                                                            quiz={mod.quiz}
+                                                            onUpdate={(updatedQuiz) => {
                                                                 const newMods = [...editingCourse.modules];
-                                                                delete newMods[idx].quiz;
+                                                                newMods[idx].quiz = updatedQuiz;
                                                                 setEditingCourse({ ...editingCourse, modules: newMods });
-                                                            });
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <div className="mt-2">
+                                                            }}
+                                                            onDelete={() => {
+                                                                openConfirm('Hapus Kuis', 'Hapus kuis materi ini? Semua pertanyaan akan hilang.', () => {
+                                                                    const newMods = [...editingCourse.modules];
+                                                                    delete newMods[idx].quiz;
+                                                                    setEditingCourse({ ...editingCourse, modules: newMods });
+                                                                });
+                                                            }}
+                                                        />
+                                                    ) : (
                                                         <button
                                                             onClick={() => {
                                                                 const newMods = [...editingCourse.modules];
                                                                 newMods[idx].quiz = {
                                                                     id: Date.now(),
-                                                                    title: 'Quiz for ' + mod.title,
+                                                                    title: 'Kuis Materi: ' + mod.title,
                                                                     questions: []
                                                                 };
                                                                 setEditingCourse({ ...editingCourse, modules: newMods });
                                                             }}
-                                                            className="text-xs bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg text-indigo-700 font-medium transition-colors border border-indigo-100 flex items-center gap-1"
+                                                            className="text-[10px] bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg text-indigo-700 font-bold transition-colors border border-indigo-100 flex items-center gap-1"
                                                         >
-                                                            + Add Quiz
+                                                            + Add Kuis Materi
                                                         </button>
-                                                    </div>
-                                                )}
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             </section>
 
-                            <section className="space-y-4 pt-4 border-t border-slate-200">
-                                <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                                    <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">3</span>
-                                    Final Assessment (Evaluasi Akhir Modul)
+                            {/* Section 4: Course Conclusion (FINAL EVALUATION) */}
+                            <section className="space-y-4 pt-8 border-t-2 border-slate-100 bg-slate-50/50 -mx-6 px-6 pb-6">
+                                <h3 className="font-bold text-slate-700 flex items-center gap-2 pt-4">
+                                    <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">4</span>
+                                    Course Conclusion (Final Evaluation)
                                 </h3>
 
-                                {!editingCourse.assessment ? (
-                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-8 text-center">
-                                        <p className="text-slate-500 mb-4">No assessment created for this module yet.</p>
-                                        <button
-                                            onClick={() => setEditingCourse({
-                                                ...editingCourse,
-                                                assessment: {
-                                                    id: Date.now(),
-                                                    title: 'Final Assessment',
-                                                    questions: []
-                                                }
-                                            })}
-                                            className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-blue-700 transition-colors"
-                                        >
-                                            Create Assessment
-                                        </button>
-                                    </div>
-                                ) : (
+                                <div className="grid grid-cols-1 gap-6">
+                                    {/* Final Post-Assessment */}
                                     <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                                         <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
-                                            <h4 className="font-bold text-lg text-slate-800">Assessment Questions</h4>
-                                            <button
-                                                onClick={() => {
-                                                    openConfirm('Remove Assessment', 'Are you sure you want to remove the final assessment?', () => {
-                                                        const upd = { ...editingCourse };
-                                                        delete upd.assessment;
-                                                        setEditingCourse(upd);
-                                                    });
-                                                }}
-                                                className="text-red-500 hover:text-red-700 font-medium text-sm"
-                                            >
-                                                Remove Assessment
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                                                    <BookOpen size={20} />
+                                                </div>
+                                                <h4 className="font-bold text-lg text-slate-800">Final Post-Test</h4>
+                                            </div>
+                                            {editingCourse.assessment && (
+                                                <button
+                                                    onClick={() => {
+                                                        openConfirm('Hapus Post-Test', 'Hapus kuis evaluasi akhir ini?', () => {
+                                                            const upd = { ...editingCourse };
+                                                            delete upd.assessment;
+                                                            setEditingCourse(upd);
+                                                        });
+                                                    }}
+                                                    className="text-red-500 hover:text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-red-100"
+                                                >
+                                                    Hapus
+                                                </button>
+                                            )}
                                         </div>
-                                        <QuizEditor
-                                            quiz={editingCourse.assessment}
-                                            onUpdate={(updatedQuiz) => setEditingCourse({ ...editingCourse, assessment: updatedQuiz })}
-                                        />
+                                        {!editingCourse.assessment ? (
+                                            <button
+                                                onClick={() => setEditingCourse({
+                                                    ...editingCourse,
+                                                    assessment: { id: Date.now(), title: 'Final Post-Test', questions: [] }
+                                                })}
+                                                className="w-full py-6 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold hover:border-blue-400 hover:text-blue-500 hover:bg-white transition-all flex flex-col items-center justify-center gap-2"
+                                            >
+                                                <Plus size={24} />
+                                                <span>Buat Kuis Evaluasi Akhir (Post-Test)</span>
+                                            </button>
+                                        ) : (
+                                            <QuizEditor
+                                                quiz={editingCourse.assessment}
+                                                onUpdate={(updatedQuiz) => {
+                                                    console.log("UPDATING POST-TEST STATE:", updatedQuiz.questions.length);
+                                                    setEditingCourse(prev => prev ? ({ ...prev, assessment: updatedQuiz }) : prev);
+                                                }}
+                                            />
+                                        )}
                                     </div>
-                                )}
+                                </div>
                             </section>
                         </div>
                     </div>

@@ -77,7 +77,14 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 
 // Initialize Database
-initDB();
+initDB().then(async () => {
+    try {
+        const [cols] = await pool.query('DESCRIBE courses');
+        console.log('ACTUAL DATABASE COLUMNS:', cols.map(c => c.Field).join(', '));
+    } catch (e) {
+        console.error('Failed to describe table:', e.message);
+    }
+});
 
 // Multer Config
 const storage = multer.diskStorage({
@@ -1130,26 +1137,54 @@ app.get('/api/courses-json', (req, res) => {
     }
 });
 
-app.get('/api/courses', async (req, res) => {
-    try {
-        // Fetch courses and modules
-        const courses = await query('SELECT * FROM courses');
-        const modules = await query('SELECT * FROM course_modules');
+const mapCourse = (c, modules) => {
+    if (!c) return null;
+    
+    // Helper to parse JSON safely
+    const parseJSON = (data) => {
+        if (!data) return undefined;
+        if (typeof data === 'object') return data;
+        try {
+            return JSON.parse(data);
+        } catch (e) {
+            console.warn("Failed to parse JSON column:", e.message);
+            return undefined;
+        }
+    };
 
-        const combined = courses.map(c => ({
-            ...c,
-            assessment: c.assessment_data ? (typeof c.assessment_data === 'string' ? JSON.parse(c.assessment_data) : c.assessment_data) : undefined,
-            modules: (modules || []).filter(m => m.course_id === c.id).map(m => ({
-                id: m.id,
+    const courseId = Number(c.id);
+
+    // EXPLICIT MAPPING: Only return what the frontend needs
+    // This prevents snake_case columns from conflicting with camelCase properties
+    return {
+        id: courseId,
+        title: c.title,
+        category: c.category,
+        description: c.description,
+        duration: c.duration,
+        assessment: parseJSON(c.assessment_data),
+        preAssessment: parseJSON(c.entry_pre_test_data || c.pre_assessment_data),
+        modules: (modules || [])
+            .filter(m => Number(m.course_id) === courseId)
+            .map(m => ({
+                id: Number(m.id),
+                courseId: Number(m.course_id),
                 title: m.title,
                 duration: m.duration,
-                locked: !!m.is_locked, // convert 0/1 to boolean
+                locked: !!m.is_locked,
                 videoId: m.video_id,
                 videoType: m.video_type || 'youtube',
-                quiz: m.quiz_data ? (typeof m.quiz_data === 'string' ? JSON.parse(m.quiz_data) : m.quiz_data) : undefined
+                quiz: parseJSON(m.quiz_data),
+                preQuiz: parseJSON(m.pre_quiz_data)
             }))
-        }));
+    };
+};
 
+app.get('/api/courses', async (req, res) => {
+    try {
+        const courses = await query('SELECT * FROM courses');
+        const modules = await query('SELECT * FROM course_modules');
+        const combined = courses.map(c => mapCourse(c, modules));
         res.json(combined);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1157,17 +1192,23 @@ app.get('/api/courses', async (req, res) => {
 app.post('/api/courses', async (req, res) => {
     try {
         const c = req.body;
+        console.log("CREATING NEW COURSE:", c.title);
+        
+        const preAssessmentJSON = c.preAssessment ? JSON.stringify(c.preAssessment) : null;
+        const assessmentJSON = c.assessment ? JSON.stringify(c.assessment) : null;
+
         const result = await query(
-            'INSERT INTO courses (title, category, description, duration, assessment_data) VALUES (?, ?, ?, ?, ?)',
-            [c.title, c.category || 'General', c.description, c.duration || 0, c.assessment ? JSON.stringify(c.assessment) : null]
+            'INSERT INTO courses (title, category, description, duration, assessment_data, entry_pre_test_data) VALUES (?, ?, ?, ?, ?, ?)',
+            [c.title, c.category || 'General', c.description || '', c.duration || '', assessmentJSON, preAssessmentJSON]
         );
         const courseId = result.insertId;
+        console.log("CREATED COURSE ID:", courseId);
 
         // Insert modules if any
         if (c.modules && c.modules.length > 0) {
             for (const mod of c.modules) {
                 await query(
-                    'INSERT INTO course_modules (course_id, title, duration, video_id, video_type, is_locked, quiz_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    'INSERT INTO course_modules (course_id, title, duration, video_id, video_type, is_locked, quiz_data, pre_quiz_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                     [
                         courseId,
                         mod.title,
@@ -1175,16 +1216,17 @@ app.post('/api/courses', async (req, res) => {
                         mod.videoId || '',
                         mod.videoType || 'youtube',
                         mod.locked ? 1 : 0,
-                        mod.quiz ? JSON.stringify(mod.quiz) : null
+                        mod.quiz ? JSON.stringify(mod.quiz) : null,
+                        mod.preQuiz ? JSON.stringify(mod.preQuiz) : null
                     ]
                 );
             }
         }
 
         // Return full object
-        const newCourse = await query('SELECT * FROM courses WHERE id=?', [courseId]);
-        // simplified return for now - frontend will likely refetch or use its own state
-        res.json({ ...newCourse[0], modules: c.modules || [] });
+        const newCourseData = await query('SELECT * FROM courses WHERE id=?', [courseId]);
+        const newModulesData = await query('SELECT * FROM course_modules WHERE course_id=?', [courseId]);
+        res.json(mapCourse(newCourseData[0], newModulesData));
     } catch (err) {
         console.error("ERROR CREATING COURSE:", err);
         res.status(500).json({ error: err.message });
@@ -1195,22 +1237,73 @@ app.put('/api/courses/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const c = req.body;
+        
+        // CLEANUP: Ensure we use the proper camelCase objects and IGNORE snake_case strings from DB
+        const preAssessmentObj = c.preAssessment;
+        const assessmentObj = c.assessment;
+        
+        const preAssessmentJSON = preAssessmentObj ? JSON.stringify(preAssessmentObj) : null;
+        const assessmentJSON = assessmentObj ? JSON.stringify(assessmentObj) : null;
+
+        console.log(`[SAVE] Course ${id}: Pre-Test length ${preAssessmentJSON ? preAssessmentJSON.length : 0}`);
 
         // 1. Update Course details
-        await query(
-            'UPDATE courses SET title = ?, category = ?, description = ?, duration = ?, assessment_data = ? WHERE id = ?',
-            [c.title, c.category, c.description, c.duration, c.assessment ? JSON.stringify(c.assessment) : null, id]
+        const updateParams = [
+            c.title,
+            c.category || 'General',
+            c.description || '',
+            c.duration || '',
+            assessmentJSON,
+            preAssessmentJSON,
+            Number(id)
+        ];
+
+        const updateResult = await query(
+            'UPDATE courses SET title = ?, category = ?, description = ?, duration = ?, assessment_data = ?, entry_pre_test_data = ? WHERE id = ?',
+            updateParams
         );
 
-        // 2. Update Modules
-        // Strategy: Delete all existing modules for this course and re-insert (simplest for syncing)
-        // ideally uses transaction
-        await query('DELETE FROM course_modules WHERE course_id = ?', [id]);
+        console.log(`[UPDATE] Course ID ${id} result:`, updateResult.affectedRows, "rows affected");
 
-        if (c.modules && c.modules.length > 0) {
-            for (const mod of c.modules) {
+        if (updateResult.affectedRows === 0) {
+            console.error(`[CRITICAL] Baris kursus dengan ID ${id} tidak ditemukan di DB!`);
+        }
+
+        // 2. Update Modules (Syncing Logic to preserve IDs)
+        const incomingModules = c.modules || [];
+        const existingModules = await query('SELECT id FROM course_modules WHERE course_id = ?', [id]);
+        const existingIds = existingModules.map(m => m.id);
+        const incomingIds = incomingModules.map(m => m.id).filter(id => typeof id === 'number' && id < 1000000000000); // Filter out frontend-only IDs (Date.now)
+
+        // a. Delete modules that are no longer present
+        const idsToDelete = existingIds.filter(eid => !incomingIds.includes(eid));
+        if (idsToDelete.length > 0) {
+            await query('DELETE FROM course_modules WHERE id IN (?)', [idsToDelete]);
+        }
+
+        // b. Update or Insert
+        for (const mod of incomingModules) {
+            const isExisting = typeof mod.id === 'number' && existingIds.includes(mod.id);
+            
+            if (isExisting) {
+                // UPDATE
                 await query(
-                    'INSERT INTO course_modules (course_id, title, duration, video_id, video_type, is_locked, quiz_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    'UPDATE course_modules SET title = ?, duration = ?, video_id = ?, video_type = ?, is_locked = ?, quiz_data = ?, pre_quiz_data = ? WHERE id = ?',
+                    [
+                        mod.title,
+                        mod.duration,
+                        mod.videoId || '',
+                        mod.videoType || 'youtube',
+                        mod.locked ? 1 : 0,
+                        mod.quiz ? JSON.stringify(mod.quiz) : null,
+                        mod.preQuiz ? JSON.stringify(mod.preQuiz) : null,
+                        mod.id
+                    ]
+                );
+            } else {
+                // INSERT
+                await query(
+                    'INSERT INTO course_modules (course_id, title, duration, video_id, video_type, is_locked, quiz_data, pre_quiz_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                     [
                         id,
                         mod.title,
@@ -1218,17 +1311,22 @@ app.put('/api/courses/:id', async (req, res) => {
                         mod.videoId || '',
                         mod.videoType || 'youtube',
                         mod.locked ? 1 : 0,
-                        mod.quiz ? JSON.stringify(mod.quiz) : null
+                        mod.quiz ? JSON.stringify(mod.quiz) : null,
+                        mod.preQuiz ? JSON.stringify(mod.preQuiz) : null
                     ]
                 );
             }
         }
 
         // Return updated
-        const updated = await query('SELECT * FROM courses WHERE id = ?', [id]);
-        res.json({ ...updated[0], modules: c.modules || [] });
+        const updatedCourseData = await query('SELECT * FROM courses WHERE id = ?', [id]);
+        const updatedModulesData = await query('SELECT * FROM course_modules WHERE course_id = ?', [id]);
+        
+        const mapped = mapCourse(updatedCourseData[0], updatedModulesData);
+        console.log("SENDING BACK MAPPED COURSE:", mapped.title, "PreAssessment:", !!mapped.preAssessment);
+        res.json(mapped);
     } catch (err) {
-        console.error("ERROR SAVING COURSE:", err); // ADDED LOGGING
+        console.error("ERROR SAVING COURSE:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -1286,6 +1384,35 @@ app.post('/api/progress/complete', async (req, res) => {
     try {
         const { userId, courseId, moduleId, employee_id } = req.body;
 
+        // --- NEW: STRICT VALIDATION ---
+        // 1. Fetch module configuration to see if it has Pre/Post tests
+        const moduleRows = await query('SELECT quiz_data, pre_quiz_data FROM course_modules WHERE id = ?', [moduleId]);
+        if (moduleRows.length > 0) {
+            const mod = moduleRows[0];
+            const hasPost = mod.quiz_data && JSON.parse(mod.quiz_data).questions && JSON.parse(mod.quiz_data).questions.length > 0;
+            const hasPre = mod.pre_quiz_data && JSON.parse(mod.pre_quiz_data).questions && JSON.parse(mod.pre_quiz_data).questions.length > 0;
+
+            if (hasPost || hasPre) {
+                // Fetch passing scores from results
+                // Using a robust query that checks both studentId (LMS ID) and studentId (can be employee_id)
+                const results = await query(
+                    'SELECT quiz_type, MAX(score) as maxScore FROM quiz_results WHERE (student_id = ? OR student_id = (SELECT employee_id FROM users WHERE id = ?)) AND module_id = ? GROUP BY quiz_type',
+                    [userId, userId, moduleId]
+                );
+
+                const maxPost = results.find(r => r.quiz_type === 'POST')?.maxScore || 0;
+                const hasPreResult = results.some(r => r.quiz_type === 'PRE');
+
+                if (hasPost && maxPost < 80) {
+                    return res.status(400).json({ error: 'Anda harus lulus Post-Test (Nilai >= 80) sebelum menyelesaikan modul ini.' });
+                }
+                if (hasPre && !hasPreResult) {
+                    return res.status(400).json({ error: 'Anda harus mengerjakan kuis Pre-Test sebelum menyelesaikan modul ini.' });
+                }
+            }
+        }
+        // --- END STRICT VALIDATION ---
+
         // Verify if we have an employeeId from users table if not provided
         let effectiveEmpId = employee_id;
         if (!effectiveEmpId) {
@@ -1316,6 +1443,7 @@ app.post('/api/progress/complete', async (req, res) => {
         const jsonIds = JSON.stringify(completedModuleIds);
         const now = new Date();
 
+        console.log(`[PROGRESS] Marking module ${moduleId} as complete for user ${userId} / course ${courseId}`);
         if (recordId) {
             await query('UPDATE progress SET completed_module_ids = ?, last_access = ?, employee_id = ? WHERE id = ?',
                 [jsonIds, now, effectiveEmpId, recordId]);
@@ -1375,17 +1503,40 @@ app.post('/api/progress/time', async (req, res) => {
 // --- QUIZ & ASSESSMENT ---
 app.post('/api/quiz/submit', async (req, res) => {
     try {
-        const { studentId, studentName, courseId, moduleId, score } = req.body;
+        const { studentId, studentName, courseId, moduleId, score, quizType = 'POST' } = req.body;
         const now = new Date();
+        console.log(`[QUIZ SUBMIT] User ${studentId} submitted ${quizType} quiz for module ${moduleId}. Score: ${score}`);
+
+        // Find user's employee_id for robust storage
+        const userRows = await query('SELECT employee_id FROM users WHERE id = ? OR employee_id = ?', [studentId, studentId]);
+        const employeeId = userRows.length > 0 ? userRows[0].employee_id : null;
 
         // 1. Save Result
         await query(
-            'INSERT INTO quiz_results (student_id, student_name, course_id, module_id, score, date) VALUES (?, ?, ?, ?, ?, ?)',
-            [studentId, studentName, courseId, moduleId, score, now]
+            'INSERT INTO quiz_results (student_id, student_name, course_id, module_id, score, date, quiz_type, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [studentId, studentName, courseId, moduleId, score, now, quizType, employeeId]
         );
 
-        // 2. If Passed (>= 80), mark module as complete
-        if (score >= 80 && moduleId) {
+        // 2. If Passed (>= 80) and it was a POST test, mark module as complete
+        if (score >= 80 && moduleId && quizType === 'POST') {
+            // --- NEW: Verify Pre-Test if exists ---
+            const moduleRows = await query('SELECT pre_quiz_data FROM course_modules WHERE id = ?', [moduleId]);
+            if (moduleRows.length > 0) {
+                const mod = moduleRows[0];
+                const hasPre = mod.pre_quiz_data && JSON.parse(mod.pre_quiz_data).questions && JSON.parse(mod.pre_quiz_data).questions.length > 0;
+                if (hasPre) {
+                    const preResults = await query(
+                        'SELECT COUNT(*) as count FROM quiz_results WHERE (student_id = ? OR student_id = (SELECT employee_id FROM users WHERE id = ?)) AND module_id = ? AND quiz_type = "PRE"',
+                        [studentId, studentId, moduleId]
+                    );
+                    if (preResults[0].count === 0) {
+                        console.log(`[QUIZ SUBMIT] Post-Test passed by ${studentName} but Pre-Test has not been taken for module ${moduleId}`);
+                        return res.json({ success: true, message: 'Post-test passed, but kuis Pre-test harus dikerjakan terlebih dahulu.' });
+                    }
+                }
+            }
+            // --- END PRE-TEST VERIFICATION ---
+
             // Find user's employee_id for better lookup
             const userRows = await query('SELECT employee_id FROM users WHERE id = ? OR employee_id = ?', [studentId, studentId]);
             const employeeId = userRows.length > 0 ? userRows[0].employee_id : null;
@@ -1432,17 +1583,14 @@ app.get('/api/quiz/results/:userId/:courseId', async (req, res) => {
         const employeeId = userRows.length > 0 ? userRows[0].employee_id : null;
 
         const results = await query(
-            'SELECT * FROM quiz_results WHERE (student_id = ? OR (employee_id IS NOT NULL AND employee_id = ?)) AND course_id = ? ORDER BY date DESC',
+            'SELECT id, student_id, student_name, course_id, module_id as moduleId, score, date, quiz_type as quizType FROM quiz_results WHERE (student_id = ? OR (employee_id IS NOT NULL AND employee_id = ?)) AND course_id = ? ORDER BY date DESC',
             [userId, employeeId, courseId]
         );
         const mapped = results.map(r => ({
-            id: r.id,
+            ...r,
             studentId: r.student_id,
             studentName: r.student_name,
             courseId: r.course_id,
-            moduleId: r.module_id,
-            score: r.score,
-            date: r.date
         }));
         res.json(mapped);
     } catch (err) { res.status(500).json({ error: err.message }); }

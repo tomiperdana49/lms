@@ -63,7 +63,8 @@ export interface Module {
     videoId?: string;
     locked: boolean;
     completed?: boolean;
-    quiz?: Quiz; // Optional quiz attached to module
+    quiz?: Quiz; // Post-test
+    preQuiz?: Quiz; // Pre-test
 }
 
 export interface Course {
@@ -75,7 +76,8 @@ export interface Course {
     studentCount: number;
     progress: number;
     modules: Module[];
-    assessment?: Quiz;
+    assessment?: Quiz; // Final Post-test
+    preAssessment?: Quiz; // Final Pre-test
 }
 
 export interface QuizResult {

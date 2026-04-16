@@ -57,6 +57,21 @@ export const initDB = async () => {
         } catch (e) { /* Ignore if exists */ }
 
         try {
+            await connection.query("ALTER TABLE course_modules ADD COLUMN pre_quiz_data JSON");
+            console.log("Added pre_quiz_data column to course_modules.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE courses ADD COLUMN entry_pre_test_data JSON");
+            console.log("Added entry_pre_test_data column to courses.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE courses ADD COLUMN pre_assessment_data JSON");
+            console.log("Added pre_assessment_data column to courses.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
             await connection.query("ALTER TABLE courses MODIFY COLUMN duration VARCHAR(50)");
             console.log("Modified courses.duration to VARCHAR(50).");
         } catch (e) { /* Ignore if exists */ }
@@ -186,6 +201,11 @@ export const initDB = async () => {
                 console.log(`Added employee_id column to ${table}.`);
             } catch (e) { /* Ignore if exists */ }
         }
+
+        try {
+            await connection.query("ALTER TABLE quiz_results ADD COLUMN quiz_type VARCHAR(20) DEFAULT 'POST'");
+            console.log("Added quiz_type column to quiz_results.");
+        } catch (e) { /* Ignore if exists */ }
 
         try {
             await connection.query("ALTER TABLE meetings ADD COLUMN type VARCHAR(50) DEFAULT 'Offline'");
