@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { PlayCircle, Lock, ChevronRight, BookOpen, ArrowLeft, X, Clock, CheckCircle, Award, AlertCircle } from 'lucide-react';
 import { API_BASE_URL } from '../config';
-import type { Course, Quiz, QuizResult, User } from '../types';
+import type { Course, Quiz, User } from '../types';
 import PopupNotification from './PopupNotification';
 
 interface CoursePlayerProps {
@@ -299,8 +299,8 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
         // BLOCK: If any PRE-TEST is active (either course-level or module-level), STOP.
         if (activeQuiz && activeQuiz.type === 'PRE') {
-            if (playerRef.current && playerRef.current.pauseVideo) {
-                try { playerRef.current.pauseVideo(); } catch (e) { console.warn(e); }
+            if (playerRef.current && (playerRef.current as any).pauseVideo) {
+                try { (playerRef.current as any).pauseVideo(); } catch (e) { console.warn(e); }
             }
             return;
         }
@@ -947,9 +947,9 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                     >
                                                         <PlayCircle size={20} /> Putar Ulang
                                                     </button>
-                                                    {activeModule.quiz && activeModule.quiz.questions && activeModule.quiz.questions.length > 0 && (!quizResults[activeModule.id] || quizResults[activeModule.id] < 80) ? (
+                                                    {activeModule?.quiz && activeModule.quiz.questions && activeModule.quiz.questions.length > 0 && activeModule.id && (!quizResults[activeModule.id] || quizResults[activeModule.id] < 80) ? (
                                                         <button
-                                                            onClick={() => setActiveQuiz({ quiz: activeModule.quiz!, moduleId: activeModule.id, type: 'POST' })}
+                                                            onClick={() => { if (activeModule) setActiveQuiz({ quiz: activeModule.quiz!, moduleId: activeModule.id, type: 'POST' }); }}
                                                             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all shadow-lg group"
                                                         >
                                                             <BookOpen size={20} className="group-hover:scale-110 transition-transform" /> Mulai Kuis Materi
