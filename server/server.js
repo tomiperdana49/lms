@@ -1409,6 +1409,7 @@ app.post('/api/progress/complete', async (req, res) => {
                 if (hasPre && !hasPreResult) {
                     return res.status(400).json({ error: 'Anda harus mengerjakan kuis Pre-Test sebelum menyelesaikan modul ini.' });
                 }
+
             }
         }
         // --- END STRICT VALIDATION ---

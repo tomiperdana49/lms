@@ -697,6 +697,28 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         </button>
                     </div>
 
+                    {qType === 'POST' && (
+                        <div className="bg-amber-50 border-b border-amber-100 px-6 py-3 flex items-center gap-3">
+                            <AlertCircle size={18} className="text-amber-600 shrink-0" />
+                            <p className="text-amber-800 text-sm font-medium">
+                                Standar Kelulusan: <span className="font-bold">Min. Nilai 80</span>
+                                {(() => {
+                                    const score = moduleId ? quizResults[moduleId] : assessmentScore;
+                                    if (score !== undefined && score !== null) {
+                                        return (
+                                            <>
+                                                <span className="mx-2 text-amber-300">|</span>
+                                                Nilai Terakhir: <span className={`font-bold ${score < 80 ? 'text-red-600' : 'text-green-600'}`}>{score}</span>
+                                            </>
+                                        );
+                                    }
+                                    return null;
+                                })()}
+                                . Silakan jawab dengan teliti.
+                            </p>
+                        </div>
+                    )}
+
                     <div className="p-6 md:p-8 overflow-y-auto space-y-8">
                         {Array.isArray(quiz.questions) && quiz.questions.map((q, qIdx) => (
                             <div key={q.id || qIdx} className="space-y-4">
@@ -707,7 +729,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                     {Array.isArray(q.options) && q.options.map((opt, optIdx) => {
                                         const isSelected = quizAnswers[q.id || qIdx] === optIdx;
                                         let feedbackClass = '';
-                                        if (showFeedback) {
+                                        if (showFeedback && qType !== 'POST') {
                                             if (lastScore >= 80 || qType === 'PRE') {
                                                 if (q.correctAnswer === optIdx) feedbackClass = 'bg-green-100 border-green-500 text-green-900 ring-1 ring-green-500';
                                                 else if (isSelected) feedbackClass = 'bg-red-50 border-red-300 text-red-800 ring-1 ring-red-300';
@@ -725,7 +747,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                     className="w-4 h-4 text-blue-600"
                                                 />
                                                 <span className="font-medium flex-1">{opt}</span>
-                                                {showFeedback && q.correctAnswer === optIdx && <CheckCircle size={18} className="text-green-600" />}
+                                                {showFeedback && qType !== 'POST' && q.correctAnswer === optIdx && <CheckCircle size={18} className="text-green-600" />}
                                             </label>
                                         );
                                     })}
@@ -737,29 +759,41 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     <div className="p-6 md:p-8 border-t border-slate-100 bg-slate-50 flex flex-col md:flex-row items-center justify-between gap-4">
                         {showFeedback ? (
                             <div className="flex items-center gap-4 flex-1 justify-between w-full">
-                                <div className={`px-4 py-2 rounded-lg font-bold text-sm ${lastScore >= 80 || qType === 'PRE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                    Nilai: {lastScore} / 100
+                                <div className="flex flex-col gap-2">
+                                    <div className={`px-4 py-2 rounded-lg font-bold text-sm inline-block w-fit ${lastScore >= 80 || qType === 'PRE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                        Nilai: {lastScore} / 100
+                                    </div>
+                                    {lastScore < 80 && qType === 'POST' && (
+                                        <p className="text-sm text-red-600 font-semibold animate-bounce mt-1">
+                                            ⚠️ Standar kelulusan adalah 80. Silakan jawab kembali dengan benar.
+                                        </p>
+                                    )}
                                 </div>
-                                <button
-                                    onClick={() => {
-                                        if (lastScore < 80 && qType === 'POST') {
-                                            setShowFeedback(false);
-                                            setQuizAnswers({});
-                                        } else {
-                                            setShowFeedback(false);
-                                            setActiveQuiz(undefined);
-                                            setQuizAnswers({});
-                                            
-                                            // AUTO-NEXT: If passed module quiz, complete it automatically
-                                            if (lastScore >= 80 && qType === 'POST' && moduleId) {
-                                                handleCompleteActiveModule();
+                                    <button
+                                        onClick={() => {
+                                            if (lastScore < 80 && qType === 'POST') {
+                                                setShowFeedback(false);
+                                                setQuizAnswers({});
+                                            } else {
+                                                setShowFeedback(false);
+                                                setActiveQuiz(undefined);
+                                                setQuizAnswers({});
+                                                
+                                                // AUTO-NEXT: If passed module quiz, complete it automatically
+                                                if (lastScore >= 80 && qType === 'POST' && moduleId) {
+                                                    handleCompleteActiveModule();
+                                                }
+                                                // Also close quiz if it's the Final Assessment and passed
+                                                if (lastScore >= 80 && qType === 'POST' && !moduleId) {
+                                                    setActiveQuiz(undefined);
+                                                    setPopup({ type: 'success', message: 'Selamat! Anda telah lulus kursus ini.', isOpen: true });
+                                                }
                                             }
-                                        }
-                                    }}
-                                    className="bg-slate-900 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-blue-600 transition-colors shadow-lg"
-                                >
-                                    {lastScore < 80 && qType === 'POST' ? 'Coba Lagi' : 'Lanjutkan'}
-                                </button>
+                                        }}
+                                        className="bg-slate-900 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-blue-600 transition-colors shadow-lg"
+                                    >
+                                        {lastScore < 80 && qType === 'POST' ? 'Coba Lagi' : 'Lanjutkan'}
+                                    </button>
                             </div>
                         ) : (
                             <button
@@ -793,14 +827,31 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
                                         if (!res.ok) throw new Error();
                                         
-                                        setShowFeedback(true);
                                         if (qType === 'POST') {
+                                            // 1. Update scores in state
                                             if (moduleId) {
                                                 setQuizResults(prev => ({ ...prev, [moduleId]: score }));
                                             } else {
                                                 setAssessmentScore(score);
                                             }
+
+                                            // 2. Close Quiz Immediately
+                                            setActiveQuiz(undefined);
+                                            setQuizAnswers({});
+                                            setShowFeedback(false);
+
+                                            // AUTO-NEXT: Always complete if it's a POST test and passed
+                                            if (score >= 80 && qType === 'POST') {
+                                                if (moduleId) {
+                                                    handleCompleteActiveModule();
+                                                } else {
+                                                    setActiveQuiz(undefined);
+                                                    setPopup({ type: 'success', message: 'Selamat! Anda telah lulus kursus ini.', isOpen: true });
+                                                }
+                                            }
                                         } else {
+                                            // For PRE tests, still show feedback or just close
+                                            setShowFeedback(true);
                                             if (moduleId) {
                                                 setPreQuizResults(prev => ({ ...prev, [moduleId]: score }));
                                             } else {
@@ -1077,7 +1128,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             {(!assessmentScore || assessmentScore < 80) ? (
                                 <button
                                     onClick={() => {
-                                        if (activeCourse.progress < 100) {
+                                        if (activeCourse.progress < 90) {
                                             setPopup({ type: 'error', message: 'Anda harus menyelesaikan semua materi video & quiz sebelum mengambil Final Assessment.', isOpen: true });
                                             return;
                                         }
@@ -1085,21 +1136,23 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                             setActiveQuiz({ quiz: activeCourse.assessment, moduleId: undefined, type: 'POST' });
                                         }
                                     }}
-                                    disabled={activeCourse.progress < 100}
+                                    disabled={activeCourse.progress < 90}
                                     className={`w-full p-4 rounded-xl flex items-center gap-4 text-left transition-all border-2 border-dashed
-                                            ${activeCourse.progress >= 100
+                                            ${activeCourse.progress >= 90
                                             ? 'border-indigo-400 bg-indigo-50 hover:bg-indigo-100 cursor-pointer shadow-sm animate-pulse'
                                             : 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-60'}
                                         `}
                                 >
-                                    <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center ${activeCourse.progress >= 100 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                                    <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center ${activeCourse.progress >= 90 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
                                         <Award size={20} />
                                     </div>
                                     <div>
-                                        <p className={`font-bold ${activeCourse.progress >= 100 ? 'text-indigo-900' : 'text-slate-500'}`}>Final Assessment (Ujian Akhir)</p>
-                                        <p className="text-xs text-slate-400">
-                                            {activeCourse.progress >= 100
-                                                ? 'Klik untuk Mulai'
+                                        <p className={`font-bold ${activeCourse.progress >= 90 ? 'text-indigo-900' : 'text-slate-500'}`}>Final Assessment (Ujian Akhir)</p>
+                                        <p className="text-[10px] text-slate-500 font-medium">
+                                            {activeCourse.progress >= 90
+                                                ? (assessmentScore !== null && assessmentScore < 80 
+                                                    ? `Nilai Terakhir: ${assessmentScore} (Min. 80). Silakan ulangi.`
+                                                    : 'Klik untuk Mulai Evaluasi')
                                                 : 'Selesaikan semua materi untuk membuka'}
                                         </p>
                                     </div>
