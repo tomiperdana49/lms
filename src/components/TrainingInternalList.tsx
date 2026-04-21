@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import {
     Users,
     MapPin,
@@ -94,6 +94,28 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
     const [selectedBranch, setSelectedBranch] = useState<string>('All Branches');
     const [branches, setBranches] = useState<string[]>(['All Branches']);
     const [searchQuery, setSearchQuery] = useState(''); // Unified search term
+
+    // Search states for dropdowns
+    const [hostSearch, setHostSearch] = useState('');
+    const [participantSearch, setParticipantSearch] = useState('');
+    const [showHostDropdown, setShowHostDropdown] = useState(false);
+    const [showParticipantDropdown, setShowParticipantDropdown] = useState(false);
+
+    const hostDropdownRef = useRef<HTMLDivElement>(null);
+    const participantDropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (hostDropdownRef.current && !hostDropdownRef.current.contains(event.target as Node)) {
+                setShowHostDropdown(false);
+            }
+            if (participantDropdownRef.current && !participantDropdownRef.current.contains(event.target as Node)) {
+                setShowParticipantDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Recap Detail Modal
     const [recapDetailHost, setRecapDetailHost] = useState<string | null>(null);
@@ -518,6 +540,10 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
         setFormData({ title: '', date: '', startTime: '', endTime: '', host: '', host_id: '', type: 'Online', location: '', meetLink: '', description: '' });
         setInvitedEmails([]);
         setInvitedEmployeeIds([]);
+        setHostSearch('');
+        setParticipantSearch('');
+        setShowHostDropdown(false);
+        setShowParticipantDropdown(false);
         setIsEditing(false);
         setEditId(null);
     };
@@ -888,6 +914,7 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                             required
                                             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600"
                                             value={formData.date}
+                                            min={new Date().toISOString().split('T')[0]}
                                             onChange={e => setFormData({ ...formData, date: e.target.value })}
                                         />
                                     </div>
@@ -919,26 +946,49 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Host Name</label>
-                                        <div className="relative">
-                                            <select
-                                                required
-                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-semibold text-slate-700 appearance-none"
-                                                value={formData.host_id}
-                                                onChange={e => {
-                                                    const emp = employees.find(emp => emp.id_employee === e.target.value);
-                                                    setFormData({ ...formData, host_id: e.target.value, host: emp?.full_name || '' });
-                                                }}
-                                            >
-                                                <option value="">Select Host...</option>
-                                                {employees.map(emp => (
-                                                    <option key={emp.id_employee} value={emp.id_employee}>
-                                                        {emp.full_name} ({emp.id_employee})
-                                                    </option>
-                                                ))}
-                                            </select>
+                                        <div className="relative" ref={hostDropdownRef}>
+                                            <input
+                                                type="text"
+                                                placeholder={formData.host || "Search Host..."}
+                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-semibold text-slate-700"
+                                                value={hostSearch}
+                                                onFocus={() => setShowHostDropdown(true)}
+                                                onChange={(e) => setHostSearch(e.target.value)}
+                                            />
                                             <div className="absolute right-4 top-3.5 pointer-events-none text-slate-400">
                                                 <Users size={16} />
                                             </div>
+
+                                            {showHostDropdown && (
+                                                <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                                                    {(function() {
+                                                        const filtered = employees.filter(emp =>
+                                                            emp.full_name?.toLowerCase().includes(hostSearch.toLowerCase()) ||
+                                                            emp.id_employee?.toLowerCase().includes(hostSearch.toLowerCase())
+                                                        ).slice(0, 50);
+
+                                                        if (filtered.length === 0) {
+                                                            return <div className="p-4 text-center text-xs text-slate-400 italic">No matching hosts found.</div>;
+                                                        }
+
+                                                        return filtered.map(emp => (
+                                                            <button
+                                                                key={emp.id_employee}
+                                                                type="button"
+                                                                className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm border-b border-slate-50 last:border-none flex flex-col"
+                                                                onClick={() => {
+                                                                    setFormData({ ...formData, host_id: emp.id_employee, host: emp.full_name });
+                                                                    setHostSearch("");
+                                                                    setShowHostDropdown(false);
+                                                                }}
+                                                            >
+                                                                <span className="font-bold text-slate-700">{emp.full_name}</span>
+                                                                <span className="text-[10px] text-slate-400">{emp.id_employee} • {emp.branch_name}</span>
+                                                            </button>
+                                                        ));
+                                                    })()}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <div>
@@ -992,31 +1042,52 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Invite Participants</label>
                                     <div className="flex flex-col gap-3">
-                                        <select
-                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-sm font-semibold text-slate-700"
-                                            onChange={(e) => {
-                                                const id = e.target.value;
-                                                if (!id) return;
-                                                const emp = employees.find(emp => emp.id_employee === id);
-                                                if (emp && !invitedEmployeeIds.includes(id)) {
-                                                    setInvitedEmployeeIds([...invitedEmployeeIds, id]);
-                                                    if (emp.email && !invitedEmails.includes(emp.email)) {
-                                                        setInvitedEmails([...invitedEmails, emp.email]);
-                                                    }
-                                                }
-                                                e.target.value = "";
-                                            }}
-                                        >
-                                            <option value="">Search Employee...</option>
-                                            {employees
-                                                .filter(e => !invitedEmployeeIds.includes(e.id_employee))
-                                                .map(emp => (
-                                                    <option key={emp.id_employee} value={emp.id_employee}>
-                                                        {emp.full_name} ({emp.id_employee})
-                                                    </option>
-                                                ))
-                                            }
-                                        </select>
+                                        <div className="relative" ref={participantDropdownRef}>
+                                            <input
+                                                type="text"
+                                                placeholder="Search & Add Employee..."
+                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-sm font-semibold text-slate-700"
+                                                value={participantSearch}
+                                                onFocus={() => setShowParticipantDropdown(true)}
+                                                onChange={(e) => setParticipantSearch(e.target.value)}
+                                            />
+                                            {showParticipantDropdown && (
+                                                <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                                                    {(function() {
+                                                        const filtered = employees.filter(emp =>
+                                                            !invitedEmployeeIds.includes(emp.id_employee) &&
+                                                            (emp.full_name?.toLowerCase().includes(participantSearch.toLowerCase()) ||
+                                                                emp.id_employee?.toLowerCase().includes(participantSearch.toLowerCase()))
+                                                        ).slice(0, 50);
+
+                                                        if (filtered.length === 0) {
+                                                            return <div className="p-4 text-center text-xs text-slate-400 italic">No matching employees found.</div>;
+                                                        }
+
+                                                        return filtered.map(emp => (
+                                                            <button
+                                                                key={emp.id_employee}
+                                                                type="button"
+                                                                className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm border-b border-slate-50 last:border-none flex flex-col"
+                                                                onClick={() => {
+                                                                    if (!invitedEmployeeIds.includes(emp.id_employee)) {
+                                                                        setInvitedEmployeeIds([...invitedEmployeeIds, emp.id_employee]);
+                                                                        if (emp.email && !invitedEmails.includes(emp.email)) {
+                                                                            setInvitedEmails([...invitedEmails, emp.email]);
+                                                                        }
+                                                                    }
+                                                                    setParticipantSearch("");
+                                                                    setShowParticipantDropdown(false);
+                                                                }}
+                                                            >
+                                                                <span className="font-bold text-slate-700">{emp.full_name}</span>
+                                                                <span className="text-[10px] text-slate-400">{emp.id_employee} • {emp.branch_name}</span>
+                                                            </button>
+                                                        ));
+                                                    })()}
+                                                </div>
+                                            )}
+                                        </div>
 
                                         <div className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 min-h-[50px] flex flex-wrap gap-2">
                                             {invitedEmployeeIds.map(id => {

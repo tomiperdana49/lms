@@ -16,7 +16,8 @@ import {
     ChevronDown,
     ChevronUp,
     FileText,
-    TrendingUp
+    TrendingUp,
+    GraduationCap
 } from 'lucide-react';
 import type { Page, Role, User } from '../types';
 
@@ -33,6 +34,9 @@ interface DashboardLayoutProps {
 
 const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onLogout, adminView }: DashboardLayoutProps) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isTrainingOpen, setIsTrainingOpen] = useState(() => {
+        return activePage === 'internal' || activePage === 'external' || activePage === 'external-approval';
+    });
     const [isAdminOpen, setIsAdminOpen] = useState(() => {
         const saved = localStorage.getItem('lms_admin_sidebar_open');
         if (saved !== null) return saved === 'true';
@@ -60,10 +64,11 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { header: 'MANAGEMENT' },
         { icon: Users, label: 'User Management', id: 'admin-dashboard', view: 'users' },
         { icon: BookOpen, label: 'Online Modules Management', id: 'admin-dashboard', view: 'courses' },
-        { icon: FileText, label: 'Reading Logs', id: 'admin-dashboard', view: 'logs' },
         { icon: FileText, label: 'Training Requests', id: 'admin-dashboard', view: 'training' },
-        { icon: Award, label: 'Quiz Reports', id: 'admin-dashboard', view: 'quiz-reports' },
-        { icon: TrendingUp, label: 'HR Reports', id: 'admin-dashboard', view: 'reports' },
+        { header: 'REPORT' },
+        { icon: Library, label: 'Reading Log', id: 'admin-dashboard', view: 'logs' },
+        { icon: Award, label: 'Quiz Report', id: 'admin-dashboard', view: 'quiz-reports' },
+        { icon: TrendingUp, label: 'HR Report', id: 'admin-dashboard', view: 'reports' },
         { icon: Award, label: 'Incentives', id: 'admin-dashboard', view: 'incentives' },
         { icon: Users, label: 'Training Internal', id: 'admin-dashboard', view: 'meetings' },
     ];
@@ -72,10 +77,14 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard' },
         { icon: Library, label: 'Reading Log', id: 'reading-log' },
         { icon: BookOpen, label: 'Online Modules', id: 'courses' },
-        { icon: Users, label: 'Training Internal', id: 'internal' },
-        { icon: Globe, label: 'External', id: 'external' },
         { icon: Calendar, label: 'Calendar', id: 'calendar' },
         { icon: Award, label: 'Incentives', id: 'incentives' },
+    ];
+
+    const trainingSubItems = [
+        { icon: Users, label: 'Internal', id: 'internal' },
+        { icon: Globe, label: 'External', id: 'external' },
+        ...(userRole === 'SUPERVISOR' ? [{ icon: Shield, label: 'External Approval', id: 'external-approval' }] : []),
     ];
 
     const getInitials = (name: string) => {
@@ -137,6 +146,48 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             </button>
                         ))}
 
+                        {/* Training Dropdown */}
+                        <div className="pt-1">
+                            <button
+                                onClick={() => setIsTrainingOpen(!isTrainingOpen)}
+                                className={`
+                                    w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors text-left
+                                    ${activePage === 'internal' || activePage === 'external' || activePage === 'external-approval' || isTrainingOpen
+                                        ? 'bg-slate-800 text-white'
+                                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                    }
+                                `}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <GraduationCap size={20} />
+                                    <span className="font-medium">Training</span>
+                                </div>
+                                {isTrainingOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </button>
+                            
+                            {isTrainingOpen && (
+                                <div className="mt-1 ml-4 space-y-1">
+                                    {trainingSubItems.map((sub, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => {
+                                                onNavigate(sub.id as Page);
+                                                setIsSidebarOpen(false);
+                                            }}
+                                            className={`w-full flex items-center gap-3 px-6 py-2.5 text-sm rounded-xl transition-all
+                                                ${activePage === sub.id 
+                                                    ? 'text-white font-bold bg-blue-600 shadow-md translate-x-1' 
+                                                    : 'text-slate-400 hover:text-white hover:bg-slate-800'}
+                                            `}
+                                        >
+                                            <sub.icon size={16} className={activePage === sub.id ? 'opacity-100' : 'opacity-60'} />
+                                            <span>{sub.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
                         {/* Admin Panel Expandable */}
                         {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
                             <div className="pt-2">
@@ -160,7 +211,6 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                 {/* SUB-MENU (Accordion) */}
                                 {isAdminOpen && (
                                     <div className="mt-2 ml-4 space-y-1 border-l border-slate-700">
-                                        <p className="px-6 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 mt-4">Main</p>
                                         {adminSubItems.map((sub, idx) => (
                                             sub.header ? (
                                                 <p key={idx} className="px-6 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 mt-6">{sub.header}</p>

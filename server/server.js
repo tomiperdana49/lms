@@ -1380,6 +1380,35 @@ app.get('/api/progress/:userId/:courseId', async (req, res) => {
     }
 });
 
+app.delete('/api/progress/:userId/:courseId', async (req, res) => {
+    try {
+        const { userId, courseId } = req.params;
+        
+        // Robust Lookup: Find employee_id to ensure we clear all variations of the user's ID
+        const userRows = await query('SELECT employee_id FROM users WHERE id = ? OR employee_id = ?', [userId, userId]);
+        const employeeId = userRows.length > 0 ? userRows[0].employee_id : null;
+
+        console.log(`[PROGRESS] Cancelling progress for user ${userId} / course ${courseId}`);
+
+        // 1. Delete matching progress records
+        await query(
+            'DELETE FROM progress WHERE (user_id = ? OR (employee_id IS NOT NULL AND employee_id = ?)) AND course_id = ?',
+            [userId, employeeId, courseId]
+        );
+
+        // 2. Delete matching quiz results
+        await query(
+            'DELETE FROM quiz_results WHERE (student_id = ? OR (employee_id IS NOT NULL AND employee_id = ?)) AND course_id = ?',
+            [userId, employeeId, courseId]
+        );
+
+        res.json({ success: true, message: 'Progress and quiz results cleared.' });
+    } catch (err) {
+        console.error("CANCEL PROGRESS ERROR:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/api/progress/complete', async (req, res) => {
     try {
         const { userId, courseId, moduleId, employee_id } = req.body;
@@ -1611,7 +1640,8 @@ app.get('/api/admin/quiz-reports', async (req, res) => {
                 cm.title as module_title,
                 qr.score,
                 qr.date,
-                qr.module_id
+                qr.module_id,
+                qr.quiz_type
             FROM quiz_results qr
             LEFT JOIN users u ON qr.student_id = u.id
             LEFT JOIN courses c ON qr.course_id = c.id

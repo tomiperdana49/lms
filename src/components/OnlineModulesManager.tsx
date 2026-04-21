@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Edit, Trash2, Plus, GripVertical, Save, X, BookOpen, Clock } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Course, Module, Quiz } from '../types';
@@ -129,6 +129,7 @@ const QuizEditor = ({ quiz, onUpdate, onDelete }: { quiz: Quiz | undefined, onUp
 const OnlineModulesManager = () => {
     const [courses, setCourses] = useState<Course[]>([]);
     const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+    const editorScrollRef = useRef<HTMLDivElement>(null);
 
     const [popup, setPopup] = useState<{ type: 'success' | 'error', message: string, isOpen: boolean }>({
         type: 'success',
@@ -179,8 +180,8 @@ const OnlineModulesManager = () => {
     const handleAddNewCourse = () => {
         const newCourse: Course = {
             id: Date.now(),
-            title: 'New Untitled Course',
-            description: 'Description here...',
+            title: '',
+            description: '',
             duration: '0 jam',
             modulesCount: 0,
             studentCount: 0,
@@ -262,7 +263,7 @@ const OnlineModulesManager = () => {
                         </button>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-6 bg-white">
+                    <div ref={editorScrollRef} className="flex-1 overflow-y-auto p-6 bg-white">
                         <div className="space-y-8">
                             <section className="space-y-4">
                                 <h3 className="font-bold text-slate-700 flex items-center gap-2">
@@ -275,6 +276,7 @@ const OnlineModulesManager = () => {
                                         <input
                                             value={editingCourse.title}
                                             onChange={e => setEditingCourse({ ...editingCourse, title: e.target.value })}
+                                            placeholder="New Untitled Course"
                                             className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
                                         />
                                     </div>
@@ -284,6 +286,7 @@ const OnlineModulesManager = () => {
                                             value={editingCourse.description}
                                             onChange={e => setEditingCourse({ ...editingCourse, description: e.target.value })}
                                             rows={3}
+                                            placeholder="Description here..."
                                             className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
                                         />
                                     </div>
@@ -360,9 +363,10 @@ const OnlineModulesManager = () => {
                                     </h3>
                                     <button
                                         onClick={() => {
+                                            const newId = Date.now();
                                             const newMod: Module = {
-                                                id: Date.now(),
-                                                title: 'New Course',
+                                                id: newId,
+                                                title: '',
                                                 duration: '05:00',
                                                 videoType: 'youtube',
                                                 videoId: '',
@@ -372,6 +376,17 @@ const OnlineModulesManager = () => {
                                                 ...editingCourse,
                                                 modules: [...editingCourse.modules, newMod]
                                             });
+
+                                            // Precision scroll to the specific new module
+                                            setTimeout(() => {
+                                                const el = document.getElementById(`module-row-${newId}`);
+                                                if (el) {
+                                                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                    // Auto-focus the title input for immediate typing
+                                                    const input = el.querySelector('input');
+                                                    if (input) input.focus();
+                                                }
+                                            }, 150);
                                         }}
                                         className="text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
                                     >
@@ -381,7 +396,11 @@ const OnlineModulesManager = () => {
 
                                 <div className="space-y-3">
                                     {editingCourse.modules.map((mod, idx) => (
-                                        <div key={mod.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                                        <div 
+                                            key={mod.id} 
+                                            id={`module-row-${mod.id}`}
+                                            className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 transition-all duration-300 scroll-mt-24"
+                                        >
                                             <div className="flex items-center gap-3">
                                                 <div className="cursor-move text-slate-400 hover:text-slate-600">
                                                     <GripVertical size={20} />
@@ -394,7 +413,7 @@ const OnlineModulesManager = () => {
                                                             newMods[idx] = { ...mod, title: e.target.value };
                                                             setEditingCourse({ ...editingCourse, modules: newMods });
                                                         }}
-                                                        placeholder="Course/Materi Title"
+                                                        placeholder="New Course"
                                                         className="px-3 py-2 rounded-lg border border-slate-200 text-sm"
                                                     />
                                                     <div className="flex gap-2">

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { PlayCircle, Lock, ChevronRight, BookOpen, ArrowLeft, X, Clock, CheckCircle, Award, AlertCircle } from 'lucide-react';
+import { PlayCircle, Lock, ChevronRight, BookOpen, ArrowLeft, X, Clock, CheckCircle, Award, AlertCircle, XCircle } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Course, Quiz, User } from '../types';
 import PopupNotification from './PopupNotification';
@@ -106,116 +106,116 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
     const userId = user?.id || 'guest';
 
     // --- Fetch Courses & Progress ---
-    useEffect(() => {
-        const loadCourses = async () => {
-            try {
-                // 1. Fetch all courses (from MySQL API)
-                const res = await fetch(`${API_BASE_URL}/api/courses`);
-                const allCourses = await res.json();
+    const loadCourses = async () => {
+        try {
+            // 1. Fetch all courses (from MySQL API)
+            const res = await fetch(`${API_BASE_URL}/api/courses`);
+            const allCourses = await res.json();
 
-                // 2. Sync Progress for each course
-                const coursesWithProgress = await Promise.all(allCourses.map(async (course: Course) => {
+            // 2. Sync Progress for each course
+            const coursesWithProgress = await Promise.all(allCourses.map(async (course: Course) => {
+                try {
+                    const [progressRes, quizRes] = await Promise.all([
+                        fetch(`${API_BASE_URL}/api/progress/${userId}/${course.id}?_t=${new Date().getTime()}`),
+                        fetch(`${API_BASE_URL}/api/quiz/results/${userId}/${course.id}?_t=${new Date().getTime()}`)
+                    ]);
+
+                    if (!progressRes.ok) throw new Error('Failed to fetch progress');
+
+                    const progressData = await progressRes.json() as ProgressResponse;
+                    const completedIds = (progressData.completedModuleIds || []).filter(id => id !== null && id !== undefined);
+
+                    // Check Assessment Status from Quiz Results
+                    let isAssessmentPassed = false;
+                    let preScore: number | null = null;
                     try {
-                        const [progressRes, quizRes] = await Promise.all([
-                            fetch(`${API_BASE_URL}/api/progress/${userId}/${course.id}?_t=${new Date().getTime()}`),
-                            fetch(`${API_BASE_URL}/api/quiz/results/${userId}/${course.id}?_t=${new Date().getTime()}`)
-                        ]);
-
-                        if (!progressRes.ok) throw new Error('Failed to fetch progress');
-
-                        const progressData = await progressRes.json() as ProgressResponse;
-                        const completedIds = (progressData.completedModuleIds || []).filter(id => id !== null && id !== undefined);
-
-                        // Check Assessment Status from Quiz Results
-                        let isAssessmentPassed = false;
-                        let preScore: number | null = null;
-                        try {
-                            const quizData = await quizRes.json();
-                            if (Array.isArray(quizData)) {
-                                // IMPORTANT: Only POST tests (Final Evaluation) count towards completion.
-                                isAssessmentPassed = quizData.some((r: any) => 
-                                    !r.moduleId && 
-                                    r.score >= 80 && 
-                                    (r.quizType === 'POST' || r.quiz_type === 'POST' || !r.quizType)
-                                );
-                                
-                                // Find Pre-Test score for course level
-                                const preResults = quizData.filter((r: any) => !r.moduleId && (r.quizType === 'PRE' || r.quiz_type === 'PRE'));
-                                if (preResults.length > 0) {
-                                    preScore = Math.max(...preResults.map((r: any) => r.score));
-                                }
-                            }
-                        } catch (e) {
-                            console.warn("Failed to parse quiz results", e);
-                        }
-
-                        // Save module progress map to state if active course
-                        if (activeCourse?.id === course.id) {
-                            setModuleProgress(progressData.moduleProgress || {});
-                        }
-
-                        // Calculate progress percentage
-                        const totalModules = Array.isArray(course.modules) ? course.modules.length : 0;
-                        const uniqueCompletedCount = Array.isArray(course.modules) 
-                            ? course.modules.filter(m => completedIds.some(id => String(id) === String(m.id))).length
-                            : 0;
-                        // Progress calculation
-                        const hasAssessment = !!course.assessment;
-                        let progress = 0;
-                        
-                        if (totalModules > 0) {
-                            const videoProgress = (uniqueCompletedCount / totalModules) * 100;
+                        const quizData = await quizRes.json();
+                        if (Array.isArray(quizData)) {
+                            // IMPORTANT: Only POST tests (Final Evaluation) count towards completion.
+                            isAssessmentPassed = quizData.some((r: any) => 
+                                !r.moduleId && 
+                                r.score >= 100 && 
+                                (r.quizType === 'POST' || r.quiz_type === 'POST' || !r.quizType)
+                            );
                             
-                            if (hasAssessment) {
-                                // If there is an assessment, videos count for 90%, assessment for 10%
-                                if (isAssessmentPassed) {
-                                    progress = 100;
-                                } else {
-                                    // Max 90% if videos all done but assessment not
-                                    progress = Math.min(90, Math.round(videoProgress * 0.9));
-                                }
-                            } else {
-                                // Video only course
-                                progress = Math.min(100, Math.round(videoProgress));
+                            // Find Pre-Test score for course level
+                            const preResults = quizData.filter((r: any) => !r.moduleId && (r.quizType === 'PRE' || r.quiz_type === 'PRE'));
+                            if (preResults.length > 0) {
+                                preScore = Math.max(...preResults.map((r: any) => r.score));
                             }
                         }
-
-
-                        // Unlock modules based on completion
-                        // Simple rule: If module N is done, N+1 is unlocked. 
-                        // First module always unlocked.
-                        const modules = Array.isArray(course.modules) ? course.modules.map((m, idx) => {
-                            // Previous module completed?
-                            const prevMod = course.modules[idx - 1];
-                            // Check if previous module is in completedIds (using String)
-                            const prevCompleted = prevMod && completedIds.some((id) => String(id) === String(prevMod.id));
-
-                            const isLocked = idx === 0 ? false : (prevMod && !prevCompleted);
-                            const isCompleted = completedIds.some((id) => String(id) === String(m.id));
-
-                            return { ...m, locked: isLocked, completed: isCompleted };
-                        }) : [];
-
-                        return { ...course, progress, modules, isAssessmentPassed, preScore } as Course & { preScore: number | null };
-                    } catch (err) {
-                        console.error(`Error syncing progress for course ${course.id}:`, err);
-                        return { ...course, progress: 0, preScore: null };
+                    } catch (e) {
+                        console.warn("Failed to parse quiz results", e);
                     }
-                }));
 
-                setCourses(coursesWithProgress);
-                setLoadingResults(false);
-            } catch (error) {
-                console.error("Failed to load courses:", error);
-                setLoadingResults(false);
-            }
-        };
+                    // Save module progress map to state if active course
+                    if (activeCourse?.id === course.id) {
+                        setModuleProgress(progressData.moduleProgress || {});
+                    }
+
+                    // Calculate progress percentage
+                    const totalModules = Array.isArray(course.modules) ? course.modules.length : 0;
+                    const uniqueCompletedCount = Array.isArray(course.modules) 
+                        ? course.modules.filter(m => completedIds.some(id => String(id) === String(m.id))).length
+                        : 0;
+                    // Progress calculation
+                    const hasAssessment = !!course.assessment;
+                    let progress = 0;
+                    
+                    if (totalModules > 0) {
+                        const videoProgress = (uniqueCompletedCount / totalModules) * 100;
+                        
+                        if (hasAssessment) {
+                            // If there is an assessment, videos count for 90%, assessment for 10%
+                            if (isAssessmentPassed) {
+                                progress = 100;
+                            } else {
+                                // Max 90% if videos all done but assessment not
+                                progress = Math.min(90, Math.round(videoProgress * 0.9));
+                            }
+                        } else {
+                            // Video only course
+                            progress = Math.min(100, Math.round(videoProgress));
+                        }
+                    }
+
+
+                    // Unlock modules based on completion
+                    // Simple rule: If module N is done, N+1 is unlocked. 
+                    // First module always unlocked.
+                    const modules = Array.isArray(course.modules) ? course.modules.map((m, idx) => {
+                        // Previous module completed?
+                        const prevMod = course.modules[idx - 1];
+                        // Check if previous module is in completedIds (using String)
+                        const prevCompleted = prevMod && completedIds.some((id) => String(id) === String(prevMod.id));
+
+                        const isLocked = idx === 0 ? false : (prevMod && !prevCompleted);
+                        const isCompleted = completedIds.some((id) => String(id) === String(m.id));
+
+                        return { ...m, locked: isLocked, completed: isCompleted };
+                    }) : [];
+
+                    return { ...course, progress, modules, isAssessmentPassed, preScore } as Course & { preScore: number | null };
+                } catch (err) {
+                    console.error(`Error syncing progress for course ${course.id}:`, err);
+                    return { ...course, progress: 0, preScore: null };
+                }
+            }));
+
+            setCourses(coursesWithProgress);
+            setLoadingResults(false);
+        } catch (error) {
+            console.error("Failed to load courses:", error);
+            setLoadingResults(false);
+        }
+    };
+
+    useEffect(() => {
         // Only load list if we are in list view OR if we need to sync active course
         if (viewMode === 'list' || activeCourse) {
             loadCourses();
         }
-
-    }, [userId, activeCourse, viewMode]); // Depend on activeCourse object to catch all changes
+    }, [userId, activeCourse, viewMode]);
 
     // Fetch quiz results when activeCourse changes
     useEffect(() => {
@@ -297,8 +297,8 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
         // NEW: PRE-TEST BLOCK (Completion required, passing not mandatory)
         if (loadingResults) return; // Wait until we know for sure if pre-test was taken
 
-        // BLOCK: If any PRE-TEST is active (either course-level or module-level), STOP.
-        if (activeQuiz && activeQuiz.type === 'PRE') {
+        // BLOCK: If any Quiz is active (PRE or POST), pause video and wait.
+        if (activeQuiz) {
             if (playerRef.current && (playerRef.current as any).pauseVideo) {
                 try { (playerRef.current as any).pauseVideo(); } catch (e) { console.warn(e); }
             }
@@ -345,7 +345,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     // Auto-open quiz if exists and not passed
                     // Check against REF to avoid stale closure
                     const currentResults = quizResultsRef.current;
-                    if (activeModule?.quiz && (!currentResults[activeModule.id] || currentResults[activeModule.id] < 80)) {
+                    if (activeModule?.quiz && (!currentResults[activeModule.id] || currentResults[activeModule.id] < 100)) {
                         setActiveQuiz({ quiz: activeModule.quiz, moduleId: activeModule.id, type: 'POST' });
                     }
                 }
@@ -386,9 +386,9 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                 document.body.contains(playerRef.current.getIframe());
 
             if (isPlayerValid) {
-                // Use loadVideoById to auto-play immediately
+                // Use cueVideoById to prevent auto-play on module change
                 try {
-                    playerRef.current?.loadVideoById({
+                    playerRef.current?.cueVideoById({
                         videoId: activeModule.videoId,
                         startSeconds: savedTime
                     });
@@ -406,7 +406,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         videoId: activeModule.videoId,
                         playerVars: {
                             start: Math.floor(savedTime),
-                            autoplay: 1,
+                            autoplay: 0,
                             controls: 1,
                             rel: 0,
                             modestbranding: 1,
@@ -415,13 +415,13 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             iv_load_policy: 3
                         },
                         events: {
-                            onReady: (event: YTPlayerEvent) => {
-                                event.target.playVideo();
+                            onReady: () => {
+                                // No auto-play on ready
                             },
                             onStateChange: (event: { data: number }) => {
                                 if (event.data === window.YT.PlayerState.ENDED) {
                                     setIsVideoCompleted(true);
-                                    if (activeModule?.quiz && (!quizResults[activeModule.id] || quizResults[activeModule.id] < 80)) {
+                                    if (activeModule?.quiz && (!quizResults[activeModule.id] || quizResults[activeModule.id] < 100)) {
                                         setActiveQuiz({ quiz: activeModule.quiz, moduleId: activeModule.id, type: 'POST' });
                                     }
                                 }
@@ -454,6 +454,24 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
     const handleStartCourse = (course: Course) => {
         if (!course) return;
+
+        // NEW: Inversion to allow only ONE course in-progress at a time
+        // A course is in progress if progress > 0 and progress < 100, or pre-score is done but not finished.
+        const activeInProgressCourse = courses.find(c => 
+            c.id !== course.id && 
+            c.progress < 100 && 
+            (c.progress > 0 || (c as any).preScore !== null)
+        );
+
+        if (activeInProgressCourse) {
+            setPopup({ 
+                type: 'error', 
+                message: `Anda memiliki modul yang masih berjalan: "${activeInProgressCourse.title}". Selesaikan atau batalkan modul tersebut terlebih dahulu sebelum memulai modul baru.`, 
+                isOpen: true 
+            });
+            return;
+        }
+
         const c = course as Course & { preScore?: number | null };
 
         // Safety: If course is empty
@@ -486,10 +504,16 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
             
             // If all modules done, but final assessment exists and not passed yet
             if (!incompleteModule && c.assessment && !(c as any).isAssessmentPassed) {
-                setActiveQuiz({ quiz: c.assessment, moduleId: undefined, type: 'POST' });
-                // Still set a module ID to maintain UI context behind the overlay
-                setActiveModuleId(c.modules[c.modules.length - 1].id);
-                return;
+                // Check if already passed assessment with 100%
+                const assessmentScores = (c as any).assessmentScores || [];
+                const passed = (assessmentScore !== null && assessmentScore >= 100);
+                
+                if (!passed) {
+                    setActiveQuiz({ quiz: c.assessment, moduleId: undefined, type: 'POST' });
+                    // Still set a module ID to maintain UI context behind the overlay
+                    setActiveModuleId(c.modules[c.modules.length - 1].id);
+                    return;
+                }
             }
 
             const targetModule = incompleteModule || c.modules[0];
@@ -510,6 +534,29 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
     };
 
     // --- Views ---
+
+    const handleCancelCourse = async (course: Course) => {
+        if (!window.confirm(`Apakah Anda yakin ingin membatalkan progres modul "${course.title}"? Seluruh nilai kuis dan riwayat belajar akan dihapus.`)) return;
+        
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/progress/${userId}/${course.id}`, {
+                method: 'DELETE'
+            });
+            
+            if (res.ok) {
+                setPopup({ type: 'success', message: 'Progres modul berhasil dibatalkan.', isOpen: true });
+                // Reset local state for this course
+                setQuizResults({});
+                setAssessmentScore(null);
+                setPreAssessmentScore(null);
+                loadCourses(); // Refresh list to update progress bars
+            } else {
+                throw new Error();
+            }
+        } catch (e) {
+            setPopup({ type: 'error', message: 'Gagal membatalkan progres.', isOpen: true });
+        }
+    };
 
     if (viewMode === 'list') {
         return (
@@ -566,8 +613,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                     </div>
                                 </div>
 
-                                {/* Action Button */}
-                                <div className="w-full md:w-auto flex flex-col items-center justify-center self-center pl-0 md:pl-6 border-l-0 md:border-l border-slate-100">
+                                <div className="w-full md:w-auto flex flex-col items-center justify-center self-center pl-0 md:pl-6 border-l-0 md:border-l border-slate-100 gap-3">
                                     <button
                                         onClick={() => handleStartCourse(course)}
                                         className={`w-full md:w-auto whitespace-nowrap px-8 py-3.5 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2 
@@ -592,6 +638,19 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                             </>
                                         )}
                                     </button>
+                                    
+                                    {/* Action Secondary: Cancel */}
+                                    {(course.progress > 0 || (course as any).preScore !== null) && course.progress < 100 && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleCancelCourse(course);
+                                            }}
+                                            className="text-red-500 text-sm font-bold hover:text-red-700 flex items-center gap-1 transition-colors underline underline-offset-4 decoration-red-200"
+                                        >
+                                            <XCircle size={16} /> Batalkan Progres
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -690,7 +749,15 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             <h2 className="font-bold text-2xl text-slate-900">{quiz.title}</h2>
                         </div>
                         <button 
-                            onClick={handleBackToList} 
+                            onClick={() => {
+                                if (qType === 'PRE') {
+                                    handleBackToList();
+                                } else {
+                                    setActiveQuiz(undefined);
+                                    setQuizAnswers({});
+                                    setShowFeedback(false);
+                                }
+                            }} 
                             className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
                         >
                             <X size={24} />
@@ -701,14 +768,14 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         <div className="bg-amber-50 border-b border-amber-100 px-6 py-3 flex items-center gap-3">
                             <AlertCircle size={18} className="text-amber-600 shrink-0" />
                             <p className="text-amber-800 text-sm font-medium">
-                                Standar Kelulusan: <span className="font-bold">Min. Nilai 80</span>
+                                Standar Kelulusan: <span className="font-bold">Min. Nilai {moduleId ? '100' : '80'}</span>
                                 {(() => {
                                     const score = moduleId ? quizResults[moduleId] : assessmentScore;
                                     if (score !== undefined && score !== null) {
                                         return (
                                             <>
                                                 <span className="mx-2 text-amber-300">|</span>
-                                                Nilai Terakhir: <span className={`font-bold ${score < 80 ? 'text-red-600' : 'text-green-600'}`}>{score}</span>
+                                                Nilai Terakhir: <span className={`font-bold ${score < 100 ? 'text-red-600' : 'text-green-600'}`}>{score}</span>
                                             </>
                                         );
                                     }
@@ -760,12 +827,12 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         {showFeedback ? (
                             <div className="flex items-center gap-4 flex-1 justify-between w-full">
                                 <div className="flex flex-col gap-2">
-                                    <div className={`px-4 py-2 rounded-lg font-bold text-sm inline-block w-fit ${lastScore >= 80 || qType === 'PRE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    <div className={`px-4 py-2 rounded-lg font-bold text-sm inline-block w-fit ${lastScore >= (moduleId ? 100 : 80) || qType === 'PRE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                         Nilai: {lastScore} / 100
                                     </div>
-                                    {lastScore < 80 && qType === 'POST' && (
+                                    {lastScore < (moduleId ? 100 : 80) && qType === 'POST' && (
                                         <p className="text-sm text-red-600 font-semibold animate-bounce mt-1">
-                                            ⚠️ Standar kelulusan adalah 80. Silakan jawab kembali dengan benar.
+                                            ⚠️ Standar kelulusan adalah {moduleId ? '100' : '80'}. Silakan jawab kembali dengan benar.
                                         </p>
                                     )}
                                 </div>
@@ -792,7 +859,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         }}
                                         className="bg-slate-900 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-blue-600 transition-colors shadow-lg"
                                     >
-                                        {lastScore < 80 && qType === 'POST' ? 'Coba Lagi' : 'Lanjutkan'}
+                                        {lastScore < (moduleId ? 100 : 80) && qType === 'POST' ? 'Coba Lagi' : 'Lanjutkan'}
                                     </button>
                             </div>
                         ) : (
@@ -828,26 +895,30 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         if (!res.ok) throw new Error();
                                         
                                         if (qType === 'POST') {
-                                            // 1. Update scores in state
+                                            // Update local state first
                                             if (moduleId) {
                                                 setQuizResults(prev => ({ ...prev, [moduleId]: score }));
                                             } else {
                                                 setAssessmentScore(score);
                                             }
 
-                                            // 2. Close Quiz Immediately
-                                            setActiveQuiz(undefined);
-                                            setQuizAnswers({});
-                                            setShowFeedback(false);
-
-                                            // AUTO-NEXT: Always complete if it's a POST test and passed
-                                            if (score >= 80 && qType === 'POST') {
+                                            // Only auto-proceed if passed
+                                            const passingScore = moduleId ? 100 : 80;
+                                            if (score >= passingScore) {
                                                 if (moduleId) {
+                                                    setActiveQuiz(undefined);
+                                                    setQuizAnswers({});
+                                                    setShowFeedback(false);
                                                     handleCompleteActiveModule();
                                                 } else {
                                                     setActiveQuiz(undefined);
+                                                    setQuizAnswers({});
+                                                    setShowFeedback(false);
                                                     setPopup({ type: 'success', message: 'Selamat! Anda telah lulus kursus ini.', isOpen: true });
                                                 }
+                                            } else {
+                                                // Show feedback with Score and "Coba Lagi"
+                                                setShowFeedback(true);
                                             }
                                         } else {
                                             // For PRE tests, still show feedback or just close
@@ -924,7 +995,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                     {/* Control Buttons */}
                                     {activeModule?.quiz && activeModule.id ? (
                                         // If module has quiz, render Quiz Button first if not passed
-                                        (quizResults[activeModule.id] >= 80 || activeModule.completed) ? (
+                                        (quizResults[activeModule.id] >= 100 || activeModule.completed) ? (
                                             <div className="flex flex-col md:flex-row items-center gap-4">
                                                 <span className="bg-green-100 text-green-700 px-4 py-3 rounded-xl font-bold flex items-center gap-2">
                                                     <CheckCircle size={20} /> Lulus {quizResults[activeModule.id] ? `: ${quizResults[activeModule.id]}%` : ''}
@@ -962,7 +1033,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                     ) : (
                                         <>
                                             {(() => {
-                                                const hasPassedQuiz = activeModule?.quiz && activeModule.quiz.questions.length > 0 && (quizResults[activeModule.id] || 0) >= 80;
+                                                const hasPassedQuiz = activeModule?.quiz && activeModule.quiz.questions.length > 0 && (quizResults[activeModule.id] || 0) >= 100;
                                                 const isAllowed = isVideoCompleted || hasPassedQuiz || activeModule?.completed;
                                                 
                                                 if (!isAllowed) {
@@ -998,7 +1069,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                     >
                                                         <PlayCircle size={20} /> Putar Ulang
                                                     </button>
-                                                    {activeModule?.quiz && activeModule.quiz.questions && activeModule.quiz.questions.length > 0 && activeModule.id && (!quizResults[activeModule.id] || quizResults[activeModule.id] < 80) ? (
+                                                    {activeModule?.quiz && activeModule.quiz.questions && activeModule.quiz.questions.length > 0 && activeModule.id && (!quizResults[activeModule.id] || quizResults[activeModule.id] < 100) ? (
                                                         <button
                                                             onClick={() => { if (activeModule) setActiveQuiz({ quiz: activeModule.quiz!, moduleId: activeModule.id, type: 'POST' }); }}
                                                             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all shadow-lg group"
@@ -1125,7 +1196,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     {activeCourse.assessment && (
                         <div className="p-4 pt-0 space-y-3">
                             {/* State 1: Ready to take Assessment */}
-                            {(!assessmentScore || assessmentScore < 80) ? (
+                            {(!assessmentScore || assessmentScore < 100) ? (
                                 <button
                                     onClick={() => {
                                         if (activeCourse.progress < 90) {
@@ -1150,8 +1221,8 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         <p className={`font-bold ${activeCourse.progress >= 90 ? 'text-indigo-900' : 'text-slate-500'}`}>Final Assessment (Ujian Akhir)</p>
                                         <p className="text-[10px] text-slate-500 font-medium">
                                             {activeCourse.progress >= 90
-                                                ? (assessmentScore !== null && assessmentScore < 80 
-                                                    ? `Nilai Terakhir: ${assessmentScore} (Min. 80). Silakan ulangi.`
+                                                ? (assessmentScore !== null && assessmentScore < 100 
+                                                    ? `Nilai Terakhir: ${assessmentScore} (Min. 100). Silakan ulangi.`
                                                     : 'Klik untuk Mulai Evaluasi')
                                                 : 'Selesaikan semua materi untuk membuka'}
                                         </p>

@@ -12,7 +12,8 @@ interface QuizReport {
     score: number;
     date: string;
     employee_id: string | null;
-    module_id: number | null; // null for final assessment
+    module_id: number | null;
+    quiz_type: 'PRE' | 'POST';
 }
 
 interface QuizReportListProps {
@@ -97,45 +98,99 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
 
     // 1. Filter raw reports
     const filteredRawReports = mappedReports.filter(r => {
-        const matchesSearch = r.student_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            r.course_title?.toLowerCase().includes(searchTerm.toLowerCase());
+        const studentName = r.student_name || 'Unknown';
+        const courseTitle = r.course_title || 'Unknown';
+        const matchesSearch = studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            courseTitle.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesBranch = selectedBranch === 'All' || r.branch === selectedBranch;
         return matchesSearch && matchesBranch;
     });
 
-    // 2. Group by Student
+    interface CourseSummary {
+        courseTitle: string;
+        date: string;
+        preScore: number | null;
+        postScore: number | null;
+        status: 'Valid' | 'Fail';
+    }
+
     interface GroupedUser {
         student_name: string;
         branch: string;
+        courseSummaries: CourseSummary[];
+        completedCoursesCount: number;
         reports: QuizReport[];
-        passedModules: number;
-        completedCourses: string[];
     }
 
-    const groupedData = Object.values(filteredRawReports.reduce((acc, curr) => {
-        if (!acc[curr.student_name]) {
-            acc[curr.student_name] = {
-                student_name: curr.student_name,
-                branch: curr.branch,
-                reports: [],
-                passedModules: 0,
-                completedCourses: []
-            };
-        }
-        acc[curr.student_name].reports.push(curr);
+    const { groupedData, branches: derivedBranches } = (function() {
+        const rawGrouped = filteredRawReports.reduce((acc, curr) => {
+            const sName = curr.student_name || 'Unknown Student';
+            const cTitle = curr.course_title || 'Unknown Course';
 
-        // Count passing scores
-        if (curr.score >= 80) {
-            acc[curr.student_name].passedModules++;
-            // Identify Course Completion (Final Assessment Passed)
-            if (!curr.module_id && !acc[curr.student_name].completedCourses.includes(curr.course_title)) {
-                acc[curr.student_name].completedCourses.push(curr.course_title);
+            if (!acc[sName]) {
+                acc[sName] = {
+                    student_name: sName,
+                    branch: curr.branch || 'Unknown',
+                    courseSummariesMap: {},
+                    reports: []
+                };
             }
-        }
 
+            const userGroup = acc[sName];
+            userGroup.reports.push(curr);
 
-        return acc;
-    }, {} as Record<string, GroupedUser>));
+            if (!userGroup.courseSummariesMap[cTitle]) {
+                userGroup.courseSummariesMap[cTitle] = {
+                    courseTitle: cTitle,
+                    date: curr.date,
+                    preScore: null,
+                    postScore: null,
+                    status: 'Fail'
+                };
+            }
+
+            const summary = userGroup.courseSummariesMap[cTitle];
+
+            // Assign Pre-Score (use any PRE test found for this course, latest preferred)
+            if (curr.quiz_type === 'PRE') {
+                summary.preScore = curr.score;
+            }
+
+            // Assign Post-Score (only check Final Assessment (module_id null))
+            if (curr.quiz_type === 'POST' && !curr.module_id) {
+                if (summary.postScore === null || curr.score > summary.postScore) {
+                    summary.postScore = curr.score;
+                }
+            }
+
+            // Final Status
+            if (summary.postScore !== null && summary.postScore >= 80) {
+                summary.status = 'Valid';
+            } else {
+                summary.status = 'Fail';
+            }
+
+            // Update latest date
+            if (new Date(curr.date) > new Date(summary.date)) {
+                summary.date = curr.date;
+            }
+
+            return acc;
+        }, {} as any);
+
+        const data = Object.values(rawGrouped).map((u: any) => {
+            const courseSummaries = Object.values(u.courseSummariesMap) as CourseSummary[];
+            return {
+                student_name: u.student_name,
+                branch: u.branch,
+                courseSummaries,
+                reports: u.reports,
+                completedCoursesCount: courseSummaries.filter(cs => cs.status === 'Valid').length
+            } as GroupedUser;
+        });
+
+        return { groupedData: data, branches };
+    })();
 
     const totalPages = Math.ceil(groupedData.length / itemsPerPage);
     const paginatedUsers = groupedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -242,20 +297,9 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-3">
-                                    {/* Completion Badges */}
-                                    {user.completedCourses.length > 0 && (
-                                        <div className="flex gap-1">
-                                            {user.completedCourses.map(c => (
-                                                <span key={c} className="flex items-center gap-1 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold border border-green-200">
-                                                    <CheckCircle size={12} /> Completed: {c}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    )}
-
                                     <div className="text-right mr-2 hidden md:block">
-                                        <div className="text-2xl font-bold text-slate-700">{user.passedModules}</div>
-                                        <div className="text-xs text-slate-400 uppercase tracking-wide">Modules Passed</div>
+                                        <div className="text-2xl font-bold text-slate-700">{user.completedCoursesCount}</div>
+                                        <div className="text-xs text-slate-400 uppercase tracking-wide">Courses Completed</div>
                                     </div>
                                     {expandedUser === user.student_name ? <ChevronLeft className="-rotate-90 text-slate-400" /> : <ChevronLeft className="rotate-180 text-slate-400" />}
                                 </div>
@@ -270,27 +314,29 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
                                                 <tr>
                                                     <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">Date</th>
                                                     <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">Course</th>
-                                                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">Module / Assessment</th>
-                                                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">Score</th>
+                                                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-center">Pre-Tes</th>
+                                                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-center">Post-Tes</th>
                                                     <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">Status</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
-                                                {user.reports.map((r, idx) => (
+                                                {user.courseSummaries.map((summary, idx) => (
                                                     <tr key={idx} className="hover:bg-slate-50">
-                                                        <td className="px-4 py-3 text-sm text-slate-500">{new Date(r.date).toLocaleDateString()}</td>
-                                                        <td className="px-4 py-3 text-sm font-medium text-slate-700">{r.course_title}</td>
-                                                        <td className="px-4 py-3 text-sm text-slate-600">
-                                                            {r.module_id ? r.module_title : <span className="text-indigo-600 font-bold flex items-center gap-1"><CheckCircle size={12} /> Final Assessment</span>}
+                                                        <td className="px-4 py-3 text-sm text-slate-500">{new Date(summary.date).toLocaleDateString()}</td>
+                                                        <td className="px-4 py-3 text-sm font-medium text-slate-700">{summary.courseTitle}</td>
+                                                        <td className="px-4 py-3 text-sm text-center font-bold text-slate-600">
+                                                            {summary.preScore ?? '-'}
                                                         </td>
-                                                        <td className="px-4 py-3 text-sm font-bold">{r.score}</td>
-                                                        <td className="px-4 py-3 pb-3">
-                                                            {r.score >= 80 ? (
-                                                                <span className="inline-flex items-center gap-1 text-green-700 bg-green-50 px-2 py-1 rounded text-xs font-bold border border-green-100">
+                                                        <td className="px-4 py-3 text-sm text-center font-extrabold text-blue-700">
+                                                            {summary.postScore ?? '-'}
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            {summary.status === 'Valid' ? (
+                                                                <span className="inline-flex items-center gap-1 text-green-700 bg-green-50 px-3 py-1 rounded-full text-xs font-bold border border-green-200">
                                                                     <CheckCircle size={12} /> Valid
                                                                 </span>
                                                             ) : (
-                                                                <span className="inline-flex items-center gap-1 text-red-700 bg-red-50 px-2 py-1 rounded text-xs font-bold border border-red-100">
+                                                                <span className="inline-flex items-center gap-1 text-red-700 bg-red-50 px-3 py-1 rounded-full text-xs font-bold border border-red-200">
                                                                     <XCircle size={12} /> Fail
                                                                 </span>
                                                             )}
