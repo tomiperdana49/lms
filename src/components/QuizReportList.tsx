@@ -189,7 +189,7 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
             } as GroupedUser;
         });
 
-        return { groupedData: data, branches };
+        return { groupedData: data };
     })();
 
     const totalPages = Math.ceil(groupedData.length / itemsPerPage);
