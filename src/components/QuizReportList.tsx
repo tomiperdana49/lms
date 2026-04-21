@@ -122,7 +122,7 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
         reports: QuizReport[];
     }
 
-    const { groupedData, branches: derivedBranches } = (function() {
+    const { groupedData } = (function() {
         const rawGrouped = filteredRawReports.reduce((acc, curr) => {
             const sName = curr.student_name || 'Unknown Student';
             const cTitle = curr.course_title || 'Unknown Course';

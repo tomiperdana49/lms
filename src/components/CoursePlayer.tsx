@@ -505,7 +505,6 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
             // If all modules done, but final assessment exists and not passed yet
             if (!incompleteModule && c.assessment && !(c as any).isAssessmentPassed) {
                 // Check if already passed assessment with 100%
-                const assessmentScores = (c as any).assessmentScores || [];
                 const passed = (assessmentScore !== null && assessmentScore >= 100);
                 
                 if (!passed) {
