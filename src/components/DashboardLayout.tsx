@@ -110,11 +110,17 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
             {/* Sidebar */}
             <aside
                 className={`
-          fixed lg:static inset-y-0 left-0 z-50
+          fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0 lg:h-screen
           w-64 bg-slate-900 text-white transition-transform duration-300 ease-in-out
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
             >
+                <style dangerouslySetInnerHTML={{ __html: `
+                    aside nav::-webkit-scrollbar { width: 4px; }
+                    aside nav::-webkit-scrollbar-track { background: transparent; }
+                    aside nav::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+                    aside nav::-webkit-scrollbar-thumb:hover { background: #475569; }
+                `}} />
                 <div className="h-full flex flex-col">
                     {/* Logo / Brand */}
                     <div className="p-6 border-b border-slate-700 flex items-center justify-between">
