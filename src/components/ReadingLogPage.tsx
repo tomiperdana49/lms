@@ -180,7 +180,27 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         );
     };
 
-
+    const handleClaimIncentive = async (id: number | string) => {
+        setIsLoading(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/logs/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ hrApprovalStatus: 'Pending' })
+            });
+            if (res.ok) {
+                setReadingLogs(readingLogs.map(l => l.id === id ? { ...l, hrApprovalStatus: 'Pending' } : l));
+                setNotification({ show: true, type: 'success', message: 'Incentive claim sent to HR successfully!' });
+            } else {
+                setNotification({ show: true, type: 'error', message: 'Failed to send claim.' });
+            }
+        } catch (err) {
+            console.error(err);
+            setNotification({ show: true, type: 'error', message: 'Failed to connect to server.' });
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>, target: 'privateReport' | 'claimFinish') => {
         if (e.target.files && e.target.files[0]) {
@@ -652,7 +672,11 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                             <div className="flex flex-col items-end gap-2">
                                                 {isMyLog && log.hrApprovalStatus === 'Draft' && log.status !== 'Cancelled' && (
                                                     <div className="flex gap-2">
-                                                        <button onClick={(e) => { e.stopPropagation(); openClaimModal(log); }} className="px-3 py-1 text-[10px] font-bold bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all">Claim</button>
+                                                        {log.status === 'Reading' ? (
+                                                            <button onClick={(e) => { e.stopPropagation(); openClaimModal(log); }} className="px-3 py-1 text-[10px] font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all">Finish</button>
+                                                        ) : (
+                                                            <button onClick={(e) => { e.stopPropagation(); handleClaimIncentive(log.id); }} className="px-3 py-1 text-[10px] font-bold bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all">Claim</button>
+                                                        )}
                                                         <button onClick={(e) => { e.stopPropagation(); handleDelete(log.id); }} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={14} /></button>
                                                     </div>
                                                 )}
