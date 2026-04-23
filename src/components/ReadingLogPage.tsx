@@ -1,5 +1,5 @@
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
-import { BookOpen, ArrowLeft, Search, Book, Trophy, Trash2, XCircle, CheckCircle, Upload, AlertCircle, Clock } from 'lucide-react';
+import { BookOpen, ArrowLeft, Search, Book, Trophy, Trash2, XCircle, CheckCircle, Upload, Clock } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry, User } from '../types';
 import PopupNotification from './PopupNotification';
@@ -257,8 +257,8 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         "Non-Fiction", "Self Development", "History", "Technology", "Others"
     ];
 
-    const [filterYear, setFilterYear] = useState(new Date().getFullYear());
-    const [filterPeriod, setFilterPeriod] = useState('all');
+    const [filterYear] = useState(new Date().getFullYear());
+    const [filterPeriod] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'Reading', 'Approved', 'Pending'
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -268,13 +268,13 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         setCurrentPage(1);
     }, [filterYear, filterPeriod, searchQuery, filterStatus]);
 
-    const periodOptions = [
+    /* const periodOptions = [
         { label: 'All Year', value: 'all' },
         ...[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(m => ({
             label: new Date(2024, m, 1).toLocaleString('default', { month: 'long' }),
             value: String(m)
         }))
-    ];
+    ]; */
 
     const filteredLogs = readingLogs.filter(log => {
         if (!log.date) return false;
@@ -302,7 +302,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         return period.month === parseInt(filterPeriod);
     });
 
-    const totalPages = Math.ceil(filteredLogs.length / ITEMS_PER_PAGE);
+    // const totalPages = Math.ceil(filteredLogs.length / ITEMS_PER_PAGE);
     const paginatedLogs = filteredLogs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
     const submitPrivateReportData = async () => {
@@ -388,26 +388,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         submitPrivateReportData();
     };
 
-    const openClaimModal = (logToFinish?: ReadingLogEntry) => {
-        if (logToFinish) {
-            setSelectedLog(logToFinish);
-            setClaimForm({
-                title: logToFinish.title,
-                category: logToFinish.category,
-                startDate: logToFinish.startDate ? new Date(new Date(logToFinish.startDate).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : (logToFinish.date ? new Date(new Date(logToFinish.date).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : ''),
-                finishDate: new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16),
-                link: '',
-                evidenceUrl: ''
-            });
-        } else {
-            setSelectedLog(null);
-            setClaimForm({
-                title: '', category: '', startDate: '', finishDate: today,
-                link: '', evidenceUrl: ''
-            });
-        }
-        setClaimModalOpen(true);
-    };
+    // Removed unused openClaimModal function
 
     const submitClaimData = async () => {
         setIsLoading(true);
@@ -641,7 +622,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                             <div className="flex items-center gap-2 text-slate-500 font-medium">
                                                                 <span>Start: {new Date(log.startDate || log.date).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                                                                 <span>•</span>
-                                                                <span>Finish: {new Date(log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                                                <span>Finish: {log.finishDate ? new Date(log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</span>
                                                                 {log.startDate && log.finishDate && (
                                                                     <span className="ml-2 text-[8px] whitespace-nowrap font-black bg-indigo-600 text-white px-1 py-0.5 rounded shadow-sm inline-flex items-center gap-1">
                                                                         <Clock size={8} />

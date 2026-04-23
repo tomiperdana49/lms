@@ -78,7 +78,8 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
     const [popup, setPopup] = useState<{ type: 'success' | 'error', message: string, isOpen: boolean }>({ type: 'success', message: '', isOpen: false });
 
-    const [isAssessmentPassed, setIsAssessmentPassed] = useState(false);
+    const [showFeedback, setShowFeedback] = useState(false);
+    const [lastScore, setLastScore] = useState<number>(0);
 
     const [isVideoCompleted, setIsVideoCompleted] = useState(false);
     const [loadingResults, setLoadingResults] = useState(false);

@@ -86,10 +86,13 @@ export interface QuizResult {
     studentName: string;
     courseId: number;
     moduleId: number;
+    meetingId?: number;
+    meeting_id?: number;
     score: number;
     date: string;
     employee_id?: string;
     quizType?: 'PRE' | 'POST';
+    quiz_type?: 'PRE' | 'POST';
 }
 
 export interface TrainingRequest {
@@ -182,6 +185,7 @@ export interface Employee {
     id_employee: string;
     branch_id: string;
     full_name: string;
+    name?: string; // Compatibility field
     job_position: string;
     email: string;
     mobile_phone: string;

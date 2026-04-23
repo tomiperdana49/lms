@@ -15,7 +15,7 @@ import {
     ChevronDown
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
-import type { Role, Meeting, CostReport, Employee, QuizResult } from '../types';
+import type { Role, Meeting, CostReport, Employee, QuizResult, User } from '../types';
 import PopupNotification from './PopupNotification';
 import ConfirmationModal from './ConfirmationModal';
 
@@ -161,7 +161,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             const uniqueResults: QuizResult[] = [];
             const types = new Set();
             allFetchedResults.forEach(r => {
-                const type = r.quizType || r.quiz_type;
+                const type = r.quizType || (r as any).quiz_type;
                 if (!types.has(type)) {
                     types.add(type);
                     uniqueResults.push(r);
@@ -912,12 +912,12 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         <tbody className="divide-y divide-white">
                                                             {meetings.filter(m => m.host === stat.host).map((m) => {
                                                                 const meetingResults = allResults.filter(r => 
-                                                                    Number(r.meetingId || r.meeting_id) === Number(m.id) &&
-                                                                    !(r.courseId || r.course_id)
+                                                                    Number(r.meetingId || (r as any).meeting_id) === Number(m.id) &&
+                                                                    !(r as any).courseId && !(r as any).course_id
                                                                 );
 
                                                                 const meetingFeedback = allFeedback.filter(f => 
-                                                                    Number(f.meetingId || f.meeting_id || f.id_meeting || f.trainingId || f.training_id || f.session_id) === Number(m.id)
+                                                                    Number(f.meetingId || (f as any).meeting_id || (f as any).id_meeting || (f as any).trainingId || (f as any).training_id || (f as any).session_id) === Number(m.id)
                                                                 );
 
                                                                 // Define participant matching logic
@@ -949,19 +949,19 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 }, []);
 
                                                                 const completedParticipants = allParticipantIds.filter(email => {
-                                                                    const hasPre = meetingResults.some(r => isParticipantMatch(r, email) && (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE'));
-                                                                    const hasPost = meetingResults.some(r => isParticipantMatch(r, email) && (r.quizType || r.quiz_type || "").toUpperCase().includes('POST'));
+                                                                    const hasPre = meetingResults.some(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('PRE'));
+                                                                    const hasPost = meetingResults.some(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('POST'));
                                                                     const hasFB = meetingFeedback.some(f => isParticipantMatch(f, email));
                                                                     return hasPre && hasPost && hasFB;
                                                                 });
 
                                                                 // Calculate Averages based only on completedParticipants
                                                                 const preScores = completedParticipants.map(email => {
-                                                                    const scores = meetingResults.filter(r => isParticipantMatch(r, email) && (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE')).map(r => Number(r.score) || 0);
+                                                                    const scores = meetingResults.filter(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('PRE')).map(r => Number(r.score) || 0);
                                                                     return Math.max(...scores, 0);
                                                                 });
                                                                 const postScores = completedParticipants.map(email => {
-                                                                    const scores = meetingResults.filter(r => isParticipantMatch(r, email) && (r.quizType || r.quiz_type || "").toUpperCase().includes('POST')).map(r => Number(r.score) || 0);
+                                                                    const scores = meetingResults.filter(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('POST')).map(r => Number(r.score) || 0);
                                                                     return Math.max(...scores, 0);
                                                                 });
                                                                 const fbScoresList: number[] = [];
@@ -1068,8 +1068,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                                     };
 
                                                                                                     const participantQuizRes = meetingResults.filter(r => findById(r, email));
-                                                                                                    const preData = participantQuizRes.filter(r => (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE')).sort((a,b) => (b.score||0) - (a.score||0))[0];
-                                                                                                    const postData = participantQuizRes.filter(r => (r.quizType || r.quiz_type || "").toUpperCase().includes('POST')).sort((a,b) => (b.score||0) - (a.score||0))[0];
+                                                                                                    const preData = participantQuizRes.filter(r => (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('PRE')).sort((a,b) => (Number(b.score)||0) - (Number(a.score)||0))[0];
+                                                                                                    const postData = participantQuizRes.filter(r => (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('POST')).sort((a,b) => (Number(b.score)||0) - (Number(a.score)||0))[0];
                                                                                                     
                                                                                                     const pre = preData ? preData.score : '-';
                                                                                                     const post = postData ? postData.score : '-';
@@ -1092,7 +1092,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                                     if (!targetFeedback) {
                                                                                                         targetFeedback = allFeedback.find(f => {
                                                                                                             const isUserMatch = (f.userEmail || f.user_email || f.userId || f.user_id || f.studentId || f.student_id || f.email || '').toString().toLowerCase().trim() === email.toLowerCase().trim();
-                                                                                                            const isMeetingMatch = Number(f.meetingId || f.meeting_id || f.id_meeting || f.trainingId || f.training_id || f.session_id) === Number(m.id);
+                                                                                                            const isMeetingMatch = Number(f.meetingId || (f as any).meeting_id || (f as any).id_meeting || (f as any).trainingId || (f as any).training_id || (f as any).session_id) === Number(m.id);
                                                                                                             return isUserMatch && isMeetingMatch;
                                                                                                         });
                                                                                                     }
@@ -2103,7 +2103,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     if (meetingQuizResults.find(r => r.quizType === 'PRE')) return;
                                                     setShowQuiz('PRE');
                                                 }}
-                                                className={`w-full group bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between transition-all ${meetingQuizResults.find(r => (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE')) 
+                                                className={`w-full group bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between transition-all ${meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('PRE')) 
                                                     ? 'cursor-default' 
                                                     : 'hover:border-indigo-300 cursor-pointer'}`}
                                             >
@@ -2120,8 +2120,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 </div>
                                                 {(() => {
                                                     const res = meetingQuizResults.find(r => {
-                                                        const type = (r.quizType || r.quiz_type || "").toUpperCase();
-                                                        const midMatches = Number(r.meetingId || r.meeting_id) === Number(selectedMeeting.id);
+                                                        const type = (r.quizType || "").toUpperCase();
+                                                        const midMatches = Number(r.meetingId || (r as any).meeting_id) === Number(selectedMeeting.id);
                                                         return (type === 'PRE' || type === 'PRE-TEST') && midMatches;
                                                     });
                                                     return res ? (
@@ -2135,27 +2135,27 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             <button
                                                 onClick={() => {
                                                     const preRes = meetingQuizResults.find(r => {
-                                                        const type = (r.quizType || r.quiz_type || "").toUpperCase();
+                                                        const type = (r.quizType || "").toUpperCase();
                                                         return (type === 'PRE' || type === 'PRE-TEST');
                                                     });
                                                     if (!preRes) {
                                                         setNotification({ show: true, type: 'error', message: "Silakan kerjakan Pre-Test terlebih dahulu sebelum memulai Post-Test." });
                                                         return;
                                                     }
-                                                    const postRes = meetingQuizResults.find(r => (r.quizType || r.quiz_type || "").toUpperCase().includes('POST'));
+                                                    const postRes = meetingQuizResults.find(r => (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('POST'));
                                                     if (postRes && (Number(postRes.score) || 0) >= 80) return;
                                                     setShowQuiz('POST');
                                                 }}
                                                 className={`w-full group bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between transition-all ${(() => {
-                                                    const preRes = meetingQuizResults.find(r => (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE'));
-                                                    const postRes = meetingQuizResults.find(r => (r.quizType || r.quiz_type || "").toUpperCase().includes('POST'));
+                                                    const preRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('PRE'));
+                                                    const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
                                                     if (!preRes) return 'opacity-60 cursor-not-allowed';
                                                     return (postRes && (Number(postRes.score) || 0) >= 80) ? 'cursor-default' : 'hover:border-indigo-300 cursor-pointer';
                                                 })()}`}
                                             >
                                                 <div className="flex items-center gap-3">
                                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${(() => {
-                                                        const postRes = meetingQuizResults.find(r => (r.quizType || r.quiz_type || "").toUpperCase().includes('POST'));
+                                                        const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
                                                         return (postRes && (Number(postRes.score) || 0) >= 80)
                                                             ? 'bg-emerald-100 text-emerald-600'
                                                             : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-500 group-hover:text-white';
@@ -2169,8 +2169,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 </div>
                                                 {(() => {
                                                     const res = meetingQuizResults.find(r => {
-                                                        const type = (r.quizType || r.quiz_type || "").toUpperCase();
-                                                        const midMatches = Number(r.meetingId || r.meeting_id) === Number(selectedMeeting.id);
+                                                        const type = (r.quizType || "").toUpperCase();
+                                                        const midMatches = Number(r.meetingId || (r as any).meeting_id) === Number(selectedMeeting.id);
                                                         return (type === 'POST' || type === 'POST-TEST') && midMatches;
                                                     });
                                                     return res ? (
@@ -2232,7 +2232,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         type={showQuiz}
                         questions={showQuiz === 'PRE' ? (selectedMeeting.pre_test_data?.questions || []) : (selectedMeeting.post_test_data?.questions || [])}
                         onClose={() => setShowQuiz(null)}
-                        onSubmit={async (score) => {
+                        onSubmit={async (score: number) => {
                             try {
                                 const response = await fetch(`${API_BASE_URL}/api/quiz/submit`, {
                                     method: 'POST',
@@ -2274,7 +2274,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
                     <TrainingFeedbackForm
                         onClose={() => setShowFeedback(false)}
-                        onSubmit={async (feedback) => {
+                        onSubmit={async (feedback: any) => {
                             try {
                                 const response = await fetch(`${API_BASE_URL}/api/feedback/submit`, {
                                     method: 'POST',
