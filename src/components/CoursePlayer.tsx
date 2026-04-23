@@ -125,13 +125,21 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     const completedIds = (progressData.completedModuleIds || []).filter(id => id !== null && id !== undefined);
 
                     // Check Assessment Status from Quiz Results
+                    let isAssPassed = false;
                     let preScore: number | null = null;
 
                     try {
                         const quizData = await quizRes.json();
                         if (Array.isArray(quizData)) {
+                             // IMPORTANT: Only POST tests (Final Evaluation) count towards completion.
+                             isAssPassed = quizData.some((r: any) => 
+                                !r.moduleId && 
+                                Number(r.score) >= 80 && 
+                                ((r.quizType || r.quiz_type || "").toUpperCase() === 'POST' || !r.quizType)
+                            );
+
                             // Find Pre-Test score for course level
-                            const preResults = quizData.filter((r: any) => !r.moduleId && (r.quizType === 'PRE' || r.quiz_type === 'PRE'));
+                            const preResults = quizData.filter((r: any) => !r.moduleId && (r.quizType === 'PRE' || (r as any).quiz_type === 'PRE'));
                             if (preResults.length > 0) {
                                 preScore = Math.max(...preResults.map((r: any) => r.score));
                             }

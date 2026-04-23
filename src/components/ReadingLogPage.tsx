@@ -57,6 +57,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
     const [detailModalOpen, setDetailModalOpen] = useState(false);
     const [viewLog, setViewLog] = useState<ReadingLogEntry | null>(null);
+    const [selectedLog, setSelectedLog] = useState<ReadingLogEntry | null>(null);
     const [cancelNote, setCancelNote] = useState('');
     const [notification, setNotification] = useState<{ show: boolean, type: 'success' | 'error', message: string }>({ show: false, type: 'success', message: '' });
 
