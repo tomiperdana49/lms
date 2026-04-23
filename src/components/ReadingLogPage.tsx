@@ -388,7 +388,26 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         submitPrivateReportData();
     };
 
-    // Removed unused openClaimModal function
+    const openClaimModal = (logToFinish?: ReadingLogEntry) => {
+        if (logToFinish) {
+            setSelectedLog(logToFinish);
+            setClaimForm({
+                title: logToFinish.title,
+                category: logToFinish.category,
+                startDate: logToFinish.startDate ? new Date(new Date(logToFinish.startDate).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : (logToFinish.date ? new Date(new Date(logToFinish.date).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : ''),
+                finishDate: new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16),
+                link: '',
+                evidenceUrl: ''
+            });
+        } else {
+            setSelectedLog(null);
+            setClaimForm({
+                title: '', category: '', startDate: '', finishDate: today,
+                link: '', evidenceUrl: ''
+            });
+        }
+        setClaimModalOpen(true);
+    };
 
     const submitClaimData = async () => {
         setIsLoading(true);
@@ -653,7 +672,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                             <div className="flex flex-col items-end gap-2">
                                                 {isMyLog && log.hrApprovalStatus === 'Draft' && log.status !== 'Cancelled' && (
                                                     <div className="flex gap-2">
-                                                        <button onClick={(e) => { e.stopPropagation(); handleClaimIncentive(log.id); }} className="px-3 py-1 text-[10px] font-bold bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all">Claim</button>
+                                                        <button onClick={(e) => { e.stopPropagation(); openClaimModal(log); }} className="px-3 py-1 text-[10px] font-bold bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all">Claim</button>
                                                         <button onClick={(e) => { e.stopPropagation(); handleDelete(log.id); }} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={14} /></button>
                                                     </div>
                                                 )}
