@@ -180,27 +180,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         );
     };
 
-    const handleClaimIncentive = async (id: number | string) => {
-        setIsLoading(true);
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/logs/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ hrApprovalStatus: 'Pending' })
-            });
-            if (res.ok) {
-                setReadingLogs(readingLogs.map(l => l.id === id ? { ...l, hrApprovalStatus: 'Pending' } : l));
-                setNotification({ show: true, type: 'success', message: 'Incentive claim sent to HR successfully!' });
-            } else {
-                setNotification({ show: true, type: 'error', message: 'Failed to send claim.' });
-            }
-        } catch (err) {
-            console.error(err);
-            setNotification({ show: true, type: 'error', message: 'Failed to connect to server.' });
-        } finally {
-            setIsLoading(false);
-        }
-    };
+
 
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>, target: 'privateReport' | 'claimFinish') => {
         if (e.target.files && e.target.files[0]) {
