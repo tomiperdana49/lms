@@ -1044,7 +1044,10 @@ app.get('/api/meetings', async (req, res) => {
             ...m,
             description: m.agenda, // Map agenda to description for frontend
             guests: m.guests_json ? (typeof m.guests_json === 'string' ? JSON.parse(m.guests_json) : m.guests_json) : undefined,
-            costReport: m.cost_report_json ? (typeof m.cost_report_json === 'string' ? JSON.parse(m.cost_report_json) : m.cost_report_json) : undefined
+            costReport: m.cost_report_json ? (typeof m.cost_report_json === 'string' ? JSON.parse(m.cost_report_json) : m.cost_report_json) : undefined,
+            pre_test_data: m.pre_test_data ? (typeof m.pre_test_data === 'string' ? JSON.parse(m.pre_test_data) : m.pre_test_data) : undefined,
+            post_test_data: m.post_test_data ? (typeof m.post_test_data === 'string' ? JSON.parse(m.post_test_data) : m.post_test_data) : undefined,
+            feedback_data: m.feedback_data ? (typeof m.feedback_data === 'string' ? JSON.parse(m.feedback_data) : m.feedback_data) : undefined
         }));
         res.json(mapped);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1058,8 +1061,27 @@ app.post('/api/meetings', async (req, res) => {
         if (!guests.emails) guests.emails = [];
 
         const result = await query(
-            'INSERT INTO meetings (title, date, time, host, location, type, meetLink, agenda, guests_json, cost_report_json, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [m.title, new Date(m.date), m.time, m.host || 'HR Team', m.location, m.type || 'Offline', m.meetLink || '', m.description || m.agenda || '', JSON.stringify(guests), null, m.employee_id]
+            'INSERT INTO meetings (title, date, time, host, location, type, meetLink, agenda, guests_json, cost_report_json, employee_id, pre_test_link, material_link, post_test_link, feedback_link, pre_test_data, post_test_data, feedback_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+                m.title, 
+                new Date(m.date), 
+                m.time, 
+                m.host || 'HR Team', 
+                m.location, 
+                m.type || 'Offline', 
+                m.meetLink || '', 
+                m.description || m.agenda || '', 
+                JSON.stringify(guests), 
+                null, 
+                m.employee_id, 
+                m.pre_test_link || '', 
+                m.material_link || '', 
+                m.post_test_link || '', 
+                m.feedback_link || '',
+                m.pre_test_data ? JSON.stringify(m.pre_test_data) : null,
+                m.post_test_data ? JSON.stringify(m.post_test_data) : null,
+                m.feedback_data ? JSON.stringify(m.feedback_data) : null
+            ]
         );
 
         const newMeeting = { ...m, id: result.insertId, guests };
@@ -1084,7 +1106,7 @@ app.put('/api/meetings/:id', async (req, res) => {
         let costReport = m.costReport || null;
 
         await query(
-            'UPDATE meetings SET title = ?, date = ?, time = ?, host = ?, location = ?, type = ?, meetLink = ?, agenda = ?, guests_json = ?, cost_report_json = ?, employee_id = ? WHERE id = ?',
+            'UPDATE meetings SET title = ?, date = ?, time = ?, host = ?, location = ?, type = ?, meetLink = ?, agenda = ?, guests_json = ?, cost_report_json = ?, employee_id = ?, pre_test_link = ?, material_link = ?, post_test_link = ?, feedback_link = ?, pre_test_data = ?, post_test_data = ?, feedback_data = ? WHERE id = ?',
             [
                 m.title,
                 new Date(m.date),
@@ -1097,6 +1119,13 @@ app.put('/api/meetings/:id', async (req, res) => {
                 JSON.stringify(guests),
                 costReport ? JSON.stringify(costReport) : null,
                 m.employee_id,
+                m.pre_test_link || '',
+                m.material_link || '',
+                m.post_test_link || '',
+                m.feedback_link || '',
+                m.pre_test_data ? JSON.stringify(m.pre_test_data) : null,
+                m.post_test_data ? JSON.stringify(m.post_test_data) : null,
+                m.feedback_data ? JSON.stringify(m.feedback_data) : null,
                 id
             ]
         );
@@ -1108,7 +1137,10 @@ app.put('/api/meetings/:id', async (req, res) => {
             ...r,
             description: r.agenda,
             guests: r.guests_json ? (typeof r.guests_json === 'string' ? JSON.parse(r.guests_json) : r.guests_json) : undefined,
-            costReport: r.cost_report_json ? (typeof r.cost_report_json === 'string' ? JSON.parse(r.cost_report_json) : r.cost_report_json) : undefined
+            costReport: r.cost_report_json ? (typeof r.cost_report_json === 'string' ? JSON.parse(r.cost_report_json) : r.cost_report_json) : undefined,
+            pre_test_data: r.pre_test_data ? (typeof r.pre_test_data === 'string' ? JSON.parse(r.pre_test_data) : r.pre_test_data) : undefined,
+            post_test_data: r.post_test_data ? (typeof r.post_test_data === 'string' ? JSON.parse(r.post_test_data) : r.post_test_data) : undefined,
+            feedback_data: r.feedback_data ? (typeof r.feedback_data === 'string' ? JSON.parse(r.feedback_data) : r.feedback_data) : undefined
         });
 
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1543,8 +1575,8 @@ app.post('/api/quiz/submit', async (req, res) => {
 
         // 1. Save Result
         await query(
-            'INSERT INTO quiz_results (student_id, student_name, course_id, module_id, score, date, quiz_type, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [studentId, studentName, courseId, moduleId, score, now, quizType, employeeId]
+            'INSERT INTO quiz_results (student_id, student_name, course_id, module_id, meeting_id, score, date, quiz_type, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [studentId, studentName, courseId || null, moduleId || null, req.body.meetingId || null, score, now, quizType, employeeId]
         );
 
         // 2. If Passed (>= 80) and it was a POST test, mark module as complete
@@ -1613,7 +1645,7 @@ app.get('/api/quiz/results/:userId/:courseId', async (req, res) => {
         const employeeId = userRows.length > 0 ? userRows[0].employee_id : null;
 
         const results = await query(
-            'SELECT id, student_id, student_name, course_id, module_id as moduleId, score, date, quiz_type as quizType FROM quiz_results WHERE (student_id = ? OR (employee_id IS NOT NULL AND employee_id = ?)) AND course_id = ? ORDER BY date DESC',
+            'SELECT id, student_id, student_name, course_id, module_id as moduleId, meeting_id as meetingId, score, date, quiz_type as quizType FROM quiz_results WHERE (student_id = ? OR (employee_id IS NOT NULL AND employee_id = ?)) AND course_id = ? ORDER BY date DESC',
             [userId, employeeId, courseId]
         );
         const mapped = results.map(r => ({
@@ -1621,6 +1653,86 @@ app.get('/api/quiz/results/:userId/:courseId', async (req, res) => {
             studentId: r.student_id,
             studentName: r.student_name,
             courseId: r.course_id,
+        }));
+        res.json(mapped);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/quiz/results/all', async (req, res) => {
+    try {
+        const results = await query(
+            'SELECT id, student_id as studentId, employee_id as employeeId, student_name as studentName, meeting_id as meetingId, score, date, quiz_type as quizType FROM quiz_results'
+        );
+        res.json(results);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/quiz/results/meeting/:userId/:meetingId', async (req, res) => {
+    try {
+        const { userId, meetingId } = req.params;
+        const userRows = await query('SELECT employee_id FROM users WHERE id = ? OR employee_id = ?', [userId, userId]);
+        const employeeId = userRows.length > 0 ? userRows[0].employee_id : null;
+
+        const results = await query(
+            'SELECT id, student_id, student_name, course_id, module_id as moduleId, meeting_id as meetingId, score, date, quiz_type as quizType FROM quiz_results WHERE (student_id = ? OR (employee_id IS NOT NULL AND employee_id = ?)) AND meeting_id = ? ORDER BY date DESC',
+            [userId, employeeId, meetingId]
+        );
+        const mapped = results.map(r => ({
+            ...r,
+            studentId: r.student_id,
+            studentName: r.student_name,
+            courseId: r.course_id,
+        }));
+        res.json(mapped);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/feedback/submit', async (req, res) => {
+    try {
+        const { userId, meetingId, courseId, feedbackData } = req.body;
+        let { employeeId } = req.body;
+        const now = new Date();
+
+        // Ensure we have employee_id for better tracking
+        if (!employeeId && userId) {
+            const userRows = await query('SELECT employee_id FROM users WHERE id = ? OR email = ? OR employee_id = ?', [userId, userId, userId]);
+            if (userRows.length > 0) employeeId = userRows[0].employee_id;
+        }
+
+        // We use ON DUPLICATE KEY UPDATE to allow users to update their feedback
+        // The unique keys are (user_id, course_id) and (user_id, meeting_id)
+        await query(
+            'INSERT INTO course_feedback (user_id, employee_id, course_id, meeting_id, feedback_data, submitted_at) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE feedback_data = ?, submitted_at = ?',
+            [userId, employeeId || null, courseId || null, meetingId || null, JSON.stringify(feedbackData), now, JSON.stringify(feedbackData), now]
+        );
+        
+        console.log(`[FEEDBACK] Saved for user ${userId}, meeting ${meetingId}`);
+        res.json({ success: true });
+    } catch (err) { 
+        console.error('[FEEDBACK ERROR]', err);
+        res.status(500).json({ error: err.message }); 
+    }
+});
+
+app.get('/api/feedback/meeting/:userId/:meetingId', async (req, res) => {
+    try {
+        const { userId, meetingId } = req.params;
+        const rows = await query('SELECT * FROM course_feedback WHERE user_id = ? AND meeting_id = ?', [userId, meetingId]);
+        res.json(rows[0] || null);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/feedback/all', async (req, res) => {
+    try {
+        const rows = await query('SELECT * FROM course_feedback ORDER BY submitted_at DESC');
+        const mapped = rows.map(r => ({
+            ...r,
+            userId: r.user_id,
+            employeeId: r.employee_id,
+            courseId: r.course_id,
+            meetingId: r.meeting_id,
+            feedbackData: r.feedback_data,
+            submittedAt: r.submitted_at
         }));
         res.json(mapped);
     } catch (err) { res.status(500).json({ error: err.message }); }

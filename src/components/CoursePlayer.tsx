@@ -78,9 +78,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
     const [popup, setPopup] = useState<{ type: 'success' | 'error', message: string, isOpen: boolean }>({ type: 'success', message: '', isOpen: false });
 
-    // Quiz Feedback State
-    const [showFeedback, setShowFeedback] = useState(false);
-    const [lastScore, setLastScore] = useState(0);
+    const [isAssessmentPassed, setIsAssessmentPassed] = useState(false);
 
     const [isVideoCompleted, setIsVideoCompleted] = useState(false);
     const [loadingResults, setLoadingResults] = useState(false);
@@ -99,7 +97,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
 
     // Derived state
-    const activeModule = activeCourse?.modules?.find(m => m.id === activeModuleId);
+    const activeModule = activeCourse?.modules?.find(m => String(m.id) === String(activeModuleId));
 
 
     // User Identity for API
@@ -126,13 +124,14 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     const completedIds = (progressData.completedModuleIds || []).filter(id => id !== null && id !== undefined);
 
                     // Check Assessment Status from Quiz Results
-                    let isAssessmentPassed = false;
+                    let isAssPassed = false;
                     let preScore: number | null = null;
+
                     try {
                         const quizData = await quizRes.json();
                         if (Array.isArray(quizData)) {
                             // IMPORTANT: Only POST tests (Final Evaluation) count towards completion.
-                            isAssessmentPassed = quizData.some((r: any) => 
+                            isAssPassed = quizData.some((r: any) => 
                                 !r.moduleId && 
                                 r.score >= 100 && 
                                 (r.quizType === 'POST' || r.quiz_type === 'POST' || !r.quizType)
@@ -166,17 +165,18 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         const videoProgress = (uniqueCompletedCount / totalModules) * 100;
                         
                         if (hasAssessment) {
-                            // If there is an assessment, videos count for 90%, assessment for 10%
-                            if (isAssessmentPassed) {
+                            if (isAssPassed) {
                                 progress = 100;
                             } else {
-                                // Max 90% if videos all done but assessment not
                                 progress = Math.min(90, Math.round(videoProgress * 0.9));
                             }
                         } else {
-                            // Video only course
                             progress = Math.min(100, Math.round(videoProgress));
                         }
+                    }
+
+                    if (activeCourse?.id === course.id) {
+                        setIsAssessmentPassed(isAssPassed);
                     }
 
 
@@ -195,7 +195,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         return { ...m, locked: isLocked, completed: isCompleted };
                     }) : [];
 
-                    return { ...course, progress, modules, isAssessmentPassed, preScore } as Course & { preScore: number | null };
+                    return { ...course, progress, modules, isAssessmentPassed: isAssPassed, preScore } as Course & { preScore: number | null };
                 } catch (err) {
                     console.error(`Error syncing progress for course ${course.id}:`, err);
                     return { ...course, progress: 0, preScore: null };
@@ -466,7 +466,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
         if (activeInProgressCourse) {
             setPopup({ 
                 type: 'error', 
-                message: `Anda memiliki modul yang masih berjalan: "${activeInProgressCourse.title}". Selesaikan atau batalkan modul tersebut terlebih dahulu sebelum memulai modul baru.`, 
+                message: `You have a module currently in progress: "${activeInProgressCourse.title}". Please finish or cancel that module before starting a new one.`, 
                 isOpen: true 
             });
             return;
@@ -476,7 +476,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
         // Safety: If course is empty
         if ((!c.modules || c.modules.length === 0) && !c.preAssessment) {
-            setPopup({ type: 'error', message: 'Kursus ini belum memiliki materi atau modul.', isOpen: true });
+            setPopup({ type: 'error', message: 'This course does not have any materials or modules yet.', isOpen: true });
             return;
         }
 
@@ -510,7 +510,8 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                 if (!passed) {
                     setActiveQuiz({ quiz: c.assessment, moduleId: undefined, type: 'POST' });
                     // Still set a module ID to maintain UI context behind the overlay
-                    setActiveModuleId(c.modules[c.modules.length - 1].id);
+                    const lastMod = c.modules[c.modules.length - 1];
+                    if (lastMod) setActiveModuleId(lastMod.id);
                     return;
                 }
             }
@@ -535,7 +536,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
     // --- Views ---
 
     const handleCancelCourse = async (course: Course) => {
-        if (!window.confirm(`Apakah Anda yakin ingin membatalkan progres modul "${course.title}"? Seluruh nilai kuis dan riwayat belajar akan dihapus.`)) return;
+        if (!window.confirm(`Are you sure you want to cancel progress for module "${course.title}"? All quiz scores and learning history will be deleted.`)) return;
         
         try {
             const res = await fetch(`${API_BASE_URL}/api/progress/${userId}/${course.id}`, {
@@ -543,7 +544,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
             });
             
             if (res.ok) {
-                setPopup({ type: 'success', message: 'Progres modul berhasil dibatalkan.', isOpen: true });
+                setPopup({ type: 'success', message: 'Module progress successfully cancelled.', isOpen: true });
                 // Reset local state for this course
                 setQuizResults({});
                 setAssessmentScore(null);
@@ -553,7 +554,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                 throw new Error();
             }
         } catch (e) {
-            setPopup({ type: 'error', message: 'Gagal membatalkan progres.', isOpen: true });
+            setPopup({ type: 'error', message: 'Failed to cancel progress.', isOpen: true });
         }
     };
 
@@ -568,10 +569,10 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             Learning Hub
                         </div>
                         <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight leading-tight">
-                            Modul Pembelajaran Online
+                            Online Learning Modules
                         </h1>
                         <p className="text-blue-100 text-lg md:text-xl leading-relaxed max-w-lg mb-8">
-                            Akses modul premium untuk meningkatkan skill professional Anda.
+                            Access premium modules to enhance your professional skills.
                         </p>
                     </div>
 
@@ -597,7 +598,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         </span>
                                         {course.progress === 100 && (
                                             <span className="flex items-center gap-1.5 bg-green-50 text-green-600 px-2.5 py-1 rounded-md border border-green-100 font-bold">
-                                                Selesai
+                                                Completed
                                             </span>
                                         )}
                                     </div>
@@ -625,15 +626,15 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                     >
                                         {course.progress === 100 ? (
                                             <>
-                                                Lihat Materi <CheckCircle size={18} />
+                                                View Content <CheckCircle size={18} />
                                             </>
                                         ) : (course.progress > 0 || (course as any).preScore !== null) ? (
                                             <>
-                                                Lanjutkan Belajar <ChevronRight size={18} />
+                                                Continue Learning <ChevronRight size={18} />
                                             </>
                                         ) : (
                                             <>
-                                                Mulai Belajar <ChevronRight size={18} />
+                                                Start Learning <ChevronRight size={18} />
                                             </>
                                         )}
                                     </button>
@@ -647,7 +648,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                             }}
                                             className="text-red-500 text-sm font-bold hover:text-red-700 flex items-center gap-1 transition-colors underline underline-offset-4 decoration-red-200"
                                         >
-                                            <XCircle size={16} /> Batalkan Progres
+                                            <XCircle size={16} /> Cancel Progress
                                         </button>
                                     )}
                                 </div>
@@ -682,7 +683,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
             if (!res.ok) {
                 const errorData = await res.json().catch(() => ({}));
-                setPopup({ type: 'error', message: errorData.error || 'Gagal menyimpan progres.', isOpen: true });
+                setPopup({ type: 'error', message: errorData.error || 'Failed to save progress.', isOpen: true });
                 return;
             }
 
@@ -714,11 +715,11 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                 if (updatedCourse.assessment) {
                     setPopup({ 
                         type: 'success', 
-                        message: 'Seluruh materi video telah selesai! Silakan lanjut ke Final Assessment (Evaluasi Akhir).', 
+                        message: 'All video materials are finished! Please proceed to the Final Assessment.', 
                         isOpen: true 
                     });
                 } else {
-                    setPopup({ type: 'success', message: 'Semua materi telah selesai!', isOpen: true });
+                    setPopup({ type: 'success', message: 'All materials are completed!', isOpen: true });
                 }
             }
         } catch (err) {
@@ -743,7 +744,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     <div className="p-6 md:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                         <div>
                             <span className="text-xs font-bold text-blue-600 tracking-wider uppercase mb-1 block">
-                                {qType === 'PRE' ? 'Pre-Test' : (moduleId ? 'Kuis Materi' : 'Final Assessment')}
+                                {qType === 'PRE' ? 'Pre-Test' : (moduleId ? 'Module Quiz' : 'Final Assessment')}
                             </span>
                             <h2 className="font-bold text-2xl text-slate-900">{quiz.title}</h2>
                         </div>
@@ -767,20 +768,20 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         <div className="bg-amber-50 border-b border-amber-100 px-6 py-3 flex items-center gap-3">
                             <AlertCircle size={18} className="text-amber-600 shrink-0" />
                             <p className="text-amber-800 text-sm font-medium">
-                                Standar Kelulusan: <span className="font-bold">Min. Nilai {moduleId ? '100' : '80'}</span>
+                                Passing Standard: <span className="font-bold">Min. Score {moduleId ? '100' : '80'}</span>
                                 {(() => {
                                     const score = moduleId ? quizResults[moduleId] : assessmentScore;
                                     if (score !== undefined && score !== null) {
                                         return (
                                             <>
                                                 <span className="mx-2 text-amber-300">|</span>
-                                                Nilai Terakhir: <span className={`font-bold ${score < 100 ? 'text-red-600' : 'text-green-600'}`}>{score}</span>
+                                                Last Score: <span className={`font-bold ${score < 100 ? 'text-red-600' : 'text-green-600'}`}>{score}</span>
                                             </>
                                         );
                                     }
                                     return null;
                                 })()}
-                                . Silakan jawab dengan teliti.
+                                . Please answer carefully.
                             </p>
                         </div>
                     )}
@@ -827,11 +828,11 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             <div className="flex items-center gap-4 flex-1 justify-between w-full">
                                 <div className="flex flex-col gap-2">
                                     <div className={`px-4 py-2 rounded-lg font-bold text-sm inline-block w-fit ${lastScore >= (moduleId ? 100 : 80) || qType === 'PRE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                        Nilai: {lastScore} / 100
+                                        Score: {lastScore} / 100
                                     </div>
                                     {lastScore < (moduleId ? 100 : 80) && qType === 'POST' && (
                                         <p className="text-sm text-red-600 font-semibold animate-bounce mt-1">
-                                            ⚠️ Standar kelulusan adalah {moduleId ? '100' : '80'}. Silakan jawab kembali dengan benar.
+                                            ⚠️ Passing standard is {moduleId ? '100' : '80'}. Please answer correctly again.
                                         </p>
                                     )}
                                 </div>
@@ -852,20 +853,20 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                 // Also close quiz if it's the Final Assessment and passed
                                                 if (lastScore >= 80 && qType === 'POST' && !moduleId) {
                                                     setActiveQuiz(undefined);
-                                                    setPopup({ type: 'success', message: 'Selamat! Anda telah lulus kursus ini.', isOpen: true });
+                                                    setPopup({ type: 'success', message: 'Congratulations! You have passed this course.', isOpen: true });
                                                 }
                                             }
                                         }}
                                         className="bg-slate-900 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-blue-600 transition-colors shadow-lg"
                                     >
-                                        {lastScore < (moduleId ? 100 : 80) && qType === 'POST' ? 'Coba Lagi' : 'Lanjutkan'}
+                                        {lastScore < (moduleId ? 100 : 80) && qType === 'POST' ? 'Retry' : 'Continue'}
                                     </button>
                             </div>
                         ) : (
                             <button
                                 onClick={async () => {
                                     if (Object.keys(quizAnswers).length < quiz.questions.length) {
-                                        setPopup({ type: 'error', message: 'Harap jawab semua pertanyaan!', isOpen: true });
+                                        setPopup({ type: 'error', message: 'Please answer all questions!', isOpen: true });
                                         return;
                                     }
                                     
@@ -913,7 +914,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                     setActiveQuiz(undefined);
                                                     setQuizAnswers({});
                                                     setShowFeedback(false);
-                                                    setPopup({ type: 'success', message: 'Selamat! Anda telah lulus kursus ini.', isOpen: true });
+                                                    setPopup({ type: 'success', message: 'Congratulations! You have passed this course.', isOpen: true });
                                                 }
                                             } else {
                                                 // Show feedback with Score and "Coba Lagi"
@@ -929,12 +930,12 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                             }
                                         }
                                     } catch {
-                                        setPopup({ type: 'error', message: 'Gagal mengirim nilai.', isOpen: true });
+                                        setPopup({ type: 'error', message: 'Failed to submit score.', isOpen: true });
                                     }
                                 }}
                                 className="w-full bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg"
                             >
-                                Submit Jawaban
+                                Submit Answers
                             </button>
                         )}
                     </div>
@@ -942,6 +943,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
             </div>
         );
     };
+
 
     // --- Player View ---
     if (!activeCourse) return null;
@@ -979,7 +981,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-8 justify-between items-start">
                                 <div>
                                     <div className="flex-1">
-                                        <h1 className="text-2xl font-bold text-white mb-2">{activeModule?.title || "Judul Materi"}</h1>
+                                        <h1 className="text-2xl font-bold text-white mb-2">{activeModule?.title || "Material Title"}</h1>
                                         <div className="flex items-center gap-4 text-white/60 text-sm">
                                             <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full backdrop-blur-md">
                                                 <Clock size={14} /> {activeModule?.duration || "00:00"}
@@ -997,14 +999,14 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         (quizResults[activeModule.id] >= 100 || activeModule.completed) ? (
                                             <div className="flex flex-col md:flex-row items-center gap-4">
                                                 <span className="bg-green-100 text-green-700 px-4 py-3 rounded-xl font-bold flex items-center gap-2">
-                                                    <CheckCircle size={20} /> Lulus {quizResults[activeModule.id] ? `: ${quizResults[activeModule.id]}%` : ''}
+                                                    <CheckCircle size={20} /> Passed {quizResults[activeModule.id] ? `: ${quizResults[activeModule.id]}%` : ''}
                                                 </span>
                                                 {!activeModule.completed && (
                                                     <button
                                                         onClick={() => handleCompleteActiveModule()}
                                                         className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700 shadow-lg flex items-center gap-2 transition-all hover:scale-105"
                                                     >
-                                                        Selesai & Lanjut <ChevronRight size={18} />
+                                                        Finish & Continue <ChevronRight size={18} />
                                                     </button>
                                                 )}
                                             </div>
@@ -1020,11 +1022,11 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                     onClick={() => setActiveQuiz({ quiz: activeModule.quiz!, moduleId: activeModule.id, type: 'POST' })}
                                                     className={`px-8 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2 ${(!isVideoCompleted && !activeModule.completed) ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500 animate-pulse'}`}
                                                 >
-                                                    {(!isVideoCompleted && !activeModule.completed) && <Lock size={18} />} Kerjakan Quiz ({activeModule.quiz.questions.length} Soal)
+                                                    {(!isVideoCompleted && !activeModule.completed) && <Lock size={18} />} Take Quiz {(activeModule.quiz.questions && activeModule.quiz.questions.length > 0) ? `(${activeModule.quiz.questions.length} Questions)` : ''}
                                                 </button>
                                                 {(!isVideoCompleted && !activeModule.completed) && (
                                                     <span className="text-amber-600 text-sm font-medium flex items-center gap-1">
-                                                        <AlertCircle size={14} /> Tonton video sampai akhir untuk membuka Kuis
+                                                        <AlertCircle size={14} /> Watch video until the end to unlock the Quiz
                                                     </span>
                                                 )}
                                             </div>
@@ -1032,8 +1034,9 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                     ) : (
                                         <>
                                             {(() => {
-                                                const hasPassedQuiz = activeModule?.quiz && activeModule.quiz.questions.length > 0 && (quizResults[activeModule.id] || 0) >= 100;
-                                                const isAllowed = isVideoCompleted || hasPassedQuiz || activeModule?.completed;
+                                                if (!activeModule) return null;
+                                                const hasPassedQuiz = activeModule.quiz && activeModule.quiz.questions && activeModule.quiz.questions.length > 0 && (quizResults[activeModule.id] || 0) >= 100;
+                                                const isAllowed = isVideoCompleted || hasPassedQuiz || activeModule.completed;
                                                 
                                                 if (!isAllowed) {
                                                     return (
@@ -1041,13 +1044,13 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                             disabled={true}
                                                             className="px-6 py-3 rounded-xl font-bold bg-slate-700 text-slate-400 cursor-not-allowed flex items-center gap-2"
                                                         >
-                                                            <Lock size={18} /> Tonton sampai selesai
+                                                            <Lock size={18} /> Watch until finished
                                                         </button>
                                                     );
                                                 }
                                                 return null;
                                             })()}
-                                            {(isVideoCompleted || (activeModule?.quiz && activeModule.quiz.questions.length > 0 && (quizResults[activeModule.id] || 0) >= 80) || activeModule?.completed) && !activeModule?.completed && (
+                                            {activeModule && (isVideoCompleted || (activeModule.quiz && activeModule.quiz.questions && activeModule.quiz.questions.length > 0 && (quizResults[activeModule.id] || 0) >= 80) || activeModule.completed) && !activeModule.completed && (
 
                                                 <div className="flex gap-2">
                                                     <button
@@ -1066,21 +1069,21 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                         }}
                                                         className="px-6 py-3 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all flex items-center gap-2"
                                                     >
-                                                        <PlayCircle size={20} /> Putar Ulang
+                                                        <PlayCircle size={20} /> Replay
                                                     </button>
                                                     {activeModule?.quiz && activeModule.quiz.questions && activeModule.quiz.questions.length > 0 && activeModule.id && (!quizResults[activeModule.id] || quizResults[activeModule.id] < 100) ? (
                                                         <button
                                                             onClick={() => { if (activeModule) setActiveQuiz({ quiz: activeModule.quiz!, moduleId: activeModule.id, type: 'POST' }); }}
                                                             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all shadow-lg group"
                                                         >
-                                                            <BookOpen size={20} className="group-hover:scale-110 transition-transform" /> Mulai Kuis Materi
+                                                            <BookOpen size={20} className="group-hover:scale-110 transition-transform" /> Start Module Quiz
                                                         </button>
                                                     ) : (
                                                         <button
                                                             onClick={() => handleCompleteActiveModule()}
                                                             className="px-6 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2 bg-green-600 text-white hover:bg-green-500 hover:shadow-green-500/20 group"
                                                         >
-                                                            <CheckCircle size={20} className="group-hover:scale-110 transition-transform" /> Selesai & Lanjut
+                                                            <CheckCircle size={20} className="group-hover:scale-110 transition-transform" /> Finish & Continue
                                                         </button>
                                                     )}
                                                 </div>
@@ -1098,9 +1101,9 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     <div className="p-6 border-b border-slate-100 bg-white sticky top-0 font-sans">
                         <div className="flex justify-between items-start mb-1">
                             <div>
-                                <h3 className="font-bold text-slate-800 text-lg">Daftar Materi</h3>
+                                <h3 className="font-bold text-slate-800 text-lg">Material List</h3>
                                 <p className="text-sm text-slate-400">
-                                    {activeCourse.modules.filter(m => m.completed).length} / {activeCourse.modules.length} Materi Selesai
+                                    {activeCourse.modules.filter(m => m.completed).length} / {activeCourse.modules.length} Materials Completed
                                 </p>
                             </div>
                             {activeCourse.preAssessment && preAssessmentScore !== null && (
@@ -1124,8 +1127,8 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         <BookOpen size={20} />
                                     </div>
                                     <div className="flex-1">
-                                        <p className="font-bold text-amber-900 leading-tight">Pre-Test Materi</p>
-                                        <p className="text-[10px] text-amber-700 font-medium uppercase tracking-wider mt-1">WAJIB DIKERJAKAN</p>
+                                        <p className="font-bold text-amber-900 leading-tight">Module Pre-Test</p>
+                                        <p className="text-[10px] text-amber-700 font-medium uppercase tracking-wider mt-1">MANDATORY</p>
                                     </div>
                                     <ChevronRight size={18} className="text-amber-400" />
                                 </button>
@@ -1180,7 +1183,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                             ${quizResults[mod.id] !== undefined ? 'text-green-600' : 'text-slate-400 opacity-60'}
                                                         `}>
                                                         <BookOpen size={12} /> 
-                                                        Kuis Materi{quizResults[mod.id] !== undefined ? `: ${quizResults[mod.id]}` : ''}
+                                                        Module Quiz{quizResults[mod.id] !== undefined ? `: ${quizResults[mod.id]}` : ''}
                                                     </div>
                                                 )}
                                             </div>
@@ -1199,7 +1202,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                 <button
                                     onClick={() => {
                                         if (activeCourse.progress < 90) {
-                                            setPopup({ type: 'error', message: 'Anda harus menyelesaikan semua materi video & quiz sebelum mengambil Final Assessment.', isOpen: true });
+                                            setPopup({ type: 'error', message: 'You must complete all video materials & quizzes before taking the Final Assessment.', isOpen: true });
                                             return;
                                         }
                                         if (activeCourse.assessment) {
@@ -1217,13 +1220,13 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         <Award size={20} />
                                     </div>
                                     <div>
-                                        <p className={`font-bold ${activeCourse.progress >= 90 ? 'text-indigo-900' : 'text-slate-500'}`}>Final Assessment (Ujian Akhir)</p>
+                                        <p className={`font-bold ${activeCourse.progress >= 90 ? 'text-indigo-900' : 'text-slate-500'}`}>Final Assessment (Final Exam)</p>
                                         <p className="text-[10px] text-slate-500 font-medium">
                                             {activeCourse.progress >= 90
                                                 ? (assessmentScore !== null && assessmentScore < 100 
-                                                    ? `Nilai Terakhir: ${assessmentScore} (Min. 100). Silakan ulangi.`
-                                                    : 'Klik untuk Mulai Evaluasi')
-                                                : 'Selesaikan semua materi untuk membuka'}
+                                                    ? `Last Score: ${assessmentScore} (Min. 100). Please retry.`
+                                                    : 'Click to Start Evaluation')
+                                                : 'Complete all materials to unlock'}
                                         </p>
                                     </div>
                                 </button>
@@ -1233,9 +1236,9 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         <CheckCircle size={20} />
                                     </div>
                                     <div>
-                                        <p className="font-bold text-green-900">Final Assessment Selesai</p>
+                                        <p className="font-bold text-green-900">Final Assessment Completed</p>
                                         <p className="text-xs text-green-700">
-                                            Nilai Akhir: {assessmentScore} / 100. Anda telah lulus kursus ini.
+                                            Final Score: {assessmentScore} / 100. You have passed this course.
                                         </p>
                                     </div>
                                 </div>
@@ -1244,6 +1247,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
                         </div>
                     )}
+
                 </div>
             </div>
 
@@ -1264,7 +1268,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         if (activeCourse?.assessment) {
                             setActiveQuiz({ quiz: activeCourse.assessment, moduleId: undefined, type: 'POST' });
                         }
-                    } else if (popup.message === 'Modul Selesai!' || popup.message === 'Semua materi telah selesai!') {
+                    } else if (popup.message === 'Module Completed!' || popup.message === 'All materials are completed!') {
                         handleBackToList();
                     }
                 }}

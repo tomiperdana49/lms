@@ -96,7 +96,7 @@ function App() {
           />
         )}
         {activePage === 'courses' && <CoursePlayer user={user!} />}
-        {activePage === 'internal' && <TrainingInternalList userRole={userRole} userEmail={user?.email || ''} />}
+        {activePage === 'internal' && <TrainingInternalList userRole={userRole} user={user!} isManagementMode={false} />}
 
 
         {/* External Training: Request Form (For Everyone) */}

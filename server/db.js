@@ -208,6 +208,11 @@ export const initDB = async () => {
         } catch (e) { /* Ignore if exists */ }
 
         try {
+            await connection.query("ALTER TABLE quiz_results ADD COLUMN meeting_id INT");
+            console.log("Added meeting_id column to quiz_results.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
             await connection.query("ALTER TABLE meetings ADD COLUMN type VARCHAR(50) DEFAULT 'Offline'");
             console.log("Added type column to meetings.");
         } catch (e) { /* Ignore if exists */ }
@@ -220,6 +225,19 @@ export const initDB = async () => {
         try {
             await connection.query("ALTER TABLE meetings ADD COLUMN host VARCHAR(255)");
             console.log("Added host column to meetings.");
+
+            await connection.query("ALTER TABLE meetings ADD COLUMN pre_test_link VARCHAR(500)");
+            await connection.query("ALTER TABLE meetings ADD COLUMN material_link VARCHAR(500)");
+            await connection.query("ALTER TABLE meetings ADD COLUMN post_test_link VARCHAR(500)");
+            await connection.query("ALTER TABLE meetings ADD COLUMN feedback_link VARCHAR(500)");
+            console.log("Added training resource columns to meetings.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE meetings ADD COLUMN pre_test_data JSON");
+            await connection.query("ALTER TABLE meetings ADD COLUMN post_test_data JSON");
+            await connection.query("ALTER TABLE meetings ADD COLUMN feedback_data JSON");
+            console.log("Added quiz and feedback data columns to meetings.");
         } catch (e) { /* Ignore if exists */ }
 
         try {
@@ -231,6 +249,26 @@ export const initDB = async () => {
             await connection.query("ALTER TABLE reading_logs ADD COLUMN source VARCHAR(100)");
             console.log("Added source column to reading_logs.");
         } catch (e) { /* Ignore if exists */ }
+
+        // MIGRATION: Add course_feedback table
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS course_feedback (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id VARCHAR(50),
+                    employee_id VARCHAR(50),
+                    course_id INT,
+                    meeting_id INT,
+                    feedback_data JSON,
+                    submitted_at DATETIME,
+                    UNIQUE KEY unique_course_feedback (user_id, course_id),
+                    UNIQUE KEY unique_meeting_feedback (user_id, meeting_id)
+                )
+            `);
+            console.log("Verified course_feedback table exists.");
+        } catch (e) {
+            console.error("Error creating course_feedback table:", e);
+        }
 
         connection.release();
     } catch (err) {

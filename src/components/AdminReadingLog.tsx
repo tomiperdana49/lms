@@ -158,14 +158,14 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 body: JSON.stringify({ employee_id: 'all' })
             });
             if (res.ok) {
-                alert('Sinkronisasi data SIMAS berhasil!');
+                alert('SIMAS data synchronization successful!');
                 fetchLogs(); // Refresh the list
             } else {
-                alert('Gagal melakukan sinkronisasi data SIMAS.');
+                alert('Failed to synchronize SIMAS data.');
             }
         } catch (error) {
             console.error(error);
-            alert('Error saat sinkronisasi data.');
+            alert('Error during data synchronization.');
         } finally {
             setIsSyncing(false);
         }
@@ -196,19 +196,26 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
     const handleVerifySubmit = async () => {
         if (!verifyModal.log) return;
         try {
+            const now = new Date().toISOString();
             const res = await fetch(`${API_BASE_URL}/api/logs/${verifyModal.log.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     hrApprovalStatus: 'Approved',
                     managedCategory: verifyModal.category === 'comic' ? 'Non-Fiksi Komik/Manga' : 'Non-Fiksi Text',
-                    incentiveAmount: verifyModal.reward
+                    incentiveAmount: verifyModal.reward,
+                    approvedBy: user.name || 'Admin',
+                    approvedAt: now
                 })
             });
 
             if (res.ok) {
                 const updated = await res.json();
-                setAllLogs(allLogs.map(l => l.id === updated.id ? updated : l));
+                setAllLogs(allLogs.map(l => l.id === updated.id ? {
+                    ...updated,
+                    approvedBy: user.name || 'Admin',
+                    approvedAt: now
+                } : l));
                 setVerifyModal(prev => ({ ...prev, open: false }));
             }
         } catch (err) { console.error(err); }
@@ -217,18 +224,25 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
     const handleRejectSubmit = async () => {
         if (!rejectModal.log) return;
         try {
+            const now = new Date().toISOString();
             const res = await fetch(`${API_BASE_URL}/api/logs/${rejectModal.log.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     hrApprovalStatus: 'Rejected',
-                    rejectionReason: rejectModal.reason
+                    rejectionReason: rejectModal.reason,
+                    cancelledBy: user.name || 'Admin',
+                    cancelledAt: now
                 })
             });
 
             if (res.ok) {
                 const updated = await res.json();
-                setAllLogs(allLogs.map(l => l.id === updated.id ? updated : l));
+                setAllLogs(allLogs.map(l => l.id === updated.id ? {
+                    ...updated,
+                    cancelledBy: user.name || 'Admin',
+                    cancelledAt: now
+                } : l));
                 setRejectModal(prev => ({ ...prev, open: false }));
             }
         } catch (err) { console.error(err); }
@@ -274,7 +288,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
     const handleCancelSubmit = () => {
         if (!cancelModal.log) return;
 
-        const finalReason = cancelModal.reason || 'Dibatalkan oleh Admin';
+        const finalReason = cancelModal.reason || 'Cancelled by Admin';
         const cancelBy = user?.name || user?.employee_id || 'Admin';
         
         console.log('--- CANCEL ACTION ---', { id: cancelModal.log.id, by: cancelBy, finalReason });
@@ -297,7 +311,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
     };
 
     const handleDeleteLog = async (id: number | string) => {
-        if (!window.confirm('Apakah Anda yakin ingin membatalkan laporan ini? Data akan tetap tersimpan namun tidak terhitung dalam laporan.')) return;
+        if (!window.confirm('Are you sure you want to cancel this report? The data will remain stored but will not be counted in reports.')) return;
         try {
             const res = await fetch(`${API_BASE_URL}/api/logs/${id}`, { method: 'DELETE' });
             if (res.ok) {
@@ -306,11 +320,11 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                     window.location.reload();
                 }, 1000);
             } else {
-                alert('Gagal membatalkan laporan');
+                alert('Failed to cancel report');
             }
         } catch (error) {
             console.error(error);
-            alert('Error saat membatalkan laporan');
+            alert('Error while cancelling report');
         }
     };
 
@@ -509,10 +523,10 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                             onClick={handleSyncSIMAS}
                             disabled={isSyncing}
                             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm border ${isSyncing ? 'bg-slate-50 text-slate-400 border-slate-200' : 'bg-white text-emerald-600 border-emerald-100 hover:bg-emerald-50 hover:border-emerald-200'}`}
-                            title="Tarik data peminjaman buku terbaru dari SIMAS untuk semua karyawan"
+                            title="Fetch latest book loan data from SIMAS for all employees"
                         >
                             <RefreshCw size={18} className={isSyncing ? 'animate-spin' : ''} />
-                            {isSyncing ? 'Syncing...' : 'Sync Data SIMAS'}
+                            {isSyncing ? 'Syncing...' : 'Sync SIMAS Data'}
                         </button>
                         <div className="bg-slate-100 p-1 rounded-xl flex shadow-inner">
                             <button onClick={() => setViewMode('verification')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'verification' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Verification</button>
@@ -569,7 +583,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     </th>
                                     <th className="px-6 py-4 w-[20%] cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setRecapSort({ key: 'milestone', direction: recapSort.key === 'milestone' && recapSort.direction === 'asc' ? 'desc' : 'asc' })}>
                                         <div className="flex items-center gap-1.5">
-                                            Status Bonus {recapSort.key === 'milestone' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                                            Bonus Status {recapSort.key === 'milestone' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
                                         </div>
                                     </th>
                                     <th className="px-6 py-4 w-[20%] cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setRecapSort({ key: 'incentive', direction: recapSort.key === 'incentive' && recapSort.direction === 'asc' ? 'desc' : 'asc' })}>
@@ -733,9 +747,30 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                 );
                                             })()}
                                         </td>
-                                        <td className="px-6 py-4"><div className="flex flex-col gap-1"><span className="font-semibold text-slate-800 text-sm">{log.title}</span><span className="text-xs text-slate-500">{log.category}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit ${log.source === 'Buku Pribadi' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>{log.source === 'Buku Pribadi' ? 'Pribadi' : 'Office'}</span></div></td>
-                                        <td className="px-6 py-4 text-sm text-slate-600">{log.startDate ? new Date(log.startDate).toLocaleDateString() : '-'}</td>
-                                        <td className="px-6 py-4 text-sm text-slate-600">{log.finishDate ? new Date(log.finishDate).toLocaleDateString() : '-'}</td>
+                                        <td className="px-6 py-4"><div className="flex flex-col gap-1"><span className="font-semibold text-slate-800 text-sm">{log.title}</span><span className="text-xs text-slate-500">{log.category}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit ${log.source === 'Buku Pribadi' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>{log.source === 'Buku Pribadi' ? 'Private' : (log.source === 'SIMAS' ? 'SIMAS' : 'Office')}</span></div></td>
+                                        <td className="px-6 py-4 text-sm text-slate-600">
+                                            {log.startDate ? new Date(log.startDate).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-slate-600">
+                                            <div className="flex flex-col gap-1">
+                                                <span>{log.finishDate ? new Date(log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}</span>
+                                                {log.startDate && log.finishDate && (
+                                                    <span className="text-[9px] whitespace-nowrap font-black bg-indigo-600 text-white px-1.5 py-0.5 rounded shadow-sm flex items-center gap-1 w-fit">
+                                                        <Clock size={10} />
+                                                        {(() => {
+                                                            const s = new Date(log.startDate).getTime();
+                                                            const e = new Date(log.finishDate).getTime();
+                                                            const diff = Math.max(0, e - s);
+                                                            const totalMinutes = Math.floor(diff / (1000 * 60));
+                                                            const days = Math.floor(totalMinutes / (24 * 60));
+                                                            const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+                                                            const minutes = totalMinutes % 60;
+                                                            return `${days}D ${hours}H ${minutes}M`;
+                                                        })()}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col gap-2">
                                                 {(log.evidenceUrl || log.returnEvidenceUrl) ? (
@@ -805,7 +840,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                         })()
                                                     ) : (
                                                         /* For Draft or finished logs not yet in Pending mode */
-                                                        <button onClick={() => handleCancelClick(log)} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-red-50 hover:text-red-500 transition-all border border-slate-200 hover:border-red-200" title="Batalkan / Hapus Laporan">
+                                                        <button onClick={() => handleCancelClick(log)} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-red-50 hover:text-red-500 transition-all border border-slate-200 hover:border-red-200" title="Cancel / Delete Report">
                                                             <Trash2 size={16} />
                                                         </button>
                                                     )}
@@ -824,7 +859,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             {/* Verify Modal */}
             {verifyModal.open && verifyModal.log && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+                    <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto pr-2">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><CheckCircle className="text-green-500" /> Verify Reading Log</h3>
                             <button onClick={() => setVerifyModal({ open: false, log: null, category: 'text', reward: 0 })} className="text-slate-400 hover:text-slate-600"><XCircle /></button>
@@ -839,8 +874,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                         <div className="bg-orange-50 border border-orange-200 p-3 rounded-xl flex items-start gap-3 animate-pulse">
                                             <Trophy size={20} className="text-orange-500 mt-1" />
                                             <div>
-                                                <p className="text-sm font-bold text-orange-800">Milestone Ke-5 Terdeteksi!</p>
-                                                <p className="text-xs text-orange-600">User ini akan mendapatkan bonus tambahan Rp 500.000.</p>
+                                                <p className="text-sm font-bold text-orange-800">Milestone #5 Detected!</p>
+                                                <p className="text-xs text-orange-600">This user will receive an additional Rp 500,000 bonus.</p>
                                             </div>
                                         </div>
                                     );
@@ -848,10 +883,110 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 return (
                                     <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center gap-2">
                                         <BookOpen size={16} className="text-blue-500" />
-                                        <p className="text-xs font-bold text-blue-700">Verifikasi Buku Ke-{currentSeq} Tahun {y}</p>
+                                        <p className="text-xs font-bold text-blue-700">Verified Book #{currentSeq} Year {y}</p>
                                     </div>
                                 );
                             })()}
+
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col gap-3">
+                                <div className="flex flex-col gap-1">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Book Details</p>
+                                    <p className="font-bold text-slate-800 text-sm leading-tight">{verifyModal.log.title}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-xs text-slate-500 font-medium">{verifyModal.log.category}</span>
+                                        <span className="text-slate-300">•</span>
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${verifyModal.log.source === 'Buku Pribadi' ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
+                                            {verifyModal.log.source === 'Buku Pribadi' ? 'Private' : (verifyModal.log.source === 'SIMAS' ? 'SIMAS' : 'Office')}
+                                        </span>
+                                        {verifyModal.log.sn && (
+                                            <>
+                                                <span className="text-slate-300">•</span>
+                                                <span className="text-[10px] font-bold text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded">SN: {verifyModal.log.sn}</span>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Dates Grid */}
+                                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200/60">
+                                    <div>
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase">Start / Borrow</p>
+                                        <p className="text-xs font-bold text-slate-700">{verifyModal.log.startDate ? new Date(verifyModal.log.startDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase">Finish / Return</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-xs font-bold text-slate-700">{verifyModal.log.finishDate ? new Date(verifyModal.log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</p>
+                                            {verifyModal.log.startDate && verifyModal.log.finishDate && (
+                                                <span className="text-[10px] whitespace-nowrap font-black bg-indigo-600 text-white px-1.5 py-0.5 rounded-md shadow-sm flex items-center gap-1">
+                                                    <Clock size={10} />
+                                                    {(() => {
+                                                        const s = new Date(verifyModal.log.startDate).getTime();
+                                                        const e = new Date(verifyModal.log.finishDate).getTime();
+                                                        const diff = Math.max(0, e - s);
+                                                        const totalMinutes = Math.floor(diff / (1000 * 60));
+                                                        const days = Math.floor(totalMinutes / (24 * 60));
+                                                        const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+                                                        const minutes = totalMinutes % 60;
+                                                        return `${days}D ${hours}H ${minutes}M`;
+                                                    })()}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Review Link */}
+                                {(verifyModal.log.link || verifyModal.log.review) && (
+                                    <div className="pt-2 border-t border-slate-200/60">
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Review Link / Goodreads</p>
+                                        <a 
+                                            href={verifyModal.log.link || verifyModal.log.review} 
+                                            target="_blank" 
+                                            rel="noreferrer" 
+                                            className="text-blue-600 text-[11px] font-bold hover:underline flex items-center gap-1 w-fit"
+                                        >
+                                            <ExternalLink size={12} /> Open Review Link
+                                        </a>
+                                    </div>
+                                )}
+
+                                {/* Evidence Thumbnails */}
+                                {(verifyModal.log.evidenceUrl || verifyModal.log.returnEvidenceUrl) && (
+                                    <div className="pt-2 border-t border-slate-200/60 flex gap-3">
+                                        {verifyModal.log.evidenceUrl && (
+                                            <div className="flex-1">
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Borrow Evidence</p>
+                                                <div className="relative group cursor-zoom-in" onClick={() => setPhotoModal({ open: true, log: verifyModal.log })}>
+                                                    <img 
+                                                        src={verifyModal.log.evidenceUrl.startsWith('http') ? verifyModal.log.evidenceUrl : `${API_BASE_URL}${verifyModal.log.evidenceUrl}`} 
+                                                        alt="Borrow Evidence" 
+                                                        className="w-full h-14 object-cover rounded-lg border border-slate-200 shadow-sm transition-transform group-hover:scale-[1.02]"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                                                        <ImageIcon size={16} className="text-white" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {verifyModal.log.returnEvidenceUrl && (
+                                            <div className="flex-1">
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Return Evidence</p>
+                                                <div className="relative group cursor-zoom-in" onClick={() => setPhotoModal({ open: true, log: verifyModal.log })}>
+                                                    <img 
+                                                        src={verifyModal.log.returnEvidenceUrl.startsWith('http') ? verifyModal.log.returnEvidenceUrl : `${API_BASE_URL}${verifyModal.log.returnEvidenceUrl}`} 
+                                                        alt="Return Evidence" 
+                                                        className="w-full h-14 object-cover rounded-lg border border-slate-200 shadow-sm transition-transform group-hover:scale-[1.02]"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                                                        <ImageIcon size={16} className="text-white" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Book Category</label>
                                 <select
@@ -868,8 +1003,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                         }));
                                     }}
                                 >
-                                    <option value="text">Non-Fiksi Text</option>
-                                    <option value="comic">Non-Fiksi Komik/Manga</option>
+                                    <option value="text">Non-Fiction Text</option>
+                                    <option value="comic">Non-Fiction Comic/Manga</option>
                                 </select>
                             </div>
                             <div>
@@ -924,20 +1059,20 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                             <button onClick={() => setCancelModal({ open: false, log: null, reason: '' })} className="text-slate-400 hover:text-slate-600"><XCircle /></button>
                         </div>
                         <p className="text-sm text-slate-500 mb-4">
-                            Membatalkan laporan ini akan menghapusnya dari statistik buku yang dibaca oleh karyawan.
+                            Cancelling this log will remove it from the employee's reading statistics.
                         </p>
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">Alasan Pembatalan</label>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">Cancellation Reason</label>
                             <textarea
                                 className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none min-h-[100px]"
-                                placeholder="Masukkan alasan mengapa laporan ini dibatalkan..."
+                                placeholder="Enter reason why this report is being cancelled..."
                                 value={cancelModal.reason}
                                 onChange={(e) => setCancelModal(prev => ({ ...prev, reason: e.target.value }))}
                             />
                         </div>
                         <div className="mt-6 flex justify-end gap-3">
                             <button onClick={() => setCancelModal({ open: false, log: null, reason: '' })} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Discard</button>
-                            <button onClick={handleCancelSubmit} className="px-4 py-2 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 shadow-lg">Ya, Batalkan Laporan</button>
+                            <button onClick={handleCancelSubmit} className="px-4 py-2 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 shadow-lg">Yes, Cancel Report</button>
                         </div>
                     </div>
                 </div>
@@ -997,9 +1132,9 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                                     <p className="font-bold text-slate-700 mb-3 flex items-center gap-2">
                                         <ImageIcon className="text-blue-500" size={18} />
-                                        {photoModal.log.source === 'SIMAS' ? 'Bukti Foto Pinjaman' : 'Bukti Foto'}
+                                        {photoModal.log.source === 'SIMAS' ? 'Borrowing Evidence Photo' : 'Evidence Photo'}
                                     </p>
-                                    <img src={photoModal.log.evidenceUrl.startsWith('http') ? photoModal.log.evidenceUrl : `${API_BASE_URL}${photoModal.log.evidenceUrl}`} alt="Pinjaman" className="w-full h-auto max-h-[500px] object-contain rounded-lg border border-slate-200 shadow-sm bg-white" />
+                                    <img src={photoModal.log.evidenceUrl.startsWith('http') ? photoModal.log.evidenceUrl : `${API_BASE_URL}${photoModal.log.evidenceUrl}`} alt="Borrowing" className="w-full h-auto max-h-[500px] object-contain rounded-lg border border-slate-200 shadow-sm bg-white" />
                                 </div>
                             )}
 
@@ -1007,9 +1142,9 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                                     <p className="font-bold text-slate-700 mb-3 flex items-center gap-2">
                                         <ImageIcon className="text-green-500" size={18} />
-                                        Bukti Foto Pengembalian
+                                        Return Evidence Photo
                                     </p>
-                                    <img src={photoModal.log.returnEvidenceUrl.startsWith('http') ? photoModal.log.returnEvidenceUrl : `${API_BASE_URL}${photoModal.log.returnEvidenceUrl}`} alt="Pengembalian" className="w-full h-auto max-h-[500px] object-contain rounded-lg border border-slate-200 shadow-sm bg-white" />
+                                    <img src={photoModal.log.returnEvidenceUrl.startsWith('http') ? photoModal.log.returnEvidenceUrl : `${API_BASE_URL}${photoModal.log.returnEvidenceUrl}`} alt="Return" className="w-full h-auto max-h-[500px] object-contain rounded-lg border border-slate-200 shadow-sm bg-white" />
                                 </div>
                             )}
                         </div>
@@ -1060,13 +1195,13 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                         <div className="font-bold text-slate-700 text-sm whitespace-pre-wrap leading-tight">{log.title}</div>
                                                         <div className="flex flex-col gap-1.5 mt-1">
                                                             <div className="text-xs text-slate-500">
-                                                                {log.category} <span className="text-slate-300 mx-1">•</span> <span className="font-medium text-slate-400 italic">{log.source === 'Buku Pribadi' ? 'Pribadi' : 'Kantor'}</span>
+                                                                {log.category} <span className="text-slate-300 mx-1">•</span> <span className="font-medium text-slate-400 italic">{log.source === 'Buku Pribadi' ? 'Private' : 'Office'}</span>
                                                             </div>
                                                             <span className={`text-[9px] font-black px-1.5 py-0.5 rounded w-fit uppercase tracking-wider border shadow-sm ${log.source === 'Buku Pribadi'
                                                                     ? 'bg-purple-100 text-purple-700 border-purple-200'
                                                                     : 'bg-indigo-100 text-indigo-700 border-indigo-200'
                                                                 }`}>
-                                                                {log.source === 'Buku Pribadi' ? 'Bacaan Pribadi' : 'Buku Kantor'}
+                                                                {log.source === 'Buku Pribadi' ? 'Private Reading' : 'Office Book'}
                                                             </span>
                                                         </div>
                                                     </td>
@@ -1081,9 +1216,9 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                         })()}
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <div className="text-sm font-medium text-slate-600">
-                                                            {log.finishDate ? new Date(log.finishDate).toLocaleDateString() : log.date ? new Date(log.date).toLocaleDateString() : '-'}
-                                                        </div>
+                                                         <div className="text-sm font-medium text-slate-600">
+                                                             {log.finishDate ? new Date(log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : log.date ? new Date(log.date).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
                                                         {log.incentiveAmount ? (
@@ -1109,7 +1244,15 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                              log.hrApprovalStatus === 'Pending' ? 'bg-orange-100 text-orange-700 border-orange-200' : 
                                                              'bg-slate-100 text-slate-500 border-slate-200'
                                                          }`}>
-                                                             {log.status === 'Reading' ? 'Reading' : (log.hrApprovalStatus === 'Pending' ? 'Under Review' : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus))}
+                                                              <div className="flex flex-col gap-1">
+                                                                 <span>{log.status === 'Reading' ? 'Reading' : (log.hrApprovalStatus === 'Pending' ? 'Under Review' : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus))}</span>
+                                                                 {(log.hrApprovalStatus === 'Approved' && log.approvedBy) && (
+                                                                     <span className="text-[8px] opacity-70 normal-case italic">By: {log.approvedBy}</span>
+                                                                 )}
+                                                                 {(log.hrApprovalStatus === 'Rejected' && log.cancelledBy) && (
+                                                                     <span className="text-[8px] opacity-70 normal-case italic">By: {log.cancelledBy}</span>
+                                                                 )}
+                                                              </div>
                                                          </div>
                                                      </td>
                                                 </tr>

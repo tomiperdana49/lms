@@ -89,6 +89,7 @@ export interface QuizResult {
     score: number;
     date: string;
     employee_id?: string;
+    quizType?: 'PRE' | 'POST';
 }
 
 export interface TrainingRequest {
@@ -137,6 +138,13 @@ export interface Meeting {
         employee_ids?: string[];
     };
     costReport?: CostReport;
+    pre_test_link?: string;
+    material_link?: string;
+    post_test_link?: string;
+    feedback_link?: string;
+    pre_test_data?: Quiz;
+    post_test_data?: Quiz;
+    feedback_data?: any;
 }
 
 export interface CostReport {

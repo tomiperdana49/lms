@@ -64,13 +64,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { header: 'MANAGEMENT' },
         { icon: Users, label: 'User Management', id: 'admin-dashboard', view: 'users' },
         { icon: BookOpen, label: 'Online Modules Management', id: 'admin-dashboard', view: 'courses' },
-        { icon: FileText, label: 'Training Requests', id: 'admin-dashboard', view: 'training' },
+        { icon: Users, label: 'Training Internal', id: 'admin-dashboard', view: 'meetings' },
         { header: 'REPORT' },
+        { icon: FileText, label: 'Training Requests', id: 'admin-dashboard', view: 'training' },
         { icon: Library, label: 'Reading Log', id: 'admin-dashboard', view: 'logs' },
         { icon: Award, label: 'Quiz Report', id: 'admin-dashboard', view: 'quiz-reports' },
         { icon: TrendingUp, label: 'HR Report', id: 'admin-dashboard', view: 'reports' },
         { icon: Award, label: 'Incentives', id: 'admin-dashboard', view: 'incentives' },
-        { icon: Users, label: 'Training Internal', id: 'admin-dashboard', view: 'meetings' },
     ];
 
     const menuItems = [

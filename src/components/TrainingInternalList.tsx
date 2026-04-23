@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type FormEvent } from 'react';
+import { useState, useEffect, useRef, Fragment, type FormEvent } from 'react';
 import {
     Users,
     MapPin,
@@ -11,16 +11,18 @@ import {
     Calendar as CalendarIcon,
     ArrowRight,
     DollarSign,
-    CheckCircle
+    CheckCircle,
+    ChevronDown
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
-import type { Role, Meeting, CostReport, Employee } from '../types';
+import type { Role, Meeting, CostReport, Employee, QuizResult } from '../types';
 import PopupNotification from './PopupNotification';
 import ConfirmationModal from './ConfirmationModal';
 
 interface TrainingInternalListProps {
     userRole: Role;
-    userEmail?: string;
+    user: User;
+    isManagementMode: boolean;
 }
 
 type ExtendedMeeting = Meeting & { shortDate?: string };
@@ -42,7 +44,11 @@ const AvatarStack = ({ count }: { count: number }) => (
     </div>
 );
 
-const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps) => {
+const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInternalListProps) => {
+    const userEmail = user.email;
+    // Determine effective role: in non-management mode, everyone is treated as STAFF
+    const effectiveRole = isManagementMode ? userRole : 'STAFF';
+
     // --- State ---
     const [meetings, setMeetings] = useState<ExtendedMeeting[]>([]);
     const [selectedMeeting, setSelectedMeeting] = useState<ExtendedMeeting | null>(null);
@@ -80,7 +86,9 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
         type: 'Online' as 'Online' | 'Offline' | 'Hybrid',
         location: '',
         meetLink: '',
-        description: ''
+        description: '',
+        pre_test_data: null as any,
+        post_test_data: null as any
     });
 
     // Email Invites State
@@ -89,6 +97,12 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
 
     // --- Filter State ---
     const [viewMode, setViewMode] = useState<'list' | 'recap'>('list');
+    const [recapDetailHost, setRecapDetailHost] = useState<string | null>(null);
+    const [allResults, setAllResults] = useState<any[]>([]);
+    const [allFeedback, setAllFeedback] = useState<any[]>([]);
+
+    const [expandedHosts, setExpandedHosts] = useState<Record<string, boolean>>({});
+    const [expandedMeetings, setExpandedMeetings] = useState<Record<number, boolean>>({});
     const [selectedYear, setSelectedYear] = useState<number | 'All'>(new Date().getFullYear());
     const [selectedPeriod, setSelectedPeriod] = useState<string>('All Year'); // Default to All Year for easier initial view
     const [selectedBranch, setSelectedBranch] = useState<string>('All Branches');
@@ -100,9 +114,83 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
     const [participantSearch, setParticipantSearch] = useState('');
     const [showHostDropdown, setShowHostDropdown] = useState(false);
     const [showParticipantDropdown, setShowParticipantDropdown] = useState(false);
+    const [activeCreateTab, setActiveCreateTab] = useState<'details' | 'assessment'>('details');
 
     const hostDropdownRef = useRef<HTMLDivElement>(null);
     const participantDropdownRef = useRef<HTMLDivElement>(null);
+
+
+    // Interactive Quiz/Feedback State
+    const [showQuiz, setShowQuiz] = useState<'PRE' | 'POST' | null>(null);
+    const [showFeedback, setShowFeedback] = useState(false);
+    const [meetingQuizResults, setMeetingQuizResults] = useState<QuizResult[]>([]);
+    const [userFeedback, setUserFeedback] = useState<any>(null);
+
+    const fetchResults = async (mid: number) => {
+        if (!user.email) return;
+        try {
+            const encodedEmail = encodeURIComponent(user.email);
+            const encodedId = encodeURIComponent(String(user.id || user.employee_id || user.email));
+            const empIdForUrl = user.employee_id ? encodeURIComponent(user.employee_id) : encodedId;
+
+            // Attempt to fetch from multiple possible endpoints to ensure coverage
+            const endpoints = [
+                `${API_BASE_URL}/api/quiz/results/meeting/${encodedEmail}/${mid}`,
+                `${API_BASE_URL}/api/quiz/results/meeting/${encodedId}/${mid}`,
+                `${API_BASE_URL}/api/quiz/results/meeting/${empIdForUrl}/${mid}`,
+                `${API_BASE_URL}/api/quiz/results/${encodedEmail}/${mid}`,
+                `${API_BASE_URL}/api/quiz/results/${encodedId}/${mid}`
+            ];
+
+            let allFetchedResults: QuizResult[] = [];
+            for (const url of endpoints) {
+                try {
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (Array.isArray(data) && data.length > 0) {
+                            allFetchedResults = [...allFetchedResults, ...data];
+                        } else if (data && !Array.isArray(data) && data.score !== undefined) {
+                            allFetchedResults.push(data);
+                        }
+                    }
+                } catch (e) { /* ignore individual fetch errors */ }
+            }
+
+            // Remove duplicates (by quizType)
+            const uniqueResults: QuizResult[] = [];
+            const types = new Set();
+            allFetchedResults.forEach(r => {
+                const type = r.quizType || r.quiz_type;
+                if (!types.has(type)) {
+                    types.add(type);
+                    uniqueResults.push(r);
+                }
+            });
+            
+            if (uniqueResults.length > 0) {
+                setMeetingQuizResults(uniqueResults);
+            }
+
+            // Fetch feedback - similar multi-endpoint approach if needed, but keeping it simple for now
+            const fRes = await fetch(`${API_BASE_URL}/api/feedback/meeting/${encodedEmail}/${mid}`);
+            if (fRes.ok) {
+                const fData = await fRes.json();
+                try {
+                    setUserFeedback(fData?.feedback_data ? (typeof fData.feedback_data === 'string' ? JSON.parse(fData.feedback_data) : fData.feedback_data) : null);
+                } catch(e) { setUserFeedback(null); }
+            }
+        } catch (err) { console.error(err); }
+    };
+
+    useEffect(() => {
+        if (selectedMeeting) {
+            fetchResults(selectedMeeting.id);
+        } else {
+            setMeetingQuizResults([]);
+            setUserFeedback(null);
+        }
+    }, [selectedMeeting]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -116,9 +204,6 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-
-    // Recap Detail Modal
-    const [recapDetailHost, setRecapDetailHost] = useState<string | null>(null);
 
     const periodOptions = [
         "All Year",
@@ -162,7 +247,7 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
     const filteredMeetings = meetings.filter(m => {
 
         // PERMISSION CHECK: Non-HR can ONLY see meetings they are invited to
-        if (userRole !== 'HR' && userRole !== 'HR_ADMIN') {
+        if (effectiveRole !== 'HR' && effectiveRole !== 'HR_ADMIN') {
             if (!userEmail) return false; // Guest without email sees nothing
             const invites = m.guests?.emails || [];
             const isInvited = invites.some(email => email.toLowerCase() === userEmail.toLowerCase());
@@ -268,6 +353,20 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
     }, []);
 
     useEffect(() => {
+        if (isManagementMode) {
+            fetch(`${API_BASE_URL}/api/quiz/results/all`)
+                .then(res => res.json())
+                .then(data => setAllResults(Array.isArray(data) ? data : (data.data || [])))
+                .catch(err => console.error("Failed to fetch all quiz results", err));
+
+            fetch(`${API_BASE_URL}/api/feedback/all`)
+                .then(res => res.json())
+                .then(data => setAllFeedback(Array.isArray(data) ? data : (data.data || [])))
+                .catch(err => console.error("Failed to fetch all feedback", err));
+        }
+    }, [isManagementMode]);
+
+    useEffect(() => {
         fetch(`${API_BASE_URL}/api/employees`)
             .then(res => res.json())
             .then(data => setEmployees(data))
@@ -343,7 +442,9 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
             type: meeting.type || 'Offline',
             location: meeting.location || '',
             meetLink: meeting.meetLink || '',
-            description: (meeting.description && meeting.description !== 'No description provided.') ? meeting.description : (meeting.agenda || '')
+            description: (meeting.description && meeting.description !== 'No description provided.') ? meeting.description : (meeting.agenda || ''),
+            pre_test_data: meeting.pre_test_data || { questions: [] },
+            post_test_data: meeting.post_test_data || { questions: [] }
         });
         setInvitedEmails(meeting.guests?.emails || []);
         setInvitedEmployeeIds((meeting.guests as any).employee_ids || []);
@@ -455,6 +556,19 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
             return;
         }
 
+        // Assessment Validation
+        const preQuestions = formData.pre_test_data?.questions || [];
+        const postQuestions = formData.post_test_data?.questions || [];
+        if (preQuestions.length === 0 || postQuestions.length === 0) {
+            setNotification({ 
+                show: true, 
+                type: 'error', 
+                message: 'Wajib mengisi data Pre-Test dan Post-Test di tab Konfigurasi Ujian sebelum mengirim undangan.' 
+            });
+            setActiveCreateTab('assessment');
+            return;
+        }
+
         const finalEmails = [...new Set(invitedEmails)];
 
         const dateObj = new Date(formData.date);
@@ -474,7 +588,9 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                 emails: finalEmails,
                 employee_ids: invitedEmployeeIds
             },
-            meetLink: formData.meetLink
+            meetLink: formData.meetLink,
+            pre_test_data: formData.pre_test_data,
+            post_test_data: formData.post_test_data
         };
 
         if (isEditing && editId) {
@@ -537,7 +653,7 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
     };
 
     const resetForm = () => {
-        setFormData({ title: '', date: '', startTime: '', endTime: '', host: '', host_id: '', type: 'Online', location: '', meetLink: '', description: '' });
+        setFormData({ title: '', date: '', startTime: '', endTime: '', host: '', host_id: '', type: 'Online', location: '', meetLink: '', description: '', pre_test_data: { questions: [] }, post_test_data: { questions: [] } });
         setInvitedEmails([]);
         setInvitedEmployeeIds([]);
         setHostSearch('');
@@ -546,7 +662,9 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
         setShowParticipantDropdown(false);
         setIsEditing(false);
         setEditId(null);
+        setActiveCreateTab('details');
     };
+
 
     const getHostStats = () => {
         const [start, end] = getPeriodDates();
@@ -668,24 +786,26 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                             </button>
                         </div>
 
-                        <div className="flex bg-slate-100 p-1 rounded-lg">
-                            <button
-                                onClick={() => toggleView('list')}
-                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            >
-                                List View
-                            </button>
-                            <button
-                                onClick={() => toggleView('recap')}
-                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'recap' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            >
-                                Recap
-                            </button>
-                        </div>
+                        {isManagementMode && (
+                            <div className="flex bg-slate-100 p-1 rounded-lg">
+                                <button
+                                    onClick={() => toggleView('list')}
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    List View
+                                </button>
+                                <button
+                                    onClick={() => toggleView('recap')}
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'recap' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    Recap
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {viewMode === 'list' && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                {viewMode === 'list' && (effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') && isManagementMode && (
                     <button
                         onClick={() => { setIsEditing(false); resetForm(); setIsCreateOpen(true); }}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/20 flex items-center gap-2 transition-all"
@@ -736,56 +856,294 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                 </div>
             </div>
 
+
             {
                 viewMode === 'recap' && (
-                    <div className="space-y-6 animate-in slide-in-from-bottom-4">
+                    <div className="space-y-6 animate-in fade-in duration-500">
+                        <div className="grid grid-cols-1 gap-4">
+                            {(() => {
+                                const stats = getHostStats();
+                                if (stats.length === 0) return <div className="py-12 text-center text-slate-400 italic bg-white rounded-3xl border border-dashed border-slate-200">No data available for the selected period.</div>;
 
+                                return stats.map((stat, idx) => (
+                                    <div key={idx} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all">
+                                        {/* Header Row */}
+                                        <div 
+                                            onClick={() => setExpandedHosts(prev => ({ ...prev, [stat.host]: !prev[stat.host] }))}
+                                            className="p-4 flex items-center justify-between cursor-pointer group"
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-lg group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                                    {stat.host.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-slate-800 text-lg leading-tight">{stat.host}</h3>
+                                                    <p className="text-xs text-slate-500 font-medium">{stat.sessions} Sessions • {stat.totalParticipants} Audience</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-8">
+                                                <div className="text-right hidden md:block">
+                                                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Trainer Incentive</span>
+                                                    <span className="text-lg font-black text-emerald-600 leading-none">{formatCurrency(stat.totalTrainerIncentive)}</span>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Cost</span>
+                                                    <span className="text-xl font-black text-slate-800 leading-none">{formatCurrency(stat.totalCost)}</span>
+                                                </div>
+                                                <ChevronDown className={`text-slate-400 transition-transform ${expandedHosts[stat.host] ? 'rotate-180' : ''}`} />
+                                            </div>
+                                        </div>
 
-                        {/* Recapitulation Table */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs tracking-wider">
-                                    <tr>
-                                        <th className="px-6 py-4">Host Name</th>
-                                        <th className="px-6 py-4 text-center">Sessions</th>
-                                        <th className="px-6 py-4 text-center">Audience</th>
-                                        <th className="px-6 py-4 text-right">Trainer Incentive</th>
-                                        <th className="px-6 py-4 text-right">Total Cost</th>
-                                        <th className="px-6 py-4 text-center">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {getHostStats().length === 0 ? (
-                                        <tr><td colSpan={6} className="p-8 text-center text-slate-400 italic">No data found matching filters.</td></tr>
-                                    ) : (
-                                        getHostStats().map((stat, idx) => (
-                                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-6 py-4 font-bold text-slate-700">{stat.host}</td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-bold">
-                                                        {stat.sessions}x
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-center text-slate-600 font-semibold">{stat.totalParticipants}</td>
-                                                <td className="px-6 py-4 text-right font-mono text-green-600 font-bold">
-                                                    {formatCurrency(stat.totalTrainerIncentive)}
-                                                </td>
-                                                <td className="px-6 py-4 text-right font-mono text-slate-700 font-bold">
-                                                    {formatCurrency(stat.totalCost)}
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <button
-                                                        onClick={() => setRecapDetailHost(stat.host)}
-                                                        className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600 text-slate-500 rounded-lg text-xs font-bold transition-all shadow-sm"
-                                                    >
-                                                        View Details
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
+                                        {/* Dropdown Content */}
+                                        {expandedHosts[stat.host] && (
+                                            <div className="px-4 pb-4 animate-in slide-in-from-top-2 duration-200">
+                                                <div className="border border-slate-100 rounded-xl overflow-hidden bg-slate-50/30">
+                                                    <table className="w-full text-left text-sm">
+                                                        <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                                                            <tr>
+                                                                <th className="px-6 py-3">Tanggal</th>
+                                                                <th className="px-6 py-3">Kursus / Sesi</th>
+                                                                <th className="px-6 py-3 text-center">Avg Pre-Test</th>
+                                                                <th className="px-6 py-3 text-center">Avg Post-Test</th>
+                                                                 <th className="px-6 py-3 text-center">Avg Feedback</th>
+                                                                <th className="px-6 py-3 text-center">Status</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-white">
+                                                            {meetings.filter(m => m.host === stat.host).map((m) => {
+                                                                const meetingResults = allResults.filter(r => 
+                                                                    Number(r.meetingId || r.meeting_id) === Number(m.id) &&
+                                                                    !(r.courseId || r.course_id)
+                                                                );
+
+                                                                const meetingFeedback = allFeedback.filter(f => 
+                                                                    Number(f.meetingId || f.meeting_id || f.id_meeting || f.trainingId || f.training_id || f.session_id) === Number(m.id)
+                                                                );
+
+                                                                // Define participant matching logic
+                                                                const isParticipantMatch = (item: any, email: string) => {
+                                                                    const itemId = (item.userEmail || item.user_email || item.userId || item.user_id || item.email || item.studentId || item.student_id || item.employee_id || item.id || '').toString().toLowerCase().trim();
+                                                                    const targetId = email.toLowerCase().trim();
+                                                                    if (itemId === targetId) return true;
+                                                                    if (targetId.includes('@') && itemId === targetId.split('@')[0]) return true;
+                                                                    const emp = (employees || []).find(e => e.email?.toLowerCase() === targetId || String(e.id_employee).toLowerCase() === targetId || String(e.id).toLowerCase() === targetId);
+                                                                    if (emp) {
+                                                                        const empIds = [String(emp.id_employee).toLowerCase(), String(emp.id).toLowerCase(), emp.email?.toLowerCase()].filter(Boolean);
+                                                                        if (empIds.includes(itemId)) return true;
+                                                                        const itemName = (item.student_name || item.studentName || item.name || "").toString().toLowerCase().trim();
+                                                                        const empName = (emp.full_name || emp.name || "").toString().toLowerCase().trim();
+                                                                        return itemName && empName && itemName === empName;
+                                                                    }
+                                                                    return false;
+                                                                };
+
+                                                                // Identify participants who completed ALL 3 stages
+                                                                const allParticipantIds = Array.from(new Set([
+                                                                    ...meetingResults.map(r => r.userEmail || r.user_email || r.userId || r.user_id || r.email || r.studentId || r.student_id || r.employee_id || r.id).filter(Boolean).map(id => String(id).toLowerCase().trim()),
+                                                                    ...meetingFeedback.map(f => f.userEmail || f.user_email || f.userId || f.user_id || f.email || f.studentId || f.student_id || f.employee_id || f.id).filter(Boolean).map(id => String(id).toLowerCase().trim())
+                                                                ])).reduce((acc: string[], id) => {
+                                                                    const emp = (employees || []).find(e => e.email?.toLowerCase() === id || String(e.id_employee).toLowerCase() === id || String(e.id).toLowerCase() === id);
+                                                                    const primary = (emp?.email || id).toLowerCase();
+                                                                    if (!acc.includes(primary)) acc.push(primary);
+                                                                    return acc;
+                                                                }, []);
+
+                                                                const completedParticipants = allParticipantIds.filter(email => {
+                                                                    const hasPre = meetingResults.some(r => isParticipantMatch(r, email) && (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE'));
+                                                                    const hasPost = meetingResults.some(r => isParticipantMatch(r, email) && (r.quizType || r.quiz_type || "").toUpperCase().includes('POST'));
+                                                                    const hasFB = meetingFeedback.some(f => isParticipantMatch(f, email));
+                                                                    return hasPre && hasPost && hasFB;
+                                                                });
+
+                                                                // Calculate Averages based only on completedParticipants
+                                                                const preScores = completedParticipants.map(email => {
+                                                                    const scores = meetingResults.filter(r => isParticipantMatch(r, email) && (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE')).map(r => Number(r.score) || 0);
+                                                                    return Math.max(...scores, 0);
+                                                                });
+                                                                const postScores = completedParticipants.map(email => {
+                                                                    const scores = meetingResults.filter(r => isParticipantMatch(r, email) && (r.quizType || r.quiz_type || "").toUpperCase().includes('POST')).map(r => Number(r.score) || 0);
+                                                                    return Math.max(...scores, 0);
+                                                                });
+                                                                const fbScoresList: number[] = [];
+                                                                completedParticipants.forEach(email => {
+                                                                    const f = meetingFeedback.find(f => isParticipantMatch(f, email));
+                                                                    const fData = f?.feedbackData || f?.feedback_data || f?.data || f?.response || f?.feedback;
+                                                                    if (fData) {
+                                                                        try {
+                                                                            const data = typeof fData === 'string' ? JSON.parse(fData) : fData;
+                                                                            const scores = Object.values(data || {}).filter(v => typeof v === 'number' || !isNaN(Number(v))).map(v => Number(v));
+                                                                            if (scores.length > 0) fbScoresList.push(Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10);
+                                                                        } catch(e) {}
+                                                                    }
+                                                                });
+
+                                                                const avgPre = preScores.length > 0 ? Math.round(preScores.reduce((a,b) => a+b, 0) / preScores.length) : '-';
+                                                                const avgPost = postScores.length > 0 ? Math.round(postScores.reduce((a,b) => a+b, 0) / postScores.length) : '-';
+                                                                const avgFeedback = fbScoresList.length > 0 ? (Math.round((fbScoresList.reduce((a,b) => a+b, 0) / fbScoresList.length) * 10) / 10).toFixed(1) : '-';
+
+                                                                const participantEmails = allParticipantIds.filter(email => {
+                                                                    return (m.guests?.emails || []).some(ge => ge.toLowerCase() === email || ge.toLowerCase().split('@')[0] === email.split('@')[0]);
+                                                                });
+
+                                                                return (
+                                                                    <Fragment key={m.id}>
+                                                                        <tr 
+                                                                            onClick={() => setExpandedMeetings(prev => ({ ...prev, [m.id]: !prev[m.id] }))}
+                                                                            className="hover:bg-white transition-colors cursor-pointer group/row"
+                                                                        >
+                                                                            <td className="px-6 py-4 text-slate-500 whitespace-nowrap">{new Date(m.date).toLocaleDateString()}</td>
+                                                                            <td className="px-6 py-4">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <div className={`transition-transform duration-200 ${expandedMeetings[m.id] ? 'rotate-90' : ''}`}>
+                                                                                        <ArrowRight size={14} className="text-slate-300 group-hover/row:text-indigo-500" />
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <span className="font-bold text-slate-700 block group-hover/row:text-indigo-600 transition-colors uppercase text-xs">{m.title}</span>
+                                                                                        <span className="text-[10px] text-slate-400 capitalize font-medium">{m.type} • {m.location}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="px-6 py-4 text-center">
+                                                                                <span className="text-xs font-black text-slate-600">{avgPre}</span>
+                                                                            </td>
+                                                                            <td className="px-6 py-4 text-center">
+                                                                                <span className={`text-xs font-black ${avgPost !== '-' && Number(avgPost) >= 80 ? 'text-indigo-600' : 'text-slate-600'}`}>{avgPost}</span>
+                                                                             </td>
+                                                                             <td className="px-6 py-4 text-center">
+                                                                                 <span className="text-xs font-black text-emerald-600">{avgFeedback}</span>
+                                                                             </td>
+                                                                            <td className="px-6 py-4 text-center whitespace-nowrap">
+                                                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${m.costReport?.isPaid ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                                                                                    {m.costReport?.isPaid ? <CheckCircle size={10} /> : null}
+                                                                                    {m.costReport?.isPaid ? 'Paid' : 'Pending'}
+                                                                                </span>
+                                                                            </td>
+                                                                        </tr>
+                                                                        {expandedMeetings[m.id] && (
+                                                                            <tr className="bg-indigo-50/20">
+                                                                                <td colSpan={5} className="p-0">
+                                                                                    <div className="mx-6 my-2 border border-indigo-100/50 rounded-xl overflow-hidden bg-white shadow-inner animate-in slide-in-from-top-2 duration-200">
+                                                                                        <table className="w-full text-[10px]">
+                                                                                            <thead className="bg-slate-50/50 text-slate-400 font-black uppercase tracking-widest border-b border-slate-50">
+                                                                                                <tr>
+                                                                                                    <th className="px-4 py-2 text-left">Nama Peserta</th>
+                                                                                                    <th className="px-4 py-2 text-center">Pre-Test</th>
+                                                                                                    <th className="px-4 py-2 text-center">Post-Test</th>
+                                                                                                    <th className="px-4 py-2 text-center">Feedback</th>
+                                                                                                </tr>
+                                                                                            </thead>
+<tbody className="divide-y divide-slate-50">
+                                                                                                {participantEmails.length === 0 ? (
+                                                                                                    <tr>
+                                                                                                        <td colSpan={4} className="px-4 py-4 text-center italic text-slate-400">Belum ada peserta yang tercatat untuk sesi ini.</td>
+                                                                                                    </tr>
+                                                                                                ) : participantEmails.map(email => {
+                                                                                                    const findById = (item: any, id: string) => {
+                                                                                                        const sid = String(id).toLowerCase().trim();
+                                                                                                        const itemAllIds = [
+                                                                                                            item.userEmail, item.user_email, item.email, 
+                                                                                                            item.userId, item.user_id, item.studentId, item.student_id, item.employee_id,
+                                                                                                            item.id_user, item.id_student, item.id
+                                                                                                        ].filter(Boolean).map(v => String(v).toLowerCase().trim());
+
+                                                                                                        if (itemAllIds.includes(sid)) return true;
+
+                                                                                                        const emp = (employees || []).find(e => 
+                                                                                                            e.email?.toLowerCase() === sid || 
+                                                                                                            String(e.id_employee).toLowerCase() === sid || 
+                                                                                                            String(e.id).toLowerCase() === sid
+                                                                                                        );
+                                                                                                        
+                                                                                                        if (emp) {
+                                                                                                            const empIds = [
+                                                                                                                emp.email,
+                                                                                                                String(emp.id_employee),
+                                                                                                                String(emp.id),
+                                                                                                                emp.email?.split('@')[0]
+                                                                                                            ].filter(Boolean).map(v => String(v).toLowerCase().trim());
+
+                                                                                                            const idMatch = itemAllIds.some(iid => empIds.includes(iid)); if (idMatch) return true; const iName = (item.student_name || item.studentName || item.name || "").toString().toLowerCase().trim(); const eName = (emp.full_name || emp.name || "").toString().toLowerCase().trim(); return iName && eName && iName === eName;
+                                                                                                        }
+                                                                                                        return false;
+                                                                                                    };
+
+                                                                                                    const participantQuizRes = meetingResults.filter(r => findById(r, email));
+                                                                                                    const preData = participantQuizRes.filter(r => (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE')).sort((a,b) => (b.score||0) - (a.score||0))[0];
+                                                                                                    const postData = participantQuizRes.filter(r => (r.quizType || r.quiz_type || "").toUpperCase().includes('POST')).sort((a,b) => (b.score||0) - (a.score||0))[0];
+                                                                                                    
+                                                                                                    const pre = preData ? preData.score : '-';
+                                                                                                    const post = postData ? postData.score : '-';
+                                                                                                    const fItem = meetingFeedback.find(f => {
+                                                                                                        const fId = (f.userEmail || f.user_email || f.userId || f.user_id || f.studentId || f.student_id || f.email || '').toString().toLowerCase().trim();
+                                                                                                        const targetId = email.toLowerCase().trim();
+                                                                                                        return fId === targetId || (targetId.includes('@') && fId === targetId.split('@')[0]);
+                                                                                                     });
+                                                                                                    
+                                                                                                    const emp = (employees || []).find(e => 
+                                                                                                        e.email?.toLowerCase() === email.toLowerCase() ||
+                                                                                                        String(e.id_employee) === email ||
+                                                                                                        String(e.id) === email
+                                                                                                    );
+                                                                                                    
+                                                                                                    let feedbackDisplay = <span className="text-slate-300">-</span>;
+                                                                                                    let targetFeedback = fItem || meetingFeedback.find(f => findById(f, email));
+                                                                                                    
+                                                                                                    // Global fallback search if not found in meeting list
+                                                                                                    if (!targetFeedback) {
+                                                                                                        targetFeedback = allFeedback.find(f => {
+                                                                                                            const isUserMatch = (f.userEmail || f.user_email || f.userId || f.user_id || f.studentId || f.student_id || f.email || '').toString().toLowerCase().trim() === email.toLowerCase().trim();
+                                                                                                            const isMeetingMatch = Number(f.meetingId || f.meeting_id || f.id_meeting || f.trainingId || f.training_id || f.session_id) === Number(m.id);
+                                                                                                            return isUserMatch && isMeetingMatch;
+                                                                                                        });
+                                                                                                    }
+                                                                                                    
+                                                                                                    if (targetFeedback) {
+                                                                                                        const fData = targetFeedback.feedbackData || targetFeedback.feedback_data;
+                                                                                                        if (fData) {
+                                                                                                            try {
+                                                                                                                const data = typeof fData === 'string' ? JSON.parse(fData) : fData;
+                                                                                                                const scores = Object.values(data || {}).filter(v => typeof v === 'number' || !isNaN(Number(v))) as any[];
+                                                                                                                if (scores.length > 0) {
+                                                                                                                    const numericScores = scores.map(s => Number(s));
+                                                                                                                    const avg = Math.round((numericScores.reduce((a, b) => a + b, 0) / numericScores.length) * 10) / 10;
+                                                                                                                    feedbackDisplay = <span className="text-emerald-600 font-bold">{avg} / 4</span>;
+                                                                                                                } else {
+                                                                                                                    feedbackDisplay = <span className="text-emerald-500 font-bold">Terkirim</span>;
+                                                                                                                }
+                                                                                                            } catch(e) {
+                                                                                                                feedbackDisplay = <span className="text-emerald-500 font-bold">Terkirim</span>;
+                                                                                                            }
+                                                                                                        } else {
+                                                                                                            feedbackDisplay = <span className="text-emerald-500 font-bold">Terkirim</span>;
+                                                                                                        }
+                                                                                                    }
+
+                                                                                                    return (
+                                                                                                        <tr key={email} className="hover:bg-slate-50/50">
+                                                                                                            <td className="px-4 py-2 text-slate-600 font-semibold">{emp?.full_name || email}</td>
+                                                                                                            <td className="px-4 py-2 text-center font-bold text-slate-500">{pre}</td>
+                                                                                                            <td className="px-4 py-2 text-center font-bold text-indigo-600">{post}</td>
+                                                                                                            <td className="px-4 py-2 text-center">{feedbackDisplay}</td>
+                                                                                                        </tr>
+                                                                                                    );
+                                                                                                })}
+                                                                                            </tbody>
+                                                                                        </table>
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        )}
+                                                                    </Fragment>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ));
+                            })()}
                         </div>
                     </div>
                 )
@@ -850,7 +1208,7 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                         <AvatarStack count={meeting.guests?.count || 0} />
 
                                         <div className="flex items-center gap-2">
-                                            {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                                            {(effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') && (
                                                 <>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); openReportModal(meeting); }}
@@ -892,7 +1250,26 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                 <button onClick={() => { setIsCreateOpen(false); resetForm(); }} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={20} /></button>
                             </div>
 
-                            <div className="overflow-y-auto p-6 space-y-5">
+                            <div className="flex border-b border-slate-100 bg-slate-50/50">
+                                <button 
+                                    type="button"
+                                    onClick={() => setActiveCreateTab('details')} 
+                                    className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeCreateTab === 'details' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-white' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    Rincian Sesi
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => setActiveCreateTab('assessment')} 
+                                    className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeCreateTab === 'assessment' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-white' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    Konfigurasi Ujian
+                                </button>
+                            </div>
+
+                            <div className="overflow-y-auto p-6 space-y-5 custom-scrollbar">
+                                {activeCreateTab === 'details' ? (
+                                    <>
                                 {/* Title */}
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Event Title</label>
@@ -1127,6 +1504,21 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                         onChange={e => setFormData({ ...formData, description: e.target.value })}
                                     />
                                 </div>
+                                    </>
+                                ) : (
+                                    <div className="space-y-8 pb-10">
+                                        <QuizEditor 
+                                            type="Pre-Test" 
+                                            data={formData.pre_test_data} 
+                                            onChange={(data: any) => setFormData({ ...formData, pre_test_data: data })} 
+                                        />
+                                        <QuizEditor 
+                                            type="Post-Test" 
+                                            data={formData.post_test_data} 
+                                            onChange={(data: any) => setFormData({ ...formData, post_test_data: data })} 
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             {/* Footer */}
@@ -1163,7 +1555,7 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                 </div>
                                 <button onClick={() => setIsReportOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={20} /></button>
                             </div>
-                            <div className="p-6 space-y-5 overflow-y-auto">
+                            <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Attendance Checklist</label>
                                     <div className={`bg-slate-50 rounded-xl border border-slate-200 p-3 max-h-[150px] overflow-y-auto space-y-2 ${reportData.isPaid ? 'opacity-60 pointer-events-none' : ''}`}>
@@ -1424,6 +1816,7 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                 variant="success"
             />
 
+
             {/* Recap Detail Modal */}
             {
                 recapDetailHost && (
@@ -1526,12 +1919,12 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                         onClick={() => setSelectedMeeting(null)}
                     >
                         <div
-                            className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20"
+                            className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20 flex flex-col max-h-[90vh]"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <div className="relative h-32 bg-gradient-to-r from-indigo-500 to-purple-500">
+                            <div className="relative h-32 flex-shrink-0 bg-gradient-to-r from-indigo-500 to-purple-500">
                                 <div className="absolute top-4 right-4 flex gap-2">
-                                    {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                                    {(effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') && (
                                         <>
                                             <button
                                                 onClick={() => openEditModal(selectedMeeting)}
@@ -1562,7 +1955,7 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                 </div>
                             </div>
 
-                            <div className="pt-10 px-6 pb-6">
+                            <div className="flex-1 overflow-y-auto pt-10 px-6 pb-6 custom-scrollbar">
                                 <h2 className="text-2xl font-bold text-slate-800 mb-1 leading-snug">{selectedMeeting.title}</h2>
                                 <p className="text-slate-500 font-medium text-sm mb-6 flex items-center gap-2">
                                     <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-600">{selectedMeeting.type}</span>
@@ -1636,22 +2029,15 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                                         const parts = selectedMeeting.time.split(' - ');
                                                         const startRaw = parts[0] ? parts[0].trim() : '09:00';
                                                         const endRaw = parts[1] ? parts[1].trim() : '10:00';
-
-                                                        // Robust Date Extraction
                                                         const baseDate = new Date(selectedMeeting.date).toISOString().split('T')[0];
-
-                                                        // Ensure HH:mm format
                                                         const formatT = (t: string) => {
                                                             const match = t.match(/(\d{1,2}):(\d{2})/);
                                                             if (!match) return "00:00";
                                                             return `${match[1].padStart(2, '0')}:${match[2]}`;
                                                         };
-
                                                         const startDate = new Date(`${baseDate}T${formatT(startRaw)}`);
                                                         const endDate = new Date(`${baseDate}T${formatT(endRaw)}`);
-
                                                         if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) throw new Error("Invalid Date");
-
                                                         const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
                                                         const text = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:${selectedMeeting.title}\nDESCRIPTION:${selectedMeeting.description}\nLOCATION:${selectedMeeting.type === 'Online' ? selectedMeeting.meetLink : selectedMeeting.location}\nDTSTART:${fmt(startDate)}\nDTEND:${fmt(endDate)}\nEND:VEVENT\nEND:VCALENDAR`;
                                                         const blob = new Blob([text], { type: 'text/calendar' });
@@ -1661,8 +2047,8 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                                         a.download = `${selectedMeeting.title}.ics`;
                                                         a.click();
                                                     } catch (e) {
-                                                        console.error("Error generating ICS", e);
-                                                        setNotification({ show: true, type: 'error', message: "Could not generate calendar file due to invalid date format." });
+                                                        console.error(e);
+                                                        setNotification({ show: true, type: 'error', message: "Gagal membuat file kalender." });
                                                     }
                                                 }}
                                                 className="flex-1 py-2 bg-white border border-slate-200 hover:bg-white hover:border-slate-300 text-slate-600 font-bold rounded-lg text-xs transition-all shadow-sm"
@@ -1676,28 +2062,21 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                                         const parts = selectedMeeting.time.split(' - ');
                                                         const startRaw = parts[0] ? parts[0].trim() : '09:00';
                                                         const endRaw = parts[1] ? parts[1].trim() : '10:00';
-
-                                                        // Robust Date Extraction
                                                         const baseDate = new Date(selectedMeeting.date).toISOString().split('T')[0];
-
-                                                        // Ensure HH:mm format
                                                         const formatT = (t: string) => {
                                                             const match = t.match(/(\d{1,2}):(\d{2})/);
                                                             if (!match) return "00:00";
                                                             return `${match[1].padStart(2, '0')}:${match[2]}`;
                                                         };
-
                                                         const startDate = new Date(`${baseDate}T${formatT(startRaw)}`);
                                                         const endDate = new Date(`${baseDate}T${formatT(endRaw)}`);
-
                                                         if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) throw new Error("Invalid Date");
-
                                                         const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
                                                         const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(selectedMeeting.title)}&details=${encodeURIComponent(selectedMeeting.description)}&location=${encodeURIComponent(selectedMeeting.type === 'Online' ? (selectedMeeting.meetLink || 'Online') : (selectedMeeting.location || ''))}&dates=${fmt(startDate)}/${fmt(endDate)}`;
                                                         window.open(url, '_blank');
                                                     } catch (e) {
-                                                        console.error("Error opening Google Calendar", e);
-                                                        setNotification({ show: true, type: 'error', message: "Could not open calendar due to invalid date format." });
+                                                        console.error(e);
+                                                        setNotification({ show: true, type: 'error', message: "Gagal membuka Google Calendar." });
                                                     }
                                                 }}
                                                 className="flex-1 py-2 bg-white border border-slate-200 hover:bg-white hover:border-slate-300 text-blue-600 font-bold rounded-lg text-xs transition-all shadow-sm text-center flex items-center justify-center"
@@ -1706,19 +2085,519 @@ const TrainingInternalList = ({ userRole, userEmail }: TrainingInternalListProps
                                             </button>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => setSelectedMeeting(null)}
-                                        className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all"
-                                    >
-                                        Close Details
-                                    </button>
                                 </div>
+
+                                {/* Assessment Section - Only for Participants */}
+                                {!(effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') && (
+                                    <div className="mt-6 space-y-3 border-t border-slate-100 pt-6">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider">Assessment & Feedback</h4>
+                                            <div className="flex items-center gap-1 text-[10px] text-indigo-500 font-bold">
+                                                <CheckCircle size={12} /> REQUIRED
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <button
+                                                onClick={() => {
+                                                    if (meetingQuizResults.find(r => r.quizType === 'PRE')) return;
+                                                    setShowQuiz('PRE');
+                                                }}
+                                                className={`w-full group bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between transition-all ${meetingQuizResults.find(r => (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE')) 
+                                                    ? 'cursor-default' 
+                                                    : 'hover:border-indigo-300 cursor-pointer'}`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${meetingQuizResults.find(r => r.quizType === 'PRE')
+                                                        ? 'bg-slate-100 text-slate-400'
+                                                        : 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white'}`}>
+                                                        <FileText size={16} />
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <p className="font-bold text-slate-800 text-xs">Pre-Test Assessment</p>
+                                                        <p className="text-[10px] text-slate-400">Evaluasi sebelum materi</p>
+                                                    </div>
+                                                </div>
+                                                {(() => {
+                                                    const res = meetingQuizResults.find(r => {
+                                                        const type = (r.quizType || r.quiz_type || "").toUpperCase();
+                                                        const midMatches = Number(r.meetingId || r.meeting_id) === Number(selectedMeeting.id);
+                                                        return (type === 'PRE' || type === 'PRE-TEST') && midMatches;
+                                                    });
+                                                    return res ? (
+                                                        <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">Score: {res.score}</span>
+                                                    ) : (
+                                                        <ArrowRight size={14} className="text-slate-300 group-hover:text-indigo-500" />
+                                                    );
+                                                })()}
+                                            </button>
+
+                                            <button
+                                                onClick={() => {
+                                                    const preRes = meetingQuizResults.find(r => {
+                                                        const type = (r.quizType || r.quiz_type || "").toUpperCase();
+                                                        return (type === 'PRE' || type === 'PRE-TEST');
+                                                    });
+                                                    if (!preRes) {
+                                                        setNotification({ show: true, type: 'error', message: "Silakan kerjakan Pre-Test terlebih dahulu sebelum memulai Post-Test." });
+                                                        return;
+                                                    }
+                                                    const postRes = meetingQuizResults.find(r => (r.quizType || r.quiz_type || "").toUpperCase().includes('POST'));
+                                                    if (postRes && (Number(postRes.score) || 0) >= 80) return;
+                                                    setShowQuiz('POST');
+                                                }}
+                                                className={`w-full group bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between transition-all ${(() => {
+                                                    const preRes = meetingQuizResults.find(r => (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE'));
+                                                    const postRes = meetingQuizResults.find(r => (r.quizType || r.quiz_type || "").toUpperCase().includes('POST'));
+                                                    if (!preRes) return 'opacity-60 cursor-not-allowed';
+                                                    return (postRes && (Number(postRes.score) || 0) >= 80) ? 'cursor-default' : 'hover:border-indigo-300 cursor-pointer';
+                                                })()}`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${(() => {
+                                                        const postRes = meetingQuizResults.find(r => (r.quizType || r.quiz_type || "").toUpperCase().includes('POST'));
+                                                        return (postRes && (Number(postRes.score) || 0) >= 80)
+                                                            ? 'bg-emerald-100 text-emerald-600'
+                                                            : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-500 group-hover:text-white';
+                                                    })()}`}>
+                                                        <CheckCircle size={16} />
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <p className="font-bold text-slate-800 text-xs">Post-Test Assessment</p>
+                                                        <p className="text-[10px] text-slate-400">Syarat kelulusan (Min. 80)</p>
+                                                    </div>
+                                                </div>
+                                                {(() => {
+                                                    const res = meetingQuizResults.find(r => {
+                                                        const type = (r.quizType || r.quiz_type || "").toUpperCase();
+                                                        const midMatches = Number(r.meetingId || r.meeting_id) === Number(selectedMeeting.id);
+                                                        return (type === 'POST' || type === 'POST-TEST') && midMatches;
+                                                    });
+                                                    return res ? (
+                                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${res.score >= 80 ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-red-600 bg-red-50 border-red-100'}`}>Score: {res.score}</span>
+                                                    ) : (
+                                                        <ArrowRight size={14} className="text-slate-300 group-hover:text-indigo-500" />
+                                                    );
+                                                })()}
+                                            </button>
+
+                                            <button
+                                                onClick={() => {
+                                                    if (userFeedback) return;
+                                                    const postRes = meetingQuizResults.find(r => r.quizType === 'POST');
+                                                    if (postRes && postRes.score >= 80) setShowFeedback(true);
+                                                    else setNotification({ show: true, type: 'error', message: postRes ? `Nilai anda ${postRes.score} < 80, silakan isi dengan benar` : "Selesaikan Post-Test terlebih dahulu." });
+                                                }}
+                                                className={`w-full group bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between transition-all ${userFeedback 
+                                                    ? 'cursor-default' 
+                                                    : 'hover:border-purple-300 cursor-pointer'}`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${userFeedback
+                                                        ? 'bg-slate-100 text-slate-400'
+                                                        : 'bg-purple-50 text-purple-600 group-hover:bg-purple-500 group-hover:text-white'}`}>
+                                                        <Users size={16} />
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <p className="font-bold text-slate-800 text-xs">Feedback Form</p>
+                                                        <p className="text-[10px] text-slate-400">Evaluasi penyelenggara (Bahasa Indonesia)</p>
+                                                    </div>
+                                                </div>
+                                                {userFeedback ? (
+                                                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">SUBMITTED</span>
+                                                ) : (
+                                                    <ArrowRight size={14} className="text-slate-300 group-hover:text-purple-500" />
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={() => setSelectedMeeting(null)}
+                                    className="w-full mt-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all"
+                                >
+                                    Tutup Detail
+                                </button>
                             </div>
                         </div>
                     </div>
                 )
             }
-        </div >
+
+            {/* Quiz Modal */}
+            {showQuiz && selectedMeeting && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <TrainingQuiz
+                        type={showQuiz}
+                        questions={showQuiz === 'PRE' ? (selectedMeeting.pre_test_data?.questions || []) : (selectedMeeting.post_test_data?.questions || [])}
+                        onClose={() => setShowQuiz(null)}
+                        onSubmit={async (score) => {
+                            try {
+                                const response = await fetch(`${API_BASE_URL}/api/quiz/submit`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        userId: user.email,
+                                        user_id: user.email,
+                                        userEmail: user.email,
+                                        user_email: user.email,
+                                        studentId: user.id || null,
+                                        studentName: user.name,
+                                        employee_id: user.employee_id || null,
+                                        meetingId: selectedMeeting.id,
+                                        meeting_id: selectedMeeting.id,
+                                        score: score,
+                                        quizType: showQuiz,
+                                        quiz_type: showQuiz,
+                                        type: showQuiz
+                                    })
+                                });
+                                if (response.ok) {
+                                    fetchResults(selectedMeeting.id);
+                                    if (isManagementMode) {
+                                        fetch(`${API_BASE_URL}/api/quiz/results/all`).then(r => r.json()).then(setAllResults);
+                                        fetch(`${API_BASE_URL}/api/feedback/all`).then(r => r.json()).then(setAllFeedback);
+                                    }
+                                    setShowQuiz(null);
+                                    setNotification({ show: true, type: 'success', message: `${showQuiz} Test berhasil diselesaikan!` });
+                                }
+                            } catch (err) { console.error(err); }
+                        }}
+                        meetingTitle={selectedMeeting.title}
+                    />
+                </div>
+            )}
+
+            {/* Feedback Modal */}
+            {showFeedback && selectedMeeting && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <TrainingFeedbackForm
+                        onClose={() => setShowFeedback(false)}
+                        onSubmit={async (feedback) => {
+                            try {
+                                const response = await fetch(`${API_BASE_URL}/api/feedback/submit`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        userId: user.email,
+                                        user_id: user.email,
+                                        userEmail: user.email,
+                                        user_email: user.email,
+                                        studentId: user.id || null,
+                                        employee_id: user.employee_id || null,
+                                        meetingId: selectedMeeting.id,
+                                        meeting_id: selectedMeeting.id,
+                                        feedbackData: feedback,
+                                        feedback_data: feedback
+                                    })
+                                });
+                                if (response.ok) {
+                                    setUserFeedback(feedback);
+                                    if (isManagementMode) {
+                                        fetch(`${API_BASE_URL}/api/quiz/results/all`).then(r => r.json()).then(setAllResults);
+                                        fetch(`${API_BASE_URL}/api/feedback/all`).then(r => r.json()).then(setAllFeedback);
+                                    }
+                                    setShowFeedback(false);
+                                    setNotification({ show: true, type: 'success', message: "Terima kasih atas feedback Anda!" });
+                                }
+                            } catch (err) { console.error(err); }
+                        }}
+                        meetingTitle={selectedMeeting.title}
+                    />
+                </div>
+            )}
+        </div>
+    );
+};
+
+// --- Sub-components for Interactive Training ---
+
+const TrainingQuiz = ({ type, questions, onClose, onSubmit, meetingTitle }: any) => {
+    const [currentStep, setCurrentStep] = useState(0);
+    const [answers, setAnswers] = useState<number[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSelect = (idx: number) => {
+        const newAnswers = [...answers];
+        newAnswers[currentStep] = idx;
+        setAnswers(newAnswers);
+    };
+
+    const handleNext = () => {
+        if (currentStep < questions.length - 1) setCurrentStep(currentStep + 1);
+        else {
+            let correct = 0;
+            questions.forEach((q: any, i: number) => {
+                if (answers[i] === q.correctAnswer) correct++;
+            });
+            const score = Math.round((correct / questions.length) * 100);
+            setIsSubmitting(true);
+            onSubmit(score);
+        }
+    };
+
+    if (questions.length === 0) return (
+        <div className="bg-white p-8 rounded-3xl text-center max-w-sm">
+            <p className="text-slate-500 mb-4 italic">Soal belum dikonfigurasi untuk sesi ini.</p>
+            <button onClick={onClose} className="px-6 py-2 bg-slate-100 rounded-xl font-bold">Tutup</button>
+        </div>
+    );
+
+    const q = questions[currentStep];
+
+    return (
+        <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+                <div>
+                    <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">{type} TEST ASSESSMENT</span>
+                    <h2 className="font-black text-xl text-slate-800 leading-tight">{meetingTitle}</h2>
+                </div>
+                <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400"><X size={20} /></button>
+            </div>
+
+            <div className="p-8 overflow-y-auto custom-scrollbar">
+                <div className="mb-8">
+                    {(() => {
+                        const answeredCount = answers.filter(a => a !== undefined).length;
+                        const progress = Math.round((answeredCount / questions.length) * 100);
+                        return (
+                            <>
+                                <div className="flex justify-between items-end mb-4">
+                                    <span className="text-sm font-black text-indigo-600 uppercase">Pertanyaan {currentStep + 1} dari {questions.length}</span>
+                                    <span className="text-xs font-bold text-slate-400">{progress}% Terisi</span>
+                                </div>
+                                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${progress}%` }} />
+                                </div>
+                            </>
+                        );
+                    })()}
+                </div>
+
+                <div className="animate-in slide-in-from-right-4 duration-300">
+                    <h3 className="text-lg font-bold text-slate-800 mb-6 leading-relaxed">{q.question}</h3>
+                    <div className="space-y-3">
+                        {q.options.map((opt: string, i: number) => {
+                            if (!opt || opt.trim() === '') return null;
+                            return (
+                                <button
+                                    key={i}
+                                    onClick={() => handleSelect(i)}
+                                    className={`w-full p-4 rounded-2xl text-left border-2 transition-all flex justify-between items-center font-bold ${answers[currentStep] === i
+                                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-md shadow-indigo-500/10'
+                                        : 'border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50'
+                                        }`}
+                                >
+                                    <span>{opt}</span>
+                                    {answers[currentStep] === i && <CheckCircle size={18} className="text-indigo-500" />}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+
+            <div className="p-6 bg-slate-50 border-t border-slate-100">
+                <button
+                    disabled={answers[currentStep] === undefined || isSubmitting}
+                    onClick={handleNext}
+                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-black rounded-2xl shadow-xl shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
+                >
+                    {isSubmitting ? 'Mengirim...' : (currentStep === questions.length - 1 ? 'SELESAIKAN TES' : 'PERTANYAAN BERIKUTNYA')}
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const TrainingFeedbackForm = ({ onClose, onSubmit, meetingTitle }: any) => {
+    const [isLoading, setIsLoading] = useState(false);
+    const questions = [
+        { id: 'q1', text: 'Materi training sesuai dengan kebutuhan pengembangan saya.', type: 'scale' },
+        { id: 'q2', text: 'Materi training dapat diterapkan dalam pekerjaan saya.', type: 'scale' },
+        { id: 'q3', text: 'Penyampaian materi training mudah dipahami.', type: 'scale' },
+        { id: 'q4', text: 'Secara keseluruhan, training ini memenuhi ekspektasi saya.', type: 'scale' },
+        { id: 'q5', text: 'Materi pendukung (handout/modul/ppt) membantu pemahaman saya.', type: 'scale' },
+        { id: 'q6', text: 'Trainer menyampaikan materi dengan efektif.', type: 'scale' },
+        { id: 'q7', text: 'Trainer menjawab pertanyaan dengan jelas.', type: 'scale' },
+        { id: 'q8', text: 'Studi kasus/contoh yang diberikan membantu pemahaman saya.', type: 'scale' },
+        { id: 'q9', text: 'Tempat training nyaman dan mendukung proses belajar.', type: 'scale' },
+        { id: 'q10', text: 'Konsumsi yang disediakan selama training memuaskan.', type: 'scale' },
+        { id: 'q11', text: 'Hal apa yang sudah baik dari training ini?', type: 'text' },
+        { id: 'q12', text: 'Hal apa yang perlu ditingkatkan untuk training selanjutnya?', type: 'text' }
+    ];
+
+    const [form, setForm] = useState<any>({});
+
+    const handleLevel = (id: string, val: number) => setForm({ ...form, [id]: val });
+
+    const isComplete = questions.every(q => q.type === 'text' ? (form[q.id]?.length > 2) : (form[q.id] !== undefined));
+
+    return (
+        <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+                <div>
+                    <span className="text-[10px] font-black uppercase text-purple-500 tracking-widest">FEEDBACK PENYELENGGARA</span>
+                    <h2 className="font-black text-xl text-slate-800 leading-tight">{meetingTitle}</h2>
+                </div>
+                <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400"><X size={20} /></button>
+            </div>
+
+            <div className="p-8 overflow-y-auto space-y-8 custom-scrollbar">
+                {questions.map((q, idx) => (
+                    <div key={q.id} className="animate-in slide-in-from-bottom-4 transition-all" style={{ animationDelay: `${idx * 100}ms` }}>
+                        <h4 className="text-sm font-black text-slate-700 mb-4 leading-tight uppercase tracking-tight">{idx + 1}. {q.text}</h4>
+                        {q.type === 'scale' ? (
+                            <div className="flex justify-between gap-2">
+                                {[1, 2, 3, 4].map(v => {
+                                    const labels = ["", "Strongly Disagree", "Disagree", "Agree", "Strongly Agree"];
+                                    return (
+                                        <button
+                                            key={v}
+                                            onClick={() => handleLevel(q.id, v)}
+                                            className={`flex-1 py-2.5 rounded-xl border-2 transition-all flex flex-col items-center group ${form[q.id] === v
+                                                ? 'bg-purple-600 border-purple-600 text-white shadow-lg shadow-purple-500/30 ring-2 ring-purple-100'
+                                                : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200 hover:bg-slate-50'
+                                                }`}
+                                        >
+                                            <span className="text-sm font-black">{v}</span>
+                                            <span className={`text-[7px] font-black uppercase text-center leading-none tracking-tighter ${form[q.id] === v ? 'text-purple-100' : 'text-slate-400'}`}>
+                                                {labels[v]}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <textarea
+                                value={form[q.id] || ''}
+                                onChange={e => setForm({ ...form, [q.id]: e.target.value })}
+                                className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 focus:border-purple-500 outline-none transition-all font-semibold text-slate-700"
+                                rows={4}
+                                placeholder="Tuliskan masukan Anda di sini..."
+                            />
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            <div className="p-6 bg-slate-50 border-t border-slate-100">
+                <button
+                    disabled={!isComplete || isLoading}
+                    onClick={() => {
+                        setIsLoading(true);
+                        onSubmit(form);
+                    }}
+                    className="w-full py-4 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white font-black rounded-2xl shadow-xl shadow-purple-500/20 transition-all"
+                >
+                    {isLoading ? 'Mengirim...' : 'KIRIM FEEDBACK'}
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChange: (data: any) => void }) => {
+    const questions = data?.questions || [];
+    const lastQuestionRef = useRef<HTMLDivElement>(null);
+    const lastInputRef = useRef<HTMLTextAreaElement>(null);
+
+    const addQuestion = () => {
+        const newQs = [...questions, { question: '', options: ['', '', '', ''], correctAnswer: 0 }];
+        onChange({ ...data, questions: newQs });
+        setTimeout(() => {
+            lastQuestionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            lastInputRef.current?.focus();
+        }, 150);
+    };
+    
+    const removeQuestion = (idx: number) => {
+        const newQs = questions.filter((_: any, i: number) => i !== idx);
+        onChange({ ...data, questions: newQs });
+    };
+
+    const updateQuestion = (idx: number, field: string, value: any) => {
+        const newQs = [...questions];
+        newQs[idx] = { ...newQs[idx], [field]: value };
+        onChange({ ...data, questions: newQs });
+    };
+
+    const updateOption = (qIdx: number, oIdx: number, value: string) => {
+        const newQs = [...questions];
+        const newOpts = [...newQs[qIdx].options];
+        newOpts[oIdx] = value;
+        newQs[qIdx] = { ...newQs[qIdx], options: newOpts };
+        onChange({ ...data, questions: newQs });
+    };
+
+    return (
+        <div className="space-y-4">
+             <div className="flex items-center justify-between">
+                 <h4 className="text-sm font-black text-slate-700 uppercase tracking-tight flex items-center gap-2">
+                     <div className={`w-2 h-2 rounded-full ${type === 'Pre-Test' ? 'bg-blue-500' : 'bg-indigo-500'}`} />
+                     {type} Assessment
+                 </h4>
+                 <button type="button" onClick={addQuestion} className="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-black hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-1">
+                     <Plus size={14} /> TAMBAH SOAL
+                 </button>
+             </div>
+             {questions.length === 0 && (
+                 <div className="py-8 px-4 border-2 border-dashed border-slate-100 rounded-2xl text-center">
+                     <p className="text-xs text-slate-400 font-medium">Belum ada soal untuk {type}.</p>
+                 </div>
+             )}
+             <div className="space-y-6">
+                 {questions.map((q: any, i: number) => (
+                     <div 
+                        key={i} 
+                        ref={i === questions.length - 1 ? lastQuestionRef : null}
+                        style={{ scrollMarginTop: '20px' }}
+                        className="bg-slate-50/50 p-5 rounded-2xl relative border border-slate-100 animate-in slide-in-from-bottom-2 duration-300"
+                    >
+                         <button type="button" onClick={() => removeQuestion(i)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500 transition-colors">
+                             <Trash2 size={16} />
+                         </button>
+                         <div className="mb-4 pr-8">
+                             <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5">Pertanyaan {i + 1}</label>
+                             <textarea 
+                                 ref={i === questions.length - 1 ? lastInputRef : null}
+                                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                 value={q.question}
+                                 onChange={e => updateQuestion(i, 'question', e.target.value)}
+                                 placeholder="Tuliskan pertanyaan di sini..."
+                                 rows={2}
+                             />
+                         </div>
+                         <div className="grid grid-cols-1 gap-2.5">
+                             <label className="block text-[9px] font-black text-slate-400 uppercase">Opsi Jawaban (Pilih satu yang benar)</label>
+                             {q.options.map((opt: string, oi: number) => (
+                                 <div 
+                                    key={oi} 
+                                    onClick={() => updateQuestion(i, 'correctAnswer', oi)}
+                                    className={`flex items-center gap-3 p-2 rounded-xl transition-all border cursor-pointer ${q.correctAnswer === oi ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}
+                                 >
+                                     <input 
+                                         type="radio" 
+                                         name={`${type.toLowerCase()}-correct-${i}`}
+                                         checked={q.correctAnswer === oi} 
+                                         onChange={() => updateQuestion(i, 'correctAnswer', oi)}
+                                         className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                                     />
+                                     <input 
+                                         className="flex-1 bg-transparent border-none focus:ring-0 text-xs font-semibold text-slate-600 cursor-text"
+                                         value={opt}
+                                         onClick={(e) => e.stopPropagation()}
+                                         onChange={e => updateOption(i, oi, e.target.value)}
+                                         placeholder={`Opsi ${oi + 1}`}
+                                     />
+                                 </div>
+                             ))}
+                         </div>
+                     </div>
+                 ))}
+             </div>
+        </div>
     );
 };
 

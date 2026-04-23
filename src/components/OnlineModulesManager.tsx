@@ -182,7 +182,7 @@ const OnlineModulesManager = () => {
             id: Date.now(),
             title: '',
             description: '',
-            duration: '0 jam',
+            duration: '0 hours',
             modulesCount: 0,
             studentCount: 0,
             progress: 0,
@@ -254,7 +254,7 @@ const OnlineModulesManager = () => {
                     <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                         <div className="flex flex-col">
                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                {courses.find(c => c.id === editingCourse.id) ? 'Managing Modul' : 'Creating Modul'}
+                                {courses.find(c => c.id === editingCourse.id) ? 'Managing Module' : 'Creating Module'}
                             </span>
                             <h2 className="font-bold text-xl text-slate-800">{editingCourse.title}</h2>
                         </div>
@@ -272,7 +272,7 @@ const OnlineModulesManager = () => {
                                 </h3>
                                 <div className="grid grid-cols-1 gap-4">
                                     <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-1">Nama Modul</label>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">Module Name</label>
                                         <input
                                             value={editingCourse.title}
                                             onChange={e => setEditingCourse({ ...editingCourse, title: e.target.value })}
@@ -296,7 +296,7 @@ const OnlineModulesManager = () => {
                                             <input
                                                 value={editingCourse.duration}
                                                 onChange={e => setEditingCourse({ ...editingCourse, duration: e.target.value })}
-                                                placeholder="e.g. 60 Jam Belajar"
+                                                placeholder="e.g. 60 Hours of Learning"
                                                 className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
                                             />
                                             <Clock size={16} className="absolute left-3.5 top-3 text-slate-400" />
@@ -322,15 +322,15 @@ const OnlineModulesManager = () => {
                                             className="w-full py-6 border-2 border-dashed border-amber-200 rounded-2xl text-amber-500 font-bold hover:border-amber-400 hover:bg-amber-50 transition-all flex flex-col items-center justify-center gap-2"
                                         >
                                             <Plus size={24} />
-                                            <span>Buat Kuis Pre-Test (Wajib dikerjakan sebelum materi dimulai)</span>
+                                            <span>Create Pre-Test Quiz (Mandatory before starting material)</span>
                                         </button>
                                     ) : (
                                         <div className="bg-white rounded-2xl shadow-sm border border-amber-200 overflow-hidden">
                                             <div className="px-6 py-4 bg-amber-50 border-b border-amber-100 flex justify-between items-center">
-                                                <span className="font-bold text-amber-900 text-sm italic">✓ Syarat Masuk Kursus Aktif</span>
+                                                <span className="font-bold text-amber-900 text-sm italic">✓ Course Entry Requirement Active</span>
                                                 <button
                                                     onClick={() => {
-                                                        openConfirm('Hapus Pre-Test', 'Hapus kuis syarat masuk ini?', () => {
+                                                        openConfirm('Delete Pre-Test', 'Delete this entry requirement quiz?', () => {
                                                             const upd = { ...editingCourse };
                                                             delete upd.preAssessment;
                                                             setEditingCourse(upd);
@@ -338,7 +338,7 @@ const OnlineModulesManager = () => {
                                                     }}
                                                     className="text-red-500 hover:text-red-700 text-xs font-bold"
                                                 >
-                                                    Hapus Syarat
+                                                    Delete Requirement
                                                 </button>
                                             </div>
                                             <div className="p-4">
@@ -359,7 +359,7 @@ const OnlineModulesManager = () => {
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-bold text-slate-700 flex items-center gap-2">
                                         <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">3</span>
-                                        Daftar Materi (Video & Kuis Modul)
+                                        Material List (Video & Module Quizzes)
                                     </h3>
                                     <button
                                         onClick={() => {
@@ -474,7 +474,7 @@ const OnlineModulesManager = () => {
 
 
                                                 <div className="space-y-2">
-                                                    <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-[#5d5dff]">Kuis Materi (Setelah Video)</h5>
+                                                    <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-[#5d5dff]">Module Quiz (After Video)</h5>
                                                     {mod.quiz ? (
                                                         <QuizEditor
                                                             quiz={mod.quiz}
@@ -484,7 +484,7 @@ const OnlineModulesManager = () => {
                                                                 setEditingCourse({ ...editingCourse, modules: newMods });
                                                             }}
                                                             onDelete={() => {
-                                                                openConfirm('Hapus Kuis', 'Hapus kuis materi ini? Semua pertanyaan akan hilang.', () => {
+                                                                openConfirm('Delete Quiz', 'Delete this module quiz? All questions will be lost.', () => {
                                                                     const newMods = [...editingCourse.modules];
                                                                     delete newMods[idx].quiz;
                                                                     setEditingCourse({ ...editingCourse, modules: newMods });
@@ -497,14 +497,14 @@ const OnlineModulesManager = () => {
                                                                 const newMods = [...editingCourse.modules];
                                                                 newMods[idx].quiz = {
                                                                     id: Date.now(),
-                                                                    title: 'Kuis Materi: ' + mod.title,
+                                                                    title: 'Module Quiz: ' + mod.title,
                                                                     questions: []
                                                                 };
                                                                 setEditingCourse({ ...editingCourse, modules: newMods });
                                                             }}
                                                             className="text-[10px] bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg text-indigo-700 font-bold transition-colors border border-indigo-100 flex items-center gap-1"
                                                         >
-                                                            + Add Kuis Materi
+                                                            + Add Module Quiz
                                                         </button>
                                                     )}
                                                 </div>
@@ -534,7 +534,7 @@ const OnlineModulesManager = () => {
                                             {editingCourse.assessment && (
                                                 <button
                                                     onClick={() => {
-                                                        openConfirm('Hapus Post-Test', 'Hapus kuis evaluasi akhir ini?', () => {
+                                                        openConfirm('Delete Post-Test', 'Delete this final evaluation quiz?', () => {
                                                             const upd = { ...editingCourse };
                                                             delete upd.assessment;
                                                             setEditingCourse(upd);
@@ -542,7 +542,7 @@ const OnlineModulesManager = () => {
                                                     }}
                                                     className="text-red-500 hover:text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-red-100"
                                                 >
-                                                    Hapus
+                                                    Delete
                                                 </button>
                                             )}
                                         </div>
@@ -555,7 +555,7 @@ const OnlineModulesManager = () => {
                                                 className="w-full py-6 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold hover:border-blue-400 hover:text-blue-500 hover:bg-white transition-all flex flex-col items-center justify-center gap-2"
                                             >
                                                 <Plus size={24} />
-                                                <span>Buat Kuis Evaluasi Akhir (Post-Test)</span>
+                                                <span>Create Final Evaluation Quiz (Post-Test)</span>
                                             </button>
                                         ) : (
                                             <QuizEditor
@@ -597,14 +597,14 @@ const OnlineModulesManager = () => {
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
                 <div className="relative z-10 flex justify-between items-end">
                     <div>
-                        <h1 className="text-3xl font-bold mb-2">Manajemen Modul Online</h1>
+                        <h1 className="text-3xl font-bold mb-2">Online Module Management</h1>
                         <p className="text-blue-100 max-w-xl">Create, edit, and manage training modules. Track progress.</p>
                     </div>
                     <button
                         onClick={handleAddNewCourse}
                         className="bg-white text-blue-600 px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg hover:bg-blue-50 transition-all"
                     >
-                        <Plus size={20} /> New Modul
+                        <Plus size={20} /> New Module
                     </button>
                 </div>
             </div>
@@ -615,7 +615,7 @@ const OnlineModulesManager = () => {
                         <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         <div className="flex justify-between items-start mb-4">
                             <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider">
-                                Modul
+                                Module
                             </span>
                             <div className="flex gap-1">
                                 <button
