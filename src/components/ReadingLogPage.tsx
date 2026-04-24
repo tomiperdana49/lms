@@ -1,5 +1,5 @@
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
-import { BookOpen, ArrowLeft, Search, Book, Trophy, Trash2, XCircle, CheckCircle, Upload, Clock } from 'lucide-react';
+import { BookOpen, ArrowLeft, Search, Book, Trophy, Trash2, XCircle, CheckCircle, Upload, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry, User } from '../types';
 import PopupNotification from './PopupNotification';
@@ -302,7 +302,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         return period.month === parseInt(filterPeriod);
     });
 
-    // const totalPages = Math.ceil(filteredLogs.length / ITEMS_PER_PAGE);
+    const totalPages = Math.ceil(filteredLogs.length / ITEMS_PER_PAGE);
     const paginatedLogs = filteredLogs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
     const submitPrivateReportData = async () => {
@@ -691,6 +691,50 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 })
                             )}
                         </div>
+                        
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="p-4 border-t border-slate-50 flex items-center justify-between bg-slate-50/30">
+                                <p className="text-xs text-slate-500 font-medium">
+                                    Showing <span className="text-slate-800 font-bold">{Math.min(filteredLogs.length, (currentPage - 1) * ITEMS_PER_PAGE + 1)}</span> to <span className="text-slate-800 font-bold">{Math.min(filteredLogs.length, currentPage * ITEMS_PER_PAGE)}</span> of <span className="text-slate-800 font-bold">{filteredLogs.length}</span> logs
+                                </p>
+                                <div className="flex gap-2">
+                                    <button 
+                                        disabled={currentPage === 1}
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                        className={`p-2 rounded-lg border transition-all ${currentPage === 1 ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300 active:scale-95'}`}
+                                    >
+                                        <ChevronLeft size={16} />
+                                    </button>
+                                    <div className="flex gap-1">
+                                        {[...Array(totalPages)].map((_, i) => {
+                                            const page = i + 1;
+                                            // Show limited pages if many
+                                            if (totalPages > 5 && Math.abs(page - currentPage) > 1 && page !== 1 && page !== totalPages) {
+                                                if (page === 2 || page === totalPages - 1) return <span key={page} className="px-1 text-slate-400 self-end">...</span>;
+                                                return null;
+                                            }
+                                            return (
+                                                <button
+                                                    key={page}
+                                                    onClick={() => setCurrentPage(page)}
+                                                    className={`w-9 h-9 rounded-lg text-xs font-bold transition-all ${currentPage === page ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 active:scale-95'}`}
+                                                >
+                                                    {page}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    <button 
+                                        disabled={currentPage === totalPages}
+                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                        className={`p-2 rounded-lg border transition-all ${currentPage === totalPages ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300 active:scale-95'}`}
+                                    >
+                                        <ChevronRight size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
