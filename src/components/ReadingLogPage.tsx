@@ -519,8 +519,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                         <div className="text-4xl font-black">
                             {readingLogs.filter(l => 
                                 new Date(l.finishDate || l.date).getFullYear() === filterYear && 
-                                l.status === 'Finished' && 
-                                l.hrApprovalStatus !== 'Rejected'
+                                l.status === 'Finished'
                             ).length}
                         </div>
                         <div className="text-sm font-medium text-blue-100 uppercase tracking-wider">Books In {filterYear}</div>
