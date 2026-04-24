@@ -798,10 +798,9 @@ app.put('/api/logs/:id', async (req, res) => {
         if (updates.rejectionReason !== undefined) dbUpdates.rejection_reason = updates.rejectionReason;
         if (updates.approvedBy !== undefined) dbUpdates.approved_by = updates.approvedBy;
         if (updates.sn !== undefined) dbUpdates.sn = updates.sn;
-        if (updates.approvedBy !== undefined) dbUpdates.approved_by = updates.approvedBy;
-        if (updates.approvedAt !== undefined) dbUpdates.approved_at = updates.approvedAt;
-        if (updates.plannedFinishDate !== undefined) dbUpdates.planned_finish_date = updates.plannedFinishDate;
-        if (updates.cancelledAt !== undefined) dbUpdates.cancelled_at = updates.cancelledAt;
+        if (updates.approvedAt !== undefined) dbUpdates.approved_at = new Date(updates.approvedAt);
+        if (updates.plannedFinishDate !== undefined) dbUpdates.planned_finish_date = new Date(updates.plannedFinishDate);
+        if (updates.cancelledAt !== undefined) dbUpdates.cancelled_at = new Date(updates.cancelledAt);
         if (updates.cancelledBy !== undefined) dbUpdates.cancelled_by = updates.cancelledBy;
         if (updates.location !== undefined) dbUpdates.location = updates.location;
         if (updates.source !== undefined) dbUpdates.source = updates.source;
@@ -823,9 +822,15 @@ app.put('/api/logs/:id', async (req, res) => {
         const fields = Object.keys(dbUpdates).map(k => `${k} = ?`).join(', ');
         const values = Object.values(dbUpdates);
 
+        console.log(`[API] Updating Reading Log ${id}:`, dbUpdates);
+
         await query(`UPDATE reading_logs SET ${fields} WHERE id = ?`, [...values, id]);
 
         const updatedLogs = await query('SELECT * FROM reading_logs WHERE id = ?', [id]);
+        if (!updatedLogs || updatedLogs.length === 0) {
+            return res.status(404).json({ error: 'Reading log not found after update' });
+        }
+        
         const updated = updatedLogs[0];
 
         res.json({
@@ -841,7 +846,10 @@ app.put('/api/logs/:id', async (req, res) => {
             cancelledAt: updated.cancelled_at,
             cancelledBy: updated.cancelled_by
         });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { 
+        console.error(`[API ERROR] Update Reading Log ${req.params.id} Failed:`, err);
+        res.status(500).json({ error: err.message }); 
+    }
 });
 
 // --- NEW BOOKS BORROW/RETURN ENDPOINTS ---
