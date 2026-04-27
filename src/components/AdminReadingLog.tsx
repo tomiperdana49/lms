@@ -13,20 +13,12 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
     const [users, setUsers] = useState<User[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [startDate, setStartDate] = useState(() => {
-        const now = new Date();
-        const d = new Date(now.getFullYear(), now.getMonth() - 1, 26);
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${y}-${m}-${day}`;
+        const y = new Date().getFullYear();
+        return `${y}-01-01`;
     });
     const [endDate, setEndDate] = useState(() => {
-        const now = new Date();
-        const d = new Date(now.getFullYear(), now.getMonth(), 25);
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${y}-${m}-${day}`;
+        const y = new Date().getFullYear();
+        return `${y}-12-31`;
     });
     const [selectedBranch, setSelectedBranch] = useState('All Branches');
     const [branches, setBranches] = useState<string[]>(['All Branches']);
@@ -75,7 +67,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
     });
 
     const [recapSort, setRecapSort] = useState<{ key: 'name' | 'totalBooks' | 'verifiedCount' | 'milestone' | 'incentive', direction: 'asc' | 'desc' }>({
-        key: 'totalBooks',
+        key: 'incentive',
         direction: 'desc'
     });
 
@@ -399,15 +391,20 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             return logDate.getFullYear() === currentYear;
         });
 
-        // Data Periode Range
+        // Data Periode Range - Sekarang menggunakan TANGGAL APPROVED
         const userRangeLogs = allLogs.filter(l => {
             if (!areSameUser(user, l)) return false;
-            if (l.status === 'Reading') return false;
-            const logDate = new Date(l.finishDate || l.date);
+            if (l.hrApprovalStatus !== 'Approved') return false; // Hanya hitung yang sudah approved untuk range insentif
+            
+            // Gunakan approvedAt, jika tidak ada (data lama) fallback ke finishDate/date
+            const approvalDateStr = l.approvedAt || l.finishDate || l.date;
+            const logDate = new Date(approvalDateStr);
+            
             const start = new Date(startDate);
             start.setHours(0, 0, 0, 0);
             const end = new Date(endDate);
             end.setHours(23, 59, 59, 999);
+            
             return logDate >= start && logDate <= end;
         });
 
@@ -529,8 +526,37 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                             {isSyncing ? 'Syncing...' : 'Sync SIMAS Data'}
                         </button>
                         <div className="bg-slate-100 p-1 rounded-xl flex shadow-inner">
-                            <button onClick={() => setViewMode('verification')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'verification' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Verification</button>
-                            <button onClick={() => setViewMode('recap')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'recap' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Recapitulation</button>
+                            <button 
+                                onClick={() => {
+                                    setViewMode('verification');
+                                    // Reset to Full Year for Verification
+                                    const y = new Date().getFullYear();
+                                    setStartDate(`${y}-01-01`);
+                                    setEndDate(`${y}-12-31`);
+                                }} 
+                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'verification' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Verification
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    setViewMode('recap');
+                                    // Reset to Rolling Cycle for Recap
+                                    const now = new Date();
+                                    const d = now.getDate() >= 26 
+                                        ? new Date(now.getFullYear(), now.getMonth(), 26)
+                                        : new Date(now.getFullYear(), now.getMonth() - 1, 26);
+                                    const ed = now.getDate() >= 26
+                                        ? new Date(now.getFullYear(), now.getMonth() + 1, 25)
+                                        : new Date(now.getFullYear(), now.getMonth(), 25);
+                                    
+                                    setStartDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+                                    setEndDate(`${ed.getFullYear()}-${String(ed.getMonth() + 1).padStart(2, '0')}-${String(ed.getDate()).padStart(2, '0')}`);
+                                }} 
+                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'recap' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Recapitulation
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -708,7 +734,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     <th className="px-6 py-4">Book Title / Source</th>
                                     <th className="px-6 py-4">Start Date</th>
                                     <th className="px-6 py-4">Finish Date</th>
-                                    <th className="px-6 py-4">Evidence & Links</th>
+
                                     <th className="px-6 py-4">Status</th>
                                     <th className="px-6 py-4 text-center">Action</th>
                                 </tr>
@@ -771,21 +797,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col gap-2">
-                                                {(log.evidenceUrl || log.returnEvidenceUrl) ? (
-                                                    <button onClick={() => setPhotoModal({ open: true, log })} className="flex items-center gap-1 text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded text-xs font-bold transition-colors w-fit border border-blue-100">
-                                                        <ImageIcon size={14} /> View Evidence
-                                                    </button>
-                                                ) : <span className="text-slate-400 text-xs italic">No photo</span>}
 
-                                                {log.link || log.review ? (
-                                                    <a href={log.link || log.review} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-green-600 hover:text-green-700 bg-green-50 px-2 py-1 rounded text-xs font-bold transition-colors w-fit border border-green-100">
-                                                        <ExternalLink size={14} /> Goodreads / Review
-                                                    </a>
-                                                ) : <span className="text-slate-400 text-xs italic">No link</span>}
-                                            </div>
-                                        </td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${
                                                 log.status === 'Reading' ? 'bg-orange-50 text-orange-600 border-orange-100' :
@@ -814,17 +826,41 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                 <span className="text-xs text-slate-300 italic">-</span>
                                             ) : log.status !== 'Cancelled' ? (
                                                 <div className="flex justify-center gap-2">
-                                                    {log.hrApprovalStatus === 'Pending' ? (
+                                                     {log.hrApprovalStatus === 'Pending' ? (
                                                         (() => {
                                                             const currentSeq = getLogSequence(log);
                                                             if (currentSeq <= 5) {
                                                                 return (
-                                                                    <>
-                                                                        <button onClick={() => handleEditLogClick(log)} className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors" title="Edit Details"><Edit size={16} /></button>
-                                                                        <button onClick={() => handleVerifyClick(log)} className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors" title="Verify & Reward"><CheckCircle size={16} /></button>
-                                                                        <button onClick={() => handleCancelClick(log)} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200 transition-colors" title="Cancel Log"><Trash2 size={16} /></button>
-                                                                        <button onClick={() => handleRejectClick(log)} className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors" title="Reject"><XCircle size={16} /></button>
-                                                                    </>
+                                                                    <div className="grid grid-cols-2 gap-2 min-w-[180px]">
+                                                                        <button 
+                                                                            onClick={() => handleVerifyClick(log)} 
+                                                                            className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow-sm font-bold text-[11px]" 
+                                                                            title="Verify & Reward"
+                                                                        >
+                                                                            <CheckCircle size={13} /> Verify
+                                                                        </button>
+                                                                        <button 
+                                                                            onClick={() => handleEditLogClick(log)} 
+                                                                            className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors font-bold text-[11px] border border-slate-200" 
+                                                                            title="Edit Details"
+                                                                        >
+                                                                            <Edit size={13} /> Edit
+                                                                        </button>
+                                                                        <button 
+                                                                            onClick={() => handleRejectClick(log)} 
+                                                                            className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-rose-50 text-rose-700 rounded-lg hover:bg-rose-100 transition-colors font-bold text-[11px] border border-rose-100" 
+                                                                            title="Reject Report"
+                                                                        >
+                                                                            <XCircle size={13} /> Reject
+                                                                        </button>
+                                                                        <button 
+                                                                            onClick={() => handleCancelClick(log)} 
+                                                                            className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-white text-slate-400 rounded-lg hover:bg-slate-50 transition-colors font-bold text-[11px] border border-slate-100" 
+                                                                            title="Cancel Log"
+                                                                        >
+                                                                            <Trash2 size={13} /> Cancel
+                                                                        </button>
+                                                                    </div>
                                                                 );
                                                             } else {
                                                                 return (
@@ -889,7 +925,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                             })()}
 
                             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col gap-3">
-                                <div className="flex flex-col gap-1">
+                                 <div className="flex flex-col gap-1">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Book Details</p>
                                     <p className="font-bold text-slate-800 text-sm leading-tight">{verifyModal.log.title}</p>
                                     <div className="flex items-center gap-2 mt-1">
@@ -906,6 +942,41 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                         )}
                                     </div>
                                 </div>
+
+                                {/* Approved Books History Section */}
+                                {(() => {
+                                    const y = new Date(verifyModal.log.finishDate || verifyModal.log.date).getFullYear();
+                                    const approvedLogs = allLogs.filter(l => 
+                                        areSameUser(verifyModal.log!, l) && 
+                                        l.hrApprovalStatus === 'Approved' && 
+                                        new Date(l.finishDate || l.date).getFullYear() === y
+                                    ).sort((a, b) => new Date(a.finishDate || a.date).getTime() - new Date(b.finishDate || b.date).getTime());
+
+                                    if (approvedLogs.length === 0) return null;
+
+                                    return (
+                                        <div className="pt-2 border-t border-slate-200/60">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Previously Approved in {y} ({approvedLogs.length})</p>
+                                            <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1 custom-scrollbar">
+                                                {approvedLogs.map((appLog, idx) => (
+                                                    <div key={appLog.id} className="flex items-start gap-2 p-2 rounded-lg bg-emerald-50/50 border border-emerald-100/50">
+                                                        <div className="min-w-[18px] h-[18px] rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[9px] font-black mt-0.5">
+                                                            {idx + 1}
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <p className="text-[10px] font-bold text-slate-700 leading-tight">{appLog.title}</p>
+                                                            <div className="flex items-center gap-1.5 mt-0.5">
+                                                                <p className="text-[8px] text-slate-400 font-medium">{new Date(appLog.finishDate || appLog.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</p>
+                                                                <span className="text-slate-300 text-[8px]">•</span>
+                                                                <span className="text-[8px] font-bold text-emerald-600">{formatCurrency(appLog.incentiveAmount || 0)}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
 
                                 {/* Dates Grid */}
                                 <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200/60">
@@ -1171,9 +1242,11 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 <table className="w-full text-left">
                                     <thead className="bg-white text-xs uppercase text-slate-500 font-bold border-b border-slate-100 sticky top-0 shadow-sm">
                                         <tr>
-                                            <th className="px-6 py-3">Book Title / Category</th>
                                             <th className="px-6 py-3 text-center">Book #</th>
-                                            <th className="px-6 py-3">Period</th>
+                                            <th className="px-6 py-3">Book Title / Category</th>
+                                            <th className="px-6 py-3 text-center">Start Date</th>
+                                            <th className="px-6 py-3 text-center">Finish Date</th>
+                                            <th className="px-6 py-3 text-center">Date Verified</th>
                                             <th className="px-6 py-3 text-center">Incentive</th>
                                             <th className="px-6 py-3">Status</th>
                                         </tr>
@@ -1191,6 +1264,16 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                             })
                                             .map(log => (
                                                 <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="px-6 py-4 text-center">
+                                                        {(() => {
+                                                            const seq = getLogSequence(log);
+                                                            if (seq === 0) return '-';
+                                                            const isApproved = log.hrApprovalStatus === 'Approved';
+                                                            return <span className={`text-xs font-black px-2 py-0.5 rounded border whitespace-nowrap ${seq === 5 ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-slate-50 text-slate-700 border-slate-100'}`}>
+                                                                {!isApproved ? 'To ' : ''}{seq} / 5
+                                                            </span>;
+                                                        })()}
+                                                    </td>
                                                     <td className="px-6 py-4">
                                                         <div className="font-bold text-slate-700 text-sm whitespace-pre-wrap leading-tight">{log.title}</div>
                                                         <div className="flex flex-col gap-1.5 mt-1">
@@ -1206,19 +1289,19 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
-                                                        {(() => {
-                                                            const seq = getLogSequence(log);
-                                                            if (seq === 0) return '-';
-                                                            const isApproved = log.hrApprovalStatus === 'Approved';
-                                                            return <span className={`text-xs font-black px-2 py-0.5 rounded border whitespace-nowrap ${seq === 5 ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-slate-50 text-slate-700 border-slate-100'}`}>
-                                                                {!isApproved ? 'To ' : ''}{seq} / 5
-                                                            </span>;
-                                                        })()}
+                                                        <div className="text-sm text-slate-600">
+                                                            {log.startDate ? new Date(log.startDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                                                        </div>
                                                     </td>
                                                     <td className="px-6 py-4">
                                                          <div className="text-sm font-medium text-slate-600">
                                                              {log.finishDate ? new Date(log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : log.date ? new Date(log.date).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
                                                          </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <div className="text-sm font-bold text-indigo-600">
+                                                            {log.approvedAt ? new Date(log.approvedAt).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                                                        </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
                                                         {log.incentiveAmount ? (
