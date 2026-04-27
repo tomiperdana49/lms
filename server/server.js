@@ -1069,7 +1069,7 @@ app.post('/api/meetings', async (req, res) => {
         if (!guests.emails) guests.emails = [];
 
         const result = await query(
-            'INSERT INTO meetings (title, date, time, host, location, type, meetLink, agenda, guests_json, cost_report_json, employee_id, pre_test_link, material_link, post_test_link, feedback_link, pre_test_data, post_test_data, feedback_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO meetings (title, date, time, host, location, type, meetLink, agenda, guests_json, cost_report_json, employee_id, pre_test_link, material_link, post_test_link, feedback_link, pre_test_data, post_test_data, feedback_data, is_pre_test_active, is_post_test_active, is_feedback_active, is_closed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 m.title, 
                 new Date(m.date), 
@@ -1088,7 +1088,11 @@ app.post('/api/meetings', async (req, res) => {
                 m.feedback_link || '',
                 m.pre_test_data ? JSON.stringify(m.pre_test_data) : null,
                 m.post_test_data ? JSON.stringify(m.post_test_data) : null,
-                m.feedback_data ? JSON.stringify(m.feedback_data) : null
+                m.feedback_data ? JSON.stringify(m.feedback_data) : null,
+                m.is_pre_test_active ? 1 : 0,
+                m.is_post_test_active ? 1 : 0,
+                m.is_feedback_active ? 1 : 0,
+                m.is_closed ? 1 : 0
             ]
         );
 
@@ -1099,6 +1103,19 @@ app.post('/api/meetings', async (req, res) => {
         }
 
         res.json(newMeeting);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/meetings/summary/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const quizResults = await query('SELECT quiz_type, COUNT(*) as count FROM quiz_results WHERE meeting_id = ? GROUP BY quiz_type', [id]);
+        const feedbackResults = await query('SELECT COUNT(*) as count FROM course_feedback WHERE meeting_id = ?', [id]);
+        
+        res.json({
+            quiz: quizResults,
+            feedback: feedbackResults[0]?.count || 0
+        });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1114,7 +1131,7 @@ app.put('/api/meetings/:id', async (req, res) => {
         let costReport = m.costReport || null;
 
         await query(
-            'UPDATE meetings SET title = ?, date = ?, time = ?, host = ?, location = ?, type = ?, meetLink = ?, agenda = ?, guests_json = ?, cost_report_json = ?, employee_id = ?, pre_test_link = ?, material_link = ?, post_test_link = ?, feedback_link = ?, pre_test_data = ?, post_test_data = ?, feedback_data = ? WHERE id = ?',
+            'UPDATE meetings SET title = ?, date = ?, time = ?, host = ?, location = ?, type = ?, meetLink = ?, agenda = ?, guests_json = ?, cost_report_json = ?, employee_id = ?, pre_test_link = ?, material_link = ?, post_test_link = ?, feedback_link = ?, pre_test_data = ?, post_test_data = ?, feedback_data = ?, is_pre_test_active = ?, is_post_test_active = ?, is_feedback_active = ?, is_closed = ? WHERE id = ?',
             [
                 m.title,
                 new Date(m.date),
@@ -1134,6 +1151,10 @@ app.put('/api/meetings/:id', async (req, res) => {
                 m.pre_test_data ? JSON.stringify(m.pre_test_data) : null,
                 m.post_test_data ? JSON.stringify(m.post_test_data) : null,
                 m.feedback_data ? JSON.stringify(m.feedback_data) : null,
+                m.is_pre_test_active ? 1 : 0,
+                m.is_post_test_active ? 1 : 0,
+                m.is_feedback_active ? 1 : 0,
+                m.is_closed ? 1 : 0,
                 id
             ]
         );

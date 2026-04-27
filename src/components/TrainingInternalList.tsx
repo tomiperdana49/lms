@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, Fragment, type FormEvent } from 'react';
 import {
     Users,
+    User as UserIcon,
     MapPin,
     Video,
     Clock,
@@ -12,7 +13,9 @@ import {
     ArrowRight,
     DollarSign,
     CheckCircle,
-    ChevronDown
+    ChevronDown,
+    Zap,
+    Lock
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Role, Meeting, CostReport, Employee, QuizResult, User } from '../types';
@@ -103,8 +106,34 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
     const [expandedHosts, setExpandedHosts] = useState<Record<string, boolean>>({});
     const [expandedMeetings, setExpandedMeetings] = useState<Record<number, boolean>>({});
-    const [selectedYear, setSelectedYear] = useState<number | 'All'>(new Date().getFullYear());
-    const [selectedPeriod, setSelectedPeriod] = useState<string>('All Year'); // Default to All Year for easier initial view
+    const [startDate, setStartDate] = useState<string>(() => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = d.getMonth();
+        const day = d.getDate();
+        
+        // If today is 26th or later, start from 26th of this month
+        // Otherwise, start from 26th of last month
+        const start = day >= 26 
+            ? new Date(year, month, 26)
+            : new Date(year, month - 1, 26);
+            
+        return `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+    });
+    const [endDate, setEndDate] = useState<string>(() => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = d.getMonth();
+        const day = d.getDate();
+        
+        // If today is 26th or later, end at 25th of next month
+        // Otherwise, end at 25th of this month
+        const end = day >= 26
+            ? new Date(year, month + 1, 25)
+            : new Date(year, month, 25);
+            
+        return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+    });
     const [selectedBranch, setSelectedBranch] = useState<string>('All Branches');
     const [branches, setBranches] = useState<string[]>(['All Branches']);
     const [searchQuery, setSearchQuery] = useState(''); // Unified search term
@@ -114,16 +143,18 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [participantSearch, setParticipantSearch] = useState('');
     const [showHostDropdown, setShowHostDropdown] = useState(false);
     const [showParticipantDropdown, setShowParticipantDropdown] = useState(false);
-    const [activeCreateTab, setActiveCreateTab] = useState<'details' | 'assessment'>('details');
-
     const hostDropdownRef = useRef<HTMLDivElement>(null);
     const participantDropdownRef = useRef<HTMLDivElement>(null);
+    const [activeCreateTab, setActiveCreateTab] = useState<'details' | 'assessment'>('details');
+    const startDateRef = useRef<HTMLInputElement>(null);
+    const endDateRef = useRef<HTMLInputElement>(null);
 
 
     // Interactive Quiz/Feedback State
     const [showQuiz, setShowQuiz] = useState<'PRE' | 'POST' | null>(null);
     const [showFeedback, setShowFeedback] = useState(false);
     const [meetingQuizResults, setMeetingQuizResults] = useState<QuizResult[]>([]);
+    const [meetingSummary, setMeetingSummary] = useState<{ quiz: { quiz_type: string, count: number }[], feedback: number } | null>(null);
     const [userFeedback, setUserFeedback] = useState<any>(null);
 
     const fetchResults = async (mid: number) => {
@@ -180,7 +211,44 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     setUserFeedback(fData?.feedback_data ? (typeof fData.feedback_data === 'string' ? JSON.parse(fData.feedback_data) : fData.feedback_data) : null);
                 } catch(e) { setUserFeedback(null); }
             }
-        } catch (err) { console.error(err); }
+
+            // Fetch summary for host/HR
+            if (selectedMeeting && (effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' || (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id))) {
+                try {
+                    const sRes = await fetch(`${API_BASE_URL}/api/meetings/summary/${mid}`);
+                    if (sRes.ok) {
+                        const sData = await sRes.json();
+                        setMeetingSummary(sData);
+                    }
+                } catch (e) { console.error("Failed to fetch summary", e); }
+            }
+        } catch (err) { console.error(err);        }
+    };
+
+    const toggleMeetingStatus = async (field: 'is_pre_test_active' | 'is_post_test_active' | 'is_feedback_active' | 'is_closed', currentValue: any) => {
+        if (!selectedMeeting) return;
+        const newValue = currentValue ? 0 : 1;
+        const updatedMeeting = { ...selectedMeeting, [field]: newValue };
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/meetings/${selectedMeeting.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedMeeting)
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setSelectedMeeting(data);
+                setMeetings(prev => prev.map(m => m.id === data.id ? data : m));
+                setNotification({ show: true, type: 'success', message: `Status berhasil diperbarui.` });
+            } else {
+                throw new Error("Gagal memperbarui status.");
+            }
+        } catch (err) {
+            console.error(err);
+            setNotification({ show: true, type: 'error', message: "Terjadi kesalahan saat memperbarui status." });
+        }
     };
 
     useEffect(() => {
@@ -205,38 +273,10 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const periodOptions = [
-        "All Year",
-        "Q1 (Jan-Mar)", "Q2 (Apr-Jun)", "Q3 (Jul-Sep)", "Q4 (Oct-Dec)",
-        "Semester 1 (Jan-Jun)", "Semester 2 (Jul-Dec)",
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-    ];
+
 
     const getPeriodDates = () => {
-        const year = selectedYear === 'All' ? new Date().getFullYear() : selectedYear;
-        // Default: Full Year
-        let start = new Date(year, 0, 1);
-        let end = new Date(year, 11, 31, 23, 59, 59);
-
-        if (selectedPeriod === 'All Year') return [start, end];
-
-        if (selectedPeriod.startsWith('Q1')) { end = new Date(year, 2, 31, 23, 59, 59); }
-        else if (selectedPeriod.startsWith('Q2')) { start = new Date(year, 3, 1); end = new Date(year, 5, 30, 23, 59, 59); }
-        else if (selectedPeriod.startsWith('Q3')) { start = new Date(year, 6, 1); end = new Date(year, 8, 30, 23, 59, 59); }
-        else if (selectedPeriod.startsWith('Q4')) { start = new Date(year, 9, 1); end = new Date(year, 11, 31, 23, 59, 59); }
-        else if (selectedPeriod.startsWith('Semester 1')) { end = new Date(year, 5, 30, 23, 59, 59); }
-        else if (selectedPeriod.startsWith('Semester 2')) { start = new Date(year, 6, 1); }
-        else {
-            // Monthly
-            const monthIdx = new Date(`${selectedPeriod} 1, ${year}`).getMonth();
-            if (!isNaN(monthIdx)) {
-                // Period: 26th of previous month to 25th of current month
-                start = new Date(year, monthIdx - 1, 26);
-                end = new Date(year, monthIdx, 25, 23, 59, 59, 999);
-            }
-        }
-        return [start, end];
+        return [new Date(startDate), new Date(endDate + 'T23:59:59')];
     };
 
     // List View State
@@ -246,12 +286,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     // --- Filtered Data ---
     const filteredMeetings = meetings.filter(m => {
 
-        // PERMISSION CHECK: Non-HR can ONLY see meetings they are invited to
+        // PERMISSION CHECK: Non-HR can ONLY see meetings they are invited to OR if they are the Host
         if (effectiveRole !== 'HR' && effectiveRole !== 'HR_ADMIN') {
-            if (!userEmail) return false; // Guest without email sees nothing
             const invites = m.guests?.emails || [];
-            const isInvited = invites.some(email => email.toLowerCase() === userEmail.toLowerCase());
-            if (!isInvited) return false;
+            const isInvited = userEmail && invites.some(email => email.toLowerCase() === userEmail.toLowerCase());
+            const isHost = (m.employee_id && user.employee_id && m.employee_id === user.employee_id) || 
+                           (m.host && user.name && m.host === user.name);
+
+            if (!isInvited && !isHost) return false;
         }
 
         // Active vs History Filter (Only applies to List View, Recap shows all valid for period)
@@ -264,8 +306,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         const d = new Date(m.date);
         const [start, end] = getPeriodDates();
 
-        // Year & Period
-        if (selectedYear !== 'All' && d.getFullYear() !== selectedYear) return false;
+        // Date Range Range
         if (d < start || d > end) return false;
 
         // Branch Filter (Host Database Mapping)
@@ -283,6 +324,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             m.title.toLowerCase().includes(lower) ||
             m.host.toLowerCase().includes(lower)
         );
+    }).sort((a, b) => {
+        // Active first (is_closed: 0/false), then Closed (is_closed: 1/true)
+        const aClosed = a.is_closed ? 1 : 0;
+        const bClosed = b.is_closed ? 1 : 0;
+        if (aClosed !== bClosed) return aClosed - bClosed;
+        
+        // Then by date latest first
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
 
     // --- Handlers ---
@@ -674,7 +723,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
         meetings.forEach(m => {
             const d = new Date(m.date);
-            if (selectedYear !== 'All' && d.getFullYear() !== selectedYear) return;
+
             if (d < start || d > end) return;
 
             // Branch Filter (Host Database Mapping)
@@ -837,22 +886,26 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         {branches.map(b => <option key={b} value={b}>{b === 'Online' ? 'Online Only' : b}</option>)}
                     </select>
 
-                    <select
-                        value={selectedYear}
-                        onChange={(e) => setSelectedYear(e.target.value === 'All' ? 'All' : parseInt(e.target.value))}
-                        className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                    >
-                        <option value="All">All Year</option>
-                        {Array.from({ length: Math.max(1, new Date().getFullYear() - 2026 + 1) }, (_, i) => 2026 + i).map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
-
-                    <select
-                        value={selectedPeriod}
-                        onChange={(e) => setSelectedPeriod(e.target.value)}
-                        className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white min-w-[140px]"
-                    >
-                        {periodOptions.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
+                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200">
+                        <CalendarIcon size={14} className="text-slate-400" />
+                        <input 
+                            ref={startDateRef}
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            onClick={() => startDateRef.current?.showPicker()}
+                            className="bg-transparent font-bold text-slate-600 text-xs outline-none cursor-pointer"
+                        />
+                        <span className="text-slate-300 mx-1">-</span>
+                        <input 
+                            ref={endDateRef}
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            onClick={() => endDateRef.current?.showPicker()}
+                            className="bg-transparent font-bold text-slate-600 text-xs outline-none cursor-pointer"
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -991,7 +1044,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                             onClick={() => setExpandedMeetings(prev => ({ ...prev, [m.id]: !prev[m.id] }))}
                                                                             className="hover:bg-white transition-colors cursor-pointer group/row"
                                                                         >
-                                                                            <td className="px-6 py-4 text-slate-500 whitespace-nowrap">{new Date(m.date).toLocaleDateString()}</td>
+                                                                            <td className="px-6 py-4 text-slate-500 whitespace-nowrap">{new Date(m.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</td>
                                                                             <td className="px-6 py-4">
                                                                                 <div className="flex items-center gap-2">
                                                                                     <div className={`transition-transform duration-200 ${expandedMeetings[m.id] ? 'rotate-90' : ''}`}>
@@ -1164,7 +1217,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     className="group bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer relative overflow-hidden"
                                     onClick={() => setSelectedMeeting(meeting)}
                                 >
-                                    <div className={`absolute top-0 left-0 w-1.5 h-full ${meeting.type === 'Online' ? 'bg-blue-400' : 'bg-emerald-400'}`} />
+                                    <div className={`absolute top-0 left-0 w-1.5 h-full ${meeting.is_closed ? 'bg-red-500' : (meeting.type === 'Online' ? 'bg-blue-400' : 'bg-emerald-400')}`} />
 
                                     <div className="flex justify-between items-start mb-4 pl-2">
                                         <div className="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 text-center min-w-[60px]">
@@ -1175,12 +1228,19 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 {(meeting.shortDate || 'TBD').split(' ')[0]}
                                             </span>
                                         </div>
-                                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${meeting.type === 'Online'
-                                            ? 'bg-blue-50 text-blue-600 border-blue-100'
-                                            : 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                            }`}>
-                                            {meeting.type}
-                                        </span>
+                                        <div className="flex flex-col items-end gap-1">
+                                            {meeting.is_closed && (
+                                                <span className="px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-wider bg-red-50 text-red-600 border border-red-100 flex items-center gap-1">
+                                                    <Lock size={8} /> CLOSED
+                                                </span>
+                                            )}
+                                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${meeting.type === 'Online'
+                                                ? 'bg-blue-50 text-blue-600 border-blue-100'
+                                                : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                                }`}>
+                                                {meeting.type}
+                                            </span>
+                                        </div>
                                     </div>
 
                                     <h3 className="font-bold text-lg text-slate-800 mb-2 pl-2 line-clamp-2 leading-tight group-hover:text-indigo-600 transition-colors">
@@ -1827,7 +1887,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2">
                                         <Users className="text-indigo-600" size={20} /> {recapDetailHost} - Session Details
                                     </h2>
-                                    <p className="text-xs text-slate-500 font-medium">{selectedPeriod} • {selectedYear} • {selectedBranch}</p>
+                                    <p className="text-xs text-slate-500 font-medium">{startDate} - {endDate} • {selectedBranch}</p>
                                 </div>
                                 <button onClick={() => setRecapDetailHost(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={20} /></button>
                             </div>
@@ -1959,11 +2019,28 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 <h2 className="text-2xl font-bold text-slate-800 mb-1 leading-snug">{selectedMeeting.title}</h2>
                                 <p className="text-slate-500 font-medium text-sm mb-6 flex items-center gap-2">
                                     <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-600">{selectedMeeting.type}</span>
+                                    {selectedMeeting.is_closed ? (
+                                        <span className="bg-red-500 px-2 py-0.5 rounded text-white text-[10px] font-black flex items-center gap-1">
+                                            <Lock size={10} /> CLOSED
+                                        </span>
+                                    ) : (
+                                        <span className="bg-emerald-500 px-2 py-0.5 rounded text-white text-[10px] font-black flex items-center gap-1">
+                                            <Zap size={10} className="animate-pulse" /> ACTIVE
+                                        </span>
+                                    )}
                                     <span>•</span>
-                                    {selectedMeeting.date}
+                                    {new Date(selectedMeeting.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                                 </p>
 
                                 <div className="space-y-4">
+                                    <div className="flex gap-4">
+                                        <div className="w-8 flex justify-center pt-0.5"><UserIcon className="text-slate-400" size={20} /></div>
+                                        <div>
+                                            <p className="font-semibold text-slate-700 text-sm">Host</p>
+                                            <p className="text-sm text-slate-600">{selectedMeeting.host}</p>
+                                        </div>
+                                    </div>
+
                                     <div className="flex gap-4">
                                         <div className="w-8 flex justify-center pt-0.5"><Clock className="text-slate-400" size={20} /></div>
                                         <div>
@@ -2086,132 +2163,279 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         </div>
                                     </div>
                                 </div>
+                                 {/* Assessment Section */}
+                                 {(() => {
+                                     const isHostOrHR = effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' || (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id);
+                                     
+                                     return (
+                                         <div className="mt-6 space-y-3 border-t border-slate-100 pt-6">
+                                             <div className="flex items-center justify-between mb-1">
+                                                 <div className="flex items-center gap-2">
+                                                     <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider">Assessment & Feedback</h4>
+                                                     {isHostOrHR && !selectedMeeting.is_closed && (
+                                                         <span className="flex items-center gap-1 text-[8px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-black border border-indigo-100">
+                                                             <Zap size={8} /> HOST CONTROL
+                                                         </span>
+                                                     )}
+                                                 </div>
+                                                 <div className="flex items-center gap-1 text-[10px] text-indigo-500 font-bold">
+                                                     <CheckCircle size={12} /> REQUIRED
+                                                 </div>
+                                             </div>
 
-                                {/* Assessment Section - Only for Participants */}
-                                {!(effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') && (
-                                    <div className="mt-6 space-y-3 border-t border-slate-100 pt-6">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider">Assessment & Feedback</h4>
-                                            <div className="flex items-center gap-1 text-[10px] text-indigo-500 font-bold">
-                                                <CheckCircle size={12} /> REQUIRED
+                                             {!!isHostOrHR && (
+                                                <div className="flex flex-col gap-2">
+                                                    {!selectedMeeting.is_closed ? (
+                                                        <button 
+                                                            onClick={() => {
+                                                                if (window.confirm("Apakah Anda yakin ingin menutup sesi ini? Setelah ditutup, peserta tidak akan bisa lagi mengakses assessment dan feedback.")) {
+                                                                    toggleMeetingStatus('is_closed', false);
+                                                                }
+                                                            }}
+                                                            className="w-full mb-2 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-black rounded-xl border border-red-200 flex items-center justify-center gap-2 transition-all shadow-sm"
+                                                        >
+                                                            <Lock size={14} /> CLOSE SESSION
+                                                        </button>
+                                                    ) : (
+                                                        <div className="w-full mb-4 py-2 bg-slate-100 text-slate-500 text-xs font-black rounded-xl border border-slate-200 flex items-center justify-center gap-2 shadow-sm">
+                                                            <Lock size={14} /> SESSION CLOSED
+                                                        </div>
+                                                    )}
+
+                                                    {!!meetingSummary && (
+                                                        <div className="mb-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-2 shadow-inner">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sudah Selesai</span>
+                                                                <span className="text-sm font-black text-emerald-600 bg-emerald-50 px-3 py-0.5 rounded-full border border-emerald-100">
+                                                                    {meetingSummary.feedback || 0}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Belum Selesai</span>
+                                                                <span className="text-sm font-black text-orange-600 bg-orange-50 px-3 py-0.5 rounded-full border border-orange-100">
+                                                                    {Math.max(0, (selectedMeeting.guests?.emails?.length || 0) - (meetingSummary.feedback || 0))}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                             )}
+
+                                            <div className="space-y-2">
+                                                {/* Pre-Test */}
+                                                <div className="flex flex-col gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            if (isHostOrHR) return; // Host doesn't take the test here
+                                                            if (selectedMeeting.is_closed) {
+                                                                setNotification({ show: true, type: 'error', message: "Sesi ini sudah ditutup oleh Host." });
+                                                                return;
+                                                            }
+                                                            if (!selectedMeeting.is_pre_test_active) {
+                                                                setNotification({ show: true, type: 'error', message: "Pre-Test belum dibuka oleh Host." });
+                                                                return;
+                                                            }
+                                                            if (meetingQuizResults.find(r => r.quizType === 'PRE')) return;
+                                                            setShowQuiz('PRE');
+                                                        }}
+                                                        className={`w-full group bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between transition-all 
+                                                            ${(meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('PRE')) || isHostOrHR) 
+                                                                ? 'cursor-default' 
+                                                                : (selectedMeeting.is_pre_test_active && !selectedMeeting.is_closed) ? 'hover:border-indigo-300 cursor-pointer' : 'opacity-60 cursor-not-allowed'}`}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                                                                meetingQuizResults.find(r => r.quizType === 'PRE')
+                                                                    ? 'bg-slate-100 text-slate-400'
+                                                                    : (!selectedMeeting.is_pre_test_active || selectedMeeting.is_closed) && !isHostOrHR
+                                                                        ? 'bg-slate-50 text-slate-300'
+                                                                        : 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white'
+                                                            }`}>
+                                                                {(selectedMeeting.is_pre_test_active && !selectedMeeting.is_closed) ? <FileText size={16} /> : <Lock size={16} />}
+                                                            </div>
+                                                            <div className="text-left">
+                                                                <p className="font-bold text-slate-800 text-xs">Pre-Test Assessment</p>
+                                                                <p className="text-[10px] text-slate-400">Evaluasi sebelum materi</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            {(() => {
+                                                                const res = meetingQuizResults.find(r => {
+                                                                    const type = (r.quizType || "").toUpperCase();
+                                                                    const midMatches = Number(r.meetingId || (r as any).meeting_id) === Number(selectedMeeting.id);
+                                                                    return (type === 'PRE' || type === 'PRE-TEST') && midMatches;
+                                                                });
+                                                                return res && <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">Score: {res.score}</span>;
+                                                            })()}
+                                                            {!isHostOrHR && selectedMeeting.is_pre_test_active && !meetingQuizResults.find(r => r.quizType === 'PRE') && <ArrowRight size={14} className="text-slate-300 group-hover:text-indigo-500" />}
+                                                        </div>
+                                                    </button>
+                                                    
+                                                    {isHostOrHR && !selectedMeeting.is_closed && (
+                                                        <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Akses Pre-Test</span>
+                                                            </div>
+                                                            <button 
+                                                                onClick={() => toggleMeetingStatus('is_pre_test_active', selectedMeeting.is_pre_test_active)}
+                                                                className={`px-3 py-1 rounded-full text-[10px] font-black transition-all border ${selectedMeeting.is_pre_test_active 
+                                                                    ? 'bg-emerald-500 text-white border-emerald-600' 
+                                                                    : 'bg-white text-slate-400 border-slate-200'}`}
+                                                            >
+                                                                {selectedMeeting.is_pre_test_active ? 'AKTIF' : 'NON-AKTIF'}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Post-Test */}
+                                                <div className="flex flex-col gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            if (isHostOrHR) return;
+                                                            if (selectedMeeting.is_closed) {
+                                                                setNotification({ show: true, type: 'error', message: "Sesi ini sudah ditutup oleh Host." });
+                                                                return;
+                                                            }
+                                                            if (!selectedMeeting.is_post_test_active) {
+                                                                setNotification({ show: true, type: 'error', message: "Post-Test belum dibuka oleh Host." });
+                                                                return;
+                                                            }
+                                                            const preRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('PRE'));
+                                                            if (!preRes) {
+                                                                setNotification({ show: true, type: 'error', message: "Silakan kerjakan Pre-Test terlebih dahulu." });
+                                                                return;
+                                                            }
+                                                            const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
+                                                            if (postRes && (Number(postRes.score) || 0) >= 80) return;
+                                                            setShowQuiz('POST');
+                                                        }}
+                                                        className={`w-full group bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between transition-all 
+                                                            ${(() => {
+                                                                if (isHostOrHR) return 'cursor-default';
+                                                                if (selectedMeeting.is_closed || !selectedMeeting.is_post_test_active) return 'opacity-60 cursor-not-allowed';
+                                                                const preRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('PRE'));
+                                                                const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
+                                                                if (!preRes) return 'opacity-60 cursor-not-allowed';
+                                                                return (postRes && (Number(postRes.score) || 0) >= 80) ? 'cursor-default' : 'hover:border-indigo-300 cursor-pointer';
+                                                            })()}`}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${(() => {
+                                                                const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
+                                                                if (postRes && (Number(postRes.score) || 0) >= 80) return 'bg-emerald-100 text-emerald-600';
+                                                                if ((selectedMeeting.is_closed || !selectedMeeting.is_post_test_active) && !isHostOrHR) return 'bg-slate-50 text-slate-300';
+                                                                return 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-500 group-hover:text-white';
+                                                            })()}`}>
+                                                                {(selectedMeeting.is_post_test_active && !selectedMeeting.is_closed) ? <CheckCircle size={16} /> : <Lock size={16} />}
+                                                            </div>
+                                                            <div className="text-left">
+                                                                <p className="font-bold text-slate-800 text-xs">Post-Test Assessment</p>
+                                                                <p className="text-[10px] text-slate-400">Syarat kelulusan (Min. 80)</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            {(() => {
+                                                                const res = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
+                                                                return res && <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">Score: {res.score}</span>;
+                                                            })()}
+                                                            {!isHostOrHR && selectedMeeting.is_post_test_active && !meetingQuizResults.find(r => r.quizType === 'POST') && <ArrowRight size={14} className="text-slate-300 group-hover:text-indigo-500" />}
+                                                        </div>
+                                                    </button>
+                                                    
+                                                    {isHostOrHR && !selectedMeeting.is_closed && (
+                                                        <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Akses Post-Test</span>
+                                                            </div>
+                                                            <button 
+                                                                onClick={() => toggleMeetingStatus('is_post_test_active', selectedMeeting.is_post_test_active)}
+                                                                className={`px-3 py-1 rounded-full text-[10px] font-black transition-all border ${selectedMeeting.is_post_test_active 
+                                                                    ? 'bg-emerald-500 text-white border-emerald-600' 
+                                                                    : 'bg-white text-slate-400 border-slate-200'}`}
+                                                            >
+                                                                {selectedMeeting.is_post_test_active ? 'AKTIF' : 'NON-AKTIF'}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Feedback */}
+                                                <div className="flex flex-col gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            if (isHostOrHR) return;
+                                                            if (selectedMeeting.is_closed) {
+                                                                setNotification({ show: true, type: 'error', message: "Sesi ini sudah ditutup oleh Host." });
+                                                                return;
+                                                            }
+                                                            if (!selectedMeeting.is_feedback_active) {
+                                                                setNotification({ show: true, type: 'error', message: "Form Feedback belum dibuka oleh Host." });
+                                                                return;
+                                                            }
+                                                            const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
+                                                            if (!postRes || (Number(postRes.score) || 0) < 80) {
+                                                                setNotification({ show: true, type: 'error', message: "Anda harus lulus Post-Test (Skor >= 80) sebelum mengisi feedback." });
+                                                                return;
+                                                            }
+                                                            if (userFeedback) return;
+                                                            setShowFeedback(true);
+                                                        }}
+                                                        className={`w-full group bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between transition-all 
+                                                            ${(userFeedback || isHostOrHR) 
+                                                                ? 'cursor-default' 
+                                                                : (() => {
+                                                                    const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
+                                                                    const hasPassed = postRes && (Number(postRes.score) || 0) >= 80;
+                                                                    return (selectedMeeting.is_feedback_active && !selectedMeeting.is_closed && hasPassed) ? 'hover:border-indigo-300 cursor-pointer' : 'opacity-60 cursor-not-allowed';
+                                                                })()}`}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${(() => {
+                                                                const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
+                                                                const hasPassed = postRes && (Number(postRes.score) || 0) >= 80;
+                                                                if (userFeedback) return 'bg-emerald-100 text-emerald-600';
+                                                                if ((!selectedMeeting.is_feedback_active || selectedMeeting.is_closed || (!hasPassed && !isHostOrHR))) return 'bg-slate-50 text-slate-300';
+                                                                return 'bg-purple-50 text-purple-600 group-hover:bg-purple-500 group-hover:text-white';
+                                                            })()}`}>
+                                                                {(() => {
+                                                                    const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
+                                                                    const hasPassed = postRes && (Number(postRes.score) || 0) >= 80;
+                                                                    return (selectedMeeting.is_feedback_active && !selectedMeeting.is_closed && (hasPassed || isHostOrHR)) ? <Users size={16} /> : <Lock size={16} />;
+                                                                })()}
+                                                            </div>
+                                                            <div className="text-left">
+                                                                <p className="font-bold text-slate-800 text-xs">Feedback Form</p>
+                                                                <p className="text-[10px] text-slate-400">Evaluasi penyelenggara (Bahasa Indonesia)</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            {userFeedback && <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">Submitted</span>}
+                                                            {!isHostOrHR && selectedMeeting.is_feedback_active && !userFeedback && <ArrowRight size={14} className="text-slate-300 group-hover:text-indigo-500" />}
+                                                        </div>
+                                                    </button>
+                                                    
+                                                    {isHostOrHR && !selectedMeeting.is_closed && (
+                                                        <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Akses Feedback</span>
+                                                            </div>
+                                                            <button 
+                                                                onClick={() => toggleMeetingStatus('is_feedback_active', selectedMeeting.is_feedback_active)}
+                                                                className={`px-3 py-1 rounded-full text-[10px] font-black transition-all border ${selectedMeeting.is_feedback_active 
+                                                                    ? 'bg-emerald-500 text-white border-emerald-600' 
+                                                                    : 'bg-white text-slate-400 border-slate-200'}`}
+                                                            >
+                                                                {selectedMeeting.is_feedback_active ? 'AKTIF' : 'NON-AKTIF'}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
+                                    );
+                                })()}
 
-                                        <div className="space-y-2">
-                                            <button
-                                                onClick={() => {
-                                                    if (meetingQuizResults.find(r => r.quizType === 'PRE')) return;
-                                                    setShowQuiz('PRE');
-                                                }}
-                                                className={`w-full group bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between transition-all ${meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('PRE')) 
-                                                    ? 'cursor-default' 
-                                                    : 'hover:border-indigo-300 cursor-pointer'}`}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${meetingQuizResults.find(r => r.quizType === 'PRE')
-                                                        ? 'bg-slate-100 text-slate-400'
-                                                        : 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white'}`}>
-                                                        <FileText size={16} />
-                                                    </div>
-                                                    <div className="text-left">
-                                                        <p className="font-bold text-slate-800 text-xs">Pre-Test Assessment</p>
-                                                        <p className="text-[10px] text-slate-400">Evaluasi sebelum materi</p>
-                                                    </div>
-                                                </div>
-                                                {(() => {
-                                                    const res = meetingQuizResults.find(r => {
-                                                        const type = (r.quizType || "").toUpperCase();
-                                                        const midMatches = Number(r.meetingId || (r as any).meeting_id) === Number(selectedMeeting.id);
-                                                        return (type === 'PRE' || type === 'PRE-TEST') && midMatches;
-                                                    });
-                                                    return res ? (
-                                                        <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">Score: {res.score}</span>
-                                                    ) : (
-                                                        <ArrowRight size={14} className="text-slate-300 group-hover:text-indigo-500" />
-                                                    );
-                                                })()}
-                                            </button>
-
-                                            <button
-                                                onClick={() => {
-                                                    const preRes = meetingQuizResults.find(r => {
-                                                        const type = (r.quizType || "").toUpperCase();
-                                                        return (type === 'PRE' || type === 'PRE-TEST');
-                                                    });
-                                                    if (!preRes) {
-                                                        setNotification({ show: true, type: 'error', message: "Silakan kerjakan Pre-Test terlebih dahulu sebelum memulai Post-Test." });
-                                                        return;
-                                                    }
-                                                    const postRes = meetingQuizResults.find(r => (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('POST'));
-                                                    if (postRes && (Number(postRes.score) || 0) >= 80) return;
-                                                    setShowQuiz('POST');
-                                                }}
-                                                className={`w-full group bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between transition-all ${(() => {
-                                                    const preRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('PRE'));
-                                                    const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
-                                                    if (!preRes) return 'opacity-60 cursor-not-allowed';
-                                                    return (postRes && (Number(postRes.score) || 0) >= 80) ? 'cursor-default' : 'hover:border-indigo-300 cursor-pointer';
-                                                })()}`}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${(() => {
-                                                        const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
-                                                        return (postRes && (Number(postRes.score) || 0) >= 80)
-                                                            ? 'bg-emerald-100 text-emerald-600'
-                                                            : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-500 group-hover:text-white';
-                                                    })()}`}>
-                                                        <CheckCircle size={16} />
-                                                    </div>
-                                                    <div className="text-left">
-                                                        <p className="font-bold text-slate-800 text-xs">Post-Test Assessment</p>
-                                                        <p className="text-[10px] text-slate-400">Syarat kelulusan (Min. 80)</p>
-                                                    </div>
-                                                </div>
-                                                {(() => {
-                                                    const res = meetingQuizResults.find(r => {
-                                                        const type = (r.quizType || "").toUpperCase();
-                                                        const midMatches = Number(r.meetingId || (r as any).meeting_id) === Number(selectedMeeting.id);
-                                                        return (type === 'POST' || type === 'POST-TEST') && midMatches;
-                                                    });
-                                                    return res ? (
-                                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${res.score >= 80 ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-red-600 bg-red-50 border-red-100'}`}>Score: {res.score}</span>
-                                                    ) : (
-                                                        <ArrowRight size={14} className="text-slate-300 group-hover:text-indigo-500" />
-                                                    );
-                                                })()}
-                                            </button>
-
-                                            <button
-                                                onClick={() => {
-                                                    if (userFeedback) return;
-                                                    const postRes = meetingQuizResults.find(r => r.quizType === 'POST');
-                                                    if (postRes && postRes.score >= 80) setShowFeedback(true);
-                                                    else setNotification({ show: true, type: 'error', message: postRes ? `Nilai anda ${postRes.score} < 80, silakan isi dengan benar` : "Selesaikan Post-Test terlebih dahulu." });
-                                                }}
-                                                className={`w-full group bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between transition-all ${userFeedback 
-                                                    ? 'cursor-default' 
-                                                    : 'hover:border-purple-300 cursor-pointer'}`}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${userFeedback
-                                                        ? 'bg-slate-100 text-slate-400'
-                                                        : 'bg-purple-50 text-purple-600 group-hover:bg-purple-500 group-hover:text-white'}`}>
-                                                        <Users size={16} />
-                                                    </div>
-                                                    <div className="text-left">
-                                                        <p className="font-bold text-slate-800 text-xs">Feedback Form</p>
-                                                        <p className="text-[10px] text-slate-400">Evaluasi penyelenggara (Bahasa Indonesia)</p>
-                                                    </div>
-                                                </div>
-                                                {userFeedback ? (
-                                                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">SUBMITTED</span>
-                                                ) : (
-                                                    <ArrowRight size={14} className="text-slate-300 group-hover:text-purple-500" />
-                                                )}
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
 
                                 <button
                                     onClick={() => setSelectedMeeting(null)}

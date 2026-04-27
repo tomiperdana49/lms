@@ -122,9 +122,11 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     aside nav::-webkit-scrollbar-thumb:hover { background: #475569; }
                 `}} />
                 <div className="h-full flex flex-col">
-                    {/* Logo / Brand */}
                     <div className="p-6 border-b border-slate-700 flex items-center justify-between">
-                        <h1 className="text-xl font-bold tracking-wider">LMS NUSA</h1>
+                        <div className="flex items-center gap-3">
+                            <img src="/favicon.svg" alt="Logo" className="w-10 h-10 rounded-xl shadow-md" />
+                            <h1 className="text-xl font-bold tracking-wider">LMS NUSA</h1>
+                        </div>
                         <button onClick={toggleSidebar} className="lg:hidden text-slate-400 hover:text-white">
                             <X size={24} />
                         </button>

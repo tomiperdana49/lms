@@ -148,6 +148,10 @@ export interface Meeting {
     pre_test_data?: Quiz;
     post_test_data?: Quiz;
     feedback_data?: any;
+    is_pre_test_active?: boolean | number;
+    is_post_test_active?: boolean | number;
+    is_feedback_active?: boolean | number;
+    is_closed?: boolean | number;
 }
 
 export interface CostReport {
