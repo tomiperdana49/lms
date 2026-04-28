@@ -5,7 +5,7 @@ import type { Course, Module, Quiz } from '../types';
 import PopupNotification from './PopupNotification';
 import ConfirmationModal from './ConfirmationModal';
 
-const QuizEditor = ({ quiz, onUpdate, onDelete }: { quiz: Quiz | undefined, onUpdate: (q: Quiz) => void, onDelete?: () => void }) => {
+const QuizEditor = ({ quiz, onUpdate, onDelete, onNotify }: { quiz: Quiz | undefined, onUpdate: (q: Quiz) => void, onDelete?: () => void, onNotify?: (msg: string, type: 'success' | 'error') => void }) => {
     if (!quiz) return null;
     return (
         <div className="mt-4 space-y-4 border-l-2 border-slate-200 pl-4">
@@ -72,7 +72,8 @@ const QuizEditor = ({ quiz, onUpdate, onDelete }: { quiz: Quiz | undefined, onUp
                                     onClick={() => {
                                         const newQuestions = [...quiz.questions];
                                         if (newQuestions[qIdx].options.length <= 2) {
-                                            alert("Minimum 2 options required");
+                                            if (onNotify) onNotify("Minimum 2 options required", 'error');
+                                            else alert("Minimum 2 options required");
                                             return;
                                         }
                                         newQuestions[qIdx].options.splice(optIdx, 1);
@@ -348,6 +349,7 @@ const OnlineModulesManager = () => {
                                                         console.log("UPDATING PRE-TEST STATE:", updatedQuiz.questions.length);
                                                         setEditingCourse(prev => prev ? ({ ...prev, preAssessment: updatedQuiz }) : prev);
                                                     }}
+                                                    onNotify={(msg, type) => setPopup({ isOpen: true, message: msg, type })}
                                                 />
                                             </div>
                                         </div>
@@ -483,6 +485,7 @@ const OnlineModulesManager = () => {
                                                                 newMods[idx].quiz = updatedQuiz;
                                                                 setEditingCourse({ ...editingCourse, modules: newMods });
                                                             }}
+                                                            onNotify={(msg, type) => setPopup({ isOpen: true, message: msg, type })}
                                                             onDelete={() => {
                                                                 openConfirm('Delete Quiz', 'Delete this module quiz? All questions will be lost.', () => {
                                                                     const newMods = [...editingCourse.modules];
@@ -564,6 +567,7 @@ const OnlineModulesManager = () => {
                                                     console.log("UPDATING POST-TEST STATE:", updatedQuiz.questions.length);
                                                     setEditingCourse(prev => prev ? ({ ...prev, assessment: updatedQuiz }) : prev);
                                                 }}
+                                                onNotify={(msg, type) => setPopup({ isOpen: true, message: msg, type })}
                                             />
                                         )}
                                     </div>
