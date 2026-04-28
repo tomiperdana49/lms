@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Download, Layers, Eye, XCircle, RefreshCw } from 'lucide-react';
+import { Download, Layers, Eye, XCircle, RefreshCw, Filter, Calendar, Building2, TrendingUp, DollarSign, PieChart, ArrowUpRight } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { TrainingRequest, Meeting, Incentive, ReadingLogEntry } from '../types';
 
@@ -64,7 +64,7 @@ const HRReportGenerator = () => {
     }, []);
 
     const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(amount);
+        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount);
     };
 
     // Helper to safety parse numbers
@@ -72,20 +72,16 @@ const HRReportGenerator = () => {
         if (typeof val === 'number') return val;
         if (!val) return 0;
 
-        // Try direct conversion first (handles standard DB strings "150000.00")
         const direct = Number(val);
         if (!isNaN(direct)) return direct;
 
-        // Handle "1.000.000" string format if present
         if (typeof val === 'string') {
-            const clean = val.replace(/\./g, '').replace(/,/g, '.'); // Remove thousands dot, replace decimal comma
+            const clean = val.replace(/\./g, '').replace(/,/g, '.');
             return Number(clean) || 0;
         }
         return 0;
     };
 
-    // Aggregation Logic
-    // Helper for Incentive Period (26th Prev Month - 25th Curr Month)
     const getPeriodRange = (yearIdx: number, monthIdx: number) => {
         const start = new Date(yearIdx, monthIdx - 1, 26);
         const end = new Date(yearIdx, monthIdx, 25, 23, 59, 59, 999);
@@ -106,7 +102,6 @@ const HRReportGenerator = () => {
         const { start, end } = getPeriodRange(year, idx);
         const range = { start, end };
 
-        // 1. Internal Training (Meetings)
         meetings.forEach(m => {
             if (selectedBranch !== 'All' && m.location !== selectedBranch) return;
             if (m.costReport && isInPeriod(m.date, range)) {
@@ -120,17 +115,14 @@ const HRReportGenerator = () => {
             }
         });
 
-        // 2. Reading Incentive (Logs)
         logs.filter(l => l.hrApprovalStatus === 'Approved' && l.incentiveAmount).forEach(l => {
             if (selectedBranch !== 'All' && l.location !== selectedBranch) return;
-            // Use finishDate if available, else date
             const dateToCheck = l.finishDate || l.date;
             if (isInPeriod(dateToCheck, range)) {
                 readingIncentive += safeNum(l.incentiveAmount);
             }
         });
 
-        // 3. External Training (Requests)
         requests.filter(r => r.status === 'APPROVED').forEach(r => {
             if (selectedBranch !== 'All' && r.location !== selectedBranch) return;
             if (isInPeriod(r.date, range)) {
@@ -138,7 +130,6 @@ const HRReportGenerator = () => {
             }
         });
 
-        // 4. Certificate Incentive (Incentives)
         incentives.filter(i => ['Active', 'Paid'].includes(i.status)).forEach(i => {
             if (selectedBranch !== 'All') {
                 const emp = employees.find(e => e.id_employee === i.employee_id);
@@ -170,6 +161,16 @@ const HRReportGenerator = () => {
         };
     });
 
+    // Stats
+    const totalYTD = monthlyData.reduce((sum, m) => sum + m.total, 0);
+    const avgMonthly = totalYTD / monthlyData.filter(m => m.total > 0).length || 0;
+    const topCategory = [
+        { label: 'Internal', val: monthlyData.reduce((s, m) => s + m.internalTraining, 0) },
+        { label: 'External', val: monthlyData.reduce((s, m) => s + m.externalTraining, 0) },
+        { label: 'Reading', val: monthlyData.reduce((s, m) => s + m.readingIncentive, 0) },
+        { label: 'Cert.', val: monthlyData.reduce((s, m) => s + m.certIncentive, 0) }
+    ].sort((a, b) => b.val - a.val)[0];
+
     // Detail Data Generator
     interface Transaction {
         date: string;
@@ -185,7 +186,6 @@ const HRReportGenerator = () => {
         const { start, end } = getPeriodRange(year, monthIdx);
         const range = { start, end };
 
-        // Meetings
         meetings.forEach(m => {
             if (selectedBranch !== 'All' && m.location !== selectedBranch) return;
             if (m.costReport && isInPeriod(m.date, range)) {
@@ -213,7 +213,6 @@ const HRReportGenerator = () => {
             }
         });
 
-        // Logs
         logs.filter(l => l.hrApprovalStatus === 'Approved' && l.incentiveAmount).forEach(l => {
             if (selectedBranch !== 'All' && l.location !== selectedBranch) return;
             const dateToCheck = l.finishDate || l.date;
@@ -229,7 +228,6 @@ const HRReportGenerator = () => {
             }
         });
 
-        // External Requests
         requests.filter(r => r.status === 'APPROVED').forEach(r => {
             if (selectedBranch !== 'All' && r.location !== selectedBranch) return;
             if (isInPeriod(r.date, range)) {
@@ -247,7 +245,6 @@ const HRReportGenerator = () => {
             }
         });
 
-        // Incentives
         incentives.filter(i => ['Active', 'Paid'].includes(i.status)).forEach(i => {
             if (selectedBranch !== 'All') {
                 const emp = employees.find(e => e.id_employee === i.employee_id);
@@ -259,7 +256,6 @@ const HRReportGenerator = () => {
             const dateToUse = i.approvedDate ? new Date(i.approvedDate) : iStart;
 
             let shouldInclude = false;
-
             if (isOneTime) {
                 shouldInclude = isInPeriod(dateToUse.toISOString(), range);
             } else {
@@ -308,156 +304,224 @@ const HRReportGenerator = () => {
     const details = detailMonth !== null ? getDetailTransactions(months.indexOf(detailMonth)) : [];
 
     return (
-        <div className="p-6 bg-slate-50 min-h-screen font-sans animate-fade-in relative">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="space-y-10 animate-fade-in max-w-[1600px] mx-auto py-6">
+            {/* Professional Header */}
+            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Layers className="text-blue-600" /> Learning & Development Report
+                    <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4">
+                        <Layers className="text-indigo-600" size={32} />
+                        HR Report Generator
                     </h1>
-                    <p className="text-slate-500 mt-1">Consolidated Budget Report • {year} • {selectedBranch}</p>
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1 ml-12">Nusa LMS • Enterprise Expenditure Intelligence</p>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex items-center gap-3">
                     <button
                         onClick={fetchData}
                         disabled={refreshing}
-                        className="flex items-center gap-2 px-4 py-2 bg-white text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 font-bold transition-all disabled:opacity-50"
+                        className="flex items-center gap-2 px-6 py-2.5 bg-white text-slate-600 border border-slate-200 rounded-2xl hover:bg-slate-50 font-black text-[10px] tracking-widest transition-all disabled:opacity-50 shadow-sm"
                     >
-                        <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
-                        {refreshing ? "Refreshing..." : "Refresh Data"}
+                        <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+                        REFRESH
                     </button>
-                    <select
-                        value={year}
-                        onChange={(e) => setYear(parseInt(e.target.value))}
-                        className="px-4 py-2 rounded-xl border border-slate-300 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        {Array.from({ length: Math.max(1, new Date().getFullYear() - 2026 + 1) }, (_, i) => 2026 + i).map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
-                    <select
-                        value={selectedBranch}
-                        onChange={(e) => setSelectedBranch(e.target.value)}
-                        className="px-4 py-2 rounded-xl border border-slate-300 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option value="All">All Branches</option>
-                        {branchesList.map(b => <option key={b} value={b}>{b}</option>)}
-                    </select>
                     <button
                         onClick={handleExport}
-                        className="flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors shadow-lg shadow-green-200"
+                        className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-2xl font-black text-[10px] tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
                     >
-                        <Download size={18} /> Export CSV
+                        <Download size={14} /> EXPORT CSV
                     </button>
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <table className="w-full text-left">
-                    <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+            {/* Insight Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[
+                    { label: 'YTD Total Investment', value: formatCurrency(totalYTD), icon: DollarSign, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                    { label: 'Avg Monthly Spend', value: formatCurrency(avgMonthly), icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                    { label: 'Top Allocation', value: topCategory?.label || '-', sub: formatCurrency(topCategory?.val || 0), icon: PieChart, color: 'text-amber-600', bg: 'bg-amber-50' },
+                    { label: 'Year Analysis', value: year, sub: 'Calendar Period', icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50' }
+                ].map((stat, i) => (
+                    <div key={i} className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-5 group hover:border-indigo-100 transition-all duration-300">
+                        <div className={`p-4 ${stat.bg} ${stat.color} rounded-2xl group-hover:scale-110 transition-transform duration-500`}>
+                            <stat.icon size={24} strokeWidth={2.5} />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
+                            <p className="text-xl font-black text-slate-900 leading-none">{stat.value}</p>
+                            {stat.sub && <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase">{stat.sub}</p>}
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Global Filter Bar */}
+            <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex flex-row items-center gap-6 overflow-x-auto no-scrollbar">
+                <div className="flex items-center gap-3 flex-nowrap min-w-max">
+                    <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-2xl border border-slate-100">
+                        <div className="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm text-slate-400">
+                            <Calendar size={16} />
+                        </div>
+                        <select
+                            value={year}
+                            onChange={(e) => setYear(parseInt(e.target.value))}
+                            className="bg-transparent px-3 py-2 rounded-xl font-black text-slate-600 text-[10px] outline-none tracking-widest cursor-pointer min-w-[120px]"
+                        >
+                            {Array.from({ length: Math.max(1, new Date().getFullYear() - 2026 + 1) }, (_, i) => 2026 + i).map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-2xl border border-slate-100">
+                        <div className="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm text-slate-400">
+                            <Building2 size={16} />
+                        </div>
+                        <select
+                            value={selectedBranch}
+                            onChange={(e) => setSelectedBranch(e.target.value)}
+                            className="bg-transparent px-3 py-2 rounded-xl font-black text-slate-600 text-[10px] outline-none tracking-widest cursor-pointer min-w-[180px]"
+                        >
+                            <option value="All">ALL BRANCHES</option>
+                            {branchesList.map(b => <option key={b} value={b}>{b.toUpperCase()}</option>)}
+                        </select>
+                    </div>
+                </div>
+                <div className="ml-auto flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
+                    <Filter size={14} /> FILTERS ACTIVE
+                </div>
+            </div>
+
+            {/* Main Report Table */}
+            <div className="bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden">
+                <table className="w-full text-left border-collapse table-fixed">
+                    <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest">
                         <tr>
-                            <th className="p-4 w-32">Month</th>
-                            <th className="p-4 text-right text-blue-700">Internal Training</th>
-                            <th className="p-4 text-right text-green-700">Reading Incentives</th>
-                            <th className="p-4 text-right text-orange-700">External Training</th>
-                            <th className="p-4 text-right text-purple-700">Cert. Incentives</th>
-                            <th className="p-4 text-right bg-slate-100 text-slate-900 border-l border-slate-200">Grand Total</th>
-                            <th className="p-4 text-center w-24">Action</th>
+                            <th className="px-5 py-5 w-[140px]">Month</th>
+                            <th className="px-5 py-5 text-right">Internal</th>
+                            <th className="px-5 py-5 text-right">Reading</th>
+                            <th className="px-5 py-5 text-right">External</th>
+                            <th className="px-5 py-5 text-right">Cert. Inc</th>
+                            <th className="px-5 py-5 text-right bg-indigo-50/50 text-indigo-700 w-[160px]">Grand Total</th>
+                            <th className="px-5 py-5 text-center w-[80px]">Audit</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-50">
                         {monthlyData.map((row) => (
                             <tr key={row.month} className="hover:bg-slate-50 transition-colors group">
-                                <td className="p-4 font-bold text-slate-800">{row.month}</td>
-                                <td className="p-4 text-right font-medium text-slate-600">{row.internalTraining > 0 ? formatCurrency(row.internalTraining) : '-'}</td>
-                                <td className="p-4 text-right font-medium text-slate-600">{row.readingIncentive > 0 ? formatCurrency(row.readingIncentive) : '-'}</td>
-                                <td className="p-4 text-right font-medium text-slate-600">{row.externalTraining > 0 ? formatCurrency(row.externalTraining) : '-'}</td>
-                                <td className="p-4 text-right font-medium text-slate-600">{row.certIncentive > 0 ? formatCurrency(row.certIncentive) : '-'}</td>
-                                <td className="p-4 text-right font-bold text-slate-900 bg-slate-50/50 border-l border-slate-100">{formatCurrency(row.total)}</td>
-                                <td className="p-4 text-center">
+                                <td className="px-5 py-4">
+                                    <p className="font-black text-slate-800 text-xs">{row.month.toUpperCase()}</p>
+                                </td>
+                                <td className="px-5 py-4 text-right font-mono text-slate-500 font-bold text-[11px]">
+                                    {row.internalTraining > 0 ? formatCurrency(row.internalTraining) : <span className="opacity-20">-</span>}
+                                </td>
+                                <td className="px-5 py-4 text-right font-mono text-slate-500 font-bold text-[11px]">
+                                    {row.readingIncentive > 0 ? formatCurrency(row.readingIncentive) : <span className="opacity-20">-</span>}
+                                </td>
+                                <td className="px-5 py-4 text-right font-mono text-slate-500 font-bold text-[11px]">
+                                    {row.externalTraining > 0 ? formatCurrency(row.externalTraining) : <span className="opacity-20">-</span>}
+                                </td>
+                                <td className="px-5 py-4 text-right font-mono text-slate-500 font-bold text-[11px]">
+                                    {row.certIncentive > 0 ? formatCurrency(row.certIncentive) : <span className="opacity-20">-</span>}
+                                </td>
+                                <td className="px-5 py-4 text-right font-mono text-slate-900 font-black text-xs bg-indigo-50/20">
+                                    {formatCurrency(row.total)}
+                                </td>
+                                <td className="px-5 py-4 text-center">
                                     <button
                                         onClick={() => setDetailMonth(row.month)}
-                                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-600 rounded-xl transition-all shadow-sm"
                                     >
-                                        <Eye size={18} />
+                                        <Eye size={16} />
                                     </button>
                                 </td>
                             </tr>
                         ))}
                     </tbody>
-                    <tfoot className="bg-slate-100 font-bold border-t border-slate-300">
+                    <tfoot className="bg-slate-900 text-white font-black uppercase tracking-widest text-[9px]">
                         <tr>
-                            <td className="p-4">TOTAL YEAR</td>
-                            <td className="p-4 text-right">{formatCurrency(monthlyData.reduce((a, b) => a + b.internalTraining, 0))}</td>
-                            <td className="p-4 text-right">{formatCurrency(monthlyData.reduce((a, b) => a + b.readingIncentive, 0))}</td>
-                            <td className="p-4 text-right">{formatCurrency(monthlyData.reduce((a, b) => a + b.externalTraining, 0))}</td>
-                            <td className="p-4 text-right">{formatCurrency(monthlyData.reduce((a, b) => a + b.certIncentive, 0))}</td>
-                            <td className="p-4 text-right text-lg border-l border-slate-300 bg-slate-200">{formatCurrency(monthlyData.reduce((a, b) => a + b.total, 0))}</td>
+                            <td className="px-5 py-6">YTD TOTAL</td>
+                            <td className="px-5 py-6 text-right text-[10px]">{formatCurrency(monthlyData.reduce((a, b) => a + b.internalTraining, 0))}</td>
+                            <td className="px-5 py-6 text-right text-[10px]">{formatCurrency(monthlyData.reduce((a, b) => a + b.readingIncentive, 0))}</td>
+                            <td className="px-5 py-6 text-right text-[10px]">{formatCurrency(monthlyData.reduce((a, b) => a + b.externalTraining, 0))}</td>
+                            <td className="px-5 py-6 text-right text-[10px]">{formatCurrency(monthlyData.reduce((a, b) => a + b.certIncentive, 0))}</td>
+                            <td className="px-5 py-6 text-right text-sm font-black bg-indigo-600">{formatCurrency(totalYTD)}</td>
                             <td></td>
                         </tr>
                     </tfoot>
                 </table>
             </div>
 
+            {/* Detail Modal */}
             {detailMonth && (
-                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[50px] shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
+                        <div className="p-12 border-b border-slate-50 flex justify-between items-center bg-white">
                             <div>
-                                <h2 className="text-xl font-bold text-slate-800">Transaction Details - {detailMonth} {year}</h2>
+                                <h2 className="font-black text-2xl text-slate-900 tracking-tight flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center"><PieChart size={20} /></div>
+                                    Monthly Audit Hub • {detailMonth.toUpperCase()} {year}
+                                </h2>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 ml-14">Consolidated Ledger Overview • {selectedBranch.toUpperCase()}</p>
                             </div>
-                            <button onClick={() => setDetailMonth(null)} className="p-2 text-slate-400 hover:text-red-500 rounded-full transition-colors">
-                                <XCircle size={24} />
-                            </button>
+                            <button onClick={() => setDetailMonth(null)} className="p-4 hover:bg-slate-100 rounded-3xl text-slate-300 transition-colors"><XCircle size={32} /></button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+                        <div className="overflow-y-auto p-12 bg-slate-50/30">
                             {details.length === 0 ? (
-                                <div className="text-center py-12 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl bg-white">
-                                    No transaction data available for this month.
+                                <div className="text-center py-32 bg-white rounded-[40px] border-2 border-dashed border-slate-100">
+                                    <Layers className="mx-auto text-slate-200 mb-4" size={48} />
+                                    <p className="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">Zero transactions found for this period</p>
                                 </div>
                             ) : (
-                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden">
                                     <table className="w-full text-left">
-                                        <thead className="bg-slate-50 text-xs uppercase text-slate-500 font-bold border-b border-slate-100">
+                                        <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
                                             <tr>
-                                                <th className="p-4">Date</th>
-                                                <th className="p-4">Category</th>
-                                                <th className="p-4">Item</th>
-                                                <th className="p-4">PIC</th>
-                                                <th className="p-4">Details</th>
-                                                <th className="p-4 text-right">Amount</th>
+                                                <th className="px-8 py-6">Timestamp</th>
+                                                <th className="px-8 py-6">Categorization</th>
+                                                <th className="px-8 py-6">Transaction Item</th>
+                                                <th className="px-8 py-6">Professional PIC</th>
+                                                <th className="px-8 py-6 text-right">Net Amount</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-slate-50 text-sm">
+                                        <tbody className="divide-y divide-slate-50">
                                             {details.map((tx, idx) => (
                                                 <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="p-4 text-slate-500 whitespace-nowrap">{new Date(tx.date).toLocaleDateString()}</td>
-                                                    <td className="p-4">
-                                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase
-                                                            ${tx.category.includes('Internal') ? 'bg-blue-100 text-blue-700' :
-                                                                tx.category.includes('External') ? 'bg-orange-100 text-orange-700' :
-                                                                    'bg-green-100 text-green-700'}`}>
+                                                    <td className="px-8 py-6">
+                                                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tighter">
+                                                            {new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-8 py-6">
+                                                        <span className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider border
+                                                            ${tx.category.includes('Internal') ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
+                                                                tx.category.includes('External') ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                                                    'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
                                                             {tx.category}
                                                         </span>
                                                     </td>
-                                                    <td className="p-4 font-semibold text-slate-700">{tx.item}</td>
-                                                    <td className="p-4 text-slate-600">{tx.pic || '-'}</td>
-                                                    <td className="p-4 text-slate-500 italic text-xs">{tx.details}</td>
-                                                    <td className="p-4 text-right font-bold text-slate-800">{formatCurrency(tx.amount)}</td>
+                                                    <td className="px-8 py-6">
+                                                        <p className="font-black text-slate-800 text-sm leading-tight">{tx.item}</p>
+                                                        <p className="text-[9px] font-bold text-slate-400 mt-1 italic leading-tight">{tx.details}</p>
+                                                    </td>
+                                                    <td className="px-8 py-6 font-bold text-slate-600 text-xs uppercase">{tx.pic || 'SYSTEM'}</td>
+                                                    <td className="px-8 py-6 text-right font-mono font-black text-slate-900 text-base">{formatCurrency(tx.amount)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
-                                        <tfoot className="bg-slate-50 font-bold border-t border-slate-200 text-right">
+                                        <tfoot className="bg-slate-50 font-black border-t border-slate-100 text-right">
                                             <tr>
-                                                <td colSpan={5} className="p-4 text-slate-600">TOTAL</td>
-                                                <td className="p-4 text-slate-900 text-base">{formatCurrency(details.reduce((a, b) => a + b.amount, 0))}</td>
+                                                <td colSpan={4} className="px-8 py-6 text-slate-400 text-[10px] tracking-widest">MONTHLY AGGREGATE</td>
+                                                <td className="px-8 py-6 text-indigo-600 text-xl">{formatCurrency(details.reduce((a, b) => a + b.amount, 0))}</td>
                                             </tr>
                                         </tfoot>
                                     </table>
                                 </div>
                             )}
                         </div>
-                        <div className="p-4 border-t border-slate-100 bg-white text-right">
-                            <button onClick={() => setDetailMonth(null)} className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-900 transition-colors">Close</button>
+
+                        <div className="p-10 border-t border-slate-50 bg-white text-right">
+                            <button onClick={() => setDetailMonth(null)} className="px-10 py-4 bg-slate-900 text-white rounded-[24px] font-black text-xs tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200">
+                                CLOSE AUDIT HUB
+                            </button>
                         </div>
                     </div>
                 </div>

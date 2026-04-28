@@ -323,7 +323,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                     title, category, startDate: finalStartDate, 
                     finishDate: finalFinishDate,
                     link: link, review: '-', evidenceUrl: '', status: 'Finished', hrApprovalStatus: 'Draft',
-                    location: 'Pribadi', source: 'Buku Pribadi', userName: user.name, employee_id: user.employee_id, date: new Date()
+                    location: 'Personal', source: 'Personal Book', userName: user.name, employee_id: user.employee_id, date: new Date()
                 })
             });
 

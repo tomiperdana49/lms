@@ -194,7 +194,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     hrApprovalStatus: 'Approved',
-                    managedCategory: verifyModal.category === 'comic' ? 'Non-Fiksi Komik/Manga' : 'Non-Fiksi Text',
+                    managedCategory: verifyModal.category === 'comic' ? 'Non-Fiction Comic/Manga' : 'Non-Fiction Text',
                     incentiveAmount: verifyModal.reward,
                     approvedBy: user.name || 'Admin',
                     approvedAt: now
@@ -773,7 +773,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                 );
                                             })()}
                                         </td>
-                                        <td className="px-6 py-4"><div className="flex flex-col gap-1"><span className="font-semibold text-slate-800 text-sm">{log.title}</span><span className="text-xs text-slate-500">{log.category}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit ${log.source === 'Buku Pribadi' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>{log.source === 'Buku Pribadi' ? 'Private' : (log.source === 'SIMAS' ? 'SIMAS' : 'Office')}</span></div></td>
+                                        <td className="px-6 py-4"><div className="flex flex-col gap-1"><span className="font-semibold text-slate-800 text-sm">{log.title}</span><span className="text-xs text-slate-500">{log.category}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit ${log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>{log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'Personal' : (log.source === 'SIMAS' ? 'SIMAS' : 'Office')}</span></div></td>
                                         <td className="px-6 py-4 text-sm text-slate-600">
                                             {log.startDate ? new Date(log.startDate).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}
                                         </td>

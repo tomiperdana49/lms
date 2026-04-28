@@ -241,13 +241,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 const data = await res.json();
                 setSelectedMeeting(data);
                 setMeetings(prev => prev.map(m => m.id === data.id ? data : m));
-                setNotification({ show: true, type: 'success', message: `Status berhasil diperbarui.` });
+                setNotification({ show: true, type: 'success', message: `Status updated successfully.` });
             } else {
-                throw new Error("Gagal memperbarui status.");
+                throw new Error("Failed to update status.");
             }
         } catch (err) {
             console.error(err);
-            setNotification({ show: true, type: 'error', message: "Terjadi kesalahan saat memperbarui status." });
+            setNotification({ show: true, type: 'error', message: "An error occurred while updating status." });
         }
     };
 
@@ -612,7 +612,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             setNotification({ 
                 show: true, 
                 type: 'error', 
-                message: 'Wajib mengisi data Pre-Test dan Post-Test di tab Konfigurasi Ujian sebelum mengirim undangan.' 
+                message: 'Pre-Test and Post-Test data must be filled in the Exam Configuration tab before sending invitations.' 
             });
             setActiveCreateTab('assessment');
             return;
@@ -789,6 +789,123 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         }).sort((a, b) => b.totalCost - a.totalCost);
     };
 
+    const exportHostCSV = () => {
+        const stats = getHostStats();
+        const headers = ["Host Name", "Employee ID", "Sessions", "Total Audience", "Trainer Incentive", "Total Cost"];
+        const rows = stats.map(s => [
+            s.host,
+            s.host_id || '-',
+            s.sessions,
+            s.totalParticipants,
+            s.totalTrainerIncentive,
+            s.totalCost
+        ]);
+
+        const csvContent = "data:text/csv;charset=utf-8," 
+            + headers.join(",") + "\n"
+            + rows.map(r => r.join(",")).join("\n");
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Internal_Training_Hosts_${startDate}_to_${endDate}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const exportParticipantCSV = () => {
+        const dataRows: any[] = [];
+        const headers = ["Date", "Meeting Title", "Host", "Participant Name", "Email", "Pre-Test", "Post-Test", "Feedback Avg", "Status"];
+
+        const filtered = filteredMeetings;
+
+        filtered.forEach(m => {
+            const meetingResults = allResults.filter(r => 
+                Number(r.meetingId || (r as any).meeting_id) === Number(m.id) &&
+                !(r as any).courseId && !(r as any).course_id
+            );
+
+            const meetingFeedback = allFeedback.filter(f => 
+                Number(f.meetingId || (f as any).meeting_id || (f as any).id_meeting || (f as any).trainingId || (f as any).training_id || (f as any).session_id) === Number(m.id)
+            );
+
+            const isParticipantMatch = (item: any, email: string) => {
+                const itemId = (item.userEmail || item.user_email || item.userId || item.user_id || item.email || item.studentId || item.student_id || item.employee_id || item.id || '').toString().toLowerCase().trim();
+                const targetId = email.toLowerCase().trim();
+                if (itemId === targetId) return true;
+                if (targetId.includes('@') && itemId === targetId.split('@')[0]) return true;
+                const emp = (employees || []).find(e => e.email?.toLowerCase() === targetId || String(e.id_employee).toLowerCase() === targetId || String(e.id).toLowerCase() === targetId);
+                if (emp) {
+                    const empIds = [String(emp.id_employee).toLowerCase(), String(emp.id).toLowerCase(), emp.email?.toLowerCase()].filter(Boolean);
+                    if (empIds.includes(itemId)) return true;
+                    const itemName = (item.student_name || item.studentName || item.name || "").toString().toLowerCase().trim();
+                    const empName = (emp.full_name || emp.name || "").toString().toLowerCase().trim();
+                    return itemName && empName && itemName === empName;
+                }
+                return false;
+            };
+
+            const allParticipantEmails = Array.from(new Set([
+                ...meetingResults.map(r => r.userEmail || r.user_email || r.userId || r.user_id || r.email || r.studentId || r.student_id || r.employee_id || r.id).filter(Boolean).map(id => String(id).toLowerCase().trim()),
+                ...meetingFeedback.map(f => f.userEmail || f.user_email || f.userId || f.user_id || f.email || f.studentId || f.student_id || f.employee_id || f.id).filter(Boolean).map(id => String(id).toLowerCase().trim())
+            ])).reduce((acc: string[], id) => {
+                const emp = (employees || []).find(e => e.email?.toLowerCase() === id || String(e.id_employee).toLowerCase() === id || String(e.id).toLowerCase() === id);
+                const primary = (emp?.email || id).toLowerCase();
+                if (!acc.includes(primary)) acc.push(primary);
+                return acc;
+            }, []);
+
+            allParticipantEmails.forEach(email => {
+                const emp = employees.find(e => e.email?.toLowerCase() === email || String(e.id_employee).toLowerCase() === email);
+                const name = emp?.full_name || email;
+
+                const preScores = meetingResults.filter(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('PRE')).map(r => Number(r.score) || 0);
+                const avgPre = preScores.length > 0 ? Math.max(...preScores) : '-';
+
+                const postScores = meetingResults.filter(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('POST')).map(r => Number(r.score) || 0);
+                const avgPost = postScores.length > 0 ? Math.max(...postScores) : '-';
+
+                const f = meetingFeedback.find(f => isParticipantMatch(f, email));
+                let avgFB: any = '-';
+                if (f) {
+                    const fData = f?.feedbackData || f?.feedback_data || f?.data || f?.response || f?.feedback;
+                    if (fData) {
+                        try {
+                            const data = typeof fData === 'string' ? JSON.parse(fData) : fData;
+                            const scores = Object.values(data || {}).filter(v => typeof v === 'number' || !isNaN(Number(v))).map(v => Number(v));
+                            if (scores.length > 0) avgFB = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
+                        } catch(e) {}
+                    }
+                }
+
+                dataRows.push([
+                    new Date(m.date).toLocaleDateString(),
+                    m.title.replace(/,/g, ' '),
+                    m.host,
+                    name.replace(/,/g, ' '),
+                    email,
+                    avgPre,
+                    avgPost,
+                    avgFB,
+                    m.costReport?.isPaid ? 'Paid' : 'Pending'
+                ]);
+            });
+        });
+
+        const csvContent = "data:text/csv;charset=utf-8," 
+            + headers.join(",") + "\n"
+            + dataRows.map(r => r.join(",")).join("\n");
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Internal_Training_Participants_${startDate}_to_${endDate}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const formatCurrency = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
 
     return (
@@ -810,101 +927,136 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 variant="danger"
             />
 
-            {/* Header */}
-            <div className="bg-white rounded-3xl p-6 border border-slate-100 flex flex-col md:flex-row justify-between md:items-center gap-4 shadow-sm">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Users className="text-indigo-600" /> Training Internal
-                    </h1>
-                    <p className="text-slate-500 mt-1">Manage sharing sessions, townhalls, and internal training.</p>
+            {/* Header / Hero Section */}
+            <div className="bg-gradient-to-br from-indigo-700 via-indigo-600 to-blue-600 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden shrink-0">
+                <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12">
+                    <Users size={180} />
                 </div>
-                <div className="flex gap-3">
-                    <div className="flex items-center gap-2">
-                        <div className="flex bg-slate-100 p-1 rounded-lg mr-2">
+                
+                <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div className="space-y-1.5">
+                        <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10 mb-2">
+                            <Zap size={12} className="text-yellow-400 fill-yellow-400" /> Professional Training
+                        </div>
+                        <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
+                            Training Internal
+                        </h1>
+                        <p className="text-blue-100/80 font-medium max-w-md">
+                            Manage sharing sessions, town halls, and internal training programs with professional standards.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                        <div className="flex bg-white/10 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 self-start">
                             <button
                                 onClick={() => setListType('active')}
-                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${listType === 'active' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${listType === 'active' ? 'bg-white text-indigo-600 shadow-xl' : 'text-blue-100 hover:text-white'}`}
                             >
                                 Active
                             </button>
                             <button
                                 onClick={() => setListType('history')}
-                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${listType === 'history' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${listType === 'history' ? 'bg-white text-indigo-600 shadow-xl' : 'text-blue-100 hover:text-white'}`}
                             >
-                                History (Paid)
+                                History
                             </button>
                         </div>
 
                         {isManagementMode && (
-                            <div className="flex bg-slate-100 p-1 rounded-lg">
+                            <div className="flex bg-white/10 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 self-start">
                                 <button
                                     onClick={() => toggleView('list')}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-xl' : 'text-blue-100 hover:text-white'}`}
                                 >
-                                    List View
+                                    List
                                 </button>
                                 <button
                                     onClick={() => toggleView('recap')}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'recap' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${viewMode === 'recap' ? 'bg-white text-indigo-600 shadow-xl' : 'text-blue-100 hover:text-white'}`}
                                 >
                                     Recap
                                 </button>
                             </div>
                         )}
+
+                        {viewMode === 'list' && (effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') && isManagementMode && (
+                            <button
+                                onClick={() => { setIsEditing(false); resetForm(); setIsCreateOpen(true); }}
+                                className="bg-white text-indigo-600 px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
+                            >
+                                <Plus size={18} /> New Session
+                            </button>
+                        )}
                     </div>
                 </div>
-
-                {viewMode === 'list' && (effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') && isManagementMode && (
-                    <button
-                        onClick={() => { setIsEditing(false); resetForm(); setIsCreateOpen(true); }}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/20 flex items-center gap-2 transition-all"
-                    >
-                        <Plus size={18} /> New Session
-                    </button>
-                )}
             </div>
 
+            {/* Export Bar (Above Filter) */}
+            {viewMode === 'recap' && (effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') && (
+                <div className="flex justify-end gap-3 -mb-4 relative z-10">
+                    <button
+                        onClick={exportParticipantCSV}
+                        className="bg-white border border-slate-200 text-slate-600 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:border-indigo-500 hover:text-indigo-600 transition-all flex items-center gap-2 group"
+                    >
+                        <FileText size={16} className="text-slate-400 group-hover:text-indigo-500" /> Export Participants
+                    </button>
+                    <button
+                        onClick={exportHostCSV}
+                        className="bg-white border border-slate-200 text-slate-600 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:border-indigo-500 hover:text-indigo-600 transition-all flex items-center gap-2 group"
+                    >
+                        <Users size={16} className="text-slate-400 group-hover:text-indigo-500" /> Export Hosts
+                    </button>
+                </div>
+            )}
+
             {/* Global Filter Bar */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between mb-6">
-                <div className="relative w-full md:w-96">
-                    <Clock className="absolute left-4 top-3.5 text-slate-400" size={18} />
+            <div className="bg-white/50 backdrop-blur-md p-4 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col md:flex-row gap-5 items-center justify-between mb-8">
+                <div className="relative w-full md:w-96 group">
+                    <div className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                        <Clock size={18} />
+                    </div>
                     <input
                         type="text"
                         placeholder="Search Host or Title..."
-                        className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-600"
+                        className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-100 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-bold text-slate-600 text-sm transition-all shadow-sm"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
 
-                <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
-                    <select
-                        value={selectedBranch}
-                        onChange={(e) => setSelectedBranch(e.target.value)}
-                        className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                    >
-                        {branches.map(b => <option key={b} value={b}>{b === 'Online' ? 'Online Only' : b}</option>)}
-                    </select>
+                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                    <div className="relative">
+                        <select
+                            value={selectedBranch}
+                            onChange={(e) => setSelectedBranch(e.target.value)}
+                            className="w-full sm:w-auto pl-4 pr-10 py-3 rounded-2xl border border-slate-100 bg-white font-black text-slate-600 text-[11px] uppercase tracking-wider outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 shadow-sm appearance-none cursor-pointer"
+                        >
+                            {branches.map(b => <option key={b} value={b}>{b === 'Online' ? 'Online Only' : b}</option>)}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-4 top-4 text-slate-400 pointer-events-none" />
+                    </div>
 
-                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200">
-                        <CalendarIcon size={14} className="text-slate-400" />
-                        <input 
-                            ref={startDateRef}
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            onClick={() => startDateRef.current?.showPicker()}
-                            className="bg-transparent font-bold text-slate-600 text-xs outline-none cursor-pointer"
-                        />
-                        <span className="text-slate-300 mx-1">-</span>
-                        <input 
-                            ref={endDateRef}
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            onClick={() => endDateRef.current?.showPicker()}
-                            className="bg-transparent font-bold text-slate-600 text-xs outline-none cursor-pointer"
-                        />
+                    <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl border border-slate-100 shadow-sm">
+                        <CalendarIcon size={14} className="text-indigo-500" />
+                        <div className="flex items-center gap-2">
+                            <input 
+                                ref={startDateRef}
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                onClick={() => startDateRef.current?.showPicker()}
+                                className="bg-transparent font-black text-slate-600 text-[11px] outline-none cursor-pointer uppercase"
+                            />
+                            <span className="text-slate-200 font-bold">—</span>
+                            <input 
+                                ref={endDateRef}
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                onClick={() => endDateRef.current?.showPicker()}
+                                className="bg-transparent font-black text-slate-600 text-[11px] outline-none cursor-pointer uppercase"
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -954,8 +1106,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     <table className="w-full text-left text-sm">
                                                         <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
                                                             <tr>
-                                                                <th className="px-6 py-3">Tanggal</th>
-                                                                <th className="px-6 py-3">Kursus / Sesi</th>
+                                                                <th className="px-6 py-3">Date</th>
+                                                                <th className="px-6 py-3">Course / Session</th>
                                                                 <th className="px-6 py-3 text-center">Avg Pre-Test</th>
                                                                 <th className="px-6 py-3 text-center">Avg Post-Test</th>
                                                                  <th className="px-6 py-3 text-center">Avg Feedback</th>
@@ -1044,7 +1196,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                             onClick={() => setExpandedMeetings(prev => ({ ...prev, [m.id]: !prev[m.id] }))}
                                                                             className="hover:bg-white transition-colors cursor-pointer group/row"
                                                                         >
-                                                                            <td className="px-6 py-4 text-slate-500 whitespace-nowrap">{new Date(m.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</td>
+                                                                            <td className="px-6 py-4 text-slate-500 whitespace-nowrap">{new Date(m.date).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</td>
                                                                             <td className="px-6 py-4">
                                                                                 <div className="flex items-center gap-2">
                                                                                     <div className={`transition-transform duration-200 ${expandedMeetings[m.id] ? 'rotate-90' : ''}`}>
@@ -1079,16 +1231,17 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                         <table className="w-full text-[10px]">
                                                                                             <thead className="bg-slate-50/50 text-slate-400 font-black uppercase tracking-widest border-b border-slate-50">
                                                                                                 <tr>
-                                                                                                    <th className="px-4 py-2 text-left">Nama Peserta</th>
+                                                                                                    <th className="px-6 py-3 text-left">Participant Name</th>
                                                                                                     <th className="px-4 py-2 text-center">Pre-Test</th>
                                                                                                     <th className="px-4 py-2 text-center">Post-Test</th>
                                                                                                     <th className="px-4 py-2 text-center">Feedback</th>
+                                                                                                    <th className="px-4 py-2 text-right pr-6">Cost</th>
                                                                                                 </tr>
                                                                                             </thead>
 <tbody className="divide-y divide-slate-50">
                                                                                                 {participantEmails.length === 0 ? (
                                                                                                     <tr>
-                                                                                                        <td colSpan={4} className="px-4 py-4 text-center italic text-slate-400">Belum ada peserta yang tercatat untuk sesi ini.</td>
+                                                                                                        <td colSpan={5} className="px-4 py-4 text-center italic text-slate-400">No participants recorded for this session.</td>
                                                                                                     </tr>
                                                                                                 ) : participantEmails.map(email => {
                                                                                                     const findById = (item: any, id: string) => {
@@ -1161,13 +1314,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                                                     const avg = Math.round((numericScores.reduce((a, b) => a + b, 0) / numericScores.length) * 10) / 10;
                                                                                                                     feedbackDisplay = <span className="text-emerald-600 font-bold">{avg} / 4</span>;
                                                                                                                 } else {
-                                                                                                                    feedbackDisplay = <span className="text-emerald-500 font-bold">Terkirim</span>;
+                                                                                                                    feedbackDisplay = <span className="text-emerald-500 font-bold">Sent</span>;
                                                                                                                 }
                                                                                                             } catch(e) {
-                                                                                                                feedbackDisplay = <span className="text-emerald-500 font-bold">Terkirim</span>;
+                                                                                                                feedbackDisplay = <span className="text-emerald-500 font-bold">Sent</span>;
                                                                                                             }
                                                                                                         } else {
-                                                                                                            feedbackDisplay = <span className="text-emerald-500 font-bold">Terkirim</span>;
+                                                                                                            feedbackDisplay = <span className="text-emerald-500 font-bold">Sent</span>;
                                                                                                         }
                                                                                                     }
 
@@ -1177,6 +1330,16 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                                             <td className="px-4 py-2 text-center font-bold text-slate-500">{pre}</td>
                                                                                                             <td className="px-4 py-2 text-center font-bold text-indigo-600">{post}</td>
                                                                                                             <td className="px-4 py-2 text-center">{feedbackDisplay}</td>
+                                                                                                            <td className="px-4 py-2 text-right pr-6 font-bold text-slate-700">
+                                                                                                                {(() => {
+                                                                                                                    const totalCost = (m.costReport?.trainerIncentive || 0) + 
+                                                                                                                                    (m.costReport?.snackCost || 0) + 
+                                                                                                                                    (m.costReport?.lunchCost || 0) + 
+                                                                                                                                    (m.costReport?.otherCost || 0);
+                                                                                                                    const cpp = participantEmails.length > 0 ? totalCost / participantEmails.length : 0;
+                                                                                                                    return cpp > 0 ? formatCurrency(cpp) : '-';
+                                                                                                                })()}
+                                                                                                            </td>
                                                                                                         </tr>
                                                                                                     );
                                                                                                 })}
@@ -1214,80 +1377,84 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                             filteredMeetings.map((meeting) => (
                                 <div
                                     key={meeting.id}
-                                    className="group bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer relative overflow-hidden"
+                                    className="group bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgb(0,0,0,0.08)] hover:-translate-y-2 transition-all duration-500 cursor-pointer relative overflow-hidden flex flex-col h-full active:scale-[0.98]"
                                     onClick={() => setSelectedMeeting(meeting)}
                                 >
-                                    <div className={`absolute top-0 left-0 w-1.5 h-full ${meeting.is_closed ? 'bg-red-500' : (meeting.type === 'Online' ? 'bg-blue-400' : 'bg-emerald-400')}`} />
+                                    {/* Accent Blob */}
+                                    <div className={`absolute -right-6 -top-6 w-32 h-32 rounded-full opacity-5 group-hover:opacity-10 transition-opacity duration-700 blur-3xl ${meeting.type === 'Online' ? 'bg-blue-500' : 'bg-emerald-500'}`}></div>
 
-                                    <div className="flex justify-between items-start mb-4 pl-2">
-                                        <div className="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 text-center min-w-[60px]">
-                                            <span className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="bg-slate-50 p-0.5 rounded-2xl border border-slate-100 shadow-inner overflow-hidden min-w-[70px]">
+                                            <div className="bg-indigo-600 text-white py-1 px-2 text-[9px] font-black uppercase tracking-widest text-center">
                                                 {(meeting.shortDate || 'TBD TBD').split(' ')[1]}
-                                            </span>
-                                            <span className="block text-xl font-black text-slate-800 leading-none mt-0.5">
+                                            </div>
+                                            <div className="py-2 px-2 text-2xl font-black text-slate-800 leading-none text-center">
                                                 {(meeting.shortDate || 'TBD').split(' ')[0]}
-                                            </span>
+                                            </div>
                                         </div>
-                                        <div className="flex flex-col items-end gap-1">
+                                        <div className="flex flex-col items-end gap-2">
                                             {meeting.is_closed && (
-                                                <span className="px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-wider bg-red-50 text-red-600 border border-red-100 flex items-center gap-1">
-                                                    <Lock size={8} /> CLOSED
+                                                <span className="px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-600 border border-red-100/50 flex items-center gap-1.5 shadow-sm">
+                                                    <Lock size={10} /> CLOSED
                                                 </span>
                                             )}
-                                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${meeting.type === 'Online'
-                                                ? 'bg-blue-50 text-blue-600 border-blue-100'
-                                                : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                            <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm ${meeting.type === 'Online'
+                                                ? 'bg-blue-50 text-blue-600 border-blue-100/50'
+                                                : meeting.type === 'Hybrid' ? 'bg-purple-50 text-purple-600 border-purple-100/50' : 'bg-emerald-50 text-emerald-600 border-emerald-100/50'
                                                 }`}>
                                                 {meeting.type}
                                             </span>
                                         </div>
                                     </div>
 
-                                    <h3 className="font-bold text-lg text-slate-800 mb-2 pl-2 line-clamp-2 leading-tight group-hover:text-indigo-600 transition-colors">
+                                    <h3 className="font-black text-xl text-slate-800 mb-3 line-clamp-2 leading-[1.2] group-hover:text-indigo-600 transition-colors tracking-tight">
                                         {meeting.title}
                                     </h3>
 
-                                    <div className="space-y-2 pl-2 mb-6">
-                                        <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-                                            <Clock size={14} className="text-slate-400" />
+                                    <div className="space-y-3 mb-8">
+                                        <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500 bg-slate-50/50 p-2 rounded-xl border border-transparent group-hover:border-slate-100 transition-all">
+                                            <Clock size={16} className="text-indigo-400" />
                                             {meeting.time}
                                         </div>
-                                        <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-                                            <MapPin size={14} className="text-slate-400" />
+                                        <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500 bg-slate-50/50 p-2 rounded-xl border border-transparent group-hover:border-slate-100 transition-all">
+                                            <MapPin size={16} className="text-indigo-400" />
                                             <span className="line-clamp-1">{meeting.location || 'Online'}</span>
                                         </div>
-                                        <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-                                            <div className="w-4 h-4 rounded-full bg-indigo-100 flex items-center justify-center text-[8px] font-bold text-indigo-600">
+                                        <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500 bg-slate-50/50 p-2 rounded-xl border border-transparent group-hover:border-slate-100 transition-all">
+                                            <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-black text-white shadow-lg shadow-indigo-200">
                                                 {meeting.host.charAt(0)}
                                             </div>
-                                            Host: {meeting.host}
+                                            <span className="opacity-80">Host:</span> <span className="text-slate-700">{meeting.host}</span>
                                         </div>
                                     </div>
 
-                                    <div className="pl-2 flex items-center justify-between border-t border-slate-50 pt-4 mt-auto">
-                                        <AvatarStack count={meeting.guests?.count || 0} />
+                                    <div className="flex items-center justify-between border-t border-slate-100 pt-6 mt-auto">
+                                        <div className="space-y-1">
+                                            <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Audience</div>
+                                            <AvatarStack count={meeting.guests?.count || 0} />
+                                        </div>
 
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-3">
                                             {(effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') && (
-                                                <>
+                                                <div className="flex gap-2">
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); openReportModal(meeting); }}
-                                                        className="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:bg-green-100 hover:text-green-600 transition-colors"
+                                                        className="w-10 h-10 flex items-center justify-center rounded-2xl bg-slate-50 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-transparent hover:border-emerald-100 shadow-sm"
                                                         title="Financial Report"
                                                     >
-                                                        <DollarSign size={16} />
+                                                        <DollarSign size={18} />
                                                     </button>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); openEditModal(meeting); }}
-                                                        className="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                                                        className="w-10 h-10 flex items-center justify-center rounded-2xl bg-slate-50 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-all border border-transparent hover:border-blue-100 shadow-sm"
                                                         title="Edit Meeting"
                                                     >
-                                                        <FileText size={16} />
+                                                        <FileText size={18} />
                                                     </button>
-                                                </>
+                                                </div>
                                             )}
-                                            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                                                <ArrowRight size={16} />
+                                            <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-xl group-hover:shadow-indigo-200 transition-all duration-500">
+                                                <ArrowRight size={20} />
                                             </div>
                                         </div>
                                     </div>
@@ -1316,14 +1483,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     onClick={() => setActiveCreateTab('details')} 
                                     className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeCreateTab === 'details' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-white' : 'text-slate-400 hover:text-slate-600'}`}
                                 >
-                                    Rincian Sesi
+                                    Session Details
                                 </button>
                                 <button 
                                     type="button"
                                     onClick={() => setActiveCreateTab('assessment')} 
                                     className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeCreateTab === 'assessment' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-white' : 'text-slate-400 hover:text-slate-600'}`}
                                 >
-                                    Konfigurasi Ujian
+                                    Exam Configuration
                                 </button>
                             </div>
 
@@ -1718,36 +1885,19 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Trainer Incentive</label>
-                                        <div className="relative">
-                                            <span className="absolute left-4 top-2.5 text-slate-500 font-bold">Rp</span>
-                                            <input
-                                                type="text"
-                                                className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-700"
-                                                value={(reportData.trainerIncentive || 0).toLocaleString('id-ID')}
-                                                onChange={e => {
-                                                    const val = parseInt(e.target.value.replace(/\./g, '')) || 0;
-                                                    setReportData({ ...reportData, trainerIncentive: val });
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Audience Fee (Per Person)</label>
-                                        <div className="relative">
-                                            <span className="absolute left-4 top-2.5 text-slate-500 font-bold">Rp</span>
-                                            <input
-                                                type="text"
-                                                className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-700"
-                                                value={(reportData.audienceFee || 0).toLocaleString('id-ID')}
-                                                onChange={e => {
-                                                    const val = parseInt(e.target.value.replace(/\./g, '')) || 0;
-                                                    setReportData({ ...reportData, audienceFee: val });
-                                                }}
-                                            />
-                                        </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Trainer Incentive</label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-2.5 text-slate-500 font-bold">Rp</span>
+                                        <input
+                                            type="text"
+                                            className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-700"
+                                            value={(reportData.trainerIncentive || 0).toLocaleString('id-ID')}
+                                            onChange={e => {
+                                                const val = parseInt(e.target.value.replace(/\./g, '')) || 0;
+                                                setReportData({ ...reportData, trainerIncentive: val });
+                                            }}
+                                        />
                                     </div>
                                 </div>
 
@@ -1807,8 +1957,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             (reportData.trainerIncentive || 0) +
                                             (reportData.snackCost || 0) +
                                             (reportData.lunchCost || 0) +
-                                            (reportData.otherCost || 0) +
-                                            ((reportData.audienceFee || 0) * reportData.participantsCount)
+                                            (reportData.otherCost || 0)
                                         )}
                                     </span>
                                 </div>
@@ -2125,7 +2274,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         a.click();
                                                     } catch (e) {
                                                         console.error(e);
-                                                        setNotification({ show: true, type: 'error', message: "Gagal membuat file kalender." });
+                                                        setNotification({ show: true, type: 'error', message: "Failed to create calendar file." });
                                                     }
                                                 }}
                                                 className="flex-1 py-2 bg-white border border-slate-200 hover:bg-white hover:border-slate-300 text-slate-600 font-bold rounded-lg text-xs transition-all shadow-sm"
@@ -2153,7 +2302,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         window.open(url, '_blank');
                                                     } catch (e) {
                                                         console.error(e);
-                                                        setNotification({ show: true, type: 'error', message: "Gagal membuka Google Calendar." });
+                                                        setNotification({ show: true, type: 'error', message: "Failed to open Google Calendar." });
                                                     }
                                                 }}
                                                 className="flex-1 py-2 bg-white border border-slate-200 hover:bg-white hover:border-slate-300 text-blue-600 font-bold rounded-lg text-xs transition-all shadow-sm text-center flex items-center justify-center"
@@ -2484,7 +2633,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         fetch(`${API_BASE_URL}/api/feedback/all`).then(r => r.json()).then(setAllFeedback);
                                     }
                                     setShowQuiz(null);
-                                    setNotification({ show: true, type: 'success', message: `${showQuiz} Test berhasil diselesaikan!` });
+                                    setNotification({ show: true, type: 'success', message: `${showQuiz} Test completed successfully!` });
                                 }
                             } catch (err) { console.error(err); }
                         }}
@@ -2715,7 +2864,7 @@ const TrainingFeedbackForm = ({ onClose, onSubmit, meetingTitle }: any) => {
                     }}
                     className="w-full py-4 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white font-black rounded-2xl shadow-xl shadow-purple-500/20 transition-all"
                 >
-                    {isLoading ? 'Mengirim...' : 'KIRIM FEEDBACK'}
+                    {isLoading ? 'Sending...' : 'SUBMIT FEEDBACK'}
                 </button>
             </div>
         </div>
@@ -2728,12 +2877,32 @@ const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChang
     const lastInputRef = useRef<HTMLTextAreaElement>(null);
 
     const addQuestion = () => {
-        const newQs = [...questions, { question: '', options: ['', '', '', ''], correctAnswer: 0 }];
+        const newQs = [...questions, { question: '', options: ['', ''], correctAnswer: 0 }];
         onChange({ ...data, questions: newQs });
         setTimeout(() => {
             lastQuestionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             lastInputRef.current?.focus();
         }, 150);
+    };
+
+    const addOption = (qIdx: number) => {
+        const newQs = [...questions];
+        newQs[qIdx] = { ...newQs[qIdx], options: [...newQs[qIdx].options, ''] };
+        onChange({ ...data, questions: newQs });
+    };
+
+    const removeOption = (qIdx: number, oIdx: number) => {
+        const newQs = [...questions];
+        if (newQs[qIdx].options.length <= 2) return;
+        const newOpts = newQs[qIdx].options.filter((_: any, i: number) => i !== oIdx);
+        
+        // Adjust correctAnswer if needed
+        let newCorrect = newQs[qIdx].correctAnswer;
+        if (newCorrect === oIdx) newCorrect = 0;
+        else if (newCorrect > oIdx) newCorrect -= 1;
+        
+        newQs[qIdx] = { ...newQs[qIdx], options: newOpts, correctAnswer: newCorrect };
+        onChange({ ...data, questions: newQs });
     };
     
     const removeQuestion = (idx: number) => {
@@ -2763,7 +2932,7 @@ const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChang
                      {type} Assessment
                  </h4>
                  <button type="button" onClick={addQuestion} className="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-black hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-1">
-                     <Plus size={14} /> TAMBAH SOAL
+                     <Plus size={14} /> ADD QUESTION
                  </button>
              </div>
              {questions.length === 0 && (
@@ -2799,7 +2968,7 @@ const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChang
                                  <div 
                                     key={oi} 
                                     onClick={() => updateQuestion(i, 'correctAnswer', oi)}
-                                    className={`flex items-center gap-3 p-2 rounded-xl transition-all border cursor-pointer ${q.correctAnswer === oi ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}
+                                    className={`flex items-center gap-3 p-2 rounded-xl transition-all border cursor-pointer group/opt ${q.correctAnswer === oi ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}
                                  >
                                      <input 
                                          type="radio" 
@@ -2815,8 +2984,24 @@ const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChang
                                          onChange={e => updateOption(i, oi, e.target.value)}
                                          placeholder={`Opsi ${oi + 1}`}
                                      />
+                                     {q.options.length > 2 && (
+                                         <button 
+                                            type="button" 
+                                            onClick={(e) => { e.stopPropagation(); removeOption(i, oi); }}
+                                            className="opacity-0 group-hover/opt:opacity-100 text-slate-300 hover:text-red-500 transition-all p-1"
+                                         >
+                                             <X size={14} />
+                                         </button>
+                                     )}
                                  </div>
                              ))}
+                             <button 
+                                type="button" 
+                                onClick={() => addOption(i)}
+                                className="mt-1 w-fit text-[10px] font-black text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 bg-indigo-50/50 hover:bg-indigo-100/50 px-4 py-2 rounded-xl transition-all"
+                             >
+                                <Plus size={12} strokeWidth={3} /> ADD OPTION
+                             </button>
                          </div>
                      </div>
                  ))}

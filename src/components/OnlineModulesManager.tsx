@@ -593,16 +593,21 @@ const OnlineModulesManager = () => {
 
     return (
         <div className="space-y-8">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-3xl p-8 text-white shadow-xl shadow-blue-200 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-                <div className="relative z-10 flex justify-between items-end">
+            <div className="bg-gradient-to-br from-violet-700 via-purple-600 to-indigo-800 rounded-[2.5rem] p-8 md:p-12 text-white shadow-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12 group-hover:rotate-45 transition-transform duration-1000">
+                    <BookOpen size={200} />
+                </div>
+                <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
                     <div>
-                        <h1 className="text-3xl font-bold mb-2">Online Module Management</h1>
-                        <p className="text-blue-100 max-w-xl">Create, edit, and manage training modules. Track progress.</p>
+                        <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/20 mb-4">
+                            Module Architecture
+                        </div>
+                        <h1 className="text-3xl md:text-4xl font-black tracking-tighter mb-2">Online Module Management</h1>
+                        <p className="text-purple-100 font-medium max-w-xl opacity-90">Digital Learning Architecture: Design, edit, and manage high-standard curriculum modules.</p>
                     </div>
                     <button
                         onClick={handleAddNewCourse}
-                        className="bg-white text-blue-600 px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg hover:bg-blue-50 transition-all"
+                        className="bg-white text-purple-600 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-2xl hover:bg-purple-50 transition-all active:scale-95"
                     >
                         <Plus size={20} /> New Module
                     </button>
@@ -611,36 +616,39 @@ const OnlineModulesManager = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {courses.map(course => (
-                    <div key={course.id} className="group bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-xl hover:border-blue-200 transition-all relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="flex justify-between items-start mb-4">
-                            <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider">
+                    <div key={course.id} className="group bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgb(0,0,0,0.08)] hover:-translate-y-2 transition-all duration-500 cursor-pointer relative overflow-hidden flex flex-col h-full active:scale-[0.98]">
+                        <div className="absolute top-0 left-0 w-1.5 h-full bg-purple-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <div className="flex justify-between items-start mb-6">
+                            <span className="bg-purple-50 text-purple-600 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border border-purple-100/50 shadow-sm">
                                 Module
                             </span>
-                            <div className="flex gap-1">
+                            <div className="flex gap-2">
                                 <button
                                     onClick={() => handleEditCourse(course)}
-                                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    className="w-10 h-10 flex items-center justify-center rounded-2xl bg-slate-50 text-slate-400 hover:bg-purple-50 hover:text-purple-600 transition-all border border-transparent hover:border-purple-100 shadow-sm"
                                     title="Edit Course"
                                 >
-                                    <Edit size={20} />
+                                    <Edit size={18} />
                                 </button>
                                 <button
                                     onClick={() => handleDeleteCourse(course.id)}
-                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    className="w-10 h-10 flex items-center justify-center rounded-2xl bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-all border border-transparent hover:border-red-100 shadow-sm"
                                     title="Delete Course"
                                 >
-                                    <Trash2 size={20} />
+                                    <Trash2 size={18} />
                                 </button>
                             </div>
                         </div>
-                        <h3 className="text-lg font-bold text-slate-800 mb-2 group-hover:text-blue-600 transition-colors">{course.title}</h3>
-                        <p className="text-slate-500 text-sm mb-4 line-clamp-2">{course.description}</p>
-                        <div className="flex items-center justify-between text-sm text-slate-400 border-t border-slate-50 pt-4">
-                            <span>{course.modules?.length || 0} Courses</span>
-                            <span className="flex items-center gap-1">
+                        <h3 className="text-xl font-black text-slate-800 mb-3 group-hover:text-purple-600 transition-colors tracking-tight leading-tight">{course.title}</h3>
+                        <p className="text-slate-500 text-sm font-medium mb-8 line-clamp-2 leading-relaxed">{course.description}</p>
+                        <div className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest border-t border-slate-50 pt-6 mt-auto">
+                            <div className="flex items-center gap-2">
+                                <BookOpen size={14} className="text-purple-400" />
+                                <span>{course.modules?.length || 0} Courses</span>
+                            </div>
+                            <div className="flex items-center gap-2">
                                 <GripVertical size={14} /> Reorder
-                            </span>
+                            </div>
                         </div>
                     </div>
                 ))}

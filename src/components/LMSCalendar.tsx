@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MoreHorizontal, MapPin, Video, Plus, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MoreHorizontal, MapPin, Video, Plus, X, ArrowUpRight } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Role, Meeting, Incentive, TrainingRequest } from '../types';
 
@@ -38,9 +38,6 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
     });
 
     // --- Fetch Data ---
-    // Defined outside useEffect to be reusable after scheduling
-    // --- Fetch Data ---
-    // Defined outside useEffect to be reusable after scheduling
     const fetchEvents = useCallback(async () => {
         try {
             const [meetingsRes, incentivesRes, trainingRes] = await Promise.all([
@@ -58,7 +55,6 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
 
             // 1. Process Meetings (Internal)
             meetings.forEach((m: Meeting) => {
-                // Show if public (HR Host) OR user is invited OR User is HR (Access All)
                 if (isHR || m.host === 'HR Team' || m.host === 'Admin' || (userEmail && m.guests?.emails?.includes(userEmail))) {
                     loadedEvents.push({
                         id: m.id,
@@ -73,8 +69,6 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                 }
             });
 
-            // 2. Process External Training (HR Only sees Approved External Training as schedule items?)
-            // Usually regular users see their own requested training. HR sees all optimized.
             // 2. Process External Training
             if (isHR) {
                 training.forEach((t: TrainingRequest) => {
@@ -90,7 +84,6 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                     }
                 });
             } else if (userEmail) {
-                // Regular user sees their own
                 training.forEach((t: TrainingRequest) => {
                     if (t.employeeName.toLowerCase().includes(userEmail.split('@')[0].toLowerCase())) {
                         loadedEvents.push({
@@ -108,7 +101,6 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
             // 3. Process Incentives
             incentives.forEach((inc: Incentive) => {
                 if (isHR && inc.status === 'Active') {
-                    // HR Sees all active incentives expiry
                     loadedEvents.push({
                         id: inc.id,
                         title: `Incentive End: ${inc.courseName} - ${inc.employeeName}`,
@@ -127,7 +119,6 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
     }, [userRole, userEmail]);
 
     useEffect(() => {
-        // eslint-disable-next-line
         fetchEvents();
     }, [fetchEvents]);
 
@@ -144,7 +135,7 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                 shortDate: shortDate,
                 host: scheduleData.host,
                 type: scheduleData.type,
-                location: scheduleData.type === 'Online' ? 'Online Link Pending' : 'TBD', // simplified for quick add
+                location: scheduleData.type === 'Online' ? 'Online Link Pending' : 'TBD',
                 meetLink: scheduleData.type === 'Online' ? 'https://meet.google.com/new' : undefined,
                 description: 'Scheduled via Calendar Quick Add',
                 guests: { status: 'Awaiting', count: 0, emails: [] }
@@ -157,7 +148,7 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
             });
 
             setIsScheduleOpen(false);
-            fetchEvents(); // Refresh calendar
+            fetchEvents();
         } catch (err) { console.error('Schedule failed', err); }
     };
 
@@ -207,10 +198,10 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
 
     const getEventColor = (type: CalendarEvent['type']) => {
         switch (type) {
-            case 'INTERNAL': return 'bg-blue-500 shadow-blue-500/50'; // Meetings
-            case 'EXTERNAL': return 'bg-emerald-500 shadow-emerald-500/50';
-            case 'DEADLINE': return 'bg-rose-500 shadow-rose-500/50';
-            case 'INCENTIVE': return 'bg-amber-500 shadow-amber-500/50';
+            case 'INTERNAL': return 'bg-blue-600 shadow-blue-500/50';
+            case 'EXTERNAL': return 'bg-emerald-600 shadow-emerald-500/50';
+            case 'DEADLINE': return 'bg-rose-600 shadow-rose-500/50';
+            case 'INCENTIVE': return 'bg-amber-600 shadow-amber-500/50';
             default: return 'bg-slate-400';
         }
     };
@@ -238,16 +229,16 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                 key={day}
                 onClick={() => setSelectedDate(dateObj)}
                 className={`
-                    relative aspect-square rounded-2xl transition-all cursor-pointer flex flex-col items-center justify-center group
-                    ${compact ? 'gap-0.5' : 'gap-1'}
+                    relative rounded-[20px] transition-all duration-300 cursor-pointer flex flex-col items-center justify-center group
+                    ${compact ? 'aspect-square gap-0.5' : 'h-12 md:h-16 gap-0.5'}
                     ${isSelected
-                        ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-xl shadow-blue-500/30 scale-110 z-10'
-                        : 'bg-white/60 border border-white/50 text-slate-600 hover:bg-white hover:shadow-lg hover:scale-105 hover:z-10'
+                        ? 'bg-slate-900 text-white shadow-2xl shadow-slate-900/40 scale-105 z-10'
+                        : 'bg-white border border-slate-100 text-slate-600 hover:bg-slate-50 hover:border-slate-200 hover:shadow-xl'
                     }
-                    ${isToday && !isSelected ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-slate-50' : ''}
+                    ${isToday && !isSelected ? 'ring-2 ring-indigo-500 ring-offset-2' : ''}
                 `}
             >
-                <span className={`${compact ? 'text-xs' : 'text-sm'} font-bold ${isSelected ? 'text-white' : 'text-slate-700'}`}>
+                <span className={`${compact ? 'text-xs' : 'text-base'} font-black ${isSelected ? 'text-white' : 'text-slate-700'}`}>
                     {day}
                 </span>
                 {hasEvents && (
@@ -255,7 +246,7 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                         {dayEvents.slice(0, compact ? 2 : 3).map(ev => (
                             <div
                                 key={ev.id}
-                                className={`${compact ? 'h-1 w-1' : 'h-1.5 w-1.5'} rounded-full ${isSelected ? 'bg-white/80' : getEventColor(ev.type)} shadow-sm`}
+                                className={`${compact ? 'h-1 w-1' : 'h-1.5 w-1.5'} rounded-full ${isSelected ? 'bg-white/80' : getEventColor(ev.type)}`}
                             />
                         ))}
                     </div>
@@ -268,63 +259,52 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
 
     if (compact) {
         return (
-            <div className="flex flex-col h-full bg-slate-50/50 rounded-3xl p-4">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-bold text-slate-800">{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h2>
-                    <div className="flex gap-1">
-                        {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
-                            <button
-                                onClick={() => openScheduleModal(selectedDate.toISOString().split('T')[0])}
-                                className="p-1 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors mr-1"
-                                title="Quick Schedule"
-                            >
-                                <Plus size={16} />
-                            </button>
-                        )}
-                        <button onClick={prevMonth} className="p-1 hover:bg-white rounded-lg transition-colors text-slate-500"><ChevronLeft size={16} /></button>
-                        <button onClick={nextMonth} className="p-1 hover:bg-white rounded-lg transition-colors text-slate-500"><ChevronRight size={16} /></button>
+            <div className="flex flex-col h-full bg-white rounded-[32px] p-5 shadow-sm border border-slate-100">
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 className="text-xl font-black text-slate-800">{currentDate.toLocaleString('default', { month: 'long' })}</h2>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{currentDate.getFullYear()}</p>
+                    </div>
+                    <div className="flex gap-1.5">
+                        <button onClick={prevMonth} className="p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-400 hover:text-slate-800"><ChevronLeft size={16} /></button>
+                        <button onClick={nextMonth} className="p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-400 hover:text-slate-800"><ChevronRight size={16} /></button>
                     </div>
                 </div>
 
-                {/* Compact Days Header */}
-                <div className="grid grid-cols-7 mb-2">
+                <div className="grid grid-cols-7 mb-3">
                     {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
-                        <div key={i} className="text-center text-[10px] font-bold text-slate-400">
+                        <div key={i} className="text-center text-[10px] font-black text-slate-300 uppercase">
                             {day}
                         </div>
                     ))}
                 </div>
 
-                {/* Compact Dates Grid */}
-                <div className="grid grid-cols-7 gap-1 flex-1 content-start">
-                    {/* Empty Slots */}
+                <div className="grid grid-cols-7 gap-1.5 flex-1 content-start">
                     {Array.from({ length: startDayOffset }).map((_, i) => (
                         <div key={`empty-${i}`} />
                     ))}
-                    {/* Days */}
                     {Array.from({ length: daysInMonth }).map((_, i) => renderDay(i + 1))}
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-slate-100 flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-2">
-                    <p className="text-xs font-bold text-slate-400 uppercase mb-2">
-                        {selectedDate.getDate()} {selectedDate.toLocaleString('default', { month: 'short' })} Activities
-                    </p>
+                <div className="mt-6 pt-5 border-t border-slate-50 flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-3">
+                    <div className="flex justify-between items-center mb-1">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            Agenda • {selectedDate.getDate()} {selectedDate.toLocaleString('default', { month: 'short' })}
+                        </p>
+                        {selectedDayEvents.length > 0 && <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{selectedDayEvents.length} Tasks</span>}
+                    </div>
                     {selectedDayEvents.length === 0 ? (
-                        <p className="text-xs text-slate-400 italic text-center py-2">No activities scheduled.</p>
+                        <div className="py-8 text-center">
+                            <p className="text-xs text-slate-400 italic">No events scheduled.</p>
+                        </div>
                     ) : (
                         selectedDayEvents.sort((a, b) => a.time.localeCompare(b.time)).map(ev => (
-                            <div key={ev.id} className="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-100 hover:border-blue-200 transition-colors cursor-pointer group">
-                                <div className={`w-1 h-full min-h-[24px] rounded-full shrink-0 ${ev.type === 'INTERNAL' ? 'bg-blue-500' :
-                                    ev.type === 'EXTERNAL' ? 'bg-emerald-500' :
-                                        ev.type === 'INCENTIVE' ? 'bg-amber-500' : 'bg-rose-500'
-                                    }`} />
+                            <div key={ev.id} className="group flex items-start gap-3 p-3 rounded-2xl bg-slate-50/50 border border-transparent hover:border-slate-200 hover:bg-white transition-all cursor-pointer">
+                                <div className={`w-1 h-8 rounded-full shrink-0 mt-0.5 ${getEventColor(ev.type)}`} />
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-xs font-bold text-slate-700 truncate group-hover:text-blue-600">{ev.title}</p>
-                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${getEventBadgeStyle(ev.type)}`}>
-                                            {ev.type === 'INTERNAL' ? 'MEETING' : ev.type}
-                                        </span>
-                                        <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+                                    <p className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-600">{ev.title}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-[9px] font-black text-slate-400 flex items-center gap-1">
                                             <Clock size={10} /> {ev.time}
                                         </span>
                                     </div>
@@ -338,185 +318,195 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
     }
 
     return (
-        <div className="grid lg:grid-cols-3 gap-8 h-auto min-h-[600px] animate-fade-in">
+        <div className="grid lg:grid-cols-12 gap-6 h-full lg:h-[calc(100vh-180px)] animate-fade-in px-4 overflow-hidden">
 
             {/* --- Left: Calendar Grid --- */}
-            <div className="lg:col-span-2 flex flex-col">
+            <div className="lg:col-span-8 flex flex-col h-full overflow-hidden">
                 {/* Header */}
-                <div className="flex justify-between items-center mb-8 px-2">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6">
                     <div>
-                        <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-slate-600">
+                        <h2 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4">
                             {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                            <div className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse"></div>
                         </h2>
-                        <p className="text-slate-400 font-medium mt-1">Manage your learning schedule</p>
+                        <p className="text-slate-400 font-bold uppercase tracking-[0.2em] text-[10px] mt-2">Nusa Learning Management System • Schedule</p>
                     </div>
 
-                    <div className="flex gap-2 bg-white/50 p-1.5 rounded-2xl border border-white/60 shadow-sm backdrop-blur-sm">
-                        <button onClick={prevMonth} className="p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all text-slate-600 hover:text-blue-600">
-                            <ChevronLeft size={20} strokeWidth={2.5} />
+                    <div className="flex items-center gap-3 bg-slate-100/80 p-2 rounded-[24px] border border-slate-200">
+                        <button onClick={prevMonth} className="p-3 hover:bg-white hover:shadow-sm rounded-[18px] transition-all text-slate-500 hover:text-slate-900">
+                            <ChevronLeft size={20} strokeWidth={3} />
                         </button>
-                        <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1 hover:bg-white hover:shadow-md rounded-xl transition-all text-xs font-bold text-slate-500 hover:text-blue-600">
+                        <button onClick={() => setCurrentDate(new Date())} className="px-6 py-2 bg-white shadow-sm rounded-[18px] text-xs font-black text-slate-800 hover:bg-indigo-600 hover:text-white transition-all">
                             Today
                         </button>
-                        <button onClick={nextMonth} className="p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all text-slate-600 hover:text-blue-600">
-                            <ChevronRight size={20} strokeWidth={2.5} />
+                        <button onClick={nextMonth} className="p-3 hover:bg-white hover:shadow-sm rounded-[18px] transition-all text-slate-500 hover:text-slate-900">
+                            <ChevronRight size={20} strokeWidth={3} />
                         </button>
                     </div>
                 </div>
 
                 {/* Days Header */}
-                <div className="grid grid-cols-7 mb-4 px-2">
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                        <div key={day} className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest py-2">
-                            {day}
+                <div className="grid grid-cols-7 mb-4">
+                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+                        <div key={day} className="text-center text-[11px] font-black text-slate-300 uppercase tracking-widest">
+                            {day.substring(0, 3)}
                         </div>
                     ))}
                 </div>
 
                 {/* Dates Grid */}
-                <div className="grid grid-cols-7 gap-3 sm:gap-4 lg:gap-5 flex-1 p-2">
-                    {/* Empty Slots */}
+                <div className="grid grid-cols-7 gap-2 flex-1">
                     {Array.from({ length: startDayOffset }).map((_, i) => (
-                        <div key={`empty-${i}`} />
+                        <div key={`empty-${i}`} className="aspect-square opacity-20 border-b border-r border-slate-100" />
                     ))}
-
-                    {/* Days */}
                     {Array.from({ length: daysInMonth }).map((_, i) => renderDay(i + 1))}
                 </div>
             </div>
 
             {/* --- Right: Detail Panel --- */}
-            <div className="relative">
-                {/* Visual Connector on Desktop */}
-                <div className="hidden lg:block absolute top-[10%] -left-4 w-4 h-full border-l-2 border-dashed border-slate-200/60" />
-
-                <div className="h-full bg-white/40 backdrop-blur-md rounded-3xl border border-white/60 p-6 flex flex-col shadow-sm">
-                    {/* Selected Date Header */}
-                    <div className="mb-8 flex justify-between items-end">
-                        <div className="flex-1">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                <CalendarIcon size={14} /> Selected Date
-                            </h3>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-5xl font-black text-slate-800 tracking-tight">
-                                    {selectedDate.getDate()}
-                                </span>
-                                <span className="text-2xl font-light text-slate-500">
-                                    {selectedDate.toLocaleString('default', { month: 'long' })}
-                                </span>
-                            </div>
-                        </div>
-                        {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
-                            <button
-                                onClick={() => openScheduleModal(selectedDate.toISOString().split('T')[0])}
-                                className="bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-xl shadow-lg shadow-blue-300 hover:shadow-blue-400 transition-all active:scale-95"
-                                title="Add Event"
-                            >
-                                <Plus size={24} />
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Events List */}
-                    <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-                        {selectedDayEvents.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-center p-8 rounded-2xl border-2 border-dashed border-slate-200/60 bg-slate-50/30">
-                                <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4 text-slate-300">
-                                    <Clock size={32} />
-                                </div>
-                                <p className="text-slate-500 font-medium">No events scheduled</p>
-                                <p className="text-slate-400 text-xs mt-1">Enjoy your free time!</p>
-                            </div>
-                        ) : (
-                            selectedDayEvents.map(ev => (
-                                <div
-                                    key={ev.id}
-                                    className="group relative p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all cursor-pointer overflow-hidden"
-                                >
-                                    {/* Color Indicator Bar */}
-                                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${ev.type === 'INTERNAL' ? 'bg-blue-500' :
-                                        ev.type === 'INCENTIVE' ? 'bg-amber-500' :
-                                            ev.type === 'EXTERNAL' ? 'bg-emerald-500' : 'bg-rose-500'
-                                        }`} />
-
-                                    <div className="flex justify-between items-start mb-2 pl-3">
-                                        <span className={`text-[10px] font-bold px-2 py-1 rounded-md border ${getEventBadgeStyle(ev.type)}`}>
-                                            {ev.type === 'INTERNAL' ? 'MEETING' : ev.type}
-                                        </span>
-                                        <MoreHorizontal size={16} className="text-slate-300 group-hover:text-slate-500 transition-colors" />
+            <div className="lg:col-span-4 flex flex-col h-full overflow-hidden">
+                <div className="flex-1 bg-slate-50 rounded-[40px] border border-slate-200 p-8 flex flex-col shadow-inner relative overflow-hidden h-full">
+                    {/* Decorative Element */}
+                    <div className="absolute -top-20 -right-20 w-60 h-60 bg-indigo-100/50 rounded-full blur-3xl" />
+                    
+                    <div className="relative z-10 flex flex-col h-full">
+                        {/* Date Header */}
+                        <div className="flex justify-between items-start mb-10">
+                            <div>
+                                <h3 className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">Event Details</h3>
+                                <div className="flex items-center gap-4">
+                                    <div className="w-16 h-16 bg-slate-900 rounded-[22px] flex flex-col items-center justify-center text-white shadow-xl shadow-slate-900/20">
+                                        <span className="text-2xl font-black">{selectedDate.getDate()}</span>
+                                        <span className="text-[9px] font-bold uppercase">{selectedDate.toLocaleString('default', { month: 'short' })}</span>
                                     </div>
+                                    <div>
+                                        <h4 className="text-xl font-black text-slate-800 leading-tight">
+                                            {selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}
+                                        </h4>
+                                        <p className="text-slate-400 font-bold text-xs">{selectedDate.toLocaleDateString('en-US', { year: 'numeric' })}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                                <button
+                                    onClick={() => openScheduleModal(selectedDate.toISOString().split('T')[0])}
+                                    className="bg-slate-900 hover:bg-indigo-600 text-white p-4 rounded-[20px] shadow-xl transition-all hover:-translate-y-1 active:translate-y-0"
+                                >
+                                    <Plus size={24} />
+                                </button>
+                            )}
+                        </div>
 
-                                    <div className="pl-3">
-                                        <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-blue-700 transition-colors">
+                        {/* Events Content */}
+                        <div className="flex-1 overflow-y-auto space-y-5 pr-2 custom-scrollbar">
+                            {selectedDayEvents.length === 0 ? (
+                                <div className="h-full flex flex-col items-center justify-center text-center py-12 px-6">
+                                    <div className="w-20 h-20 rounded-[28px] bg-white shadow-sm flex items-center justify-center mb-6 text-slate-200">
+                                        <CalendarIcon size={36} />
+                                    </div>
+                                    <h5 className="text-slate-800 font-black text-lg">Clear Schedule</h5>
+                                    <p className="text-slate-400 text-sm mt-2 max-w-[200px]">No events or deadlines for this specific date.</p>
+                                </div>
+                            ) : (
+                                selectedDayEvents.map(ev => (
+                                    <div
+                                        key={ev.id}
+                                        className="group relative p-6 rounded-[32px] bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:border-indigo-100 transition-all duration-300"
+                                    >
+                                        <div className="flex justify-between items-start mb-4">
+                                            <span className={`text-[9px] font-black px-3 py-1 rounded-full border tracking-widest ${getEventBadgeStyle(ev.type)}`}>
+                                                {ev.type === 'INTERNAL' ? 'MEETING' : ev.type}
+                                            </span>
+                                            <MoreHorizontal size={18} className="text-slate-300 cursor-pointer hover:text-slate-900 transition-colors" />
+                                        </div>
+
+                                        <h4 className="font-black text-slate-800 text-base mb-3 leading-snug group-hover:text-indigo-600 transition-colors">
                                             {ev.title}
                                         </h4>
-                                        <div className="flex items-center gap-2 text-xs text-slate-500 font-medium mb-2">
-                                            <Clock size={12} className="text-slate-400" />
-                                            {ev.time}
+                                        
+                                        <div className="flex items-center gap-4 text-xs text-slate-500 font-bold mb-4">
+                                            <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl">
+                                                <Clock size={14} className="text-indigo-500" />
+                                                {ev.time}
+                                            </div>
+                                            {ev.location && (
+                                                <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl truncate max-w-[120px]">
+                                                    <MapPin size={14} className="text-rose-500" />
+                                                    {ev.location}
+                                                </div>
+                                            )}
                                         </div>
-                                        <p className="text-xs text-slate-500 leading-relaxed bg-slate-50 p-2 rounded-lg mb-2">
+
+                                        <p className="text-xs text-slate-500 leading-relaxed italic border-l-2 border-slate-100 pl-4 mb-5">
                                             {ev.description}
                                         </p>
 
-                                        {/* Meeting Location/Link Details */}
-                                        {ev.type === 'INTERNAL' && (
-                                            <div className="flex flex-wrap gap-2 text-[10px] mt-2 border-t border-slate-100 pt-2">
-                                                {ev.location && (
-                                                    <span className="flex items-center gap-1 text-slate-600 font-medium bg-slate-100 px-2 py-1 rounded">
-                                                        <MapPin size={10} /> {ev.location}
-                                                    </span>
-                                                )}
-                                                {ev.link && (
-                                                    <a href={ev.link} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-white bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded transition-colors font-bold no-underline">
-                                                        <Video size={10} /> Join
-                                                    </a>
-                                                )}
-                                            </div>
+                                        {ev.link && (
+                                            <a 
+                                                href={ev.link} 
+                                                target="_blank" 
+                                                rel="noreferrer" 
+                                                className="w-full py-3.5 bg-slate-900 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all hover:bg-indigo-600 hover:shadow-lg hover:shadow-indigo-200"
+                                            >
+                                                <Video size={16} /> JOIN MEETING <ArrowUpRight size={14} />
+                                            </a>
                                         )}
                                     </div>
-                                </div>
-                            ))
-                        )}
+                                ))
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
 
             {/* Quick Schedule Modal */}
             {isScheduleOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 overflow-hidden">
-                        <div className="flex justify-between items-center mb-4 border-b pb-4">
-                            <h3 className="font-bold text-lg text-slate-800">Quick Schedule</h3>
-                            <button onClick={() => setIsScheduleOpen(false)} className="bg-slate-100 p-1 rounded-full"><X size={16} /></button>
-                        </div>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Title</label>
-                                <input className="w-full border rounded-lg p-2" value={scheduleData.title} onChange={e => setScheduleData({ ...scheduleData, title: e.target.value })} placeholder="Session Title" />
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
+                    <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-md p-10 overflow-hidden relative">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-[100px] -mr-10 -mt-10 z-0"></div>
+                        
+                        <div className="relative z-10">
+                            <div className="flex justify-between items-center mb-8">
+                                <h3 className="font-black text-2xl text-slate-800 tracking-tight">New Schedule</h3>
+                                <button onClick={() => setIsScheduleOpen(false)} className="bg-slate-100 hover:bg-rose-50 hover:text-rose-500 p-2.5 rounded-2xl transition-all"><X size={20} /></button>
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date</label>
-                                <input type="date" className="w-full border rounded-lg p-2" value={scheduleData.date} onChange={e => setScheduleData({ ...scheduleData, date: e.target.value })} />
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
+                            
+                            <div className="space-y-6">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Start</label>
-                                    <input type="time" className="w-full border rounded-lg p-2" value={scheduleData.startTime} onChange={e => setScheduleData({ ...scheduleData, startTime: e.target.value })} />
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Event Title</label>
+                                    <input className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" value={scheduleData.title} onChange={e => setScheduleData({ ...scheduleData, title: e.target.value })} placeholder="e.g. Project Sync Up" />
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">End</label>
-                                    <input type="time" className="w-full border rounded-lg p-2" value={scheduleData.endTime} onChange={e => setScheduleData({ ...scheduleData, endTime: e.target.value })} />
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Date</label>
+                                        <input type="date" className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold text-slate-800 outline-none focus:bg-white" value={scheduleData.date} onChange={e => setScheduleData({ ...scheduleData, date: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Platform</label>
+                                        <select className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold text-slate-800 outline-none focus:bg-white appearance-none" value={scheduleData.type} onChange={e => setScheduleData({ ...scheduleData, type: e.target.value as 'Online' | 'Offline' | 'Hybrid' })}>
+                                            <option value="Online">Online Link</option>
+                                            <option value="Offline">Offline / Room</option>
+                                            <option value="Hybrid">Hybrid Session</option>
+                                        </select>
+                                    </div>
                                 </div>
+                                
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Start Time</label>
+                                        <input type="time" className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold text-slate-800 outline-none focus:bg-white" value={scheduleData.startTime} onChange={e => setScheduleData({ ...scheduleData, startTime: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">End Time</label>
+                                        <input type="time" className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold text-slate-800 outline-none focus:bg-white" value={scheduleData.endTime} onChange={e => setScheduleData({ ...scheduleData, endTime: e.target.value })} />
+                                    </div>
+                                </div>
+                                
+                                <button onClick={handleQuickSchedule} className="w-full py-5 bg-slate-900 hover:bg-indigo-600 text-white font-black rounded-3xl shadow-2xl shadow-slate-900/20 transition-all transform active:scale-95 mt-4 tracking-widest text-xs">
+                                    CONFIRM SCHEDULE
+                                </button>
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Type</label>
-                                <select className="w-full border rounded-lg p-2" value={scheduleData.type} onChange={e => setScheduleData({ ...scheduleData, type: e.target.value as 'Online' | 'Offline' | 'Hybrid' })}>
-                                    <option value="Online">Online</option>
-                                    <option value="Offline">Offline</option>
-                                    <option value="Hybrid">Hybrid</option>
-                                </select>
-                            </div>
-                            <button onClick={handleQuickSchedule} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl mt-2 hover:bg-blue-700">Schedule Event</button>
                         </div>
                     </div>
                 </div>

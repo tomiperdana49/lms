@@ -1,5 +1,5 @@
 import React, { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
-import { Award, Plus, CheckCircle, XCircle, Clock, History, Image as ImageIcon, BarChart2, Trash2 } from 'lucide-react';
+import { Award, Plus, CheckCircle, XCircle, Clock, History, Image as ImageIcon, BarChart2, Trash2, Wallet, Star, ShieldCheck, FileCheck } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { User, Incentive } from '../types';
 import PopupNotification from './PopupNotification';
@@ -319,12 +319,12 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
 
         // Validation
         if (!formData.courseName || !formData.description || !formData.startDate || !formData.endDate) {
-            setNotification({ show: true, type: 'error', message: 'Mohon lengkapi semua data sertifikat.' });
+            setNotification({ show: true, type: 'error', message: 'Please complete all certificate data.' });
             return;
         }
 
         if (!formData.evidenceUrl) {
-            setNotification({ show: true, type: 'error', message: 'Wajib upload Bukti Sertifikat.' });
+            setNotification({ show: true, type: 'error', message: 'Certificate proof is required.' });
             return;
         }
 
@@ -482,65 +482,102 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
         return isNaN(d.getTime()) ? '-' : d.toLocaleDateString();
     };
 
+    const totalPaidReward = historyIncentives.filter(i => i.status === 'Paid').reduce((sum, i) => sum + parseReward(i.reward), 0);
+
     return (
-        <div className="space-y-6 animate-fade-in p-6 bg-white rounded-3xl min-h-[500px]">
+        <div className="space-y-8 animate-fade-in p-2 min-h-[500px]">
             <PopupNotification
                 isOpen={notification.show}
                 type={notification.type}
                 message={notification.message}
                 onClose={() => setNotification({ ...notification, show: false })}
             />
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Award className="text-amber-500" /> Incentive Program
-                    </h1>
-                    <p className="text-slate-500 mt-1">
-                        {isHR ? 'Verify certificates and assign rewards.' : 'Upload certificates to claim incentives.'}
-                    </p>
+
+            {/* Premium Earnings Dashboard */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Main Hero Card */}
+                <div className="lg:col-span-2 bg-gradient-to-br from-amber-500 via-amber-600 to-orange-700 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12 group-hover:rotate-45 transition-transform duration-1000">
+                        <Award size={200} />
+                    </div>
+                    
+                    <div className="relative z-10 flex flex-col h-full justify-between gap-8">
+                        <div className="space-y-1">
+                            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/20 mb-2">
+                                <Star size={12} className="text-yellow-200 fill-yellow-200" /> Incentive Overview
+                            </div>
+                            <h1 className="text-3xl font-black tracking-tight">Your Total Earnings</h1>
+                            <p className="text-amber-100 font-medium">Appreciation for your dedication and skill development this year.</p>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-6 sm:gap-12">
+                            <div>
+                                <div className="text-[10px] font-bold text-amber-200 uppercase tracking-widest mb-1 opacity-80">Paid Incentives</div>
+                                <div className="text-4xl font-black tracking-tighter">{formatCurrency(totalPaidReward)}</div>
+                            </div>
+                            <div className="h-10 w-px bg-white/20 hidden sm:block"></div>
+                            <div>
+                                <div className="text-[10px] font-bold text-amber-200 uppercase tracking-widest mb-1 opacity-80">Monthly Active</div>
+                                <div className="text-4xl font-black tracking-tighter">{formatCurrency(activeIncentives.filter(i => i.paymentType === 'Recurring').reduce((s,i) => s + parseReward(i.reward), 0))}</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <button
-                    onClick={() => setIsFormOpen(true)}
-                    className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-amber-500/20 flex items-center gap-2"
-                >
-                    <Plus size={18} /> Upload Certificate
-                </button>
+                {/* Quick Action & Stats */}
+                <div className="flex flex-col gap-6">
+                    <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm flex flex-col justify-between flex-1">
+                        <div className="space-y-4">
+                            <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
+                                <Wallet size={24} />
+                            </div>
+                            <div>
+                                <h3 className="font-black text-slate-800 text-xl tracking-tight">Claim Incentive</h3>
+                                <p className="text-sm text-slate-400 font-medium leading-relaxed">Got a new certificate? Upload now to claim your reward.</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setIsFormOpen(true)}
+                            className="mt-6 w-full bg-slate-900 hover:bg-black text-white px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-2 active:scale-95"
+                        >
+                            <Plus size={18} /> Upload Certificate
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex gap-2 overflow-x-auto pb-2">
+            {/* Navigation Tabs */}
+            <div className="bg-slate-50/50 p-2 rounded-[2rem] border border-slate-100 flex flex-wrap gap-2">
                 {isHR && (
                     <button
                         onClick={() => setActiveTab('pending')}
-                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 whitespace-nowrap
-                            ${activeTab === 'pending' ? 'bg-blue-100 text-blue-700' : 'text-slate-500 hover:bg-slate-50'}
+                        className={`px-6 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-2
+                            ${activeTab === 'pending' ? 'bg-white text-indigo-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}
                         `}
                     >
-                        <Clock size={16} /> Pending ({pendingVerification.length})
+                        <ShieldCheck size={16} /> Pending ({pendingVerification.length})
                     </button>
                 )}
                 <button
                     onClick={() => setActiveTab('active')}
-                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 whitespace-nowrap
-                        ${activeTab === 'active' ? 'bg-green-100 text-green-700' : 'text-slate-500 hover:bg-slate-50'}
+                    className={`px-6 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-2
+                        ${activeTab === 'active' ? 'bg-white text-emerald-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}
                     `}
                 >
-                    <CheckCircle size={16} /> Active List
+                    <FileCheck size={16} /> Active Rewards
                 </button>
                 <button
                     onClick={() => setActiveTab('request')}
-                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 whitespace-nowrap
-                        ${activeTab === 'request' ? 'bg-amber-100 text-amber-700' : 'text-slate-500 hover:bg-slate-50'}
+                    className={`px-6 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-2
+                        ${activeTab === 'request' ? 'bg-white text-amber-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}
                     `}
                 >
                     <Clock size={16} /> My Requests
                 </button>
                 <button
                     onClick={() => setActiveTab('history')}
-                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 whitespace-nowrap
-                        ${activeTab === 'history' ? 'bg-slate-100 text-slate-700' : 'text-slate-500 hover:bg-slate-50'}
+                    className={`px-6 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-2
+                        ${activeTab === 'history' ? 'bg-white text-slate-700 shadow-xl' : 'text-slate-400 hover:text-slate-600'}
                     `}
                 >
                     <History size={16} /> History
@@ -548,8 +585,8 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                 {isHR && (
                     <button
                         onClick={() => setActiveTab('summary')}
-                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 whitespace-nowrap
-                            ${activeTab === 'summary' ? 'bg-purple-100 text-purple-700' : 'text-slate-500 hover:bg-slate-50'}
+                        className={`px-6 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-2
+                            ${activeTab === 'summary' ? 'bg-white text-purple-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}
                         `}
                     >
                         <BarChart2 size={16} /> Summary Report
@@ -648,22 +685,20 @@ const IncentiveManagerContent = ({ user, viewMode = 'personal' }: IncentiveManag
                     )}
                 </div>
             ) : (
-                <div className="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
+                <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
                     <table className="w-full text-left">
-                        <thead className="bg-slate-100 text-slate-500 text-xs uppercase font-semibold">
-                            <tr>
-                                <th className="px-6 py-4">Employee</th>
-                                <th className="px-6 py-4">Certificate</th>
-                                <th className="px-6 py-4">Valid From</th>
-                                <th className="px-6 py-4">Valid Until</th>
-                                <th className="px-6 py-4">Description/Evidence</th>
-                                <th className="px-6 py-4">Reward (IDR)</th>
-                                <th className="px-6 py-4">Frequency</th>
-                                <th className="px-6 py-4">Status</th>
-                                {isHR && <th className="px-6 py-4 text-right">Actions</th>}
+                        <thead>
+                            <tr className="bg-slate-50/50 border-b border-slate-100">
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Employee Info</th>
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Certificate Details</th>
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Validity</th>
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Reward (IDR)</th>
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Frequency</th>
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Current Status</th>
+                                {isHR && <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>}
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200 bg-white">
+                        <tbody className="divide-y divide-slate-50 bg-white">
                             {activeTab === 'active' ? (
                                 (function () {
                                     const grouped: Record<string, Incentive[]> = {};

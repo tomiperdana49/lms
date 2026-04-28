@@ -560,93 +560,110 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
         return (
             <div className="max-w-6xl mx-auto p-6 pb-24 space-y-8 animate-fade-in">
                 {/* Hero Section */}
-                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 to-indigo-700 p-8 md:p-12 text-white shadow-2xl">
+                <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-800 p-10 md:p-14 text-white shadow-2xl">
                     <div className="relative z-10 max-w-2xl">
-                        <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-full text-sm font-medium border border-white/20 mb-6">
-                            <span className="flex h-2 w-2 rounded-full bg-green-400 animate-pulse"></span>
-                            Learning Hub
+                        <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border border-white/20 mb-6">
+                            <span className="flex h-2 w-2 rounded-full bg-purple-300 animate-pulse"></span>
+                            Digital Learning Center
                         </div>
-                        <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight leading-tight">
-                            Online Learning Modules
+                        <h1 className="text-4xl md:text-5xl font-black mb-4 tracking-tighter leading-none">
+                            Online Modules
                         </h1>
-                        <p className="text-blue-100 text-lg md:text-xl leading-relaxed max-w-lg mb-8">
-                            Access premium modules to enhance your professional skills.
+                        <p className="text-purple-100 text-lg font-medium leading-relaxed max-w-lg mb-8 opacity-90">
+                            Enhance your skills through our expert-led, interactive digital curriculum.
                         </p>
                     </div>
 
-                    {/* Decorative Circles */}
-                    <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 bg-white/10 rounded-full blur-3xl"></div>
-                    <div className="absolute bottom-0 right-20 w-60 h-60 bg-indigo-500/30 rounded-full blur-3xl"></div>
+                    {/* Decorative Elements */}
+                    <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
+                    <div className="absolute bottom-0 right-20 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl"></div>
+                    <div className="absolute top-1/2 right-12 transform -translate-y-1/2 opacity-10">
+                        <Award size={240} />
+                    </div>
                 </div>
 
-                {/* Course Grid */}
-                <div className="grid grid-cols-1 gap-6">
+                <div className="grid grid-cols-1 gap-8">
                     {courses.map(course => (
-                        <div key={course.id} className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-slate-100 hover:shadow-xl hover:border-blue-100 transition-all duration-300 group relative overflow-hidden">
-                            <div className="flex flex-col md:flex-row gap-8 items-start">
-                                {/* Icon / Thumbnail Substitute */}
-                                <div className="hidden md:flex shrink-0 w-24 h-24 rounded-2xl bg-blue-50 items-center justify-center text-blue-600 group-hover:scale-105 transition-transform duration-300">
-                                    <BookOpen size={40} />
+                        <div key={course.id} className="bg-white rounded-[3rem] p-8 md:p-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 hover:shadow-[0_20px_50px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-500 group relative overflow-hidden active:scale-[0.99]">
+                            {/* Visual Indicator */}
+                            <div className={`absolute top-0 left-0 w-2 h-full transition-all duration-500 ${course.progress === 100 ? 'bg-emerald-500' : 'bg-purple-600 opacity-0 group-hover:opacity-100'}`}></div>
+
+                            <div className="flex flex-col md:flex-row gap-10 items-start md:items-center">
+                                {/* Course Visual Badge */}
+                                <div className="shrink-0 w-32 h-32 rounded-[2rem] bg-slate-50 flex items-center justify-center text-purple-600 group-hover:bg-purple-50 transition-colors duration-500 relative">
+                                    <BookOpen size={48} className="relative z-10" />
+                                    <div className="absolute inset-0 bg-purple-600 opacity-0 group-hover:opacity-5 rounded-[2rem] transition-opacity duration-500"></div>
                                 </div>
 
-                                <div className="flex-1 space-y-4">
-                                    <div className="flex flex-wrap gap-3 items-center text-sm font-medium text-slate-500 mb-1">
-                                        <span className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-100">
-                                            <Clock size={14} /> {course.duration}
-                                        </span>
-                                        {course.progress === 100 && (
-                                            <span className="flex items-center gap-1.5 bg-green-50 text-green-600 px-2.5 py-1 rounded-md border border-green-100 font-bold">
-                                                Completed
-                                            </span>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex flex-wrap gap-4 items-center mb-4">
+                                        <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-widest shadow-sm">
+                                            <Clock size={14} className="text-purple-500" /> {course.duration}
+                                        </div>
+                                        {course.progress === 100 ? (
+                                            <div className="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl border border-emerald-100 text-[10px] font-black uppercase tracking-widest shadow-sm">
+                                                <CheckCircle size={14} /> Course Finished
+                                            </div>
+                                        ) : course.progress > 0 && (
+                                            <div className="flex items-center gap-2 bg-purple-50 text-purple-600 px-3 py-1.5 rounded-xl border border-purple-100 text-[10px] font-black uppercase tracking-widest shadow-sm">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse"></div> In Progress
+                                            </div>
                                         )}
                                     </div>
 
-                                    <div>
-                                        <h3 className="text-2xl font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">
-                                            {course.title}
-                                        </h3>
-                                        <p className="text-slate-500 leading-relaxed">
-                                            {course.description}
-                                        </p>
+                                    <h3 className="text-3xl font-black text-slate-900 mb-3 tracking-tight group-hover:text-purple-600 transition-colors duration-300 line-clamp-1">
+                                        {course.title}
+                                    </h3>
+                                    <p className="text-slate-500 font-medium leading-relaxed max-w-3xl line-clamp-2">
+                                        {course.description}
+                                    </p>
+
+                                    {/* Sleek Progress Tracker */}
+                                    <div className="mt-8 max-w-md">
+                                        <div className="flex justify-between items-end mb-2">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mastery Level</span>
+                                            <span className={`text-sm font-black ${course.progress === 100 ? 'text-emerald-600' : 'text-purple-600'}`}>
+                                                {Math.round(course.progress)}%
+                                            </span>
+                                        </div>
+                                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                            <div 
+                                                className={`h-full transition-all duration-1000 ease-out rounded-full ${course.progress === 100 ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-gradient-to-r from-violet-500 to-purple-600 shadow-[0_0_10px_rgba(139,92,246,0.3)]'}`}
+                                                style={{ width: `${course.progress}%` }}
+                                            ></div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="w-full md:w-auto flex flex-col items-center justify-center self-center pl-0 md:pl-6 border-l-0 md:border-l border-slate-100 gap-3">
+                                <div className="w-full md:w-auto flex flex-col items-center gap-4 pt-6 md:pt-0">
                                     <button
                                         onClick={() => handleStartCourse(course)}
-                                        className={`w-full md:w-auto whitespace-nowrap px-8 py-3.5 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2 
+                                        className={`w-full md:w-auto whitespace-nowrap px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-500 flex items-center justify-center gap-3 shadow-2xl active:scale-95
                                             ${course.progress === 100
-                                                ? 'bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-green-500/20'
+                                                ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/20'
                                                 : (course.progress > 0 || (course as any).preScore !== null)
-                                                    ? 'bg-amber-500 text-white hover:bg-amber-600 hover:shadow-amber-500/30'
-                                                    : 'bg-slate-900 text-white hover:bg-blue-600 hover:shadow-blue-500/30 group-hover:translate-x-1 shadow-lg'
+                                                    ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-purple-500/30'
+                                                    : 'bg-slate-900 text-white hover:bg-purple-600 shadow-slate-900/10 hover:shadow-purple-500/20'
                                             }`}
                                     >
                                         {course.progress === 100 ? (
-                                            <>
-                                                View Content <CheckCircle size={18} />
-                                            </>
+                                            <>Review Content <ChevronRight size={18} /></>
                                         ) : (course.progress > 0 || (course as any).preScore !== null) ? (
-                                            <>
-                                                Continue Learning <ChevronRight size={18} />
-                                            </>
+                                            <>Continue Learning <ChevronRight size={18} /></>
                                         ) : (
-                                            <>
-                                                Start Learning <ChevronRight size={18} />
-                                            </>
+                                            <>Start Learning <ChevronRight size={18} /></>
                                         )}
                                     </button>
                                     
-                                    {/* Action Secondary: Cancel */}
                                     {(course.progress > 0 || (course as any).preScore !== null) && course.progress < 100 && (
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 handleCancelCourse(course);
                                             }}
-                                            className="text-red-500 text-sm font-bold hover:text-red-700 flex items-center gap-1 transition-colors underline underline-offset-4 decoration-red-200"
+                                            className="text-red-500 text-[10px] font-black uppercase tracking-widest hover:text-red-700 transition-colors flex items-center gap-2 opacity-60 hover:opacity-100"
                                         >
-                                            <XCircle size={16} /> Cancel Progress
+                                            <XCircle size={14} /> Cancel Progress
                                         </button>
                                     )}
                                 </div>
