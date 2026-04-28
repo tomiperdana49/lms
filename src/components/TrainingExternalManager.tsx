@@ -9,7 +9,6 @@ import {
     Calendar,
     Trash2,
     Filter,
-    ChevronRight,
     TrendingUp,
     Users,
     Clock,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Download, Layers, Eye, XCircle, RefreshCw, Filter, Calendar, Building2, TrendingUp, DollarSign, PieChart, ArrowUpRight } from 'lucide-react';
+import { Download, Layers, Eye, XCircle, RefreshCw, Filter, Calendar, Building2, TrendingUp, DollarSign, PieChart } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { TrainingRequest, Meeting, Incentive, ReadingLogEntry } from '../types';
 
