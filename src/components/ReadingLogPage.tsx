@@ -197,7 +197,11 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                 body: JSON.stringify({ hrApprovalStatus: 'Pending' })
             });
             if (res.ok) {
-                setReadingLogs(readingLogs.map(l => l.id === id ? { ...l, hrApprovalStatus: 'Pending' } : l));
+                const updatedLog = await res.json();
+                setReadingLogs(readingLogs.map(l => l.id === id ? updatedLog : l));
+                if (viewLog && viewLog.id === id) {
+                    setViewLog(updatedLog);
+                }
                 setNotification({ show: true, type: 'success', message: 'Incentive claim sent to HR successfully!' });
             } else {
                 setNotification({ show: true, type: 'error', message: 'Failed to send claim.' });
@@ -554,7 +558,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                         <div className={`p-2 rounded-lg shadow-lg ${approvedOnly >= 5 ? 'bg-green-500 shadow-green-500/20' : 'bg-orange-500 shadow-orange-500/20'}`}>
                                             <Trophy size={18} />
                                         </div>
-                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Quota Limit</span>
+                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Incentive Limit</span>
                                     </div>
                                     <div className="space-y-2">
                                         <div className="flex justify-between items-end">
@@ -906,6 +910,14 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                 </span>
                                             )}
                                         </div>
+                                    </div>
+                                )}
+                                {(viewLog as ReadingLogEntry).claimedAt && (
+                                    <div className="flex justify-between py-1 border-b border-slate-50 items-center">
+                                        <span className="text-slate-500">Claimed Date</span>
+                                        <span className="font-semibold text-purple-600">
+                                            {new Date((viewLog as ReadingLogEntry).claimedAt!).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                        </span>
                                     </div>
                                 )}
                                 {viewLog.hrApprovalStatus === 'Approved' && (

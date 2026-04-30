@@ -329,9 +329,6 @@ app.post('/api/login', async (req, res) => {
                 if (employeeId) {
                     try {
                         const existingEmp = await querySimAsset('SELECT * FROM employees WHERE id_employee = ?', [employeeId]);
-                        if (existingEmp.length === 0) {
-                            console.log(`[NUSANET AUTH] Auto-creating employee record for ${fullName} (${employeeId})`);
-                            
                             // Try to find branch_id matching branchName
                             let bid = null;
                             try {
@@ -344,24 +341,40 @@ app.post('/api/login', async (req, res) => {
                             } catch (e) {
                                 bid = '020';
                             }
-                            
-                            console.log(`[NUSANET AUTH] Resolved branch_id: ${bid} for ${branchName}`);
 
-                            await querySimAsset(
-                                'INSERT INTO employees (full_name, email, id_employee, job_position, job_level, organization_name, status_join, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                                [
-                                    fullName,
-                                    loginId,
-                                    employeeId,
-                                    p.job_position || p.job_position_name || 'Staff',
-                                    p.job_level_name || 'Staff',
-                                    p.organization_name || 'Nusanet',
-                                    p.employee_status_name || 'Permanent',
-                                    bid
-                                ]
-                            );
-                            console.log(`[NUSANET AUTH] Successfully created employee record for ${fullName}`);
-                        }
+                            // Sync/Upsert employee details
+                            const empData = {
+                                full_name: fullName,
+                                email: loginId,
+                                id_employee: employeeId,
+                                job_position: p.job_position || p.job_position_name || 'Staff',
+                                job_level: p.job_level_name || 'Staff',
+                                organization_name: p.organization_name || 'Nusanet',
+                                status_join: p.employee_status_name || 'Permanent',
+                                branch_id: bid,
+                                company_group: p.company_group_name || p.company_group || null,
+                                company: p.company_name || p.company || null,
+                                band: p.band_name || p.band || null,
+                                directorate: p.directorate_name || p.directorate || null,
+                                department: p.department_name || p.department || null,
+                                lob: p.lob_name || p.lob || null,
+                                division_type_mapping: p.division_type_mapping || null,
+                                gender: p.gender || null,
+                                birth_date: p.birth_date || null
+                            };
+
+                            if (existingEmp.length === 0) {
+                                console.log(`[NUSANET AUTH] Creating employee record for ${fullName}`);
+                                await querySimAsset(
+                                    'INSERT INTO employees (full_name, email, id_employee, job_position, job_level, organization_name, status_join, branch_id, company_group, company, band, directorate, department, lob, division_type_mapping, gender, birth_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                                    Object.values(empData)
+                                );
+                            } else {
+                                console.log(`[NUSANET AUTH] Updating employee record for ${fullName}`);
+                                const fields = Object.keys(empData).map(k => `${k} = ?`).join(', ');
+                                await querySimAsset(`UPDATE employees SET ${fields} WHERE id_employee = ?`, [...Object.values(empData), employeeId]);
+                            }
+                            console.log(`[NUSANET AUTH] Successfully synced employee: ${fullName}`);
                     } catch (empErr) {
                         console.error("[NUSANET AUTH] Error auto-creating employee:", empErr.message);
                     }
@@ -679,7 +692,8 @@ app.get('/api/logs', async (req, res) => {
             approvedAt: log.approved_at,
             plannedFinishDate: log.planned_finish_date,
             cancelledAt: log.cancelled_at,
-            cancelledBy: log.cancelled_by
+            cancelledBy: log.cancelled_by,
+            claimedAt: log.claimed_at
         }));
         if (logs.length > 0) {
             res.setHeader('X-Debug-Columns', Object.keys(logs[0]).join(','));
@@ -693,7 +707,7 @@ app.post('/api/logs', async (req, res) => {
         const log = req.body;
         console.log("[POST LOG] Received:", JSON.stringify(log, null, 2));
         const result = await query(
-            'INSERT INTO reading_logs (title, author, category, date, duration, review, status, user_name, employee_id, evidence_url, start_date, finish_date, reading_duration, hr_approval_status, link, sn, planned_finish_date, location, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO reading_logs (title, author, category, date, duration, review, status, user_name, employee_id, evidence_url, start_date, finish_date, reading_duration, hr_approval_status, link, sn, planned_finish_date, location, source, claimed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 log.title,
                 log.author || '',
@@ -711,9 +725,10 @@ app.post('/api/logs', async (req, res) => {
                 log.hrApprovalStatus || 'Pending',
                 log.link || '',
                 log.sn || null,
-                log.finishDate ? new Date(log.finishDate) : null,
+                log.plannedFinishDate ? new Date(log.plannedFinishDate) : (log.finishDate ? new Date(log.finishDate) : null),
                 log.location || '',
-                log.source || ''
+                log.source || '',
+                log.hrApprovalStatus === 'Pending' ? new Date() : null
             ]
         );
         const newLogs = await query('SELECT * FROM reading_logs WHERE id = ?', [result.insertId]);
@@ -733,7 +748,8 @@ app.post('/api/logs', async (req, res) => {
             sn: newLog.sn,
             approvedAt: newLog.approved_at,
             plannedFinishDate: newLog.planned_finish_date,
-            cancelledAt: newLog.cancelled_at
+            cancelledAt: newLog.cancelled_at,
+            claimedAt: newLog.claimed_at
         });
     } catch (err) {
         console.error("[POST LOG ERROR]", err);
@@ -809,6 +825,10 @@ app.put('/api/logs/:id', async (req, res) => {
         if (updates.hrApprovalStatus === 'Approved') {
             dbUpdates.approved_at = new Date();
         }
+        // Auto set claimed_at if status changes to Pending (Claimed)
+        if (updates.hrApprovalStatus === 'Pending') {
+            dbUpdates.claimed_at = new Date();
+        }
         if (updates.status !== undefined) dbUpdates.status = updates.status;
         if (updates.review !== undefined) dbUpdates.review = updates.review;
         if (updates.link !== undefined) dbUpdates.link = updates.link;
@@ -844,7 +864,8 @@ app.put('/api/logs/:id', async (req, res) => {
             incentiveAmount: updated.incentive_amount,
             rejectionReason: updated.rejection_reason,
             cancelledAt: updated.cancelled_at,
-            cancelledBy: updated.cancelled_by
+            cancelledBy: updated.cancelled_by,
+            claimedAt: updated.claimed_at
         });
     } catch (err) { 
         console.error(`[API ERROR] Update Reading Log ${req.params.id} Failed:`, err);

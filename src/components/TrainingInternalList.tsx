@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, Fragment, type FormEvent } from 'react';
+import * as XLSX from 'xlsx';
 import {
     Users,
     User as UserIcon,
@@ -15,7 +16,10 @@ import {
     CheckCircle,
     ChevronDown,
     Zap,
-    Lock
+    Lock,
+    Camera,
+    Image as ImageIcon,
+    Search
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Role, Meeting, CostReport, Employee, QuizResult, User } from '../types';
@@ -56,13 +60,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [meetings, setMeetings] = useState<ExtendedMeeting[]>([]);
     const [selectedMeeting, setSelectedMeeting] = useState<ExtendedMeeting | null>(null);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
-    const [notification, setNotification] = useState<{ show: boolean; type: 'success' | 'error'; message: string }>({ show: false, type: 'success', message: '' });
+    const [notification, setNotification] = useState<{ show: boolean; type: 'success' | 'error'; message: string; onClose?: () => void }>({ show: false, type: 'success', message: '' });
 
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
 
     const [meetingToDelete, setMeetingToDelete] = useState<number | null>(null);
     const [confirmMarkPaid, setConfirmMarkPaid] = useState<boolean>(false);
+    const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
 
 
     // Reporting State
@@ -73,7 +78,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         lunchCost: 0,
         otherCost: 0,
         participantsCount: 0,
-        isFinalized: false
+        isFinalized: false,
+        trainingPhotos: ''
     });
     const [reportingId, setReportingId] = useState<number | null>(null);
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -147,6 +153,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const participantDropdownRef = useRef<HTMLDivElement>(null);
     const [activeCreateTab, setActiveCreateTab] = useState<'details' | 'assessment'>('details');
     const startDateRef = useRef<HTMLInputElement>(null);
+    const photoInputRef = useRef<HTMLInputElement>(null);
     const endDateRef = useRef<HTMLInputElement>(null);
 
 
@@ -513,7 +520,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             attendee_ids: meeting.costReport?.attendee_ids || [],
             isFinalized: true,
             isPaid: meeting.costReport?.isPaid || false,
-            evidenceLink: meeting.costReport?.evidenceLink || ''
+            evidenceLink: meeting.costReport?.evidenceLink || '',
+            trainingPhotos: meeting.costReport?.trainingPhotos || ''
         });
         setIsReportOpen(true);
     };
@@ -553,43 +561,17 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         });
     };
 
-    const handleSaveReport = async (e: FormEvent) => {
-        e.preventDefault();
-        if (!reportingId) return;
-
-        // Validation
+    const validateReport = () => {
         if ((reportData.participantsCount || 0) <= 0) {
             setNotification({ show: true, type: 'error', message: 'Participants count must be at least 1.' });
-            return;
+            return false;
         }
-
-        if (!reportData.evidenceLink || reportData.evidenceLink.trim() === '') {
-            setNotification({ show: true, type: 'error', message: 'Evidence Link is required.' });
-            return;
+        if (!reportData.trainingPhotos || reportData.trainingPhotos.trim() === '') {
+            setNotification({ show: true, type: 'error', message: 'Training Photos are required for evidence.' });
+            return false;
         }
-
-        // Optimistic update
-        const updatedMeetings = meetings.map(m => m.id === reportingId ? { ...m, costReport: { ...reportData, isFinalized: true } } : m);
-        setMeetings(updatedMeetings);
-        setIsReportOpen(false);
-        setNotification({ show: true, type: 'success', message: 'Financial report saved successfully!' });
-
-        // Persist to backend
-        try {
-            const m = meetings.find(x => x.id === reportingId);
-            if (m) {
-                const body = { ...m, costReport: { ...reportData, isFinalized: true } };
-                await fetch(`${API_BASE_URL}/api/meetings/${reportingId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-            }
-        } catch (err) {
-            console.error("Failed to save report", err);
-        }
+        return true;
     };
-
 
     const handleSave = async (e: FormEvent) => {
         e.preventDefault();
@@ -789,36 +771,39 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         }).sort((a, b) => b.totalCost - a.totalCost);
     };
 
-    const exportHostCSV = () => {
+    const exportHostExcel = () => {
         const stats = getHostStats();
-        const headers = ["Host Name", "Employee ID", "Sessions", "Total Audience", "Trainer Incentive", "Total Cost"];
-        const rows = stats.map(s => [
-            s.host,
-            s.host_id || '-',
-            s.sessions,
-            s.totalParticipants,
-            s.totalTrainerIncentive,
-            s.totalCost
-        ]);
+        const data = stats.map(s => ({
+            "Host Name": s.host,
+            "Employee ID": s.host_id || '-',
+            "Sessions": s.sessions,
+            "Total Audience": s.totalParticipants,
+            "Trainer Incentive": s.totalTrainerIncentive,
+            "Total Cost": s.totalCost
+        }));
 
-        const csvContent = "data:text/csv;charset=utf-8," 
-            + headers.join(",") + "\n"
-            + rows.map(r => r.join(",")).join("\n");
-
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `Internal_Training_Hosts_${startDate}_to_${endDate}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Hosts");
+        XLSX.writeFile(wb, `Internal_Training_Hosts_${startDate}_to_${endDate}.xlsx`);
     };
 
-    const exportParticipantCSV = () => {
+    const exportParticipantExcel = () => {
         const dataRows: any[] = [];
-        const headers = ["Date", "Meeting Title", "Host", "Participant Name", "Email", "Pre-Test", "Post-Test", "Feedback Avg", "Status"];
+        const headers = [
+            "No", "Employee Name", "ID", "Training Type", "Designation", 
+            "Company Group", "Company", "Grade", "Band", "Directorate", 
+            "Division", "Department", "LOB", "Divison Type Mapping", 
+            "Quarter", "Year", "Month", "Month by number", "Start Date", 
+            "End Date", "Training Hours", "Competencies Type", "Competency Detail", 
+            "Training Name", "Attendance", "Participation Type", "Vendor", 
+            "Facilitator", "Total Cost", "PTE 1 Score", "Pre-Test", 
+            "Post-Test", "%Increment", "PTE 3", "Age", "Age Group", 
+            "Gender", "ESG, HSE, Other", "Action Plan", "Detail Participant Type"
+        ];
 
         const filtered = filteredMeetings;
+        let globalIndex = 1;
 
         filtered.forEach(m => {
             const meetingResults = allResults.filter(r => 
@@ -847,8 +832,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             };
 
             const allParticipantEmails = Array.from(new Set([
-                ...meetingResults.map(r => r.userEmail || r.user_email || r.userId || r.user_id || r.email || r.studentId || r.student_id || r.employee_id || r.id).filter(Boolean).map(id => String(id).toLowerCase().trim()),
-                ...meetingFeedback.map(f => f.userEmail || f.user_email || f.userId || f.user_id || f.email || f.studentId || f.student_id || f.employee_id || f.id).filter(Boolean).map(id => String(id).toLowerCase().trim())
+                ...meetingResults.map(r => r.employee_id || r.employeeId || r.userEmail || r.user_email || r.email || r.studentId || r.student_id || r.userId || r.user_id || r.id).filter(Boolean).map(id => String(id).toLowerCase().trim()),
+                ...meetingFeedback.map(f => f.employee_id || f.employeeId || f.userEmail || f.user_email || f.userId || f.user_id || f.email || f.studentId || f.student_id || f.id).filter(Boolean).map(id => String(id).toLowerCase().trim())
             ])).reduce((acc: string[], id) => {
                 const emp = (employees || []).find(e => e.email?.toLowerCase() === id || String(e.id_employee).toLowerCase() === id || String(e.id).toLowerCase() === id);
                 const primary = (emp?.email || id).toLowerCase();
@@ -879,42 +864,130 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     }
                 }
 
+                const mDate = new Date(m.date);
+                const formattedDate = mDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+                
+                // Helper to escape commas in CSV
+                const esc = (val: any) => {
+                    if (val === null || val === undefined) return "";
+                    return String(val).replace(/,/g, ' ');
+                };
+
+                const increment = (avgPre !== '-' && avgPost !== '-') 
+                    ? (Number(avgPost) - Number(avgPre)).toFixed(0) + '%'
+                    : '-';
+
+                const totalCost = (m.costReport?.trainerIncentive || 0) + 
+                                  (m.costReport?.snackCost || 0) + 
+                                  (m.costReport?.lunchCost || 0) + 
+                                  (m.costReport?.otherCost || 0);
+                const totalCostPerParticipant = allParticipantEmails.length > 0 ? (totalCost / allParticipantEmails.length) : 0;
+
                 dataRows.push([
-                    new Date(m.date).toLocaleDateString(),
-                    m.title.replace(/,/g, ' '),
-                    m.host,
-                    name.replace(/,/g, ' '),
-                    email,
+                    globalIndex++,
+                    esc(name),
+                    esc(emp?.id_employee ? `="${emp.id_employee}"` : '-'),
+                    "Internal",
+                    esc(emp?.job_position || '-'),
+                    esc((emp as any)?.company_group || '-'),
+                    esc(emp?.branch_name || '-'), // Swapped: branch_name to Company column
+                    esc(emp?.job_level || '-'),
+                    esc((emp as any)?.band || '-'),
+                    esc((emp as any)?.directorate || '-'),
+                    esc(emp?.organization_name || '-'), // Updated: Division taken from organization_name
+                    esc((emp as any)?.department || '-'),
+                    esc((emp as any)?.lob || '-'),
+                    esc((emp as any)?.division_type_mapping || '-'),
+                    Math.floor((mDate.getMonth() + 3) / 3),
+                    mDate.getFullYear(),
+                    mDate.toLocaleString('default', { month: 'long' }),
+                    mDate.getMonth() + 1,
+                    formattedDate,
+                    formattedDate,
+                    (m as any).training_hours || 0,
+                    esc((m as any).competency_type || 'Core'),
+                    esc((m as any).competency_detail || '-'),
+                    esc(m.title),
+                    (avgPre !== '-' || avgPost !== '-' || avgFB !== '-') ? 'Present' : 'Absent',
+                    esc((m as any).participation_type || 'Targeted Participants'),
+                    esc((m as any).vendor || 'Internal'),
+                    esc(m.host),
+                    Math.round(totalCostPerParticipant),
+                    '-', // PTE 1
                     avgPre,
                     avgPost,
-                    avgFB,
-                    m.costReport?.isPaid ? 'Paid' : 'Pending'
+                    increment,
+                    '-', // PTE 3
+                    (() => {
+                        if ((emp as any)?.age) return (emp as any).age + ' Tahun';
+                        if ((emp as any)?.birth_date) {
+                            const birth = new Date((emp as any).birth_date);
+                            const ageDifMs = Date.now() - birth.getTime();
+                            const ageDate = new Date(ageDifMs);
+                            return Math.abs(ageDate.getUTCFullYear() - 1970) + ' Tahun';
+                        }
+                        return '-';
+                    })(),
+                    esc((emp as any)?.age_group || '-'),
+                    esc((emp as any)?.gender || '-'),
+                    esc((m as any).esg_hse_other || '-'),
+                    esc((m as any).action_plan || '-'),
+                    esc((m as any).detail_participant_type || '-')
                 ]);
             });
         });
 
-        const csvContent = "data:text/csv;charset=utf-8," 
-            + headers.join(",") + "\n"
-            + dataRows.map(r => r.join(",")).join("\n");
-
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `Internal_Training_Participants_${startDate}_to_${endDate}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Participants");
+        XLSX.writeFile(wb, `Internal_Training_Participants_${startDate}_to_${endDate}.xlsx`);
     };
 
     const formatCurrency = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
 
+    const uploadFileToServer = async (file: File): Promise<string> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch(`${API_BASE_URL}/api/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        if (!res.ok) throw new Error('Upload failed');
+        const data = await res.json();
+        return data.fileUrl;
+    };
+
+    const getFullImageUrl = (path?: string) => {
+        if (!path) return '';
+        if (path.startsWith('http')) return path;
+        return `${API_BASE_URL}${path}`;
+    };
+
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+            setNotification({ show: true, type: 'success', message: "Uploading photo..." });
+            const url = await uploadFileToServer(file);
+            setReportData(prev => ({ ...prev, trainingPhotos: url }));
+            setNotification({ show: true, type: 'success', message: "Photo uploaded successfully!" });
+        } catch (err) {
+            console.error(err);
+            setNotification({ show: true, type: 'error', message: "Failed to upload photo." });
+        }
+    };
+
     return (
         <div className="space-y-6 animate-fade-in">
-            <PopupNotification
+             <PopupNotification
                 isOpen={notification.show}
                 type={notification.type}
                 message={notification.message}
-                onClose={() => setNotification({ ...notification, show: false })}
+                onClose={() => {
+                    setNotification({ ...notification, show: false });
+                    if (notification.onClose) notification.onClose();
+                }}
             />
 
             <ConfirmationModal
@@ -995,16 +1068,16 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             {viewMode === 'recap' && (effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') && (
                 <div className="flex justify-end gap-3 -mb-4 relative z-10">
                     <button
-                        onClick={exportParticipantCSV}
-                        className="bg-white border border-slate-200 text-slate-600 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:border-indigo-500 hover:text-indigo-600 transition-all flex items-center gap-2 group"
+                        onClick={exportParticipantExcel}
+                        className="bg-white border border-slate-200 text-slate-600 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center gap-2 group"
                     >
-                        <FileText size={16} className="text-slate-400 group-hover:text-indigo-500" /> Export Participants
+                        <FileText size={16} className="text-slate-400 group-hover:text-emerald-500" /> Export Participants (XLSX)
                     </button>
                     <button
-                        onClick={exportHostCSV}
-                        className="bg-white border border-slate-200 text-slate-600 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:border-indigo-500 hover:text-indigo-600 transition-all flex items-center gap-2 group"
+                        onClick={exportHostExcel}
+                        className="bg-white border border-slate-200 text-slate-600 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center gap-2 group"
                     >
-                        <Users size={16} className="text-slate-400 group-hover:text-indigo-500" /> Export Hosts
+                        <Users size={16} className="text-slate-400 group-hover:text-emerald-500" /> Export Hosts (XLSX)
                     </button>
                 </div>
             )}
@@ -1858,30 +1931,47 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 flex items-center gap-1">
-                                        Evidence Link <span className="text-slate-400 font-normal normal-case">(Drive / Materials)</span>
-                                    </label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-2.5 text-slate-400"><FileText size={18} /></span>
-                                        <input
-                                            type="text"
-                                            placeholder="https://drive.google.com/..."
-                                            className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-700 disabled:bg-slate-50 disabled:text-slate-500"
-                                            value={reportData.evidenceLink || ''}
-                                            onChange={e => setReportData({ ...reportData, evidenceLink: e.target.value })}
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Training Photos</label>
+                                    <div 
+                                        onClick={() => !reportData.isPaid && photoInputRef.current?.click()}
+                                        className={`relative group h-40 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-3 overflow-hidden
+                                            ${reportData.trainingPhotos 
+                                                ? 'border-indigo-200 bg-indigo-50/30' 
+                                                : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300'
+                                            }
+                                            ${reportData.isPaid ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}
+                                        `}
+                                    >
+                                        {reportData.trainingPhotos ? (
+                                            <>
+                                                <img src={getFullImageUrl(reportData.trainingPhotos)} alt="Training" className="absolute inset-0 w-full h-full object-cover" />
+                                                {!reportData.isPaid && (
+                                                    <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <div className="bg-white/20 backdrop-blur-md p-3 rounded-full text-white">
+                                                            <Camera size={24} />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="p-4 bg-white rounded-2xl shadow-sm group-hover:scale-110 transition-transform">
+                                                    <Camera size={28} className="text-slate-400" />
+                                                </div>
+                                                <div className="text-center">
+                                                    <p className="text-sm font-bold text-slate-600">Click to upload photo</p>
+                                                    <p className="text-[10px] text-slate-400">Documentation evidence (JPG/PNG)</p>
+                                                </div>
+                                            </>
+                                        )}
+                                        <input 
+                                            type="file" 
+                                            ref={photoInputRef}
+                                            onChange={handlePhotoUpload}
+                                            className="hidden"
+                                            accept="image/*"
                                             disabled={reportData.isPaid}
                                         />
-                                        {reportData.evidenceLink && (
-                                            <a
-                                                href={reportData.evidenceLink}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="absolute right-3 top-2.5 text-blue-600 hover:text-blue-800"
-                                                title="Open Link"
-                                            >
-                                                <ArrowRight size={18} />
-                                            </a>
-                                        )}
                                     </div>
                                 </div>
 
@@ -1969,20 +2059,22 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 >
                                     Cancel
                                 </button>
-                                <button
-                                    onClick={handleSaveReport}
-                                    disabled={reportData.isPaid}
-                                    className={`flex-[2] py-3 text-white font-bold rounded-xl shadow-lg transition-all ${reportData.isPaid ? 'bg-slate-400 cursor-not-allowed shadow-none' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20'}`}
-                                >
-                                    {reportData.isPaid ? 'Report Locked (Paid)' : 'Save Report'}
-                                </button>
 
-                                {!reportData.isPaid && (
+                                {reportData.isPaid ? (
+                                    <div className="flex-[2] py-3 bg-slate-100 text-slate-400 font-bold rounded-xl flex items-center justify-center gap-2 border border-slate-200">
+                                        <CheckCircle size={18} /> Report Paid & Locked
+                                    </div>
+                                ) : (
                                     <button
-                                        onClick={(e) => { e.preventDefault(); setConfirmMarkPaid(true); }}
-                                        className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2"
+                                        onClick={(e) => { 
+                                            e.preventDefault(); 
+                                            if (validateReport()) {
+                                                setConfirmMarkPaid(true); 
+                                            }
+                                        }}
+                                        className="flex-[2] py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2"
                                     >
-                                        <DollarSign size={18} /> Mark Paid
+                                        Mark Paid
                                     </button>
                                 )}
                             </div>
@@ -2242,6 +2334,29 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             {selectedMeeting.description}
                                         </p>
                                     </div>
+
+                                    {selectedMeeting.costReport?.trainingPhotos && (
+                                        <div className="mt-6 pt-4 border-t border-slate-50">
+                                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                <ImageIcon size={12} /> Training Documentation
+                                            </h4>
+                                            <div 
+                                                className="relative h-40 rounded-2xl overflow-hidden border border-slate-100 group cursor-pointer shadow-sm hover:shadow-md transition-all"
+                                                onClick={() => window.open(getFullImageUrl(selectedMeeting.costReport?.trainingPhotos), '_blank')}
+                                            >
+                                                <img 
+                                                    src={getFullImageUrl(selectedMeeting.costReport.trainingPhotos)} 
+                                                    alt="Training Evidence" 
+                                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                                                />
+                                                <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/20 transition-colors flex items-center justify-center">
+                                                    <div className="bg-white/20 backdrop-blur-md p-2 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Search size={18} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="mt-8 space-y-3">
@@ -2336,11 +2451,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 <div className="flex flex-col gap-2">
                                                     {!selectedMeeting.is_closed ? (
                                                         <button 
-                                                            onClick={() => {
-                                                                if (window.confirm("Apakah Anda yakin ingin menutup sesi ini? Setelah ditutup, peserta tidak akan bisa lagi mengakses assessment dan feedback.")) {
-                                                                    toggleMeetingStatus('is_closed', false);
-                                                                }
-                                                            }}
+                                                            onClick={() => setIsCloseModalOpen(true)}
                                                             className="w-full mb-2 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-black rounded-xl border border-red-200 flex items-center justify-center gap-2 transition-all shadow-sm"
                                                         >
                                                             <Lock size={14} /> CLOSE SESSION
@@ -2633,7 +2744,24 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         fetch(`${API_BASE_URL}/api/feedback/all`).then(r => r.json()).then(setAllFeedback);
                                     }
                                     setShowQuiz(null);
-                                    setNotification({ show: true, type: 'success', message: `${showQuiz} Test completed successfully!` });
+                                    
+                                    if (showQuiz === 'POST' && score < 80) {
+                                        setNotification({ 
+                                            show: true, 
+                                            type: 'error', 
+                                            message: `Nilai Anda: ${score}. Skor minimal untuk lulus adalah 80. Silakan coba lagi.`,
+                                            onClose: () => {
+                                                // Reopen the quiz
+                                                setShowQuiz('POST');
+                                            }
+                                        });
+                                    } else {
+                                        setNotification({ 
+                                            show: true, 
+                                            type: 'success', 
+                                            message: `${showQuiz} Test completed successfully! ${showQuiz === 'POST' ? `Nilai Anda: ${score}` : ''}` 
+                                        });
+                                    }
                                 }
                             } catch (err) { console.error(err); }
                         }}
@@ -2680,6 +2808,20 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     />
                 </div>
             )}
+            {/* Confirmation Modal for Closing Session */}
+            <ConfirmationModal
+                isOpen={isCloseModalOpen}
+                onClose={() => setIsCloseModalOpen(false)}
+                onConfirm={() => {
+                    toggleMeetingStatus('is_closed', false);
+                    setIsCloseModalOpen(false);
+                }}
+                title="Tutup Sesi Training"
+                message="Apakah Anda yakin ingin menutup sesi ini? Setelah ditutup, peserta tidak akan bisa lagi mengakses assessment dan feedback."
+                confirmText="Ya, Tutup Sesi"
+                cancelText="Batal"
+                variant="danger"
+            />
         </div>
     );
 };

@@ -387,7 +387,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         const userYearLogs = allLogs.filter(l => {
             if (!areSameUser(user, l)) return false;
             if (l.status === 'Reading') return false;
-            const logDate = new Date(l.finishDate || l.date);
+            const logDate = new Date(l.claimedAt || l.finishDate || l.date);
             return logDate.getFullYear() === currentYear;
         });
 
@@ -396,9 +396,9 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             if (!areSameUser(user, l)) return false;
             if (l.hrApprovalStatus !== 'Approved') return false; // Hanya hitung yang sudah approved untuk range insentif
             
-            // Gunakan approvedAt, jika tidak ada (data lama) fallback ke finishDate/date
-            const approvalDateStr = l.approvedAt || l.finishDate || l.date;
-            const logDate = new Date(approvalDateStr);
+            // Gunakan claimedAt untuk filter range recap
+            const dateStr = l.claimedAt || l.approvedAt || l.finishDate || l.date;
+            const logDate = new Date(dateStr);
             
             const start = new Date(startDate);
             start.setHours(0, 0, 0, 0);
@@ -473,11 +473,23 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             const empBranch = emp?.branch || 'Others';
             if (selectedBranch !== 'All Branches' && empBranch !== selectedBranch) return false;
 
-            const dateToCheck = l.finishDate || l.date;
-            const d = new Date(dateToCheck);
-            const [start, end] = getPeriodDates();
-
-            if (d < start || d > end) return false;
+            // --- Date Filter ---
+            if (viewMode === 'recap') {
+                // Recap: Gunakan range 26-25 yang dipilih di UI (sudah diproses di getUserStats)
+                // Namun verificationLogs ini juga diproses untuk tabel, jadi kita samakan
+                const dateStr = l.claimedAt || l.approvedAt || l.finishDate || l.date;
+                const d = new Date(dateStr);
+                const [start, end] = getPeriodDates();
+                if (d < start || d > end) return false;
+            } else {
+                // Verification: Tetap ambil periode 1 tahun penuh berdasarkan Claimed Date
+                const dateStr = l.claimedAt || l.finishDate || l.date;
+                const d = new Date(dateStr);
+                
+                // Jika ingin dinamis mengikuti tahun dari filter:
+                const filterYear = new Date(endDate).getFullYear();
+                if (d.getFullYear() !== filterYear) return false;
+            }
 
             // 4. Search Filter
             const s = searchTerm.trim().toLowerCase();
@@ -541,14 +553,14 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                             <button 
                                 onClick={() => {
                                     setViewMode('recap');
-                                    // Reset to Rolling Cycle for Recap
+                                    // Reset to Rolling Cycle for Recap (Periode bulan berjalan)
                                     const now = new Date();
-                                    const d = now.getDate() >= 26 
-                                        ? new Date(now.getFullYear(), now.getMonth(), 26)
-                                        : new Date(now.getFullYear(), now.getMonth() - 1, 26);
-                                    const ed = now.getDate() >= 26
-                                        ? new Date(now.getFullYear(), now.getMonth() + 1, 25)
-                                        : new Date(now.getFullYear(), now.getMonth(), 25);
+                                    const m = now.getMonth();
+                                    const y = now.getFullYear();
+                                    
+                                    // Selalu ambil 26 bulan lalu s/d 25 bulan ini
+                                    const d = new Date(y, m - 1, 26);
+                                    const ed = new Date(y, m, 25);
                                     
                                     setStartDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
                                     setEndDate(`${ed.getFullYear()}-${String(ed.getMonth() + 1).padStart(2, '0')}-${String(ed.getDate()).padStart(2, '0')}`);
@@ -730,10 +742,9 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                             <thead className="bg-slate-50 text-slate-500 font-semibold uppercase text-xs">
                                 <tr>
                                     <th className="px-6 py-4">Employee</th>
-                                    <th className="px-6 py-4">Book #</th>
                                     <th className="px-6 py-4">Book Title / Source</th>
-                                    <th className="px-6 py-4">Start Date</th>
                                     <th className="px-6 py-4">Finish Date</th>
+                                    <th className="px-6 py-4 text-purple-600">Claimed Date</th>
 
                                     <th className="px-6 py-4">Status</th>
                                     <th className="px-6 py-4 text-center">Action</th>
@@ -743,59 +754,14 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 {verificationLogs.map((log) => (
                                     <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-4"><div><p className="font-bold text-slate-700 text-sm">{log.userName || 'Unknown'}</p><p className="text-xs text-slate-400">Staff</p></div></td>
-                                        <td className="px-6 py-4">
-                                            {(() => {
-                                                const currentSeq = getLogSequence(log);
-                                                if (currentSeq === 0) return <span className="text-slate-400">-</span>;
-                                                const isApproved = log.hrApprovalStatus === 'Approved';
-
-                                                return (
-                                                    <div className="flex flex-col items-center justify-center">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase transition-colors ${isApproved
-                                                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
-                                                                    : 'bg-slate-50 text-slate-500 border-slate-100'
-                                                                }`}>
-                                                                {isApproved ? 'Verified' : 'Target'}
-                                                            </span>
-                                                        </div>
-                                                        <span className={`text-sm font-black mt-1 whitespace-nowrap ${currentSeq === 5 ? 'text-orange-600' : currentSeq > 5 ? 'text-red-500' : 'text-slate-700'}`}>
-                                                            {!isApproved ? 'To ' : ''}{currentSeq} / 5
-                                                        </span>
-                                                        <span className="text-[9px] text-slate-400 font-medium mt-0.5">Year {new Date(log.finishDate || log.date).getFullYear()}</span>
-                                                        {currentSeq === 5 && log.hrApprovalStatus === 'Pending' && (
-                                                            <span className="text-[9px] font-extrabold text-white bg-orange-500 px-1.5 rounded-full uppercase mt-1 animate-bounce shadow-sm">Bonus!</span>
-                                                        )}
-                                                        {currentSeq > 5 && (
-                                                            <span className="text-[9px] font-bold text-red-500 uppercase mt-1">Limit!</span>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })()}
-                                        </td>
                                         <td className="px-6 py-4"><div className="flex flex-col gap-1"><span className="font-semibold text-slate-800 text-sm">{log.title}</span><span className="text-xs text-slate-500">{log.category}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit ${log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>{log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'Personal' : (log.source === 'SIMAS' ? 'SIMAS' : 'Office')}</span></div></td>
-                                        <td className="px-6 py-4 text-sm text-slate-600">
-                                            {log.startDate ? new Date(log.startDate).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}
-                                        </td>
                                         <td className="px-6 py-4 text-sm text-slate-600">
                                             <div className="flex flex-col gap-1">
                                                 <span>{log.finishDate ? new Date(log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}</span>
-                                                {log.startDate && log.finishDate && (
-                                                    <span className="text-[9px] whitespace-nowrap font-black bg-indigo-600 text-white px-1.5 py-0.5 rounded shadow-sm flex items-center gap-1 w-fit">
-                                                        <Clock size={10} />
-                                                        {(() => {
-                                                            const s = new Date(log.startDate).getTime();
-                                                            const e = new Date(log.finishDate).getTime();
-                                                            const diff = Math.max(0, e - s);
-                                                            const totalMinutes = Math.floor(diff / (1000 * 60));
-                                                            const days = Math.floor(totalMinutes / (24 * 60));
-                                                            const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
-                                                            const minutes = totalMinutes % 60;
-                                                            return `${days}D ${hours}H ${minutes}M`;
-                                                        })()}
-                                                    </span>
-                                                )}
                                             </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-xs font-bold text-purple-600">
+                                            {log.claimedAt ? new Date(log.claimedAt).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}
                                         </td>
 
                                         <td className="px-6 py-4">
@@ -1244,8 +1210,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                         <tr>
                                             <th className="px-6 py-3 text-center">Book #</th>
                                             <th className="px-6 py-3">Book Title / Category</th>
-                                            <th className="px-6 py-3 text-center">Start Date</th>
                                             <th className="px-6 py-3 text-center">Finish Date</th>
+                                            <th className="px-6 py-3 text-center text-purple-600">Claimed Date</th>
                                             <th className="px-6 py-3 text-center">Date Verified</th>
                                             <th className="px-6 py-3 text-center">Incentive</th>
                                             <th className="px-6 py-3">Status</th>
@@ -1288,15 +1254,15 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                             </span>
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-center">
-                                                        <div className="text-sm text-slate-600">
-                                                            {log.startDate ? new Date(log.startDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
-                                                        </div>
-                                                    </td>
                                                     <td className="px-6 py-4">
                                                          <div className="text-sm font-medium text-slate-600">
                                                              {log.finishDate ? new Date(log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : log.date ? new Date(log.date).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
                                                          </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <div className="text-sm font-bold text-purple-600">
+                                                            {log.claimedAt ? new Date(log.claimedAt).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                                                        </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
                                                         <div className="text-sm font-bold text-indigo-600">

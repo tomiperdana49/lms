@@ -25,6 +25,7 @@ export interface ReadingLogEntry {
     plannedFinishDate?: string;
     cancelledAt?: string;
     cancelledBy?: string;
+    claimedAt?: string;
 }
 
 export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'external-approval' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives';
@@ -152,6 +153,16 @@ export interface Meeting {
     is_post_test_active?: boolean | number;
     is_feedback_active?: boolean | number;
     is_closed?: boolean | number;
+    
+    // Extended fields for reporting
+    training_hours?: number;
+    competency_type?: string;
+    competency_detail?: string;
+    participation_type?: string;
+    vendor?: string;
+    esg_hse_other?: string;
+    action_plan?: string;
+    detail_participant_type?: string;
 }
 
 export interface CostReport {
@@ -166,6 +177,7 @@ export interface CostReport {
     isFinalized: boolean;
     isPaid?: boolean;
     evidenceLink?: string; // Link to drive/materials
+    trainingPhotos?: string; // New: Uploaded training photos URL
 }
 
 export interface Incentive {
@@ -198,6 +210,18 @@ export interface Employee {
     organization_name: string;
     status_join: string;
     branch_name?: string;
+
+    // Extended fields for reporting
+    company_group?: string;
+    company?: string;
+    band?: string;
+    directorate?: string;
+    department?: string;
+    lob?: string;
+    division_type_mapping?: string;
+    age?: number | string;
+    age_group?: string;
+    gender?: string;
 }
 
 export interface Asset {
