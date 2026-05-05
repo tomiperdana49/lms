@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { PlayCircle, Lock, ChevronRight, BookOpen, ArrowLeft, X, Clock, CheckCircle, Award, AlertCircle, XCircle } from 'lucide-react';
+import { PlayCircle, Lock, ChevronRight, BookOpen, ArrowLeft, X, Clock, CheckCircle, Award, AlertCircle, XCircle, Download, Calendar } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import CertificateTemplate from './CertificateTemplate';
 import { API_BASE_URL } from '../config';
 import type { Course, Quiz, User } from '../types';
 import PopupNotification from './PopupNotification';
@@ -85,6 +88,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
     const [isVideoCompleted, setIsVideoCompleted] = useState(false);
     const [loadingResults, setLoadingResults] = useState(false);
     const [courseToCancel, setCourseToCancel] = useState<Course | null>(null);
+    const [isDownloading, setIsDownloading] = useState(false);
 
     // Player State
     const playerRef = useRef<YTPlayer | null>(null);
@@ -129,16 +133,22 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     // Check Assessment Status from Quiz Results
                     let isAssPassed = false;
                     let preScore: number | null = null;
+                    let completedAt: string | null = null;
 
                     try {
                         const quizData = await quizRes.json();
                         if (Array.isArray(quizData)) {
                              // IMPORTANT: Only POST tests (Final Evaluation) count towards completion.
-                             isAssPassed = quizData.some((r: any) => 
+                             const passResult = quizData.find((r: any) => 
                                 !r.moduleId && 
                                 Number(r.score) >= 80 && 
                                 ((r.quizType || r.quiz_type || "").toUpperCase() === 'POST' || !r.quizType)
                             );
+                            
+                            if (passResult) {
+                                isAssPassed = true;
+                                completedAt = passResult.date;
+                            }
 
                             // Find Pre-Test score for course level
                             const preResults = quizData.filter((r: any) => !r.moduleId && (r.quizType === 'PRE' || (r as any).quiz_type === 'PRE'));
@@ -175,10 +185,11 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             }
                         } else {
                             progress = Math.min(100, Math.round(videoProgress));
+                            if (progress === 100 && !completedAt) {
+                                completedAt = (progressData as any).lastAccess || null;
+                            }
                         }
                     }
-
-
 
                     // Unlock modules based on completion
                     // Simple rule: If module N is done, N+1 is unlocked. 
@@ -195,7 +206,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         return { ...m, locked: isLocked, completed: isCompleted };
                     }) : [];
 
-                    return { ...course, progress, modules, isAssessmentPassed: isAssPassed, preScore } as Course & { preScore: number | null };
+                    return { ...course, progress, modules, isAssessmentPassed: isAssPassed, preScore, completedAt } as Course & { preScore: number | null, completedAt: string | null };
                 } catch (err) {
                     console.error(`Error syncing progress for course ${course.id}:`, err);
                     return { ...course, progress: 0, preScore: null };
@@ -614,8 +625,21 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                     <Clock size={12} className="text-indigo-500" /> {course.duration}
                                 </div>
                                 {course.progress === 100 && (
-                                    <div className="absolute bottom-4 left-4 bg-emerald-500 text-white px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-md">
-                                        Completed
+                                    <div className="absolute bottom-4 left-4 flex flex-col items-start gap-1.5">
+                                        <div className="bg-emerald-500 text-white px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-md flex items-center gap-1.5">
+                                            <CheckCircle size={10} />
+                                            Completed
+                                        </div>
+                                        {(course as any).completedAt && (
+                                            <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-lg text-[8px] font-bold text-emerald-700 border border-emerald-100 shadow-sm flex items-center gap-1">
+                                                <Calendar size={10} className="text-emerald-500" />
+                                                {new Date((course as any).completedAt).toLocaleDateString('id-ID', { 
+                                                    day: '2-digit', 
+                                                    month: 'long', 
+                                                    year: 'numeric' 
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -972,6 +996,50 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
     };
 
 
+
+
+    const handleDownloadCertificate = async () => {
+        if (!activeCourse || assessmentScore === null) return;
+        
+        setIsDownloading(true);
+        try {
+            const element = document.getElementById('certificate-content');
+            if (!element) return;
+
+            // Temporarily show the element for html2canvas
+            const parent = element.parentElement;
+            if (parent) parent.style.display = 'block';
+            element.style.display = 'block';
+            
+            const canvas = await html2canvas(element, {
+                scale: 2, // Higher resolution
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff'
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save(`Certificate_${activeCourse.title.replace(/\s+/g, '_')}_${user.name.replace(/\s+/g, '_')}.pdf`);
+            
+            // Hide it back
+            if (parent) parent.style.display = 'none';
+            element.style.display = 'none';
+            setPopup({ type: 'success', message: 'Certificate downloaded successfully!', isOpen: true });
+        } catch (err) {
+            console.error('Certificate generation failed:', err);
+            setPopup({ type: 'error', message: 'Failed to generate certificate.', isOpen: true });
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
     // --- Player View ---
     if (!activeCourse) return null;
 
@@ -1264,9 +1332,21 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                     </div>
                                     <div>
                                         <p className="font-bold text-green-900">Final Assessment Completed</p>
-                                        <p className="text-xs text-green-700">
+                                        <p className="text-xs text-green-700 mb-4">
                                             Final Score: {assessmentScore} / 100. You have passed this course.
                                         </p>
+                                        <button
+                                            onClick={handleDownloadCertificate}
+                                            disabled={isDownloading}
+                                            className="w-full bg-emerald-600 text-white px-4 py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                                        >
+                                            {isDownloading ? (
+                                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            ) : (
+                                                <Download size={18} />
+                                            )}
+                                            Download Certificate (PDF)
+                                        </button>
                                     </div>
                                 </div>
                             )}
@@ -1300,6 +1380,18 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     }
                 }}
             />
+
+            {/* Hidden Certificate Content for PDF Generation */}
+            <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', display: 'none' }}>
+                {activeCourse && (
+                    <CertificateTemplate 
+                        employeeName={user.name}
+                        courseTitle={activeCourse.title}
+                        date={new Date()}
+                        certificateId={`${user.employee_id || user.id}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${new Date().getFullYear()}`}
+                    />
+                )}
+            </div>
         </div>
     );
 };
