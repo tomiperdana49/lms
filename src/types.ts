@@ -79,6 +79,9 @@ export interface Course {
     modules: Module[];
     assessment?: Quiz; // Final Post-test
     preAssessment?: Quiz; // Final Pre-test
+    completedAt?: string | null;
+    isAssessmentPassed?: boolean;
+    preScore?: number | null;
 }
 
 export interface QuizResult {
