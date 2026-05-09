@@ -356,7 +356,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     // Auto-open quiz if exists and not passed
                     // Check against REF to avoid stale closure
                     const currentResults = quizResultsRef.current;
-                    if (activeModule?.quiz && (!currentResults[activeModule.id] || currentResults[activeModule.id] < 100)) {
+                    if (activeModule?.quiz && !activeModule.completed && (!currentResults[activeModule.id] || currentResults[activeModule.id] < 100)) {
                         setActiveQuiz({ quiz: activeModule.quiz, moduleId: activeModule.id, type: 'POST' });
                     }
                 }
@@ -432,7 +432,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             onStateChange: (event: { data: number }) => {
                                 if (event.data === window.YT.PlayerState.ENDED) {
                                     setIsVideoCompleted(true);
-                                    if (activeModule?.quiz && (!quizResults[activeModule.id] || quizResults[activeModule.id] < 100)) {
+                                    if (activeModule?.quiz && !activeModule.completed && (!quizResults[activeModule.id] || quizResults[activeModule.id] < 100)) {
                                         setActiveQuiz({ quiz: activeModule.quiz, moduleId: activeModule.id, type: 'POST' });
                                     }
                                 }
@@ -1387,8 +1387,14 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     <CertificateTemplate 
                         employeeName={user.name}
                         courseTitle={activeCourse.title}
-                        date={new Date()}
-                        certificateId={`${user.employee_id || user.id}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${new Date().getFullYear()}`}
+                        date={activeCourse.completedAt ? new Date(activeCourse.completedAt) : new Date()}
+                        certificateId={`${user.employee_id || user.id}${
+                            (activeCourse.completedAt ? new Date(activeCourse.completedAt) : new Date()).getDate().toString().padStart(2, '0')
+                        }${
+                            ((activeCourse.completedAt ? new Date(activeCourse.completedAt) : new Date()).getMonth() + 1).toString().padStart(2, '0')
+                        }${
+                            (activeCourse.completedAt ? new Date(activeCourse.completedAt) : new Date()).getFullYear()
+                        }${activeCourse.id}`}
                     />
                 )}
             </div>

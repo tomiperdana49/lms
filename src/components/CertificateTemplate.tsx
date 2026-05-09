@@ -11,7 +11,7 @@ const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
     employeeName, 
     courseTitle, 
     date, 
-    certificateId 
+    certificateId
 }) => {
     // Format date for the certificate (e.g., 5 MAY 2026)
     const formattedDate = `${date.getDate()} ${date.toLocaleString('en-US', { month: 'long' }).toUpperCase()} ${date.getFullYear()}`;
@@ -83,9 +83,9 @@ const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
             {/* 4. Certificate ID */}
             <div 
                 className="absolute z-10"
-                style={{ bottom: '63px', left: '265px' }}
+                style={{ bottom: '63px', left: '255px' }}
             >
-                <span className="text-white font-bold text-[18px] tracking-widest opacity-95">
+                <span className="text-white font-bold text-[20px] tracking-widest opacity-95 uppercase">
                     {certificateId}
                 </span>
             </div>
