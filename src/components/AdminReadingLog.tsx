@@ -351,12 +351,12 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             return lY === y;
         });
 
-        // Split into categories and sort chronologically
+        // Split into categories and sort chronologically by approval/completion
         const approvedLogs = userYearLogs
             .filter(l => l.hrApprovalStatus === 'Approved')
             .sort((a, b) => {
-                const dateA = new Date(a.finishDate || a.date).getTime();
-                const dateB = new Date(b.finishDate || b.date).getTime();
+                const dateA = new Date(a.approvedAt || a.finishDate || a.date).getTime();
+                const dateB = new Date(b.approvedAt || b.finishDate || b.date).getTime();
                 if (dateA !== dateB) return dateA - dateB;
                 return Number(a.id) - Number(b.id);
             });
@@ -364,8 +364,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         const pendingLogs = userYearLogs
             .filter(l => l.hrApprovalStatus === 'Pending')
             .sort((a, b) => {
-                const dateA = new Date(a.finishDate || a.date).getTime();
-                const dateB = new Date(b.finishDate || b.date).getTime();
+                const dateA = new Date(a.claimedAt || a.finishDate || a.date).getTime();
+                const dateB = new Date(b.claimedAt || b.finishDate || b.date).getTime();
                 if (dateA !== dateB) return dateA - dateB;
                 return Number(a.id) - Number(b.id);
             });
@@ -511,8 +511,11 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         .sort((a, b) => {
             if (a.hrApprovalStatus === 'Pending' && b.hrApprovalStatus !== 'Pending') return -1;
             if (a.hrApprovalStatus !== 'Pending' && b.hrApprovalStatus === 'Pending') return 1;
-            // Within same status, sort by ID ascending so 1/5 appears first
-            return Number(a.id) - Number(b.id);
+            
+            // Within same status, sort by newest first (claimedAt or finishDate)
+            const dateA = new Date(a.claimedAt || a.finishDate || a.date).getTime();
+            const dateB = new Date(b.claimedAt || b.finishDate || b.date).getTime();
+            return dateB - dateA;
         });
 
     return (
@@ -780,7 +783,13 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                         const seq = getLogSequence(log);
                                                         if (seq === 5 && log.incentiveAmount > 500000) {
                                                             const base = log.incentiveAmount - 500000;
-                                                            return `${base.toLocaleString('id-ID')} + 500.000 = ${formatCurrency(log.incentiveAmount)}`;
+                                                            return (
+                                                                <div className="flex flex-col items-center">
+                                                                    <span className="text-[9px] text-orange-500 font-black">MILESTONE BONUS!</span>
+                                                                    <span>{formatCurrency(base)} + Rp 500.000</span>
+                                                                    <span className="text-[9px] opacity-60">= {formatCurrency(log.incentiveAmount)}</span>
+                                                                </div>
+                                                            );
                                                         }
                                                         return formatCurrency(log.incentiveAmount);
                                                     })()}
@@ -1206,15 +1215,15 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 <div className="p-8 text-center text-slate-500 italic">No books to display.</div>
                             ) : (
                                 <table className="w-full text-left">
-                                    <thead className="bg-white text-xs uppercase text-slate-500 font-bold border-b border-slate-100 sticky top-0 shadow-sm">
+                                    <thead className="bg-white text-[10px] uppercase text-slate-500 font-black border-b border-slate-100 sticky top-0 shadow-sm">
                                         <tr>
-                                            <th className="px-6 py-3 text-center">Book #</th>
-                                            <th className="px-6 py-3">Book Title / Category</th>
-                                            <th className="px-6 py-3 text-center">Finish Date</th>
-                                            <th className="px-6 py-3 text-center text-purple-600">Claimed Date</th>
-                                            <th className="px-6 py-3 text-center">Date Verified</th>
-                                            <th className="px-6 py-3 text-center">Incentive</th>
-                                            <th className="px-6 py-3">Status</th>
+                                            <th className="px-3 py-3 text-center w-[8%]">#</th>
+                                            <th className="px-3 py-3 w-[28%]">Book Title / Category</th>
+                                            <th className="px-3 py-3 text-center w-[12%]">Finished</th>
+                                            <th className="px-3 py-3 text-center text-purple-600 w-[12%]">Claimed</th>
+                                            <th className="px-3 py-3 text-center w-[12%]">Verified</th>
+                                            <th className="px-3 py-3 text-center w-[18%]">Incentive</th>
+                                            <th className="px-3 py-3 w-[10%]">Status</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
@@ -1223,84 +1232,98 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                 const seqA = getLogSequence(a);
                                                 const seqB = getLogSequence(b);
                                                 // Handle sequence 0 (Draft/Rejected) by putting them at the bottom
-                                                if (seqA === 0 && seqB === 0) return new Date(a.finishDate || a.date).getTime() - new Date(b.finishDate || b.date).getTime();
+                                                if (seqA === 0 && seqB === 0) return new Date(b.finishDate || b.date).getTime() - new Date(a.finishDate || a.date).getTime();
                                                 if (seqA === 0) return 1;
                                                 if (seqB === 0) return -1;
-                                                return seqA - seqB;
+                                                return seqB - seqA; // Descending: 5, 4, 3, 2, 1
                                             })
                                             .map(log => (
                                                 <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="px-6 py-4 text-center">
+                                                    <td className="px-3 py-4 text-center">
                                                         {(() => {
                                                             const seq = getLogSequence(log);
-                                                            if (seq === 0) return '-';
-                                                            const isApproved = log.hrApprovalStatus === 'Approved';
-                                                            return <span className={`text-xs font-black px-2 py-0.5 rounded border whitespace-nowrap ${seq === 5 ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-slate-50 text-slate-700 border-slate-100'}`}>
-                                                                {!isApproved ? 'To ' : ''}{seq} / 5
+                                                            if (seq === 0) return <span className="text-slate-300">-</span>;
+                                                            return <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border whitespace-nowrap ${seq === 5 ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-slate-50 text-slate-700 border-slate-100'}`}>
+                                                                {seq}/5
                                                             </span>;
                                                         })()}
                                                     </td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="font-bold text-slate-700 text-sm whitespace-pre-wrap leading-tight">{log.title}</div>
-                                                        <div className="flex flex-col gap-1.5 mt-1">
-                                                            <div className="text-xs text-slate-500">
-                                                                {log.category} <span className="text-slate-300 mx-1">•</span> <span className="font-medium text-slate-400 italic">{log.source === 'Buku Pribadi' ? 'Private' : 'Office'}</span>
+                                                    <td className="px-3 py-4">
+                                                        <div className="font-bold text-slate-700 text-[12px] whitespace-pre-wrap leading-tight mb-1">{log.title}</div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <div className="text-[10px] text-slate-400 font-medium">
+                                                                {log.category}
                                                             </div>
-                                                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded w-fit uppercase tracking-wider border shadow-sm ${log.source === 'Buku Pribadi'
+                                                            <span className={`text-[8px] font-black px-1 py-0.5 rounded w-fit uppercase tracking-wider border ${log.source === 'Buku Pribadi'
                                                                     ? 'bg-purple-100 text-purple-700 border-purple-200'
                                                                     : 'bg-indigo-100 text-indigo-700 border-indigo-200'
                                                                 }`}>
-                                                                {log.source === 'Buku Pribadi' ? 'Private Reading' : 'Office Book'}
+                                                                {log.source === 'Buku Pribadi' ? 'Private' : 'Office'}
                                                             </span>
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-4">
-                                                         <div className="text-sm font-medium text-slate-600">
-                                                             {log.finishDate ? new Date(log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : log.date ? new Date(log.date).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                                                    <td className="px-3 py-4 text-center">
+                                                         <div className="flex flex-col">
+                                                             <span className="text-[11px] font-bold text-slate-600">
+                                                                 {log.finishDate ? new Date(log.finishDate).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) : '-'}
+                                                             </span>
+                                                             <span className="text-[9px] text-slate-400">
+                                                                 {log.finishDate ? new Date(log.finishDate).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : ''}
+                                                             </span>
                                                          </div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-center">
-                                                        <div className="text-sm font-bold text-purple-600">
-                                                            {log.claimedAt ? new Date(log.claimedAt).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
-                                                        </div>
+                                                    <td className="px-3 py-4 text-center">
+                                                         <div className="flex flex-col">
+                                                             <span className="text-[11px] font-bold text-purple-600">
+                                                                 {log.claimedAt ? new Date(log.claimedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) : '-'}
+                                                             </span>
+                                                             <span className="text-[9px] text-purple-400/70">
+                                                                 {log.claimedAt ? new Date(log.claimedAt).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : ''}
+                                                             </span>
+                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-center">
-                                                        <div className="text-sm font-bold text-indigo-600">
-                                                            {log.approvedAt ? new Date(log.approvedAt).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
-                                                        </div>
+                                                    <td className="px-3 py-4 text-center">
+                                                         <div className="flex flex-col">
+                                                             <span className="text-[11px] font-bold text-indigo-600">
+                                                                 {log.approvedAt ? new Date(log.approvedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) : '-'}
+                                                             </span>
+                                                             <span className="text-[9px] text-indigo-400/70">
+                                                                 {log.approvedAt ? new Date(log.approvedAt).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : ''}
+                                                             </span>
+                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-center">
+                                                    <td className="px-3 py-4 text-center">
                                                         {log.incentiveAmount ? (
-                                                            <div className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-100 whitespace-nowrap">
-                                                                {(() => {
-                                                                    const seq = getLogSequence(log);
-                                                                    if (seq === 5 && log.incentiveAmount > 500000) {
-                                                                        const base = log.incentiveAmount - 500000;
-                                                                        return `${base.toLocaleString('id-ID')} + 500.000 = ${formatCurrency(log.incentiveAmount)}`;
-                                                                    }
-                                                                    return formatCurrency(log.incentiveAmount);
-                                                                })()}
+                                                            <div className="inline-flex flex-col items-center bg-green-50 px-2 py-1 rounded border border-green-100">
+                                                                    {(() => {
+                                                                        const seq = getLogSequence(log);
+                                                                        if (seq === 5 && log.incentiveAmount > 500000) {
+                                                                            const base = log.incentiveAmount - 500000;
+                                                                            return (
+                                                                                <div className="flex flex-col">
+                                                                                    <span className="text-[8px] text-orange-500 font-black leading-none mb-1">MILESTONE BONUS!</span>
+                                                                                    <span className="text-[10px] font-bold text-green-700">{formatCurrency(base)} + Rp 500k</span>
+                                                                                    <span className="text-[9px] opacity-60 font-black">= {formatCurrency(log.incentiveAmount)}</span>
+                                                                                </div>
+                                                                            );
+                                                                        }
+                                                                        return <span className="text-[11px] font-bold text-green-700">{formatCurrency(log.incentiveAmount)}</span>;
+                                                                    })()}
                                                             </div>
                                                         ) : (
-                                                            <div className="text-sm text-slate-400 italic">-</div>
+                                                            <div className="text-[10px] text-slate-300 italic">-</div>
                                                         )}
                                                     </td>
-                                                     <td className="px-6 py-4">
-                                                         <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase w-fit border ${
+                                                     <td className="px-3 py-4">
+                                                         <div className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase w-fit border ${
                                                              log.status === 'Reading' ? 'bg-orange-50 text-orange-600 border-orange-100' :
                                                              log.hrApprovalStatus === 'Approved' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 
                                                              log.hrApprovalStatus === 'Rejected' ? 'bg-red-100 text-red-700 border-red-200' : 
                                                              log.hrApprovalStatus === 'Pending' ? 'bg-orange-100 text-orange-700 border-orange-200' : 
                                                              'bg-slate-100 text-slate-500 border-slate-200'
                                                          }`}>
-                                                              <div className="flex flex-col gap-1">
-                                                                 <span>{log.status === 'Reading' ? 'Reading' : (log.hrApprovalStatus === 'Pending' ? 'Under Review' : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus))}</span>
-                                                                 {(log.hrApprovalStatus === 'Approved' && log.approvedBy) && (
-                                                                     <span className="text-[8px] opacity-70 normal-case italic">By: {log.approvedBy}</span>
-                                                                 )}
-                                                                 {(log.hrApprovalStatus === 'Rejected' && log.cancelledBy) && (
-                                                                     <span className="text-[8px] opacity-70 normal-case italic">By: {log.cancelledBy}</span>
-                                                                 )}
+                                                              <div className="flex flex-col">
+                                                                 <span>{log.status === 'Reading' ? 'Reading' : (log.hrApprovalStatus === 'Pending' ? 'Review' : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus))}</span>
                                                               </div>
                                                          </div>
                                                      </td>
