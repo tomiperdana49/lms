@@ -518,86 +518,80 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                 <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
                 <div className="absolute -left-10 -bottom-10 w-60 h-60 bg-blue-400/10 rounded-full blur-3xl"></div>
                 
-                <div className="relative z-10 flex flex-col md:flex-row justify-between gap-8">
-                    <div className="space-y-2">
-                        <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10">
-                            <Star size={12} className="text-yellow-400 fill-yellow-400" /> Member Milestone {filterYear}
-                        </div>
-                        <h2 className="text-3xl font-black tracking-tight leading-none">Your Reading Journey</h2>
-                        <p className="text-blue-100/80 font-medium">Keep reading to unlock more rewards and knowledge.</p>
-                    </div>
+                {/* Logic for Stats */}
+                {(() => {
+                    const approvedLogs = readingLogs.filter(l => l.hrApprovalStatus === 'Approved' && new Date(l.finishDate || l.date).getFullYear() === filterYear);
+                    const totalApproved = approvedLogs.length;
+                    const totalEarned = approvedLogs.reduce((acc, log) => acc + Number(log.incentiveAmount || 0), 0);
+                    const progress = Math.min(100, (totalApproved / 5) * 100);
+                    const totalRead = readingLogs.filter(l => 
+                        new Date(l.finishDate || l.date).getFullYear() === filterYear && 
+                        l.status === 'Finished'
+                    ).length;
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1 max-w-3xl">
-                        {/* Card 1: Books Count */}
-                        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all">
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="p-2 bg-blue-500 rounded-lg shadow-lg shadow-blue-500/20">
-                                    <BookOpen size={18} />
+                    return (
+                        <div className="relative z-10 flex flex-col md:flex-row justify-between gap-8">
+                            <div className="space-y-2">
+                                <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10">
+                                    <Star size={12} className="text-yellow-400 fill-yellow-400" /> Member Milestone {filterYear}
                                 </div>
-                                <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Total Read</span>
+                                <h2 className="text-3xl font-black tracking-tight leading-none">Your Reading Journey</h2>
+                                <p className="text-blue-100/80 font-medium">Keep reading to unlock more rewards and knowledge.</p>
                             </div>
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-3xl font-black tracking-tighter">
-                                    {readingLogs.filter(l => 
-                                        new Date(l.finishDate || l.date).getFullYear() === filterYear && 
-                                        l.status === 'Finished'
-                                    ).length}
-                                </span>
-                                <span className="text-sm font-bold opacity-60">Books</span>
-                            </div>
-                        </div>
 
-                        {/* Card 2: Annual Progress */}
-                        {(() => {
-                            const approvedOnly = readingLogs.filter(l => l.hrApprovalStatus === 'Approved' && new Date(l.finishDate || l.date).getFullYear() === filterYear).length;
-                            const progress = Math.min(100, (approvedOnly / 5) * 100);
-                            
-                            return (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1 max-w-3xl">
+                                {/* Card 1: Books Count */}
+                                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="p-2 bg-blue-500 rounded-lg shadow-lg shadow-blue-500/20">
+                                            <BookOpen size={18} />
+                                        </div>
+                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Total Read</span>
+                                    </div>
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-3xl font-black tracking-tighter">{totalRead}</span>
+                                        <span className="text-sm font-bold opacity-60">Books</span>
+                                    </div>
+                                </div>
+
+                                {/* Card 2: Annual Progress */}
                                 <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all relative">
                                     <div className="flex items-center gap-3 mb-3">
-                                        <div className={`p-2 rounded-lg shadow-lg ${approvedOnly >= 5 ? 'bg-green-500 shadow-green-500/20' : 'bg-orange-500 shadow-orange-500/20'}`}>
+                                        <div className={`p-2 rounded-lg shadow-lg ${totalApproved >= 5 ? 'bg-green-500 shadow-green-500/20' : 'bg-orange-500 shadow-orange-500/20'}`}>
                                             <Trophy size={18} />
                                         </div>
                                         <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Incentive Limit</span>
                                     </div>
                                     <div className="space-y-2">
                                         <div className="flex justify-between items-end">
-                                            <span className="text-2xl font-black tracking-tighter">{approvedOnly}/5</span>
+                                            <span className="text-2xl font-black tracking-tighter">{totalApproved}/5</span>
                                             <span className="text-[10px] font-bold opacity-60">Approved</span>
                                         </div>
                                         <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                            <div className={`h-full transition-all duration-1000 ${approvedOnly >= 5 ? 'bg-green-400' : 'bg-orange-400'}`} style={{ width: `${progress}%` }}></div>
+                                            <div className={`h-full transition-all duration-1000 ${totalApproved >= 5 ? 'bg-green-400' : 'bg-orange-400'}`} style={{ width: `${progress}%` }}></div>
                                         </div>
                                     </div>
                                 </div>
-                            );
-                        })()}
 
-                        {/* Card 3: Total Incentives */}
-                        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all">
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="p-2 bg-emerald-500 rounded-lg shadow-lg shadow-emerald-500/20">
-                                    <Wallet size={18} />
+                                {/* Card 3: Total Incentives */}
+                                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="p-2 bg-emerald-500 rounded-lg shadow-lg shadow-emerald-500/20">
+                                            <Wallet size={18} />
+                                        </div>
+                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Total Earned</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-2xl font-black tracking-tighter text-emerald-300">
+                                            {formatCurrency(totalEarned)}
+                                        </span>
+                                        <span className="text-[10px] font-bold opacity-60">Claimed Incentives</span>
+                                    </div>
                                 </div>
-                                <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Total Earned</span>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-2xl font-black tracking-tighter text-emerald-300">
-                                    {(() => {
-                                        const total = readingLogs.reduce((acc, log) => {
-                                            if (log.hrApprovalStatus === 'Approved' && new Date(log.finishDate || log.date).getFullYear() === filterYear) {
-                                                return acc + (log.incentiveAmount || 0);
-                                            }
-                                            return acc;
-                                        }, 0);
-                                        return formatCurrency(total);
-                                    })()}
-                                </span>
-                                <span className="text-[10px] font-bold opacity-60">Claimed Incentives</span>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    );
+                })()}
             </div>
 
             <div className="grid lg:grid-cols-3 gap-8">
@@ -725,7 +719,13 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                         {log.status === 'Reading' ? (
                                                             <button onClick={(e) => { e.stopPropagation(); openClaimModal(log); }} className="px-4 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-sm">Finish</button>
                                                         ) : (
-                                                            <button onClick={(e) => { e.stopPropagation(); handleClaimIncentive(log.id); }} className="px-4 py-1.5 text-[11px] font-bold bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all shadow-sm">Claim Incentive</button>
+                                                            (() => {
+                                                                const totalApproved = readingLogs.filter(l => l.hrApprovalStatus === 'Approved' && new Date(l.finishDate || l.date).getFullYear() === filterYear).length;
+                                                                if (totalApproved < 5) {
+                                                                    return <button onClick={(e) => { e.stopPropagation(); handleClaimIncentive(log.id); }} className="px-4 py-1.5 text-[11px] font-bold bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all shadow-sm">Claim Incentive</button>;
+                                                                }
+                                                                return null;
+                                                            })()
                                                         )}
                                                         <button 
                                                             onClick={(e) => { e.stopPropagation(); handleDelete(log.id); }} 
