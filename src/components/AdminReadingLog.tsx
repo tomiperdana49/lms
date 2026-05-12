@@ -351,12 +351,12 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             return lY === y;
         });
 
-        // Split into categories and sort chronologically by approval/completion
+        // Split into categories and sort chronologically by finish/reading date
         const approvedLogs = userYearLogs
             .filter(l => l.hrApprovalStatus === 'Approved')
             .sort((a, b) => {
-                const dateA = new Date(a.approvedAt || a.finishDate || a.date).getTime();
-                const dateB = new Date(b.approvedAt || b.finishDate || b.date).getTime();
+                const dateA = new Date(a.finishDate || a.date).getTime();
+                const dateB = new Date(b.finishDate || b.date).getTime();
                 if (dateA !== dateB) return dateA - dateB;
                 return Number(a.id) - Number(b.id);
             });
@@ -364,8 +364,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         const pendingLogs = userYearLogs
             .filter(l => l.hrApprovalStatus === 'Pending')
             .sort((a, b) => {
-                const dateA = new Date(a.claimedAt || a.finishDate || a.date).getTime();
-                const dateB = new Date(b.claimedAt || b.finishDate || b.date).getTime();
+                const dateA = new Date(a.finishDate || a.date).getTime();
+                const dateB = new Date(b.finishDate || b.date).getTime();
                 if (dateA !== dateB) return dateA - dateB;
                 return Number(a.id) - Number(b.id);
             });
@@ -785,9 +785,9 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                             const base = log.incentiveAmount - 500000;
                                                             return (
                                                                 <div className="flex flex-col items-center">
-                                                                    <span className="text-[9px] text-orange-500 font-black">MILESTONE BONUS!</span>
-                                                                    <span>{formatCurrency(base)} + Rp 500.000</span>
-                                                                    <span className="text-[9px] opacity-60">= {formatCurrency(log.incentiveAmount)}</span>
+                                                                    <span className="text-[9px] text-orange-600 font-black tracking-tighter">MILESTONE BONUS!</span>
+                                                                    <span className="text-[11px] font-bold">{formatCurrency(base)} + Rp 500.000</span>
+                                                                    <span className="text-[9px] opacity-60 font-medium">= {formatCurrency(log.incentiveAmount)}</span>
                                                                 </div>
                                                             );
                                                         }
@@ -1229,13 +1229,15 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     <tbody className="divide-y divide-slate-50">
                                         {[...recapModal.logs]
                                             .sort((a, b) => {
+                                                // Primary sort: Claimed/Finish Date Newest First
+                                                const dateA = new Date(a.claimedAt || a.finishDate || a.date).getTime();
+                                                const dateB = new Date(b.claimedAt || b.finishDate || b.date).getTime();
+                                                if (dateA !== dateB) return dateB - dateA;
+                                                
+                                                // Secondary sort: Sequence Descending
                                                 const seqA = getLogSequence(a);
                                                 const seqB = getLogSequence(b);
-                                                // Handle sequence 0 (Draft/Rejected) by putting them at the bottom
-                                                if (seqA === 0 && seqB === 0) return new Date(b.finishDate || b.date).getTime() - new Date(a.finishDate || a.date).getTime();
-                                                if (seqA === 0) return 1;
-                                                if (seqB === 0) return -1;
-                                                return seqB - seqA; // Descending: 5, 4, 3, 2, 1
+                                                return seqB - seqA;
                                             })
                                             .map(log => (
                                                 <tr key={log.id} className="hover:bg-slate-50 transition-colors">
@@ -1301,8 +1303,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                                             const base = log.incentiveAmount - 500000;
                                                                             return (
                                                                                 <div className="flex flex-col">
-                                                                                    <span className="text-[8px] text-orange-500 font-black leading-none mb-1">MILESTONE BONUS!</span>
-                                                                                    <span className="text-[10px] font-bold text-green-700">{formatCurrency(base)} + Rp 500k</span>
+                                                                                    <span className="text-[8px] text-orange-600 font-black leading-none mb-1">MILESTONE BONUS!</span>
+                                                                                    <span className="text-[10px] font-bold text-green-700">{formatCurrency(base)} + Rp 500.000</span>
                                                                                     <span className="text-[9px] opacity-60 font-black">= {formatCurrency(log.incentiveAmount)}</span>
                                                                                 </div>
                                                                             );
