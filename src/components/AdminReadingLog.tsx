@@ -338,17 +338,27 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         return n1 !== '' && n1 === n2;
     };
 
+    const getCutoffYear = (date: Date | string | number) => {
+        const d = new Date(date);
+        const year = d.getFullYear();
+        // If date is Dec 26 or later, it belongs to the NEXT cutoff year
+        if (d.getMonth() === 11 && d.getDate() >= 26) {
+            return year + 1;
+        }
+        return year;
+    };
+
     const getLogSequence = (log: ReadingLogEntry) => {
         if (log.status === 'Reading') return 0;
         const logDateObj = new Date(log.finishDate || log.date);
-        const y = logDateObj.getFullYear();
+        const cutoffY = getCutoffYear(logDateObj);
 
-        // Filter all logs for this user/year from the global state
+        // Filter all logs for this user within the same CUTOFF year
         const userYearLogs = allLogs.filter(l => {
             if (!areSameUser({ employee_id: log.employee_id, name: log.userName }, l)) return false;
-            if (l.status === 'Reading') return false; // Don't count ongoing reads in the sequence
-            const lY = new Date(l.finishDate || l.date).getFullYear();
-            return lY === y;
+            if (l.status === 'Reading') return false;
+            const lY = getCutoffYear(l.finishDate || l.date);
+            return lY === cutoffY;
         });
 
         // Split into categories and sort chronologically by finish/reading date
@@ -377,18 +387,18 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             const pIdx = pendingLogs.findIndex(l => l.id === log.id);
             return approvedLogs.length + (pIdx !== -1 ? pIdx + 1 : 1);
         }
-        return 0; // Draft or Rejected or Cancelled usually won't need sequence in this table
+        return 0;
     };
 
     const getUserStats = (user: User) => {
-        const currentYear = new Date(endDate).getFullYear();
+        const currentCutoffYear = getCutoffYear(endDate);
 
-        // Data 1 Tahun Full
+        // Data 1 Tahun Cutoff (26 Des - 25 Des)
         const userYearLogs = allLogs.filter(l => {
             if (!areSameUser(user, l)) return false;
             if (l.status === 'Reading') return false;
-            const logDate = new Date(l.claimedAt || l.finishDate || l.date);
-            return logDate.getFullYear() === currentYear;
+            const logCutoffY = getCutoffYear(l.claimedAt || l.finishDate || l.date);
+            return logCutoffY === currentCutoffYear;
         });
 
         // Data Periode Range - Sekarang menggunakan TANGGAL APPROVED
@@ -439,8 +449,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
 
     const approvedCounts = allLogs.reduce((acc: Record<string, number>, log) => {
         if (log.hrApprovalStatus === 'Approved') {
-            const y = new Date(log.finishDate || log.date).getFullYear();
-            const key = `${log.employee_id || log.userName || 'unknown'}_${y}`;
+            const cutoffY = getCutoffYear(log.finishDate || log.date);
+            const key = `${log.employee_id || log.userName || 'unknown'}_${cutoffY}`;
             acc[key] = (acc[key] || 0) + 1;
         }
         return acc;
@@ -483,12 +493,13 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 if (d < start || d > end) return false;
             } else {
                 // Verification: Tetap ambil periode 1 tahun penuh berdasarkan Claimed Date
-                const dateStr = l.claimedAt || l.finishDate || l.date;
-                const d = new Date(dateStr);
+                // Verification: Tetap ambil periode 1 tahun penuh berdasarkan Cutoff Year
+                const d = new Date(l.claimedAt || l.finishDate || l.date);
+                const logCutoffY = getCutoffYear(d);
                 
                 // Jika ingin dinamis mengikuti tahun dari filter:
-                const filterYear = new Date(endDate).getFullYear();
-                if (d.getFullYear() !== filterYear) return false;
+                const filterCutoffYear = getCutoffYear(endDate);
+                if (logCutoffY !== filterCutoffYear) return false;
             }
 
             // 4. Search Filter
