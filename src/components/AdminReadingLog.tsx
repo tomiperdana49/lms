@@ -788,24 +788,24 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                             }`}>
                                                 {log.status === 'Reading' ? 'Reading' : (log.hrApprovalStatus === 'Pending' ? 'Under Review' : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus))}
                                             </span>
-                                            {Number(log.incentiveAmount) > 0 && (
-                                                <div className="text-[10px] font-bold text-green-600 mt-1">
-                                                    {(() => {
-                                                        const seq = getLogSequence(log);
-                                                        if (seq === 5 && log.incentiveAmount > 500000) {
-                                                            const base = log.incentiveAmount - 500000;
-                                                            return (
-                                                                <div className="flex flex-col items-center">
-                                                                    <span className="text-[9px] text-orange-600 font-black tracking-tighter">MILESTONE BONUS!</span>
-                                                                    <span className="text-[11px] font-bold">{formatCurrency(base)} + Rp 500.000</span>
-                                                                    <span className="text-[9px] opacity-60 font-medium">= {formatCurrency(log.incentiveAmount)}</span>
-                                                                </div>
-                                                            );
-                                                        }
-                                                        return formatCurrency(log.incentiveAmount);
-                                                    })()}
-                                                </div>
-                                            )}
+                                                    {Number(log.incentiveAmount) > 0 && (
+                                                        <div className="text-[10px] font-bold text-green-600 mt-1">
+                                                            {(() => {
+                                                                const seq = getLogSequence(log);
+                                                                if (seq === 5 && (log.incentiveAmount ?? 0) > 500000) {
+                                                                    const base = (log.incentiveAmount ?? 0) - 500000;
+                                                                    return (
+                                                                        <div className="flex flex-col items-center">
+                                                                            <span className="text-[9px] text-orange-600 font-black tracking-tighter">MILESTONE BONUS!</span>
+                                                                            <span className="text-[11px] font-bold">{formatCurrency(base)} + Rp 500.000</span>
+                                                                            <span className="text-[9px] opacity-60 font-medium">= {formatCurrency(log.incentiveAmount ?? 0)}</span>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                return formatCurrency(log.incentiveAmount ?? 0);
+                                                            })()}
+                                                        </div>
+                                                    )}
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             {log.status === 'Reading' ? (
@@ -1310,17 +1310,17 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                             <div className="inline-flex flex-col items-center bg-green-50 px-2 py-1 rounded border border-green-100">
                                                                     {(() => {
                                                                         const seq = getLogSequence(log);
-                                                                        if (seq === 5 && log.incentiveAmount > 500000) {
-                                                                            const base = log.incentiveAmount - 500000;
+                                                                        if (seq === 5 && (log.incentiveAmount ?? 0) > 500000) {
+                                                                            const base = (log.incentiveAmount ?? 0) - 500000;
                                                                             return (
                                                                                 <div className="flex flex-col">
                                                                                     <span className="text-[8px] text-orange-600 font-black leading-none mb-1">MILESTONE BONUS!</span>
                                                                                     <span className="text-[10px] font-bold text-green-700">{formatCurrency(base)} + Rp 500.000</span>
-                                                                                    <span className="text-[9px] opacity-60 font-black">= {formatCurrency(log.incentiveAmount)}</span>
+                                                                                    <span className="text-[9px] opacity-60 font-black">= {formatCurrency(log.incentiveAmount ?? 0)}</span>
                                                                                 </div>
                                                                             );
                                                                         }
-                                                                        return <span className="text-[11px] font-bold text-green-700">{formatCurrency(log.incentiveAmount)}</span>;
+                                                                        return <span className="text-[11px] font-bold text-green-700">{formatCurrency(log.incentiveAmount ?? 0)}</span>;
                                                                     })()}
                                                             </div>
                                                         ) : (
