@@ -1,7 +1,6 @@
 import pool from './db.js';
 
-const data = `Tanggal	Email	Keterangan	Insentif per Buku
-21/01/2026 16:11:29	adhitya@nusa.net.id	How To Win Friends & Influence People	100.000
+const claimData = `21/01/2026 16:11:29	adhitya@nusa.net.id	How To Win Friends & Influence People	100.000
 21/02/2026 9:44:04	adhitya@nusa.net.id	Who Moved My Cheese?	100.000
 12/03/2026 17:10:05	adhitya@nusa.net.id	Atomic Habits	100.000
 18/03/2026 17:17:34	adhitya@nusa.net.id	Sebuah Seni untuk Bersikap Bodo Amat	100.000
@@ -55,7 +54,8 @@ const data = `Tanggal	Email	Keterangan	Insentif per Buku
 19/02/2026 9:12:56	cesar@nusa.net.id	10 Jurus Terlarang	100.000
 20/03/2026 9:34:01	cesar@nusa.net.id	Naked Sales	100.000
 11/02/2026 15:31:53	cinthya@nusa.net.id	Merawat Luka Batin	100.000
-16/03/2026 17:03:35	anggisaputra@nusa.net.id	Ikigai	100.000
+16/03/2026 17:02:04	cinthya@nusa.net.id	Quiet	100.000
+16/04/2026 14:15:38	cinthya@nusa.net.id	Noise: A Flaw in Human Judgment	100.000
 25/01/2026 21:57:30	dheyslow@nusa.net.id	Hypnotic Writing	100.000
 24/02/2026 14:17:37	dheyslow@nusa.net.id	Kejar Target	100.000
 25/03/2026 19:09:39	dheyslow@nusa.net.id	The Effective Executive	100.000
@@ -64,7 +64,7 @@ const data = `Tanggal	Email	Keterangan	Insentif per Buku
 24/03/2026 15:46:01	dian@nusa.net.id	Cantik, Cerdas, dan Feminin	100.000
 28/03/2026 10:28:25	dian@nusa.net.id	Berani Tidak Disukai	100.000
 24/04/2026 9:04:16	dian@nusa.net.id	The Way to Happiness	100.000
-24/01/2026 10:04:48	marudut@nusa.net.id	Naked Sales	100.000
+24/01/2026 10:04:48	dodisyahdianto@nusa.net.id	Start With Why	100.000
 23/02/2026 10:15:15	dodisyahdianto@nusa.net.id	Attitude Is Everything	100.000
 01/04/2026 9:47:23	dodisyahdianto@nusa.net.id	Be Your Own Boss Now	100.000
 17/04/2026 10:32:59	dodisyahdianto@nusa.net.id	The Subtle Art Of Not Giving A Fuck	100.000
@@ -131,7 +131,7 @@ const data = `Tanggal	Email	Keterangan	Insentif per Buku
 25/03/2026 15:07:40	maleakhi@nusa.net.id	50 Kesalahan Sales dan Solusinya	100.000
 13/04/2026 17:27:07	maleakhi@nusa.net.id	Tipping Point	100.000
 25/04/2026 9:37:59	maleakhi@nusa.net.id	The Empathy Effect	100.000
-16/06/2026 10:04:48	marudut@nusa.net.id	Naked Sales	100.000
+24/01/2026 10:04:48	marudut@nusa.net.id	Naked Sales	100.000
 24/03/2026 9:05:30	marudut@nusa.net.id	The 7 Habits of Highly Effective People (IDN)	100.000
 11/02/2026 15:58:15	meysha@nusa.net.id	77 Cara Bodoh Hidup Bahagia	100.000
 02/04/2026 10:16:44	meysha@nusa.net.id	Hidup Damai Tanpa Berpikir Berlebihan	100.000
@@ -214,7 +214,7 @@ const data = `Tanggal	Email	Keterangan	Insentif per Buku
 24/01/2026 20:10:12	salsabila@nusawork.com	Getting to Yes	100.000
 22/02/2026 14:02:59	salsabila@nusawork.com	Same as Ever	100.000
 11/02/2026 7:52:10	samudera@nusa.net.id	Control Your Expectation	100.000
-25/04/2026 19:21:29	samudera@nusa.net.id	50 Kesalahan Sales dan Solusinya	100.000
+25/04/2026 19:21:29	samudera@nusa.net.id	5 Kesalahan Sales dan Solusinya	100.000
 29/01/2026 9:10:20	samuelmanik@nusa.net.id	Berani Tidak Disukai	100.000
 17/01/2026 11:48:46	siddiq@nusa.net.id	Simplify Your Work Life	100.000
 04/02/2026 16:10:24	siddiq@nusa.net.id	Great Customer Service	100.000
@@ -277,92 +277,118 @@ const data = `Tanggal	Email	Keterangan	Insentif per Buku
 23/02/2026 17:47:13	zoya@nusa.net.id	77 Cara Bodoh Hidup Bahagia	100.000
 25/03/2026 18:34:19	zoya@nusa.net.id	Atomic Habits	100.000`;
 
-async function processClaims() {
+async function processMassClaims() {
     try {
-        const lines = data.trim().split('\n').slice(1);
+        const claims = claimData.trim().split('\n').map(line => {
+            const [timestamp, email, title, incentive] = line.split('\t');
+            return {
+                timestamp,
+                email: email.trim().toLowerCase(),
+                title: title.trim(),
+                incentive: parseFloat(incentive.replace(/\./g, '').replace(',', '.'))
+            };
+        });
+
+        // 1. Ambil semua log
+        const [logs] = await pool.query('SELECT * FROM reading_logs');
+        
+        // 2. Ambil semua user untuk mapping email ke employee_id
         const [users] = await pool.query('SELECT employee_id, email, name FROM users');
         const userMap = users.reduce((acc, u) => {
             acc[u.email.toLowerCase()] = u;
             return acc;
         }, {});
 
-        const approverEmail = 'tomi@nusa.net.id';
-        const approver = userMap[approverEmail];
-        const approverName = approver ? approver.name : 'Tomi Perdana Putra';
+        console.log(`Starting reconciliation for ${claims.length} claims against ${logs.length} logs...`);
 
-        let processedCount = 0;
-        let notFoundCount = 0;
-        let missingLogs = [];
+        // Reset all Approved logs first to ensure fresh sequence calculation
+        await pool.query('UPDATE reading_logs SET hr_approval_status = "Draft", incentive_amount = NULL, approved_at = NULL, approved_by = NULL');
 
-        for (const line of lines) {
-            const parts = line.split('\t');
-            if (parts.length < 3) continue;
-
-            const dateStr = parts[0];
-            const email = parts[1].toLowerCase();
-            const title = parts[2];
-            const incentiveStr = parts[3] || '100.000';
-            const incentive = parseFloat(incentiveStr.replace(/\./g, '')) || 100000;
-
-            const user = userMap[email];
+        let matchedCount = 0;
+        for (const claim of claims) {
+            const user = userMap[claim.email];
             if (!user) {
-                missingLogs.push(`${email}\tUser Not Found\t${title}`);
-                notFoundCount++;
+                console.warn(`⚠️ User not found: ${claim.email}`);
                 continue;
             }
 
-            // Clean title for matching (remove special chars and zero-width spaces)
-            const cleanTitle = title.trim().toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, '');
+            // Find matching log by empId and title (fuzzy)
+            const matchedLog = logs.find(log => {
+                if (log.employee_id !== user.employee_id) return false;
+                
+                const dbTitle = log.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const claimTitle = claim.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+                return dbTitle.includes(claimTitle) || claimTitle.includes(dbTitle);
+            });
 
-            // Search for existing log with flexible matching
-            const [logs] = await pool.query(
-                `SELECT id, finish_date, title FROM reading_logs 
-                 WHERE user_name = ? 
-                 AND (LOWER(title) LIKE ? OR ? LIKE CONCAT('%', LOWER(title), '%')) 
-                 LIMIT 1`,
-                [user.name, `%${cleanTitle}%`, cleanTitle]
-            );
+            if (matchedLog) {
+                // Parse timestamp - FORCE D/M/YYYY
+                const [datePart, timePart] = claim.timestamp.split(' ');
+                const dateParts = datePart.split('/');
+                const day = dateParts[0];
+                const month = dateParts[1];
+                const year = dateParts[2];
+                const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${timePart || '00:00:00'}`;
 
-            if (logs.length > 0) {
-                const log = logs[0];
-                // Parse Date: DD/MM/YYYY HH:mm:ss
-                const [dPart, tPart] = dateStr.split(' ');
-                const [day, month, year] = dPart.split('/');
-                const formattedDate = `${year}-${month}-${day} ${tPart}`;
-
-                const claimDate = log.finish_date || formattedDate;
-
+                // Update flow: Request claim -> Approved
                 await pool.query(
                     `UPDATE reading_logs SET 
-                        hr_approval_status = 'Approved',
-                        incentive_amount = ?,
-                        approved_by = ?,
-                        approved_at = NOW(),
-                        claimed_at = ?,
-                        status = 'Finished'
+                        status = "Finished", 
+                        hr_approval_status = "Approved", 
+                        incentive_amount = ?, 
+                        claimed_at = ?, 
+                        approved_at = CURRENT_TIMESTAMP, 
+                        approved_by = "Tomi Perdana Putra",
+                        finish_date = ?
                     WHERE id = ?`,
-                    [incentive, approverName, claimDate, log.id]
+                    [claim.incentive, formattedDate, formattedDate, matchedLog.id]
                 );
-                processedCount++;
-                console.log(`✅ Approved: ${log.title} for ${user.name}`);
-            } else {
-                missingLogs.push(`${email}\t${user.name}\t${title}`);
-                notFoundCount++;
+                matchedCount++;
             }
         }
 
-        console.log(`\n🎉 Processed: ${processedCount}`);
-        console.log(`❌ Not Found/Error: ${notFoundCount}`);
+        // Final step: Re-calculate milestones
+        console.log('🔄 Re-calculating milestone bonuses...');
+        await recalculateMilestones();
 
-        if (missingLogs.length > 0) {
-            console.log('\n--- Missing Logs Details ---');
-            console.log(missingLogs.join('\n'));
-        }
+        console.log(`🎉 Finished! Matched and approved ${matchedCount} logs.`);
         process.exit(0);
     } catch (err) {
-        console.error('❌ Processing failed:', err);
+        console.error('❌ Reconciliation failed:', err);
         process.exit(1);
     }
 }
 
-processClaims();
+async function recalculateMilestones() {
+    function getCutoffYear(date) {
+        const d = new Date(date);
+        const year = d.getFullYear();
+        if (d.getMonth() === 11 && d.getDate() >= 26) return year + 1;
+        return year;
+    }
+
+    // Reset base incentives first (avoid double counting bonus)
+    await pool.query('UPDATE reading_logs SET incentive_amount = 100000 WHERE incentive_amount > 500000 AND hr_approval_status = "Approved"');
+    await pool.query('UPDATE reading_logs SET incentive_amount = 50000 WHERE incentive_amount > 50000 AND incentive_amount < 100000 AND hr_approval_status = "Approved"');
+
+    const [rows] = await pool.query("SELECT id, employee_id, finish_date, date FROM reading_logs WHERE hr_approval_status = 'Approved' ORDER BY employee_id, finish_date ASC, id ASC");
+    
+    const groups = {};
+    rows.forEach(row => {
+        const cy = getCutoffYear(row.finish_date || row.date);
+        const key = row.employee_id + '_' + cy;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(row);
+    });
+
+    for (const key in groups) {
+        const logs = groups[key];
+        if (logs.length >= 5) {
+            // Apply bonus to the 5th log in chronological order
+            await pool.query('UPDATE reading_logs SET incentive_amount = incentive_amount + 500000 WHERE id = ?', [logs[4].id]);
+            console.log(`⭐ Milestone Bonus applied to 5th book of user ${key.split('_')[0]} (Period: ${key.split('_')[1]})`);
+        }
+    }
+}
+
+processMassClaims();

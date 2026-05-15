@@ -569,6 +569,41 @@ app.delete('/api/users/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+const parseFlexibleDate = (timestamp) => {
+    if (!timestamp || typeof timestamp !== 'string') return null;
+    try {
+        const parts = timestamp.split(' ');
+        const dateStr = parts[0];
+        const timeStr = parts[1] || '00:00:00';
+        
+        const dateParts = dateStr.split('/');
+        if (dateParts.length !== 3) return new Date(timestamp); // Fallback
+
+        let month, day, year;
+        // Detect if parts[0] is month or day (assuming D/M/YYYY or M/D/YYYY)
+        if (parseInt(dateParts[0]) > 12) {
+            day = dateParts[0];
+            month = dateParts[1];
+            year = dateParts[2];
+        } else if (parseInt(dateParts[1]) > 12) {
+            month = dateParts[0];
+            day = dateParts[1];
+            year = dateParts[2];
+        } else {
+            // Ambiguous, assume D/M/YYYY for SIMAS
+            day = dateParts[0];
+            month = dateParts[1];
+            year = dateParts[2];
+        }
+
+        const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${timeStr}`;
+        const d = new Date(isoDate);
+        return isNaN(d.getTime()) ? null : d;
+    } catch (e) {
+        return null;
+    }
+};
+
 app.post('/api/simas/sync', async (req, res) => {
     try {
         const { employee_id, user_name } = req.body;
@@ -610,13 +645,20 @@ app.post('/api/simas/sync', async (req, res) => {
 
                             const sn = b.code;
                             const startDateRaw = b.loanHistory.loaning.loanPeriod;
-                            const startDate = new Date(startDateRaw);
+                            const startDate = parseFlexibleDate(startDateRaw);
+                            
+                            if (!startDate) {
+                                console.warn(`[SIMAS SYNC] Invalid date for ${targetName}: ${startDateRaw}`);
+                                continue;
+                            }
+
                             const isReturned = b.loanHistory.return && b.loanHistory.return.returnTime;
                             const finishDateRaw = isReturned ? b.loanHistory.return.returnTime : null;
+                            const finishDate = finishDateRaw ? parseFlexibleDate(finishDateRaw) : null;
 
                             // Check if exists
-                            const existing = await query('SELECT * FROM reading_logs WHERE source = ? AND employee_id = ? AND sn = ? AND (DATE(start_date) = DATE(?) OR start_date = ?)',
-                                ['SIMAS', targetEid, sn, startDateRaw, startDateRaw]);
+                            const existing = await query('SELECT * FROM reading_logs WHERE source = ? AND employee_id = ? AND sn = ? AND start_date = ?',
+                                ['SIMAS', targetEid, sn, startDate]);
 
                             if (existing.length === 0) {
                                 console.log(`[SIMAS SYNC] Inserting new book for ${targetName}: ${b.name}`);
@@ -628,7 +670,7 @@ app.post('/api/simas/sync', async (req, res) => {
                                         isReturned ? 'Finished' : 'Reading',
                                         targetName, targetEid, b.loanHistory.loaning.loanPhoto || '',
                                         isReturned ? (b.loanHistory.return.returnPhoto || '') : '',
-                                        startDate, finishDateRaw ? new Date(finishDateRaw) : null,
+                                        startDate, finishDate,
                                         isReturned ? 'Draft' : null,
                                         isReturned ? (b.loanHistory.return.linkReview || '') : '',
                                         sn, 'Kantor', 'SIMAS'
@@ -640,7 +682,7 @@ app.post('/api/simas/sync', async (req, res) => {
                                     console.log(`[SIMAS SYNC] Updating book to Finished for ${targetName}: ${b.name}`);
                                     await query(
                                         'UPDATE reading_logs SET status = ?, finish_date = ?, return_evidence_url = ?, link = ?, review = ?, hr_approval_status = ? WHERE id = ?',
-                                        ['Finished', new Date(finishDateRaw), b.loanHistory.return.returnPhoto || '', b.loanHistory.return.linkReview || '', b.loanHistory.return.linkReview || '', 'Draft', log.id]
+                                        ['Finished', finishDate, b.loanHistory.return.returnPhoto || '', b.loanHistory.return.linkReview || '', b.loanHistory.return.linkReview || '', 'Draft', log.id]
                                     );
                                 }
                             }

@@ -595,12 +595,20 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             </p>
                         </div>
                         <div className="hidden lg:block">
-                            <div className="flex -space-x-4">
-                                {[1,2,3,4].map(i => (
-                                    <div key={i} className="w-12 h-12 rounded-full border-4 border-slate-900 bg-slate-800 flex items-center justify-center text-xs font-black text-indigo-400 shadow-xl">
-                                        {i}+
+                            <div className="flex -space-x-3">
+                                {[
+                                    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop",
+                                    "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&h=100&fit=crop",
+                                    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop"
+                                ].map((url, i) => (
+                                    <div key={i} className="w-12 h-12 rounded-full border-4 border-slate-900 overflow-hidden shadow-xl ring-2 ring-indigo-500/10">
+                                        <img src={url} alt="Student" className="w-full h-full object-cover" />
                                     </div>
                                 ))}
+                                <div className="w-12 h-12 rounded-full border-4 border-slate-900 bg-indigo-600 flex flex-col items-center justify-center shadow-xl ring-2 ring-indigo-500/10">
+                                    <span className="text-[10px] font-black text-white leading-none">1k+</span>
+                                    <span className="text-[6px] font-bold text-indigo-200 uppercase tracking-tighter">Students</span>
+                                </div>
                             </div>
                         </div>
                     </div>

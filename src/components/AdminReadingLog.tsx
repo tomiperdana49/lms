@@ -788,7 +788,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                             }`}>
                                                 {log.status === 'Reading' ? 'Reading' : (log.hrApprovalStatus === 'Pending' ? 'Under Review' : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus))}
                                             </span>
-                                            {log.incentiveAmount && (
+                                            {Number(log.incentiveAmount) > 0 && (
                                                 <div className="text-[10px] font-bold text-green-600 mt-1">
                                                     {(() => {
                                                         const seq = getLogSequence(log);
@@ -1306,7 +1306,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                          </div>
                                                     </td>
                                                     <td className="px-3 py-4 text-center">
-                                                        {log.incentiveAmount ? (
+                                                        {Number(log.incentiveAmount) > 0 ? (
                                                             <div className="inline-flex flex-col items-center bg-green-50 px-2 py-1 rounded border border-green-100">
                                                                     {(() => {
                                                                         const seq = getLogSequence(log);
