@@ -14,11 +14,11 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [startDate, setStartDate] = useState(() => {
         const y = new Date().getFullYear();
-        return `${y}-01-01`;
+        return `${y - 1}-12-26`;
     });
     const [endDate, setEndDate] = useState(() => {
         const y = new Date().getFullYear();
-        return `${y}-12-31`;
+        return `${y}-12-25`;
     });
     const [selectedBranch, setSelectedBranch] = useState('All Branches');
     const [branches, setBranches] = useState<string[]>(['All Branches']);
@@ -789,20 +789,24 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                 {log.status === 'Reading' ? 'Reading' : (log.hrApprovalStatus === 'Pending' ? 'Under Review' : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus))}
                                             </span>
                                                     {Number(log.incentiveAmount) > 0 && (
-                                                        <div className="text-[10px] font-bold text-green-600 mt-1">
+                                                        <div className="mt-1">
                                                             {(() => {
                                                                 const seq = getLogSequence(log);
-                                                                if (seq === 5 && (log.incentiveAmount ?? 0) > 500000) {
-                                                                    const base = (log.incentiveAmount ?? 0) - 500000;
+                                                                const amount = Number(log.incentiveAmount) || 0;
+                                                                if (seq === 5) {
+                                                                    const hasBonus = amount > 500000;
+                                                                    const baseAmount = hasBonus ? amount - 500000 : amount;
                                                                     return (
-                                                                        <div className="flex flex-col items-center">
-                                                                            <span className="text-[9px] text-orange-600 font-black tracking-tighter">MILESTONE BONUS!</span>
-                                                                            <span className="text-[11px] font-bold">{formatCurrency(base)} + Rp 500.000</span>
-                                                                            <span className="text-[9px] opacity-60 font-medium">= {formatCurrency(log.incentiveAmount ?? 0)}</span>
+                                                                        <div className="flex flex-col items-center bg-orange-50 p-1 rounded border border-orange-100 shadow-sm animate-pulse">
+                                                                            <span className="text-[9px] text-orange-600 font-black tracking-tighter uppercase">Milestone Bonus!</span>
+                                                                            <div className="flex flex-col items-center">
+                                                                                <span className="text-[11px] font-bold text-green-700">{formatCurrency(baseAmount)} + Rp 500.000</span>
+                                                                                <span className="text-[9px] text-slate-500 font-black">= {formatCurrency(baseAmount + 500000)}</span>
+                                                                            </div>
                                                                         </div>
                                                                     );
                                                                 }
-                                                                return formatCurrency(log.incentiveAmount ?? 0);
+                                                                return <span className="text-[10px] font-bold text-green-600">{formatCurrency(amount)}</span>;
                                                             })()}
                                                         </div>
                                                     )}
@@ -1307,20 +1311,26 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                     </td>
                                                     <td className="px-3 py-4 text-center">
                                                         {Number(log.incentiveAmount) > 0 ? (
-                                                            <div className="inline-flex flex-col items-center bg-green-50 px-2 py-1 rounded border border-green-100">
+                                                            <div className="inline-flex flex-col items-center">
                                                                     {(() => {
                                                                         const seq = getLogSequence(log);
-                                                                        if (seq === 5 && (log.incentiveAmount ?? 0) > 500000) {
-                                                                            const base = (log.incentiveAmount ?? 0) - 500000;
+                                                                        const amount = Number(log.incentiveAmount) || 0;
+                                                                        if (seq === 5) {
+                                                                            const hasBonus = amount > 500000;
+                                                                            const baseAmount = hasBonus ? amount - 500000 : amount;
                                                                             return (
-                                                                                <div className="flex flex-col">
+                                                                                <div className="flex flex-col items-center bg-orange-50 px-2 py-1 rounded border border-orange-100 min-w-[100px]">
                                                                                     <span className="text-[8px] text-orange-600 font-black leading-none mb-1">MILESTONE BONUS!</span>
-                                                                                    <span className="text-[10px] font-bold text-green-700">{formatCurrency(base)} + Rp 500.000</span>
-                                                                                    <span className="text-[9px] opacity-60 font-black">= {formatCurrency(log.incentiveAmount ?? 0)}</span>
+                                                                                    <span className="text-[10px] font-bold text-green-700">{formatCurrency(baseAmount)} + Rp 500.000</span>
+                                                                                    <span className="text-[9px] text-slate-500 font-black">= {formatCurrency(baseAmount + 500000)}</span>
                                                                                 </div>
                                                                             );
                                                                         }
-                                                                        return <span className="text-[11px] font-bold text-green-700">{formatCurrency(log.incentiveAmount ?? 0)}</span>;
+                                                                        return (
+                                                                            <div className="bg-green-50 px-2 py-1 rounded border border-green-100">
+                                                                                <span className="text-[11px] font-bold text-green-700">{formatCurrency(amount)}</span>
+                                                                            </div>
+                                                                        );
                                                                     })()}
                                                             </div>
                                                         ) : (
