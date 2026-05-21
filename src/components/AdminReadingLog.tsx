@@ -484,23 +484,10 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             if (selectedBranch !== 'All Branches' && empBranch !== selectedBranch) return false;
 
             // --- Date Filter ---
-            if (viewMode === 'recap') {
-                // Recap: Gunakan range 26-25 yang dipilih di UI (sudah diproses di getUserStats)
-                // Namun verificationLogs ini juga diproses untuk tabel, jadi kita samakan
-                const dateStr = l.claimedAt || l.approvedAt || l.finishDate || l.date;
-                const d = new Date(dateStr);
-                const [start, end] = getPeriodDates();
-                if (d < start || d > end) return false;
-            } else {
-                // Verification: Tetap ambil periode 1 tahun penuh berdasarkan Claimed Date
-                // Verification: Tetap ambil periode 1 tahun penuh berdasarkan Cutoff Year
-                const d = new Date(l.claimedAt || l.finishDate || l.date);
-                const logCutoffY = getCutoffYear(d);
-                
-                // Jika ingin dinamis mengikuti tahun dari filter:
-                const filterCutoffYear = getCutoffYear(endDate);
-                if (logCutoffY !== filterCutoffYear) return false;
-            }
+            const dateStr = l.claimedAt || l.approvedAt || l.finishDate || l.date;
+            const d = new Date(dateStr);
+            const [start, end] = getPeriodDates();
+            if (d < start || d > end) return false;
 
             // 4. Search Filter
             const s = searchTerm.trim().toLowerCase();
@@ -557,8 +544,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     setViewMode('verification');
                                     // Reset to Full Year for Verification
                                     const y = new Date().getFullYear();
-                                    setStartDate(`${y}-01-01`);
-                                    setEndDate(`${y}-12-31`);
+                                    setStartDate(`${y - 1}-12-26`);
+                                    setEndDate(`${y}-12-25`);
                                 }} 
                                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'verification' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             >
