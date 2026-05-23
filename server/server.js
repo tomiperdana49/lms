@@ -684,6 +684,34 @@ app.post('/api/simas/sync', async (req, res) => {
                                         'UPDATE reading_logs SET status = ?, finish_date = ?, return_evidence_url = ?, link = ?, review = ?, hr_approval_status = ? WHERE id = ?',
                                         ['Finished', finishDate, b.loanHistory.return.returnPhoto || '', b.loanHistory.return.linkReview || '', b.loanHistory.return.linkReview || '', 'Draft', log.id]
                                     );
+                                    // Update local record representation for accurate comparison afterward
+                                    log.status = 'Finished';
+                                    log.return_evidence_url = b.loanHistory.return.returnPhoto || '';
+                                }
+
+                                if (log.status !== 'Cancelled') {
+                                    const simasEvidencePhoto = b.loanHistory.loaning.loanPhoto || '';
+                                    const simasReturnEvidencePhoto = isReturned ? (b.loanHistory.return.returnPhoto || '') : '';
+                                    
+                                    const dbEvidencePhoto = log.evidence_url || '';
+                                    const dbReturnEvidencePhoto = log.return_evidence_url || '';
+                                    
+                                    const updates = {};
+                                    if (dbEvidencePhoto !== simasEvidencePhoto) {
+                                        updates.evidence_url = simasEvidencePhoto;
+                                    }
+                                    if (isReturned && dbReturnEvidencePhoto !== simasReturnEvidencePhoto) {
+                                        updates.return_evidence_url = simasReturnEvidencePhoto;
+                                    }
+                                    
+                                    const updateKeys = Object.keys(updates);
+                                    if (updateKeys.length > 0) {
+                                        console.log(`[SIMAS SYNC] Updating photos for ${targetName} - ${b.name}:`, updates);
+                                        const setClause = updateKeys.map(key => `${key} = ?`).join(', ');
+                                        const params = updateKeys.map(key => updates[key]);
+                                        params.push(log.id);
+                                        await query(`UPDATE reading_logs SET ${setClause} WHERE id = ?`, params);
+                                    }
                                 }
                             }
                         }
