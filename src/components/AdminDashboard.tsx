@@ -198,12 +198,12 @@ const AdminDashboard = ({ user, initialView }: AdminDashboardProps) => {
                                             Add New Staff
                                             <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                                         </button>
-                                        <button
+                                        {/* <button
                                             onClick={() => setCurrentView('training')}
                                             className="w-full text-left p-3 rounded-xl bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors font-medium flex justify-between items-center group">
                                             Review Training Requests
                                             <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                                        </button>
+                                        </button> */}
                                     </div>
                                 </div>
 

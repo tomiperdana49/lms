@@ -4,7 +4,6 @@ import {
     Library,
     BookOpen,
     Users,
-    Globe,
     Calendar,
     Menu,
     X,
@@ -15,7 +14,6 @@ import {
     Shield,
     ChevronDown,
     ChevronUp,
-    FileText,
     TrendingUp,
     GraduationCap
 } from 'lucide-react';
@@ -66,12 +64,12 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { icon: BookOpen, label: 'Online Modules Management', id: 'admin-dashboard', view: 'courses' },
         { header: 'TRAINING' },
         { icon: Users, label: 'Internal', id: 'admin-dashboard', view: 'meetings' },
-        { icon: FileText, label: 'External', id: 'admin-dashboard', view: 'training' },
+        // { icon: FileText, label: 'External', id: 'admin-dashboard', view: 'training' },
         { header: 'REPORT' },
         { icon: Library, label: 'Reading Log', id: 'admin-dashboard', view: 'logs' },
         { icon: Award, label: 'Quiz Report', id: 'admin-dashboard', view: 'quiz-reports' },
         { icon: TrendingUp, label: 'HR Report', id: 'admin-dashboard', view: 'reports' },
-        { icon: Award, label: 'Incentives', id: 'admin-dashboard', view: 'incentives' },
+        // { icon: Award, label: 'Incentives', id: 'admin-dashboard', view: 'incentives' },
     ];
 
     const menuItems = [
@@ -79,13 +77,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { icon: Library, label: 'Reading Log', id: 'reading-log' },
         { icon: BookOpen, label: 'Online Modules', id: 'courses' },
         { icon: Calendar, label: 'Calendar', id: 'calendar' },
-        { icon: Award, label: 'Incentives', id: 'incentives' },
+        // { icon: Award, label: 'Incentives', id: 'incentives' },
     ];
 
     const trainingSubItems = [
         { icon: Users, label: 'Internal', id: 'internal' },
-        { icon: Globe, label: 'External', id: 'external' },
-        ...(userRole === 'SUPERVISOR' ? [{ icon: Shield, label: 'External Approval', id: 'external-approval' }] : []),
+        // { icon: Globe, label: 'External', id: 'external' },
+        // ...(userRole === 'SUPERVISOR' ? [{ icon: Shield, label: 'External Approval', id: 'external-approval' }] : []),
     ];
 
     const getInitials = (name: string) => {
