@@ -483,6 +483,108 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
     res.json({ success: true, fileUrl });
 });
 
+// --- FEEDBACK ROUTES ---
+app.post('/api/feedback', async (req, res) => {
+    try {
+        const { userEmail, userName, url, category, description, imageUrls } = req.body;
+
+        // Auto-create lms_feedbacks table in LMS database if not exists (using lms_feedbacks to avoid conflicts with other apps)
+        await query(`
+            CREATE TABLE IF NOT EXISTS lms_feedbacks (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_email VARCHAR(255) NOT NULL,
+                user_name VARCHAR(255) NOT NULL,
+                url VARCHAR(255) NOT NULL,
+                category VARCHAR(50) NOT NULL,
+                description TEXT NOT NULL,
+                image_urls TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Insert feedback into LMS database
+        const result = await query(
+            'INSERT INTO lms_feedbacks (user_email, user_name, url, category, description, image_urls) VALUES (?, ?, ?, ?, ?, ?)',
+            [userEmail || 'Anonymous', userName || 'Anonymous', url || '', category || 'Issue', description || '', JSON.stringify(imageUrls || [])]
+        );
+
+        // Optional sync to Google Sheets Apps Script Web App
+        const sheetsScriptUrl = process.env.GOOGLE_FEEDBACK_SHEETS_URL;
+        
+        if (sheetsScriptUrl) {
+            try {
+                // Fetch with a short timeout to prevent blocking in case the script is slow
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 6000);
+                const hostUrl = process.env.VITE_API_BASE_URL || `http://localhost:${process.env.PORT || 8036}`;
+                
+                await fetch(sheetsScriptUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        timestamp: new Date().toLocaleString('id-ID'),
+                        userEmail,
+                        userName,
+                        url,
+                        category,
+                        description,
+                        imageUrls: (imageUrls || []).map(url => url.startsWith('http') ? url : `${hostUrl}${url}`).join(', ')
+                    }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                console.log("Successfully synced feedback to Google Sheets!");
+            } catch (sheetErr) {
+                console.error("Google Sheets sync status:", sheetErr.message);
+            }
+        }
+
+        res.json({ success: true, feedbackId: result.insertId });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/feedback/history', async (req, res) => {
+    try {
+        const { email } = req.query;
+        if (!email) return res.status(400).json({ error: 'Email is required' });
+
+        await query(`
+            CREATE TABLE IF NOT EXISTS lms_feedbacks (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_email VARCHAR(255) NOT NULL,
+                user_name VARCHAR(255) NOT NULL,
+                url VARCHAR(255) NOT NULL,
+                category VARCHAR(50) NOT NULL,
+                description TEXT NOT NULL,
+                image_urls TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        const feedbacks = await query(
+            'SELECT * FROM lms_feedbacks WHERE user_email = ? ORDER BY created_at DESC',
+            [email]
+        );
+        res.json(feedbacks.map(f => ({
+            id: f.id,
+            userEmail: f.user_email,
+            userName: f.user_name,
+            url: f.url,
+            category: f.category,
+            description: f.description,
+            imageUrls: JSON.parse(f.image_urls || '[]'),
+            createdAt: f.created_at
+        })));
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 // --- USER ROUTES ---
 app.get('/api/users', async (req, res) => {
     try {
@@ -2139,4 +2241,5 @@ if (fs.existsSync(DIST_DIR)) {
 }
 
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT} with MySQL`));
+// Trigger node watch reload to read new env variables
 

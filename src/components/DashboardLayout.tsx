@@ -15,9 +15,11 @@ import {
     ChevronDown,
     ChevronUp,
     TrendingUp,
-    GraduationCap
+    GraduationCap,
+    MessageSquarePlus
 } from 'lucide-react';
 import type { Page, Role, User } from '../types';
+import FeedbackModal from './FeedbackModal';
 
 interface DashboardLayoutProps {
     children: ReactNode;
@@ -32,6 +34,7 @@ interface DashboardLayoutProps {
 
 const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onLogout, adminView }: DashboardLayoutProps) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
     const [isTrainingOpen, setIsTrainingOpen] = useState(() => {
         return activePage === 'internal' || activePage === 'external' || activePage === 'external-approval';
     });
@@ -243,6 +246,18 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                         )}
                     </nav>
 
+                    {/* Feedback Button */}
+                    <div className="px-4 pt-4 border-t border-slate-800/60">
+                        <button
+                            type="button"
+                            onClick={() => setIsFeedbackOpen(true)}
+                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-emerald-400 hover:bg-slate-800 hover:text-emerald-300 transition-all text-left cursor-pointer"
+                        >
+                            <MessageSquarePlus size={20} />
+                            <span className="font-medium">Feedback</span>
+                        </button>
+                    </div>
+
                     {/* Logout Button (Sidebar Bottom) */}
                     <div className="p-4">
                         <button
@@ -312,6 +327,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     {children}
                 </main>
             </div>
+            
+            {/* Feedback Popup Modal */}
+            <FeedbackModal
+                isOpen={isFeedbackOpen}
+                onClose={() => setIsFeedbackOpen(false)}
+                user={user}
+            />
         </div>
     );
 };
