@@ -33,6 +33,103 @@ const getFullImageUrl = (path: string) => {
     return `${API_BASE_URL}/${cleanPath}`;
 };
 
+const SearchableDropdown = ({
+    value,
+    onChange,
+    options,
+    placeholder
+}: {
+    value: string;
+    onChange: (val: string) => void;
+    options: string[];
+    placeholder: string;
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const [dropdownId] = useState(() => Math.random().toString(36).substring(2, 9));
+
+    const filteredOptions = options.filter(opt =>
+        opt.toLowerCase().includes(search.toLowerCase())
+    );
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (!target.closest(`#dropdown-${dropdownId}`)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [dropdownId]);
+
+    return (
+        <div id={`dropdown-${dropdownId}`} className="relative w-full">
+            <button
+                type="button"
+                onClick={() => {
+                    setIsOpen(!isOpen);
+                    setSearch('');
+                }}
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white flex items-center justify-between font-medium text-slate-700 text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300 transition-all text-left shadow-sm"
+            >
+                <span className={value ? 'text-slate-800 font-semibold' : 'text-slate-400 font-medium'}>
+                    {value || placeholder}
+                </span>
+                <svg className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+
+            {isOpen && (
+                <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] flex flex-col overflow-hidden max-h-60 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="p-2 border-b border-slate-100 bg-slate-50 flex items-center sticky top-0 z-10">
+                        <Search size={14} className="text-slate-400 mr-2 shrink-0 ml-1" />
+                        <input
+                            type="text"
+                            placeholder="Cari kategori..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full bg-transparent border-none text-xs outline-none focus:ring-0 text-slate-700 p-1 font-semibold"
+                            autoFocus
+                        />
+                        {search && (
+                            <button type="button" onClick={() => setSearch('')} className="text-slate-400 hover:text-slate-600 mr-1">
+                                <XCircle size={14} />
+                            </button>
+                        )}
+                    </div>
+                    <div className="overflow-y-auto max-h-48 py-1">
+                        {filteredOptions.length === 0 ? (
+                            <div className="px-4 py-2.5 text-xs text-slate-400 italic text-center">
+                                Tidak ada kategori cocok
+                            </div>
+                        ) : (
+                            filteredOptions.map((opt, idx) => (
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => {
+                                        onChange(opt);
+                                        setIsOpen(false);
+                                    }}
+                                    className={`w-full px-4 py-2 text-left text-xs font-semibold transition-colors hover:bg-blue-50 ${
+                                        value === opt 
+                                            ? 'bg-blue-50/50 text-blue-600 border-l-4 border-blue-500 pl-3' 
+                                            : 'text-slate-700 hover:text-slate-900'
+                                    }`}
+                                >
+                                    {opt}
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
     const [readingLogs, setReadingLogs] = useState<ReadingLogEntry[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -485,7 +582,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
     const handleClaimSubmit = async (e: FormEvent) => {
         e.preventDefault();
 
-        if (!claimFile || !claimForm.startDate || !claimForm.finishDate || !claimForm.link) {
+        if (!claimFile || !claimForm.startDate || !claimForm.finishDate || !claimForm.link || (!selectedLog && !claimForm.category)) {
             setNotification({ show: true, type: 'error', message: 'Please complete all required fields.' });
             return;
         }
@@ -620,10 +717,12 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-1">Category</label>
-                                <select value={privateReportForm.category} onChange={e => setPrivateReportForm({ ...privateReportForm, category: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white" required>
-                                    <option value="">Select Category...</option>
-                                    {categories.map((cat, idx) => <option key={idx} value={cat}>{cat}</option>)}
-                                </select>
+                                <SearchableDropdown
+                                    value={privateReportForm.category}
+                                    onChange={(val) => setPrivateReportForm({ ...privateReportForm, category: val })}
+                                    options={categories}
+                                    placeholder="Select Category..."
+                                />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div><label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Start Date <span className="text-red-500">*</span></label><input type="date" max={today} required value={privateReportForm.startDate} onChange={e => setPrivateReportForm({ ...privateReportForm, startDate: e.target.value })} onClick={(e) => e.currentTarget.showPicker()} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" /></div>
@@ -822,7 +921,15 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                             {!selectedLog && (
                                 <>
                                     <div><label className="block text-sm font-semibold text-slate-700 mb-1">Book Title <span className="text-red-500">*</span></label><input required value={claimForm.title} onChange={e => setClaimForm({ ...claimForm, title: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none" placeholder="Title..." /></div>
-                                    <div><label className="block text-sm font-semibold text-slate-700 mb-1">Category</label><select value={claimForm.category} onChange={e => setClaimForm({ ...claimForm, category: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-white" required><option value="">Select Category...</option>{categories.map((cat, idx) => <option key={idx} value={cat}>{cat}</option>)}</select></div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">Category</label>
+                                        <SearchableDropdown
+                                            value={claimForm.category}
+                                            onChange={(val) => setClaimForm({ ...claimForm, category: val })}
+                                            options={categories}
+                                            placeholder="Select Category..."
+                                        />
+                                    </div>
                                 </>
                             )}
                             <div className="grid grid-cols-2 gap-4">
