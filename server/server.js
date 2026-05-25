@@ -476,6 +476,12 @@ app.post('/api/auth/google', async (req, res) => {
     }
 });
 
+// --- SESSION EPOCH ENDPOINT (Force Logout Mechanism) ---
+app.get('/api/auth/session-epoch', (req, res) => {
+    const currentEpoch = process.env.SESSION_EPOCH || 'v1';
+    res.json({ success: true, epoch: currentEpoch });
+});
+
 // --- UPLOAD ROUTE ---
 app.post('/api/upload', upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });

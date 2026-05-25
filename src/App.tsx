@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from './config';
 import DashboardLayout from './components/DashboardLayout';
 import DashboardHome from './components/DashboardHome';
 import ReadingLogPage from './components/ReadingLogPage';
@@ -49,6 +50,34 @@ function App() {
       localStorage.setItem('lms_admin_view', adminView);
     }
   }, [adminView]);
+
+  // Session Epoch Check (Force logout if version mismatches)
+  useEffect(() => {
+    const checkSessionEpoch = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/session-epoch`);
+        if (res.ok) {
+          const data = await res.json();
+          const serverEpoch = data.epoch;
+          const localEpoch = localStorage.getItem('lms_session_epoch');
+          const hasUser = !!localStorage.getItem('lms_user');
+
+          if (hasUser && localEpoch !== serverEpoch) {
+            console.log(`[AUTH] Session epoch mismatch (local: ${localEpoch}, server: ${serverEpoch}). Forcing logout...`);
+            setUser(null);
+            setActivePage('dashboard');
+            localStorage.removeItem('lms_user');
+            localStorage.removeItem('lms_active_page');
+          }
+          localStorage.setItem('lms_session_epoch', serverEpoch);
+        }
+      } catch (err) {
+        console.error('Failed to check session epoch:', err);
+      }
+    };
+
+    checkSessionEpoch();
+  }, []);
 
   // REPLACE THIS WITH YOUR ACTUAL GOOGLE CLIENT ID
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "735607886412-vgmgsm981577uhg72etjeoh30jjp8trs.apps.googleusercontent.com";
