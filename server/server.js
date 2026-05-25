@@ -303,12 +303,12 @@ app.post('/api/login', async (req, res) => {
                 const avatar = `https://ui-avatars.com/api/?name=${fullName}&background=random`;
 
                 if (!user) {
-                    console.log(`[NUSANET AUTH] Creating new local record for ${loginId}`);
+                    console.log(`[NUSANET AUTH] Creating new local record for ${loginId} with default role STAFF`);
                     const id = Date.now().toString();
                     await query('INSERT INTO users (id, email, password, name, role, avatar, branch, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                        [id, loginId, 'nusanet-oauth-placeholder', fullName, lmsRole, avatar, branchName, employeeId]);
+                        [id, loginId, 'nusanet-oauth-placeholder', fullName, 'STAFF', avatar, branchName, employeeId]);
 
-                    user = { id, email: loginId, name: fullName, role: lmsRole, avatar, branch: branchName, employee_id: employeeId };
+                    user = { id, email: loginId, name: fullName, role: 'STAFF', avatar, branch: branchName, employee_id: employeeId };
                 } else {
                     console.log(`[NUSANET AUTH] Syncing existing user data for ${loginId}`);
                     // Role protection: Only auto-update role if it's an upgrade or the current role is STAFF.
@@ -452,11 +452,11 @@ app.post('/api/auth/google', async (req, res) => {
             const branch = 'Headquarters';
             const employeeId = employeeHelper ? employeeHelper.id_employee : null;
 
-            console.log(`[GOOGLE AUTH] Creating new user ${email} with role ${detectedRole}`);
+            console.log(`[GOOGLE AUTH] Creating new user ${email} with default role STAFF`);
             await query('INSERT INTO users (id, email, password, name, role, avatar, branch, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [id, email, 'google-oauth-placeholder', name, detectedRole, avatar, branch, employeeId]);
+                [id, email, 'google-oauth-placeholder', name, 'STAFF', avatar, branch, employeeId]);
 
-            user = { id, email, name, role: detectedRole, avatar, branch, employee_id: employeeId };
+            user = { id, email, name, role: 'STAFF', avatar, branch, employee_id: employeeId };
         }
 
         res.json({
