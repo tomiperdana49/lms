@@ -32,7 +32,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
 
 
     // Verification Modal State
-    const [verifyModal, setVerifyModal] = useState<{ open: boolean; log: ReadingLogEntry | null; category: 'comic' | 'text'; reward: number }>({
+    const [verifyModal, setVerifyModal] = useState<{ open: boolean; log: ReadingLogEntry | null; category: 'comic' | 'text' | 'none'; reward: number }>({
         open: false,
         log: null,
         category: 'text',
@@ -168,15 +168,30 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         const key = `${log.employee_id || log.userName || 'unknown'}_${y}`;
         const currentSeq = (approvedCounts[key] || 0) + 1;
 
-        let reward = log.category?.toLowerCase().includes('komik') ? 50000 : 100000;
-        if (currentSeq === 5) {
+        const cat = (log.category || '').trim().toLowerCase();
+        let category: 'comic' | 'text' | 'none' = 'text';
+        let baseReward = 100000;
+
+        if (cat === 'buku fiksi/novel' || cat === 'majalah' || cat === 'fiction') {
+            category = 'none';
+            baseReward = 0;
+        } else if (cat === 'komik bisnis/non fiksi' || cat === 'comic/manga' || cat === 'comic' || cat.includes('komik')) {
+            category = 'comic';
+            baseReward = 50000;
+        } else {
+            category = 'text';
+            baseReward = 100000;
+        }
+
+        let reward = baseReward;
+        if (baseReward > 0 && currentSeq === 5) {
             reward += 500000;
         }
 
         setVerifyModal({
             open: true,
             log: log,
-            category: log.category?.toLowerCase().includes('komik') ? 'comic' : 'text',
+            category: category,
             reward: reward
         });
     };
@@ -189,12 +204,18 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         if (!verifyModal.log) return;
         try {
             const now = new Date().toISOString();
+            let managedCategory = 'Non-Fiction Text';
+            if (verifyModal.category === 'comic') {
+                managedCategory = 'Non-Fiction Comic/Manga';
+            } else if (verifyModal.category === 'none') {
+                managedCategory = 'Fiction/Magazine (No Incentive)';
+            }
             const res = await fetch(`${API_BASE_URL}/api/logs/${verifyModal.log.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     hrApprovalStatus: 'Approved',
-                    managedCategory: verifyModal.category === 'comic' ? 'Non-Fiction Comic/Manga' : 'Non-Fiction Text',
+                    managedCategory: managedCategory,
                     incentiveAmount: verifyModal.reward,
                     approvedBy: user.name || 'Admin',
                     approvedAt: now
@@ -421,11 +442,20 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         const totalIncentiveRange = userRangeLogs.reduce((sum, l) => {
             if (l.hrApprovalStatus !== 'Approved') return sum;
 
-            // Forced conversion and robust fallback
-            const dbAmount = Number(l.incentiveAmount);
-            const amount = (!isNaN(dbAmount) && dbAmount > 0)
-                ? dbAmount
-                : (l.category?.toLowerCase() === 'comic' ? 50000 : 100000);
+            const dbAmount = l.incentiveAmount !== null && l.incentiveAmount !== undefined ? Number(l.incentiveAmount) : null;
+            let amount = 0;
+            if (dbAmount !== null && !isNaN(dbAmount)) {
+                amount = dbAmount;
+            } else {
+                const cat = (l.category || '').trim().toLowerCase();
+                if (cat === 'buku fiksi/novel' || cat === 'majalah' || cat === 'fiction') {
+                    amount = 0;
+                } else if (cat === 'komik bisnis/non fiksi' || cat === 'comic/manga' || cat === 'comic' || cat.includes('komik')) {
+                    amount = 50000;
+                } else {
+                    amount = 100000;
+                }
+            }
 
             return sum + amount;
         }, 0);
@@ -1044,15 +1074,32 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                         const y = new Date(verifyModal.log!.finishDate || verifyModal.log!.date).getFullYear();
                                         const key = `${verifyModal.log!.employee_id || verifyModal.log!.userName || 'unknown'}_${y}`;
                                         const isFifth = ((approvedCounts[key] || 0) + 1) === 5;
+                                        
+                                        const selectedCat = e.target.value;
+                                        let baseReward = 100000;
+                                        if (selectedCat === 'none') {
+                                            baseReward = 0;
+                                        } else if (selectedCat === 'comic') {
+                                            baseReward = 50000;
+                                        } else {
+                                            baseReward = 100000;
+                                        }
+
+                                        let finalReward = baseReward;
+                                        if (baseReward > 0 && isFifth) {
+                                            finalReward += 500000;
+                                        }
+
                                         setVerifyModal(prev => ({
                                             ...prev,
-                                            category: e.target.value as any,
-                                            reward: (e.target.value === 'comic' ? 50000 : 100000) + (isFifth ? 500000 : 0)
+                                            category: selectedCat as any,
+                                            reward: finalReward
                                         }));
                                     }}
                                 >
-                                    <option value="text">Non-Fiction Text</option>
-                                    <option value="comic">Non-Fiction Comic/Manga</option>
+                                    <option value="text">Non-Fiction Text (Rp 100.000)</option>
+                                    <option value="comic">Non-Fiction Comic/Manga (Rp 50.000)</option>
+                                    <option value="none">No Incentive (Rp 0 - Fiksi/Novel/Majalah)</option>
                                 </select>
                             </div>
                             <div>

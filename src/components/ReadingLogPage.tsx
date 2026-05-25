@@ -722,8 +722,10 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                             <button onClick={(e) => { e.stopPropagation(); openClaimModal(log); }} className="px-4 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-sm flex-1 sm:flex-none text-center">Finish</button>
                                                         ) : (
                                                             (() => {
+                                                                const cat = (log.category || '').trim().toLowerCase();
+                                                                const isNoIncentive = cat === 'buku fiksi/novel' || cat === 'majalah' || cat === 'fiction';
                                                                 const totalApproved = readingLogs.filter(l => l.hrApprovalStatus === 'Approved' && new Date(l.finishDate || l.date).getFullYear() === filterYear).length;
-                                                                if (totalApproved < 5) {
+                                                                if (!isNoIncentive && totalApproved < 5) {
                                                                     return <button onClick={(e) => { e.stopPropagation(); handleClaimIncentive(log.id); }} className="px-4 py-1.5 text-[11px] font-bold bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all shadow-sm flex-1 sm:flex-none text-center">Claim Incentive</button>;
                                                                 }
                                                                 return null;
