@@ -575,8 +575,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 </div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 items-stretch md:items-center mb-6">
-                <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-center flex-1">
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col lg:flex-row gap-4 items-stretch lg:items-center mb-6">
+                <div className="flex flex-col sm:flex-row lg:flex-nowrap gap-3 items-stretch sm:items-center flex-1">
                     <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)} className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white w-full sm:w-auto min-w-[150px]">
                         {branches.map(b => <option key={b} value={b}>{b}</option>)}
                     </select>
@@ -597,7 +597,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         </select>
                     )}
                 </div>
-                <div className="relative w-full md:w-72">
+                <div className="relative w-full lg:w-72">
                     <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
                     <input type="text" placeholder="Search Name, Title..." className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-600 text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
