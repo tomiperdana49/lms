@@ -998,6 +998,7 @@ app.put('/api/logs/:id', async (req, res) => {
         if (updates.cancelledBy !== undefined) dbUpdates.cancelled_by = updates.cancelledBy;
         if (updates.location !== undefined) dbUpdates.location = updates.location;
         if (updates.source !== undefined) dbUpdates.source = updates.source;
+        if (updates.category !== undefined) dbUpdates.category = updates.category;
 
         // Auto set approved_at if status changes to Approved
         if (updates.hrApprovalStatus === 'Approved') {

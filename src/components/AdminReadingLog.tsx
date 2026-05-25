@@ -8,6 +8,41 @@ interface AdminReadingLogProps {
     user: User;
 }
 
+const categories = [
+    "Buku Fiksi/Novel",
+    "Majalah",
+    "Komik Bisnis/Non Fiksi",
+    "Buku Biografi dan Sejarah",
+    "Buku Bisnis dan Manajemen",
+    "Buku Paling Diminati",
+    "Buku Pengembangan Diri",
+    "Buku Religi dan Hubungan",
+    "Buku Sales dan Marketing",
+    "Buku Teknologi",
+    "Buku Terlaris",
+    "Buku Wajib Baca",
+    "Buku Lainya"
+];
+
+const formatToDatetimeLocal = (dateStr?: string | Date) => {
+    if (!dateStr) return '';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return '';
+        
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const year = d.getFullYear();
+        const month = pad(d.getMonth() + 1);
+        const day = pad(d.getDate());
+        const hours = pad(d.getHours());
+        const minutes = pad(d.getMinutes());
+        
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+    } catch (e) {
+        return '';
+    }
+};
+
 const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
     const [allLogs, setAllLogs] = useState<ReadingLogEntry[]>([]);
     const [users, setUsers] = useState<User[]>([]);
@@ -1187,12 +1222,25 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 <input type="text" className="w-full px-4 py-2 border border-slate-200 rounded-xl" value={editLogModal.formData.title || ''} onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, title: e.target.value } }))} />
                             </div>
                             <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">Category</label>
+                                <select 
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                                    value={editLogModal.formData.category || ''} 
+                                    onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, category: e.target.value } }))}
+                                >
+                                    <option value="" disabled>Select Category...</option>
+                                    {categories.map((cat, idx) => (
+                                        <option key={idx} value={cat}>{cat}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Start Date</label>
-                                <input type="date" className="w-full px-4 py-2 border border-slate-200 rounded-xl" value={editLogModal.formData.startDate?.split('T')[0] || editLogModal.formData.date?.split('T')[0] || ''} onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, startDate: e.target.value } }))} />
+                                <input type="datetime-local" className="w-full px-4 py-2 border border-slate-200 rounded-xl" value={formatToDatetimeLocal(editLogModal.formData.startDate || editLogModal.formData.date)} onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, startDate: e.target.value } }))} />
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Finish Date</label>
-                                <input type="date" className="w-full px-4 py-2 border border-slate-200 rounded-xl" value={editLogModal.formData.finishDate?.split('T')[0] || ''} onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, finishDate: e.target.value } }))} />
+                                <input type="datetime-local" className="w-full px-4 py-2 border border-slate-200 rounded-xl" value={formatToDatetimeLocal(editLogModal.formData.finishDate)} onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, finishDate: e.target.value } }))} />
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Evidence URL / Image</label>
