@@ -43,6 +43,13 @@ const formatToDatetimeLocal = (dateStr?: string | Date) => {
     }
 };
 
+const formatNumberWithDots = (val: number | string) => {
+    if (val === undefined || val === null || val === '') return '';
+    const num = parseInt(String(val).replace(/\D/g, ''), 10);
+    if (isNaN(num)) return '0';
+    return new Intl.NumberFormat('id-ID').format(num);
+};
+
 const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
     const [allLogs, setAllLogs] = useState<ReadingLogEntry[]>([]);
     const [users, setUsers] = useState<User[]>([]);
@@ -1140,10 +1147,14 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Incentive Amount (Rp)</label>
                                 <input
-                                    type="number"
+                                    type="text"
                                     className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-green-700 bg-green-50/30"
-                                    value={verifyModal.reward}
-                                    onChange={(e) => setVerifyModal(prev => ({ ...prev, reward: Number(e.target.value) }))}
+                                    value={formatNumberWithDots(verifyModal.reward)}
+                                    onChange={(e) => {
+                                        const cleanVal = e.target.value.replace(/\D/g, '');
+                                        const numVal = cleanVal ? parseInt(cleanVal, 10) : 0;
+                                        setVerifyModal(prev => ({ ...prev, reward: numVal }));
+                                    }}
                                 />
                             </div>
                         </div>
