@@ -523,22 +523,22 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                     <ArrowLeft size={20} className="mr-2 group-hover:-translate-x-1 transition-transform" /> Back to Dashboard
                 </button>
 
-                <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <h1 className="text-2xl font-bold text-slate-800">Reading Log Management</h1>
                         <p className="text-slate-500">Manage validations and view reading statistics.</p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                         <button
                             onClick={handleSyncSIMAS}
                             disabled={isSyncing}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm border ${isSyncing ? 'bg-slate-50 text-slate-400 border-slate-200' : 'bg-white text-emerald-600 border-emerald-100 hover:bg-emerald-50 hover:border-emerald-200'}`}
+                            className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm border ${isSyncing ? 'bg-slate-50 text-slate-400 border-slate-200' : 'bg-white text-emerald-600 border-emerald-100 hover:bg-emerald-50 hover:border-emerald-200'} w-full sm:w-auto`}
                             title="Fetch latest book loan data from SIMAS for all employees"
                         >
                             <RefreshCw size={18} className={isSyncing ? 'animate-spin' : ''} />
                             {isSyncing ? 'Syncing...' : 'Sync SIMAS Data'}
                         </button>
-                        <div className="bg-slate-100 p-1 rounded-xl flex shadow-inner">
+                        <div className="bg-slate-100 p-1 rounded-xl flex shadow-inner w-full sm:w-auto justify-center">
                             <button 
                                 onClick={() => {
                                     setViewMode('verification');
@@ -547,7 +547,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     setStartDate(`${y - 1}-12-26`);
                                     setEndDate(`${y}-12-25`);
                                 }} 
-                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'verification' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-all text-center ${viewMode === 'verification' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             >
                                 Verification
                             </button>
@@ -566,7 +566,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     setStartDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
                                     setEndDate(`${ed.getFullYear()}-${String(ed.getMonth() + 1).padStart(2, '0')}-${String(ed.getDate()).padStart(2, '0')}`);
                                 }} 
-                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'recap' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-all text-center ${viewMode === 'recap' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             >
                                 Recapitulation
                             </button>
@@ -575,18 +575,18 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 </div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center mb-6">
-                <div className="flex flex-wrap gap-2 items-center">
-                    <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)} className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[150px]">
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 items-stretch md:items-center mb-6">
+                <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-center flex-1">
+                    <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)} className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white w-full sm:w-auto min-w-[150px]">
                         {branches.map(b => <option key={b} value={b}>{b}</option>)}
                     </select>
-                    <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-xl border border-slate-100">
-                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} onClick={(e) => e.currentTarget.showPicker()} className="bg-transparent border-none font-bold text-slate-600 text-xs outline-none focus:ring-0 cursor-pointer" />
+                    <div className="flex items-center justify-between sm:justify-start gap-2 bg-slate-50 px-3 py-2.5 rounded-xl border border-slate-100 w-full sm:w-auto">
+                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} onClick={(e) => e.currentTarget.showPicker()} className="bg-transparent border-none font-bold text-slate-600 text-xs outline-none focus:ring-0 cursor-pointer w-[110px]" />
                         <span className="text-slate-400 font-medium text-xs">to</span>
-                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} onClick={(e) => e.currentTarget.showPicker()} className="bg-transparent border-none font-bold text-slate-600 text-xs outline-none focus:ring-0 cursor-pointer" />
+                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} onClick={(e) => e.currentTarget.showPicker()} className="bg-transparent border-none font-bold text-slate-600 text-xs outline-none focus:ring-0 cursor-pointer w-[110px]" />
                     </div>
                     {viewMode === 'verification' && (
-                        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white w-full sm:w-auto">
                             <option value="all">All Status</option>
                             <option value="Reading">Reading</option>
                             <option value="Read">Read</option>
@@ -597,7 +597,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         </select>
                     )}
                 </div>
-                <div className="relative flex-1 min-w-[200px]">
+                <div className="relative w-full md:w-72">
                     <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
                     <input type="text" placeholder="Search Name, Title..." className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-600 text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>

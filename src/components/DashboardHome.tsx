@@ -75,9 +75,9 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName }: DashboardH
     };
 
     return (
-        <div className="max-w-[1600px] mx-auto pt-6 px-6 h-[calc(100vh-100px)] flex flex-col gap-6">
+        <div className="max-w-[1600px] mx-auto pt-4 md:pt-6 px-4 md:px-6 min-h-screen lg:h-[calc(100vh-100px)] flex flex-col gap-6">
             {/* Header / Hero Section */}
-            <div className="bg-gradient-to-br from-indigo-600 via-blue-600 to-blue-700 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden shrink-0">
+            <div className="bg-gradient-to-br from-indigo-600 via-blue-600 to-blue-700 rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden shrink-0">
                 <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12">
                     <GraduationCap size={200} />
                 </div>
@@ -90,21 +90,21 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName }: DashboardH
                         <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
                             {getGreeting()}, <span className="text-blue-200">{userName || 'User'}</span>!
                         </h1>
-                        <p className="text-blue-100/80 font-medium max-w-md">
+                        <p className="text-blue-100/80 font-medium max-w-md text-sm sm:text-base">
                             Ready to level up your skills today? You have several activities waiting to be completed.
                         </p>
                     </div>
 
                     {/* Quick Stats Bar */}
                     <div className="flex gap-4 w-full md:w-auto">
-                        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/10 flex-1 md:flex-none md:min-w-[140px] group hover:bg-white/15 transition-all text-center">
+                        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-white/10 flex-1 md:flex-none md:min-w-[140px] group hover:bg-white/15 transition-all text-center">
                             <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-70">Learning Pulse</div>
-                            <div className="text-2xl font-black tracking-tighter">Active</div>
+                            <div className="text-xl sm:text-2xl font-black tracking-tighter">Active</div>
                             <div className="text-[9px] font-medium text-blue-200 mt-1">Account Status</div>
                         </div>
-                        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/10 flex-1 md:flex-none md:min-w-[140px] group hover:bg-white/15 transition-all text-center">
+                        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-white/10 flex-1 md:flex-none md:min-w-[140px] group hover:bg-white/15 transition-all text-center">
                             <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-70">Year {new Date().getFullYear()}</div>
-                            <div className="text-2xl font-black tracking-tighter">Premium</div>
+                            <div className="text-xl sm:text-2xl font-black tracking-tighter">Premium</div>
                             <div className="text-[9px] font-medium text-blue-200 mt-1">Membership</div>
                         </div>
                     </div>
@@ -112,7 +112,7 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName }: DashboardH
             </div>
 
             {/* 3-Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 overflow-hidden min-h-0">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 lg:overflow-hidden min-h-0">
 
                 {/* --- Left Column: Compact Calendar (3 cols) --- */}
                 <div className="hidden lg:block lg:col-span-3 h-full overflow-hidden bg-white rounded-3xl border border-slate-100 shadow-sm">

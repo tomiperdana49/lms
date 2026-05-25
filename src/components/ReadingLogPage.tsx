@@ -672,64 +672,67 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 paginatedLogs.map((log) => {
                                     const isMyLog = (!!log.employee_id && !!user.employee_id && log.employee_id === user.employee_id) || (!log.employee_id && log.userName === user.name);
                                     return (
-                                        <div key={log.id} className={`p-4 hover:bg-slate-50 transition-colors flex items-start gap-4 group ${log.status === 'Cancelled' ? 'opacity-60 bg-slate-50/50' : ''}`}>
-                                            <div className={`p-3 rounded-xl ${log.status === 'Finished' ? 'bg-green-50 text-green-600' : log.status === 'Cancelled' ? 'bg-red-50 text-red-400' : 'bg-blue-50 text-blue-600'}`}>
-                                                {log.status === 'Finished' ? <Trophy size={20} /> : log.status === 'Cancelled' ? <XCircle size={20} /> : <Book size={20} />}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <h3 onClick={() => openDetailModal(log)} className="font-semibold text-slate-800 truncate cursor-pointer hover:text-blue-600 transition-colors mb-1">{log.title}</h3>
-                                                <p className="text-sm text-slate-500 truncate">{log.category} • {log.location || 'Medan'}</p>
-                                                <div className="mt-2 p-2 bg-slate-50 rounded-lg border border-slate-100 text-xs">
-                                                    {log.status === 'Finished' ? (
-                                                        <div className="flex flex-col gap-1">
-                                                            <div className="flex items-center gap-2 text-slate-500 font-medium">
-                                                                <span>Start: {new Date(log.startDate || log.date).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                                                                <span>•</span>
-                                                                <span>Finish: {log.finishDate ? new Date(log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</span>
-                                                                {log.startDate && log.finishDate && (
-                                                                    <span className="ml-2 text-[8px] whitespace-nowrap font-black bg-indigo-600 text-white px-1 py-0.5 rounded shadow-sm inline-flex items-center gap-1">
-                                                                        <Clock size={8} />
-                                                                        {(() => {
-                                                                            const s = new Date(log.startDate).getTime();
-                                                                            const e = new Date(log.finishDate).getTime();
-                                                                            const diff = Math.max(0, e - s);
-                                                                            const totalMinutes = Math.floor(diff / (1000 * 60));
-                                                                            const days = Math.floor(totalMinutes / (24 * 60));
-                                                                            const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
-                                                                            const minutes = totalMinutes % 60;
-                                                                            return `${days}D ${hours}H ${minutes}M`;
-                                                                        })()}
-                                                                    </span>
-                                                                )}
+                                    return (
+                                        <div key={log.id} className={`p-4 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row items-stretch sm:items-start gap-4 group ${log.status === 'Cancelled' ? 'opacity-60 bg-slate-50/50' : ''}`}>
+                                            <div className="flex gap-4 items-start flex-1 min-w-0">
+                                                <div className={`p-3 rounded-xl shrink-0 ${log.status === 'Finished' ? 'bg-green-50 text-green-600' : log.status === 'Cancelled' ? 'bg-red-50 text-red-400' : 'bg-blue-50 text-blue-600'}`}>
+                                                    {log.status === 'Finished' ? <Trophy size={20} /> : log.status === 'Cancelled' ? <XCircle size={20} /> : <Book size={20} />}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 onClick={() => openDetailModal(log)} className="font-semibold text-slate-800 truncate cursor-pointer hover:text-blue-600 transition-colors mb-1">{log.title}</h3>
+                                                    <p className="text-sm text-slate-500 truncate">{log.category} • {log.location || 'Medan'}</p>
+                                                    <div className="mt-2 p-2 bg-slate-50 rounded-lg border border-slate-100 text-xs">
+                                                        {log.status === 'Finished' ? (
+                                                            <div className="flex flex-col gap-1">
+                                                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-500 font-medium">
+                                                                    <span>Start: {new Date(log.startDate || log.date).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                                                    <span className="hidden xs:inline">•</span>
+                                                                    <span>Finish: {log.finishDate ? new Date(log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</span>
+                                                                    {log.startDate && log.finishDate && (
+                                                                        <span className="text-[8px] whitespace-nowrap font-black bg-indigo-600 text-white px-1.5 py-0.5 rounded shadow-sm inline-flex items-center gap-1 w-fit mt-0.5">
+                                                                            <Clock size={8} />
+                                                                            {(() => {
+                                                                                const s = new Date(log.startDate).getTime();
+                                                                                const e = new Date(log.finishDate).getTime();
+                                                                                const diff = Math.max(0, e - s);
+                                                                                const totalMinutes = Math.floor(diff / (1000 * 60));
+                                                                                const days = Math.floor(totalMinutes / (24 * 60));
+                                                                                const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+                                                                                const minutes = totalMinutes % 60;
+                                                                                return `${days}D ${hours}H ${minutes}M`;
+                                                                            })()}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className={`mt-1 font-bold uppercase tracking-wider ${log.hrApprovalStatus === 'Approved' ? 'text-blue-600 font-black' : (log.hrApprovalStatus === 'Pending' ? 'text-yellow-600' : 'text-slate-400')}`}>
+                                                                    {log.hrApprovalStatus === 'Approved' ? `Approved ${log.approvedBy ? `by ${log.approvedBy}` : ''}` : (log.hrApprovalStatus === 'Pending' ? 'Under Review' : 'Draft')}
+                                                                </div>
                                                             </div>
-                                                            <div className={`mt-1 font-bold uppercase tracking-wider ${log.hrApprovalStatus === 'Approved' ? 'text-blue-600 font-black' : (log.hrApprovalStatus === 'Pending' ? 'text-yellow-600' : 'text-slate-400')}`}>
-                                                                {log.hrApprovalStatus === 'Approved' ? `Approved ${log.approvedBy ? `by ${log.approvedBy}` : ''}` : (log.hrApprovalStatus === 'Pending' ? 'Under Review' : 'Draft')}
-                                                            </div>
-                                                        </div>
-                                                    ) : log.status === 'Cancelled' ? (
-                                                        <span className="font-bold text-red-500 uppercase">Log Cancelled</span>
-                                                    ) : (
-                                                        <span className="font-bold text-orange-600 uppercase">Reading (Started: {new Date(log.date).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })})</span>
-                                                    )}
+                                                        ) : log.status === 'Cancelled' ? (
+                                                            <span className="font-bold text-red-500 uppercase">Log Cancelled</span>
+                                                        ) : (
+                                                            <span className="font-bold text-orange-600 uppercase">Reading (Started: {new Date(log.date).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })})</span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="flex flex-col items-end gap-2">
+                                            <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 mt-3 sm:mt-0 pt-3 sm:pt-0 border-t border-slate-100 sm:border-t-0">
                                                 {isMyLog && log.hrApprovalStatus === 'Draft' && log.status !== 'Cancelled' && (
-                                                    <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                                                         {log.status === 'Reading' ? (
-                                                            <button onClick={(e) => { e.stopPropagation(); openClaimModal(log); }} className="px-4 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-sm">Finish</button>
+                                                            <button onClick={(e) => { e.stopPropagation(); openClaimModal(log); }} className="px-4 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-sm flex-1 sm:flex-none text-center">Finish</button>
                                                         ) : (
                                                             (() => {
                                                                 const totalApproved = readingLogs.filter(l => l.hrApprovalStatus === 'Approved' && new Date(l.finishDate || l.date).getFullYear() === filterYear).length;
                                                                 if (totalApproved < 5) {
-                                                                    return <button onClick={(e) => { e.stopPropagation(); handleClaimIncentive(log.id); }} className="px-4 py-1.5 text-[11px] font-bold bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all shadow-sm">Claim Incentive</button>;
+                                                                    return <button onClick={(e) => { e.stopPropagation(); handleClaimIncentive(log.id); }} className="px-4 py-1.5 text-[11px] font-bold bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all shadow-sm flex-1 sm:flex-none text-center">Claim Incentive</button>;
                                                                 }
                                                                 return null;
                                                             })()
                                                         )}
                                                         <button 
                                                             onClick={(e) => { e.stopPropagation(); handleDelete(log.id); }} 
-                                                            className="group flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-slate-500 rounded-xl px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm transition-all active:scale-95 text-slate-500 text-[11px] font-bold"
+                                                            className="group flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-slate-500 rounded-xl px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm transition-all active:scale-95 text-slate-500 text-[11px] font-bold flex-1 sm:flex-none"
                                                         >
                                                             <Trash2 size={14} className="text-slate-400 group-hover:text-red-500 transition-colors" />
                                                             Cancel
