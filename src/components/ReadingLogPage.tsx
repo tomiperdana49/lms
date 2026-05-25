@@ -672,7 +672,6 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 paginatedLogs.map((log) => {
                                     const isMyLog = (!!log.employee_id && !!user.employee_id && log.employee_id === user.employee_id) || (!log.employee_id && log.userName === user.name);
                                     return (
-                                    return (
                                         <div key={log.id} className={`p-4 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row items-stretch sm:items-start gap-4 group ${log.status === 'Cancelled' ? 'opacity-60 bg-slate-50/50' : ''}`}>
                                             <div className="flex gap-4 items-start flex-1 min-w-0">
                                                 <div className={`p-3 rounded-xl shrink-0 ${log.status === 'Finished' ? 'bg-green-50 text-green-600' : log.status === 'Cancelled' ? 'bg-red-50 text-red-400' : 'bg-blue-50 text-blue-600'}`}>
