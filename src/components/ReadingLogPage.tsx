@@ -21,15 +21,15 @@ interface ReadingLogPageProps {
 const getFullImageUrl = (path: string) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
-    
+
     let cleanPath = path.startsWith('/') ? path.slice(1) : path;
-    
+
     // If path starts with 'api/' and API_BASE_URL already contains '/api'
     if (cleanPath.startsWith('api/') && API_BASE_URL.toLowerCase().endsWith('/api')) {
         const root = API_BASE_URL.substring(0, API_BASE_URL.length - 4);
         return `${root}/${cleanPath}`;
     }
-    
+
     return `${API_BASE_URL}/${cleanPath}`;
 };
 
@@ -83,12 +83,12 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
     }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
 
     const openConfirm = (
-        title: string, 
-        message: string, 
-        onConfirm: (val?: string) => void = () => { }, 
-        confirmText = 'Yes, Delete', 
-        variant: 'danger' | 'warning' | 'info' | 'success' = 'danger', 
-        cancelText = 'Cancel', 
+        title: string,
+        message: string,
+        onConfirm: (val?: string) => void = () => { },
+        confirmText = 'Yes, Delete',
+        variant: 'danger' | 'warning' | 'info' | 'success' = 'danger',
+        cancelText = 'Cancel',
         hideConfirm = false,
         showInput = false,
         inputPlaceholder = 'Enter note...'
@@ -107,7 +107,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
             // Then fetch all logs from local DB
             const resLogs = await fetch(`${API_BASE_URL}/api/logs`);
-            
+
             let myLogs: ReadingLogEntry[] = [];
 
             if (resLogs && resLogs.ok) {
@@ -138,32 +138,32 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
     const handleDelete = (id: number | string) => {
         setCancelNote('');
         openConfirm(
-            'Cancel Reading Log', 
-            'Are you sure you want to cancel this reading log? Please provide a reason.', 
+            'Cancel Reading Log',
+            'Are you sure you want to cancel this reading log? Please provide a reason.',
             async (reason) => {
                 try {
                     const finalReason = reason || 'Cancelled by user';
-                    const res = await fetch(`${API_BASE_URL}/api/logs/${id}/cancel`, { 
+                    const res = await fetch(`${API_BASE_URL}/api/logs/${id}/cancel`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ reason: finalReason, cancelledBy: user.name })
                     });
                     if (res.ok) {
                         const now = new Date().toISOString();
-                        const updatedLogs = readingLogs.map(l => String(l.id) === String(id) ? { 
-                            ...l, 
-                            status: 'Cancelled', 
-                            hrApprovalStatus: 'Cancelled' as 'Cancelled', 
+                        const updatedLogs = readingLogs.map(l => String(l.id) === String(id) ? {
+                            ...l,
+                            status: 'Cancelled',
+                            hrApprovalStatus: 'Cancelled' as 'Cancelled',
                             rejectionReason: finalReason,
                             cancelledAt: now,
                             cancelledBy: user.name
                         } : l);
                         setReadingLogs(updatedLogs);
                         if (viewLog && String(viewLog.id) === String(id)) {
-                            setViewLog({ 
-                                ...viewLog, 
-                                status: 'Cancelled', 
-                                hrApprovalStatus: 'Cancelled' as 'Cancelled', 
+                            setViewLog({
+                                ...viewLog,
+                                status: 'Cancelled',
+                                hrApprovalStatus: 'Cancelled' as 'Cancelled',
                                 rejectionReason: finalReason,
                                 cancelledAt: now,
                                 cancelledBy: user.name
@@ -178,8 +178,8 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                     console.error("Failed to cancel log", err);
                     setNotification({ show: true, type: 'error', message: "Failed to cancel log." });
                 }
-            }, 
-            'Yes, Cancel', 
+            },
+            'Yes, Cancel',
             'warning',
             'Back',
             false,
@@ -218,7 +218,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
             const previewUrl = URL.createObjectURL(file);
-            
+
             if (target === 'privateReport') {
                 setPrivateFile(file);
                 setPrivatePreview(previewUrl);
@@ -257,8 +257,19 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
     };
 
     const categories = [
-        "Biography", "Business & Economy", "Fiction", "Comic/Manga",
-        "Non-Fiction", "Self Development", "History", "Technology", "Others"
+        "Buku Fiksi/Novel",
+        "Majalah",
+        "Komik Bisnis/Non Fiksi",
+        "Buku Biografi dan Sejarah",
+        "Buku Bisnis dan Manajemen",
+        "Buku Paling Diminati",
+        "Buku Pengembangan Diri",
+        "Buku Religi dan Hubungan",
+        "Buku Sales dan Marketing",
+        "Buku Teknologi",
+        "Buku Terlaris",
+        "Buku Wajib Baca",
+        "Buku Lainya"
     ];
 
     const [filterYear] = useState(new Date().getFullYear());
@@ -324,7 +335,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    title, category, startDate: finalStartDate, 
+                    title, category, startDate: finalStartDate,
                     finishDate: finalFinishDate,
                     link: link, review: '-', evidenceUrl: '', status: 'Finished', hrApprovalStatus: 'Draft',
                     location: 'Personal', source: 'Personal Book', userName: user.name, employee_id: user.employee_id, date: new Date()
@@ -517,15 +528,15 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                 {/* Decorative Elements */}
                 <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
                 <div className="absolute -left-10 -bottom-10 w-60 h-60 bg-blue-400/10 rounded-full blur-3xl"></div>
-                
+
                 {/* Logic for Stats */}
                 {(() => {
                     const approvedLogs = readingLogs.filter(l => l.hrApprovalStatus === 'Approved' && new Date(l.finishDate || l.date).getFullYear() === filterYear);
                     const totalApproved = approvedLogs.length;
                     const totalEarned = approvedLogs.reduce((acc, log) => acc + Number(log.incentiveAmount || 0), 0);
                     const progress = Math.min(100, (totalApproved / 5) * 100);
-                    const totalRead = readingLogs.filter(l => 
-                        new Date(l.finishDate || l.date).getFullYear() === filterYear && 
+                    const totalRead = readingLogs.filter(l =>
+                        new Date(l.finishDate || l.date).getFullYear() === filterYear &&
                         l.status === 'Finished'
                     ).length;
 
@@ -731,8 +742,8 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                                 return null;
                                                             })()
                                                         )}
-                                                        <button 
-                                                            onClick={(e) => { e.stopPropagation(); handleDelete(log.id); }} 
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleDelete(log.id); }}
                                                             className="group flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-slate-500 rounded-xl px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm transition-all active:scale-95 text-slate-500 text-[11px] font-bold flex-1 sm:flex-none"
                                                         >
                                                             <Trash2 size={14} className="text-slate-400 group-hover:text-red-500 transition-colors" />
@@ -751,7 +762,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 })
                             )}
                         </div>
-                        
+
                         {/* Pagination */}
                         {totalPages > 1 && (
                             <div className="p-4 border-t border-slate-50 flex items-center justify-between bg-slate-50/30">
@@ -759,7 +770,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                     Showing <span className="text-slate-800 font-bold">{Math.min(filteredLogs.length, (currentPage - 1) * ITEMS_PER_PAGE + 1)}</span> to <span className="text-slate-800 font-bold">{Math.min(filteredLogs.length, currentPage * ITEMS_PER_PAGE)}</span> of <span className="text-slate-800 font-bold">{filteredLogs.length}</span> logs
                                 </p>
                                 <div className="flex gap-2">
-                                    <button 
+                                    <button
                                         disabled={currentPage === 1}
                                         onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                                         className={`p-2 rounded-lg border transition-all ${currentPage === 1 ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300 active:scale-95'}`}
@@ -785,7 +796,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                             );
                                         })}
                                     </div>
-                                    <button 
+                                    <button
                                         disabled={currentPage === totalPages}
                                         onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                                         className={`p-2 rounded-lg border transition-all ${currentPage === totalPages ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300 active:scale-95'}`}
