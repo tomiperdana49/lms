@@ -408,8 +408,8 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/auth/google', async (req, res) => {
     try {
         const { email } = req.body;
-        if (!email || !email.endsWith('@nusa.net.id')) {
-            return res.status(403).json({ success: false, message: 'Access Restricted: Only @nusa.net.id emails are allowed.' });
+        if (!email || (!email.endsWith('@nusa.net.id') && !email.endsWith('@nusawork.com'))) {
+            return res.status(403).json({ success: false, message: 'Access Restricted: Only @nusa.net.id or @nusawork.com emails are allowed.' });
         }
 
         // 1. Check if user already exists in LMS
