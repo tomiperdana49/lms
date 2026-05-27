@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2, RefreshCw, BookOpen, Trophy, ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2, RefreshCw, BookOpen, Trophy, ArrowUp, ArrowDown, Save } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry, User, Employee } from '../types';
 
@@ -113,6 +113,12 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         direction: 'desc'
     });
 
+    // Sort state for verification logs table (default: old-new / earliest claimed first)
+    const [verificationSort, setVerificationSort] = useState<{ key: 'claimedDate' | 'finishDate', direction: 'asc' | 'desc' }>({
+        key: 'claimedDate',
+        direction: 'asc'
+    });
+
     // Photo Modal State
     const [photoModal, setPhotoModal] = useState<{ open: boolean; log: ReadingLogEntry | null }>({
         open: false,
@@ -124,6 +130,11 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         open: false,
         log: null
     });
+
+    // Inline editing states for approved logs review information
+    const [isEditingReviewInfo, setIsEditingReviewInfo] = useState(false);
+    const [editReviewLink, setEditReviewLink] = useState('');
+    const [editReviewNotes, setEditReviewNotes] = useState('');
 
 
     const fetchBranches = () => {
@@ -340,6 +351,59 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 setEditLogModal({ open: false, log: null, formData: {} });
             }
         } catch (err) { console.error(err); }
+    };
+
+    const handleOpenDetailModal = (log: ReadingLogEntry) => {
+        setDetailModal({ open: true, log });
+        setEditReviewLink(log.link || log.review || '');
+        setEditReviewNotes(log.review && log.review !== '-' ? log.review : '');
+        setIsEditingReviewInfo(false);
+    };
+
+    const handleUpdateReviewInfo = async () => {
+        if (!detailModal.log) return;
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/logs/${detailModal.log.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    link: editReviewLink,
+                    review: editReviewNotes
+                })
+            });
+
+            if (res.ok) {
+                const updated = await res.json();
+                
+                // Update in allLogs
+                setAllLogs(prevLogs => prevLogs.map(l => l.id === updated.id ? updated : l));
+                
+                // Update in recapModal logs if open
+                if (recapModal.open) {
+                    setRecapModal(prev => ({
+                        ...prev,
+                        logs: prev.logs.map(l => l.id === updated.id ? updated : l)
+                    }));
+                }
+                
+                // Update in detailModal
+                setDetailModal(prev => ({
+                    ...prev,
+                    log: updated
+                }));
+                
+                setIsEditingReviewInfo(false);
+            }
+        } catch (err) {
+            console.error('[Update Review Info Failed]', err);
+        }
+    };
+
+    const handleVerificationSortClick = (key: 'claimedDate' | 'finishDate') => {
+        setVerificationSort(prev => ({
+            key,
+            direction: prev.key === key ? (prev.direction === 'asc' ? 'desc' : 'asc') : 'asc'
+        }));
     };
 
     const handleCancelClick = (log: ReadingLogEntry) => {
@@ -590,10 +654,21 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             if (a.hrApprovalStatus === 'Pending' && b.hrApprovalStatus !== 'Pending') return -1;
             if (a.hrApprovalStatus !== 'Pending' && b.hrApprovalStatus === 'Pending') return 1;
             
-            // Within same status, sort by newest first (claimedAt or finishDate)
-            const dateA = new Date(a.claimedAt || a.finishDate || a.date).getTime();
-            const dateB = new Date(b.claimedAt || b.finishDate || b.date).getTime();
-            return dateB - dateA;
+            let dateA = 0;
+            let dateB = 0;
+            if (verificationSort.key === 'claimedDate') {
+                dateA = new Date(a.claimedAt || a.finishDate || a.date).getTime();
+                dateB = new Date(b.claimedAt || b.finishDate || b.date).getTime();
+            } else {
+                dateA = new Date(a.finishDate || a.date).getTime();
+                dateB = new Date(b.finishDate || b.date).getTime();
+            }
+
+            if (verificationSort.direction === 'asc') {
+                return dateA - dateB;
+            } else {
+                return dateB - dateA;
+            }
         });
 
     return (
@@ -820,13 +895,26 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                            <thead className="bg-slate-50 text-slate-500 font-semibold uppercase text-xs">
+                            <thead className="bg-slate-50 text-slate-500 font-semibold uppercase text-xs select-none">
                                 <tr>
                                     <th className="px-6 py-4">Employee</th>
                                     <th className="px-6 py-4">Book Title / Source</th>
-                                    <th className="px-6 py-4">Finish Date</th>
-                                    <th className="px-6 py-4 text-purple-600">Claimed Date</th>
-
+                                    <th className="px-6 py-4 cursor-pointer hover:bg-slate-100/80 transition-colors" onClick={() => handleVerificationSortClick('finishDate')}>
+                                        <div className="flex items-center gap-1">
+                                            <span>Finish Date</span>
+                                            {verificationSort.key === 'finishDate' && (
+                                                verificationSort.direction === 'asc' ? <ArrowUp size={14} className="text-slate-400" /> : <ArrowDown size={14} className="text-slate-400" />
+                                            )}
+                                        </div>
+                                    </th>
+                                    <th className="px-6 py-4 text-purple-600 cursor-pointer hover:bg-slate-100/80 transition-colors" onClick={() => handleVerificationSortClick('claimedDate')}>
+                                        <div className="flex items-center gap-1">
+                                            <span>Claimed Date</span>
+                                            {verificationSort.key === 'claimedDate' && (
+                                                verificationSort.direction === 'asc' ? <ArrowUp size={14} className="text-purple-500 animate-in fade-in zoom-in-75" /> : <ArrowDown size={14} className="text-purple-500 animate-in fade-in zoom-in-75" />
+                                            )}
+                                        </div>
+                                    </th>
                                     <th className="px-6 py-4">Status</th>
                                     <th className="px-6 py-4 text-center">Action</th>
                                 </tr>
@@ -835,7 +923,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 {verificationLogs.map((log) => (
                                     <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-4"><div><p className="font-bold text-slate-700 text-sm">{log.userName || 'Unknown'}</p><p className="text-xs text-slate-400">Staff</p></div></td>
-                                        <td className="px-6 py-4"><div className="flex flex-col gap-1"><span onClick={() => setDetailModal({ open: true, log })} className="font-semibold text-slate-800 text-sm cursor-pointer hover:text-blue-600 transition-colors">{log.title}</span><span className="text-xs text-slate-500">{log.category}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit ${log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>{log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'Personal' : (log.source === 'SIMAS' ? 'SIMAS' : 'Office')}</span></div></td>
+                                        <td className="px-6 py-4"><div className="flex flex-col gap-1"><span onClick={() => handleOpenDetailModal(log)} className="font-semibold text-slate-800 text-sm cursor-pointer hover:text-blue-600 transition-colors">{log.title}</span><span className="text-xs text-slate-500">{log.category}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit ${log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>{log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'Personal' : (log.source === 'SIMAS' ? 'SIMAS' : 'Office')}</span></div></td>
                                         <td className="px-6 py-4 text-sm text-slate-600">
                                             <div className="flex flex-col gap-1">
                                                 <span>{log.finishDate ? new Date(log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}</span>
@@ -932,10 +1020,23 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                             }
                                                         })()
                                                     ) : (
-                                                        /* For Draft or finished logs not yet in Pending mode */
-                                                        <button onClick={() => handleCancelClick(log)} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-red-50 hover:text-red-500 transition-all border border-slate-200 hover:border-red-200" title="Cancel / Delete Report">
-                                                            <Trash2 size={16} />
-                                                        </button>
+                                                         /* For Approved, Rejected, Draft or finished logs not in Pending mode */
+                                                         <div className="flex justify-center gap-1.5">
+                                                             <button 
+                                                                 onClick={() => handleEditLogClick(log)} 
+                                                                 className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-all border border-slate-200 hover:border-blue-200" 
+                                                                 title="Edit Details"
+                                                             >
+                                                                 <Edit size={16} />
+                                                             </button>
+                                                             <button 
+                                                                 onClick={() => handleCancelClick(log)} 
+                                                                 className="p-2 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-all border border-slate-100 hover:border-red-200" 
+                                                                 title="Cancel / Delete Report"
+                                                             >
+                                                                 <Trash2 size={16} />
+                                                             </button>
+                                                         </div>
                                                     )}
                                                 </div>
                                             ) : (
@@ -1288,7 +1389,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             )}
             {/* Detail Modal */}
             {detailModal.open && detailModal.log && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in" onClick={() => setDetailModal({ open: false, log: null })}>
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in" onClick={() => { setDetailModal({ open: false, log: null }); setIsEditingReviewInfo(false); }}>
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
                         <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50">
                             <div className="min-w-0 flex-1">
@@ -1306,7 +1407,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     </span>
                                 </div>
                             </div>
-                            <button onClick={() => setDetailModal({ open: false, log: null })} className="text-slate-400 hover:text-slate-600 bg-white p-1.5 rounded-full shadow-sm hover:shadow transition-all shrink-0">
+                            <button onClick={() => { setDetailModal({ open: false, log: null }); setIsEditingReviewInfo(false); }} className="text-slate-400 hover:text-slate-600 bg-white p-1.5 rounded-full shadow-sm hover:shadow transition-all shrink-0">
                                 <XCircle size={20} />
                             </button>
                         </div>
@@ -1425,19 +1526,86 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                         })()}
                                     </div>
                                 )}
-                                {detailModal.log.link && (
-                                    <div className="pt-2">
-                                        <div className="text-[10px] font-black text-slate-400 uppercase mb-1">Review Link</div>
-                                        <a href={detailModal.log.link} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all flex items-center gap-1 font-bold">
-                                            {detailModal.log.link}
-                                            <ExternalLink size={12} className="inline shrink-0" />
-                                        </a>
+                                
+                                {isEditingReviewInfo ? (
+                                    <div className="space-y-4 pt-3 bg-slate-50 p-4 rounded-xl border border-slate-100 animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <div className="text-[10px] font-black text-blue-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                            <Edit size={12} /> Edit Review Details
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Goodreads / Review Link</label>
+                                            <input 
+                                                type="text" 
+                                                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-semibold text-slate-800"
+                                                placeholder="https://goodreads.com/..."
+                                                value={editReviewLink}
+                                                onChange={e => setEditReviewLink(e.target.value)}
+                                            />
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Review Notes</label>
+                                            <textarea 
+                                                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none min-h-[70px] font-semibold text-slate-700 leading-relaxed"
+                                                placeholder="Write review notes..."
+                                                value={editReviewNotes}
+                                                onChange={e => setEditReviewNotes(e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+                                            <button 
+                                                onClick={() => setIsEditingReviewInfo(false)} 
+                                                className="px-2.5 py-1.5 text-[11px] font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                                            >
+                                                Discard
+                                            </button>
+                                            <button 
+                                                onClick={handleUpdateReviewInfo} 
+                                                className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-sm"
+                                            >
+                                                <Save size={12} /> Save
+                                            </button>
+                                        </div>
                                     </div>
-                                )}
-                                {detailModal.log.review && detailModal.log.review !== '-' && (
-                                    <div className="pt-2">
-                                        <div className="text-[10px] font-black text-slate-400 uppercase mb-1">Review Notes</div>
-                                        <p className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-slate-600 leading-relaxed italic">"{detailModal.log.review}"</p>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-start group/section">
+                                            <div className="flex-1">
+                                                <div className="text-[10px] font-black text-slate-400 uppercase mb-1">Review Link</div>
+                                                {detailModal.log.link ? (
+                                                    <a href={detailModal.log.link} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all flex items-center gap-1 font-bold">
+                                                        {detailModal.log.link}
+                                                        <ExternalLink size={12} className="inline shrink-0 text-blue-500" />
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-slate-400 italic text-[11px]">No review link provided</span>
+                                                )}
+                                            </div>
+                                            {detailModal.log.status !== 'Cancelled' && (
+                                                <button 
+                                                    onClick={() => {
+                                                        setEditReviewLink(detailModal.log?.link || '');
+                                                        setEditReviewNotes(detailModal.log?.review || '');
+                                                        setIsEditingReviewInfo(true);
+                                                    }}
+                                                    className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors ml-2 flex items-center gap-1 font-bold text-[10px]"
+                                                    title="Edit Review Details"
+                                                >
+                                                    <Edit size={12} /> Edit
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <div className="text-[10px] font-black text-slate-400 uppercase mb-1">Review Notes</div>
+                                            {detailModal.log.review && detailModal.log.review !== '-' ? (
+                                                <p className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-slate-600 leading-relaxed italic">"{detailModal.log.review}"</p>
+                                            ) : (
+                                                <span className="text-slate-400 italic text-[11px] block bg-slate-50/50 p-2.5 rounded-xl border border-dashed border-slate-200">No review notes provided</span>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                                 {detailModal.log.evidenceUrl && (
@@ -1554,7 +1722,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                         })()}
                                                     </td>
                                                     <td className="px-3 py-4">
-                                                        <div onClick={() => setDetailModal({ open: true, log })} className="font-bold text-slate-700 text-[12px] whitespace-pre-wrap leading-tight mb-1 cursor-pointer hover:text-blue-600 transition-colors">{log.title}</div>
+                                                        <div onClick={() => handleOpenDetailModal(log)} className="font-bold text-slate-700 text-[12px] whitespace-pre-wrap leading-tight mb-1 cursor-pointer hover:text-blue-600 transition-colors">{log.title}</div>
                                                         <div className="flex flex-col gap-0.5">
                                                             <div className="text-[10px] text-slate-400 font-medium">
                                                                 {log.category}
