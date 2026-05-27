@@ -119,6 +119,12 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         log: null
     });
 
+    // Detail Modal State (Admin view)
+    const [detailModal, setDetailModal] = useState<{ open: boolean; log: ReadingLogEntry | null }>({
+        open: false,
+        log: null
+    });
+
 
     const fetchBranches = () => {
         fetch(`${API_BASE_URL}/api/branches`)
@@ -153,7 +159,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         name: emp.full_name,
                         email: emp.email,
                         branch: emp.branch_name,
-                        role: emp.job_position?.includes('HR') ? 'HR' : (emp.job_position?.includes('Supervisor') ? 'SUPERVISOR' : 'STAFF')
+                        role: (emp.job_position?.includes('HR') && !emp.job_position?.includes('HRIS')) ? 'HR' : (emp.job_position?.includes('Supervisor') ? 'SUPERVISOR' : 'STAFF')
                     }));
                     setUsers(mapped);
                 }
@@ -394,7 +400,9 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
     const areSameUser = (u1: { employee_id?: any, name?: string }, u2: { employee_id?: any, name?: string, userName?: string }) => {
         const id1 = u1.employee_id ? String(u1.employee_id).replace(/^0+/, '') : '';
         const id2 = u2.employee_id ? String(u2.employee_id).replace(/^0+/, '') : '';
-        if (id1 && id2 && id1 === id2) return true;
+        if (id1 && id2) {
+            return id1 === id2;
+        }
 
         const n1 = (u1.name || '').trim().toLowerCase();
         const n2 = (u2.name || u2.userName || '').trim().toLowerCase();
@@ -827,7 +835,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 {verificationLogs.map((log) => (
                                     <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-4"><div><p className="font-bold text-slate-700 text-sm">{log.userName || 'Unknown'}</p><p className="text-xs text-slate-400">Staff</p></div></td>
-                                        <td className="px-6 py-4"><div className="flex flex-col gap-1"><span className="font-semibold text-slate-800 text-sm">{log.title}</span><span className="text-xs text-slate-500">{log.category}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit ${log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>{log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'Personal' : (log.source === 'SIMAS' ? 'SIMAS' : 'Office')}</span></div></td>
+                                        <td className="px-6 py-4"><div className="flex flex-col gap-1"><span onClick={() => setDetailModal({ open: true, log })} className="font-semibold text-slate-800 text-sm cursor-pointer hover:text-blue-600 transition-colors">{log.title}</span><span className="text-xs text-slate-500">{log.category}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit ${log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>{log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'Personal' : (log.source === 'SIMAS' ? 'SIMAS' : 'Office')}</span></div></td>
                                         <td className="px-6 py-4 text-sm text-slate-600">
                                             <div className="flex flex-col gap-1">
                                                 <span>{log.finishDate ? new Date(log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}</span>
@@ -980,8 +988,14 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     <div className="flex items-center gap-2 mt-1">
                                         <span className="text-xs text-slate-500 font-medium">{verifyModal.log.category}</span>
                                         <span className="text-slate-300">•</span>
-                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${verifyModal.log.source === 'Buku Pribadi' ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
-                                            {verifyModal.log.source === 'Buku Pribadi' ? 'Private' : (verifyModal.log.source === 'SIMAS' ? 'SIMAS' : 'Office')}
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                                            verifyModal.log.source === 'Personal Book' || verifyModal.log.source === 'Buku Pribadi'
+                                                ? 'bg-purple-100 text-purple-700 border-purple-200'
+                                                : verifyModal.log.source === 'SIMAS'
+                                                    ? 'bg-blue-100 text-blue-700 border-blue-200'
+                                                    : 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                                            }`}>
+                                            {verifyModal.log.source === 'Personal Book' || verifyModal.log.source === 'Buku Pribadi' ? 'Private' : (verifyModal.log.source === 'SIMAS' ? 'SIMAS' : 'Office')}
                                         </span>
                                         {verifyModal.log.sn && (
                                             <>
@@ -1272,6 +1286,187 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                     </div>
                 </div>
             )}
+            {/* Detail Modal */}
+            {detailModal.open && detailModal.log && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in" onClick={() => setDetailModal({ open: false, log: null })}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50">
+                            <div className="min-w-0 flex-1">
+                                <h3 className="text-base font-bold text-slate-800 pr-4 leading-snug break-words">{detailModal.log.title}</h3>
+                                <div className="text-xs text-slate-500 mt-1.5 font-medium flex flex-wrap items-center gap-1.5">
+                                    <BookOpen size={13} className="text-slate-400 shrink-0" />
+                                    <span className="truncate">{detailModal.log.category}</span>
+                                    <span>•</span>
+                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase shrink-0 ${
+                                        detailModal.log.source === 'Personal Book' || detailModal.log.source === 'Buku Pribadi'
+                                            ? 'bg-purple-50 text-purple-700 border border-purple-100'
+                                            : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                                    }`}>
+                                        {detailModal.log.source === 'Personal Book' || detailModal.log.source === 'Buku Pribadi' ? 'Private' : (detailModal.log.source === 'SIMAS' ? 'SIMAS' : 'Office')}
+                                    </span>
+                                </div>
+                            </div>
+                            <button onClick={() => setDetailModal({ open: false, log: null })} className="text-slate-400 hover:text-slate-600 bg-white p-1.5 rounded-full shadow-sm hover:shadow transition-all shrink-0">
+                                <XCircle size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto space-y-5">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Status</div>
+                                    <div className={`font-black text-xs uppercase ${detailModal.log.status === 'Finished' ? 'text-green-600' : detailModal.log.status === 'Cancelled' ? 'text-red-500' : 'text-blue-600'}`}>{detailModal.log.status === 'Finished' ? 'Read' : detailModal.log.status}</div>
+                                </div>
+                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">HR Approval</div>
+                                    <div className="font-black text-xs uppercase text-indigo-600">{detailModal.log.hrApprovalStatus || 'Draft'}</div>
+                                </div>
+                            </div>
+
+                            {detailModal.log.rejectionReason && (
+                                <div className="bg-red-50 p-3.5 rounded-xl border border-red-100">
+                                    <div className="text-[10px] font-black text-red-600 uppercase mb-1.5 flex justify-between items-center">
+                                        <span>REJECTION/CANCELLATION NOTE</span>
+                                        {detailModal.log.cancelledAt && (
+                                            <span className="text-[9px] opacity-60 normal-case flex items-center gap-1 font-bold">
+                                                <Clock size={10} /> {new Date(detailModal.log.cancelledAt).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-red-800 font-semibold italic">"{detailModal.log.rejectionReason}"</p>
+                                    {detailModal.log.cancelledBy && (
+                                        <div className="mt-2 text-[9px] text-red-600/70 font-black">
+                                            • BY: {detailModal.log.cancelledBy}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="space-y-3 text-xs font-semibold text-slate-700">
+                                <div className="flex justify-between py-1.5 border-b border-slate-50">
+                                    <span className="text-slate-400">Reader Name</span>
+                                    <span className="font-bold text-slate-800">{detailModal.log.userName || 'Unknown'}</span>
+                                </div>
+                                {detailModal.log.employee_id && (
+                                    <div className="flex justify-between py-1.5 border-b border-slate-50">
+                                        <span className="text-slate-400">Employee ID</span>
+                                        <span className="font-mono text-slate-800">{detailModal.log.employee_id}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between py-1.5 border-b border-slate-50">
+                                    <span className="text-slate-400">Start Date</span>
+                                    <span className="font-bold text-slate-800">{new Date(detailModal.log.startDate || detailModal.log.date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                                {detailModal.log.finishDate && (
+                                    <div className="flex justify-between py-1.5 border-b border-slate-50 items-center">
+                                        <span className="text-slate-400">Finish Date</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-slate-800">{new Date(detailModal.log.finishDate).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                            {detailModal.log.startDate && (
+                                                <span className="text-[9px] whitespace-nowrap font-black bg-indigo-600 text-white px-1.5 py-0.5 rounded shadow-sm flex items-center gap-1">
+                                                    <Clock size={10} />
+                                                    {(() => {
+                                                        const s = new Date(detailModal.log.startDate).getTime();
+                                                        const e = new Date(detailModal.log.finishDate).getTime();
+                                                        const diff = Math.max(0, e - s);
+                                                        const totalMinutes = Math.floor(diff / (1000 * 60));
+                                                        const days = Math.floor(totalMinutes / (24 * 60));
+                                                        const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+                                                        const minutes = totalMinutes % 60;
+                                                        return `${days}D ${hours}H ${minutes}M`;
+                                                    })()}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                                {detailModal.log.claimedAt && (
+                                    <div className="flex justify-between py-1.5 border-b border-slate-50 items-center">
+                                        <span className="text-slate-400">Claimed Date</span>
+                                        <span className="font-bold text-purple-600">
+                                            {new Date(detailModal.log.claimedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                    </div>
+                                )}
+                                {detailModal.log.hrApprovalStatus === 'Approved' && (
+                                    <>
+                                        <div className="flex justify-between py-1.5 border-b border-slate-50">
+                                            <span className="text-slate-400">Approved By</span>
+                                            <span className="font-bold text-blue-600">{detailModal.log.approvedBy || 'HR Administrator'}</span>
+                                        </div>
+                                        {detailModal.log.approvedAt && (
+                                            <div className="flex justify-between py-1.5 border-b border-slate-50">
+                                                <span className="text-slate-400">Approved Time</span>
+                                                <span className="font-bold text-slate-800">{new Date(detailModal.log.approvedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                                {Number(detailModal.log.incentiveAmount) > 0 && (
+                                    <div className="flex justify-between py-1.5 border-b border-slate-50 items-center">
+                                        <span className="text-slate-400">Incentive Reward</span>
+                                        {(() => {
+                                            const seq = getLogSequence(detailModal.log);
+                                            const amount = Number(detailModal.log.incentiveAmount) || 0;
+                                            if (seq === 5) {
+                                                const hasBonus = amount > 500000;
+                                                const baseAmount = hasBonus ? amount - 500000 : amount;
+                                                return (
+                                                    <div className="flex flex-col items-end bg-orange-50 px-2.5 py-1 rounded-xl border border-orange-100 shadow-sm">
+                                                        <span className="text-[8px] text-orange-600 font-black tracking-tighter uppercase leading-none mb-0.5">Milestone #5 Bonus!</span>
+                                                        <span className="font-bold text-green-700 text-xs">{formatCurrency(baseAmount)} + Rp 500.000</span>
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <span className="font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-lg border border-green-100 text-xs">
+                                                    {formatCurrency(amount)}
+                                                </span>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
+                                {detailModal.log.link && (
+                                    <div className="pt-2">
+                                        <div className="text-[10px] font-black text-slate-400 uppercase mb-1">Review Link</div>
+                                        <a href={detailModal.log.link} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all flex items-center gap-1 font-bold">
+                                            {detailModal.log.link}
+                                            <ExternalLink size={12} className="inline shrink-0" />
+                                        </a>
+                                    </div>
+                                )}
+                                {detailModal.log.review && detailModal.log.review !== '-' && (
+                                    <div className="pt-2">
+                                        <div className="text-[10px] font-black text-slate-400 uppercase mb-1">Review Notes</div>
+                                        <p className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-slate-600 leading-relaxed italic">"{detailModal.log.review}"</p>
+                                    </div>
+                                )}
+                                {detailModal.log.evidenceUrl && (
+                                    <div className="pt-2">
+                                        <div className="text-[10px] font-black text-slate-400 uppercase mb-2">Evidence Photo</div>
+                                        <img 
+                                            src={detailModal.log.evidenceUrl.startsWith('http') ? detailModal.log.evidenceUrl : `${API_BASE_URL}${detailModal.log.evidenceUrl}`} 
+                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 max-h-[220px] object-cover hover:scale-[1.02] transition-transform duration-300 cursor-zoom-in" 
+                                            alt="Evidence" 
+                                            onClick={() => setPhotoModal({ open: true, log: detailModal.log })}
+                                        />
+                                    </div>
+                                )}
+                                {detailModal.log.returnEvidenceUrl && (
+                                    <div className="pt-2">
+                                        <div className="text-[10px] font-black text-slate-400 uppercase mb-2">Return Evidence Photo</div>
+                                        <img 
+                                            src={detailModal.log.returnEvidenceUrl.startsWith('http') ? detailModal.log.returnEvidenceUrl : `${API_BASE_URL}${detailModal.log.returnEvidenceUrl}`} 
+                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 max-h-[220px] object-cover hover:scale-[1.02] transition-transform duration-300 cursor-zoom-in" 
+                                            alt="Return Evidence" 
+                                            onClick={() => setPhotoModal({ open: true, log: detailModal.log })}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* Photo Modal */}
             {photoModal.open && photoModal.log && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1359,16 +1554,19 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                         })()}
                                                     </td>
                                                     <td className="px-3 py-4">
-                                                        <div className="font-bold text-slate-700 text-[12px] whitespace-pre-wrap leading-tight mb-1">{log.title}</div>
+                                                        <div onClick={() => setDetailModal({ open: true, log })} className="font-bold text-slate-700 text-[12px] whitespace-pre-wrap leading-tight mb-1 cursor-pointer hover:text-blue-600 transition-colors">{log.title}</div>
                                                         <div className="flex flex-col gap-0.5">
                                                             <div className="text-[10px] text-slate-400 font-medium">
                                                                 {log.category}
                                                             </div>
-                                                            <span className={`text-[8px] font-black px-1 py-0.5 rounded w-fit uppercase tracking-wider border ${log.source === 'Buku Pribadi'
+                                                            <span className={`text-[8px] font-black px-1 py-0.5 rounded w-fit uppercase tracking-wider border ${
+                                                                log.source === 'Personal Book' || log.source === 'Buku Pribadi'
                                                                     ? 'bg-purple-100 text-purple-700 border-purple-200'
-                                                                    : 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                                                                    : log.source === 'SIMAS'
+                                                                        ? 'bg-blue-100 text-blue-700 border-blue-200'
+                                                                        : 'bg-indigo-100 text-indigo-700 border-indigo-200'
                                                                 }`}>
-                                                                {log.source === 'Buku Pribadi' ? 'Private' : 'Office'}
+                                                                {log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'Private' : (log.source === 'SIMAS' ? 'SIMAS' : 'Office')}
                                                             </span>
                                                         </div>
                                                     </td>

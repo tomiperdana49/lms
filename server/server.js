@@ -180,6 +180,15 @@ app.post('/api/login', async (req, res) => {
         }
         // --- DEBUG BYPASS end ---
 
+        // Domain restriction check for email logins
+        if (loginId.includes('@')) {
+            const isDemoBypass = loginId.endsWith('@nusa.com');
+            const isCorporate = loginId.endsWith('@nusa.net.id') || loginId.endsWith('@nusawork.com') || loginId.endsWith('@nusa.id');
+            if (!isDemoBypass && !isCorporate) {
+                return res.status(403).json({ success: false, message: 'Access Restricted: Only @nusa.net.id, @nusawork.com, or @nusa.id emails are allowed.' });
+            }
+        }
+
         // 2. First try: Local database check (including legacy users and demo accounts in DB)
         const localUsers = await query(
             'SELECT * FROM users WHERE (email = ? OR employee_id = ?) AND password = ?',
@@ -274,7 +283,7 @@ app.post('/api/login', async (req, res) => {
                 // 1. Check Nusanet Roles
                 if (authData.role && authData.role.role_name) {
                     const roles = Array.isArray(authData.role.role_name) ? authData.role.role_name : [authData.role.role_name];
-                    if (roles.some(r => r.toUpperCase().includes('ADMIN') || r.toUpperCase().includes('HR'))) {
+                    if (roles.some(r => r.toUpperCase().includes('ADMIN') || (r.toUpperCase().includes('HR') && !r.toUpperCase().includes('HRIS')))) {
                         lmsRole = 'HR';
                     } else if (roles.some(r => r.toUpperCase().includes('SPV') || r.toUpperCase().includes('SUPERVISOR'))) {
                         lmsRole = 'SUPERVISOR';
@@ -283,7 +292,7 @@ app.post('/api/login', async (req, res) => {
 
                 // 2. Check Job Position from Profile (More specific for HR Staff)
                 const position = p.job_position || p.job_position_name || p.position_name || '';
-                if (lmsRole === 'STAFF' && position.toUpperCase().includes('HR')) {
+                if (lmsRole === 'STAFF' && position.toUpperCase().includes('HR') && !position.toUpperCase().includes('HRIS')) {
                     console.log(`[NUSANET AUTH] Elevating role to HR based on position: ${position}`);
                     lmsRole = 'HR';
                 }
@@ -422,7 +431,7 @@ app.post('/api/auth/google', async (req, res) => {
 
         // Determine role based on job position
         const jobPos = (employeeHelper && employeeHelper.job_position) ? employeeHelper.job_position.toUpperCase() : '';
-        const detectedRole = jobPos.includes('HR') ? 'HR' : (jobPos.includes('SUPERVISOR') || jobPos.includes('SPV') || jobPos.includes('MANAGER') ? 'SUPERVISOR' : 'STAFF');
+        const detectedRole = (jobPos.includes('HR') && !jobPos.includes('HRIS')) ? 'HR' : (jobPos.includes('SUPERVISOR') || jobPos.includes('SPV') || jobPos.includes('MANAGER') ? 'SUPERVISOR' : 'STAFF');
 
         if (user) {
             // Role protection: Only auto-update role if it's an upgrade or the current role is STAFF.
