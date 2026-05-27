@@ -540,6 +540,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         const userRangeLogs = allLogs.filter(l => {
             if (!areSameUser(user, l)) return false;
             if (l.hrApprovalStatus !== 'Approved') return false; // Hanya hitung yang sudah approved untuk range insentif
+            if (l.status === 'Cancelled') return false; // Filter out Cancelled/Removed logs!
             
             // Gunakan claimedAt untuk filter range recap
             const dateStr = l.claimedAt || l.approvedAt || l.finishDate || l.date;
