@@ -748,7 +748,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                             <option value="Approved">Approved</option>
                             <option value="Under Review">Under Review</option>
                             <option value="Rejected HRD">Rejected HRD</option>
-                            <option value="Cancel">Cancel</option>
+                            <option value="Cancel">Removed</option>
                         </select>
                     )}
                 </div>
@@ -941,7 +941,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                 log.hrApprovalStatus === 'Pending' ? 'bg-orange-100 text-orange-700 border-orange-200' : 
                                                 'bg-slate-100 text-slate-500 border-slate-200'
                                             }`}>
-                                                {log.status === 'Reading' ? 'Reading' : (log.hrApprovalStatus === 'Pending' ? 'Under Review' : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus))}
+                                                {log.status === 'Reading' ? 'Reading' : (log.status === 'Cancelled' || log.hrApprovalStatus === 'Cancelled' ? 'Removed' : (log.hrApprovalStatus === 'Pending' ? 'Under Review' : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus)))}
                                             </span>
                                                     {Number(log.incentiveAmount) > 0 && (
                                                         <div className="mt-1">
@@ -1001,9 +1001,9 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                                         <button 
                                                                             onClick={() => handleCancelClick(log)} 
                                                                             className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-white text-slate-400 rounded-lg hover:bg-slate-50 transition-colors font-bold text-[11px] border border-slate-100" 
-                                                                            title="Cancel Log"
+                                                                            title="Remove Log"
                                                                         >
-                                                                            <Trash2 size={13} /> Cancel
+                                                                            <Trash2 size={13} /> Remove
                                                                         </button>
                                                                     </div>
                                                                 );
@@ -1012,7 +1012,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                                     <div className="flex flex-col items-center">
                                                                         <span className="text-xs text-red-500 font-bold italic">Limit Exceeded ({currentSeq}/5)</span>
                                                                         <div className="flex items-center gap-2 mt-1">
-                                                                            <button onClick={() => handleCancelClick(log)} className="p-1.5 bg-slate-100 text-slate-500 rounded hover:bg-slate-200" title="Cancel Log"><Trash2 size={12} /></button>
+                                                                            <button onClick={() => handleCancelClick(log)} className="p-1.5 bg-slate-100 text-slate-500 rounded hover:bg-slate-200" title="Remove Log"><Trash2 size={12} /></button>
                                                                             <button onClick={() => handleRejectClick(log)} className="text-[10px] text-red-600 hover:underline flex items-center gap-1"><XCircle size={10} /> Reject Over Limit</button>
                                                                         </div>
                                                                     </div>
@@ -1032,7 +1032,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                              <button 
                                                                  onClick={() => handleCancelClick(log)} 
                                                                  className="p-2 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-all border border-slate-100 hover:border-red-200" 
-                                                                 title="Cancel / Delete Report"
+                                                                 title="Remove Report"
                                                              >
                                                                  <Trash2 size={16} />
                                                              </button>
@@ -1040,7 +1040,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                     )}
                                                 </div>
                                             ) : (
-                                                <span className="text-xs text-slate-300 font-bold uppercase tracking-wider italic">Cancelled</span>
+                                                <span className="text-xs text-slate-300 font-bold uppercase tracking-wider italic">Removed</span>
                                             )}
                                         </td>
                                     </tr>
@@ -1286,7 +1286,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-red-600 flex items-center gap-2"><XCircle /> Reject Reading Log</h3>
+                            <h3 className="text-xl font-bold text-red-600 flex items-center gap-2"><XCircle /> Reject Incentive Claim</h3>
                             <button onClick={() => setRejectModal({ open: false, log: null, reason: '' })} className="text-slate-400 hover:text-slate-600"><XCircle /></button>
                         </div>
                         <div>
@@ -1300,7 +1300,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         </div>
                         <div className="mt-6 flex justify-end gap-3">
                             <button onClick={() => setRejectModal({ open: false, log: null, reason: '' })} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Cancel</button>
-                            <button onClick={handleRejectSubmit} className="px-4 py-2 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700">Reject Log</button>
+                            <button onClick={handleRejectSubmit} className="px-4 py-2 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700">Reject Incentive Claim</button>
                         </div>
                     </div>
                 </div>
@@ -1311,24 +1311,24 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-slate-700 flex items-center gap-2"><Trash2 className="text-slate-400" /> Cancel Reading Log</h3>
+                            <h3 className="text-xl font-bold text-slate-700 flex items-center gap-2"><Trash2 className="text-slate-400" /> Remove Reading Log</h3>
                             <button onClick={() => setCancelModal({ open: false, log: null, reason: '' })} className="text-slate-400 hover:text-slate-600"><XCircle /></button>
                         </div>
                         <p className="text-sm text-slate-500 mb-4">
-                            Cancelling this log will remove it from the employee's reading statistics.
+                            Removing this log will remove it from the employee's reading statistics.
                         </p>
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">Cancellation Reason</label>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">Removal Reason</label>
                             <textarea
                                 className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none min-h-[100px]"
-                                placeholder="Enter reason why this report is being cancelled..."
+                                placeholder="Enter reason why this report is being removed..."
                                 value={cancelModal.reason}
                                 onChange={(e) => setCancelModal(prev => ({ ...prev, reason: e.target.value }))}
                             />
                         </div>
                         <div className="mt-6 flex justify-end gap-3">
                             <button onClick={() => setCancelModal({ open: false, log: null, reason: '' })} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Discard</button>
-                            <button onClick={handleCancelSubmit} className="px-4 py-2 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 shadow-lg">Yes, Cancel Report</button>
+                            <button onClick={handleCancelSubmit} className="px-4 py-2 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 shadow-lg">Yes, Remove Report</button>
                         </div>
                     </div>
                 </div>
@@ -1415,18 +1415,18 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                                     <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Status</div>
-                                    <div className={`font-black text-xs uppercase ${detailModal.log.status === 'Finished' ? 'text-green-600' : detailModal.log.status === 'Cancelled' ? 'text-red-500' : 'text-blue-600'}`}>{detailModal.log.status === 'Finished' ? 'Read' : detailModal.log.status}</div>
+                                    <div className={`font-black text-xs uppercase ${detailModal.log.status === 'Finished' ? 'text-green-600' : detailModal.log.status === 'Cancelled' ? 'text-red-500' : 'text-blue-600'}`}>{detailModal.log.status === 'Finished' ? 'Read' : (detailModal.log.status === 'Cancelled' ? 'Removed' : detailModal.log.status)}</div>
                                 </div>
                                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                                     <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">HR Approval</div>
-                                    <div className="font-black text-xs uppercase text-indigo-600">{detailModal.log.hrApprovalStatus || 'Draft'}</div>
+                                    <div className="font-black text-xs uppercase text-indigo-600">{detailModal.log.hrApprovalStatus === 'Cancelled' ? 'Removed' : (detailModal.log.hrApprovalStatus || 'Draft')}</div>
                                 </div>
                             </div>
 
                             {detailModal.log.rejectionReason && (
                                 <div className="bg-red-50 p-3.5 rounded-xl border border-red-100">
                                     <div className="text-[10px] font-black text-red-600 uppercase mb-1.5 flex justify-between items-center">
-                                        <span>REJECTION/CANCELLATION NOTE</span>
+                                        <span>REJECTION/REMOVAL NOTE</span>
                                         {detailModal.log.cancelledAt && (
                                             <span className="text-[9px] opacity-60 normal-case flex items-center gap-1 font-bold">
                                                 <Clock size={10} /> {new Date(detailModal.log.cancelledAt).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
@@ -1805,7 +1805,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                              'bg-slate-100 text-slate-500 border-slate-200'
                                                          }`}>
                                                               <div className="flex flex-col">
-                                                                 <span>{log.status === 'Reading' ? 'Reading' : (log.hrApprovalStatus === 'Pending' ? 'Review' : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus))}</span>
+                                                                 <span>{log.status === 'Reading' ? 'Reading' : (log.status === 'Cancelled' || log.hrApprovalStatus === 'Cancelled' ? 'Removed' : (log.hrApprovalStatus === 'Pending' ? 'Review' : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus)))}</span>
                                                               </div>
                                                          </div>
                                                      </td>
