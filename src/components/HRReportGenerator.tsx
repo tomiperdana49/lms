@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Download, Layers, Eye, XCircle, RefreshCw, Filter, Calendar, Building2, TrendingUp, DollarSign, PieChart } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { TrainingRequest, Meeting, Incentive, ReadingLogEntry } from '../types';
+import * as XLSX from 'xlsx';
 
 const HRReportGenerator = () => {
     // Data State
@@ -278,27 +279,54 @@ const HRReportGenerator = () => {
     };
 
     const handleExport = () => {
-        const headers = ["Month", "Internal Training", "Reading Incentives", "External Training", "Cert. Incentives", "Grand Total"];
-        const rows = monthlyData.map(row => [
-            row.month,
-            row.internalTraining,
-            row.readingIncentive,
-            row.externalTraining,
-            row.certIncentive,
-            row.total
-        ]);
+        try {
+            const totalInternal = monthlyData.reduce((a, b) => a + b.internalTraining, 0);
+            const totalReading = monthlyData.reduce((a, b) => a + b.readingIncentive, 0);
+            const totalExternal = monthlyData.reduce((a, b) => a + b.externalTraining, 0);
+            const totalCert = monthlyData.reduce((a, b) => a + b.certIncentive, 0);
+            const totalGrand = monthlyData.reduce((a, b) => a + b.total, 0);
 
-        const csvContent = "data:text/csv;charset=utf-8,"
-            + headers.join(",") + "\n"
-            + rows.map(r => r.join(",")).join("\n");
+            const dataToExport = [
+                ...monthlyData.map((row, idx) => ({
+                    'No.': idx + 1,
+                    'Month': row.month.toUpperCase(),
+                    'Internal Training': row.internalTraining,
+                    'Reading Incentives': row.readingIncentive,
+                    'External Training': row.externalTraining,
+                    'Cert. Incentives': row.certIncentive,
+                    'Grand Total': row.total
+                })),
+                {
+                    'No.': null as any,
+                    'Month': 'YTD TOTAL',
+                    'Internal Training': totalInternal,
+                    'Reading Incentives': totalReading,
+                    'External Training': totalExternal,
+                    'Cert. Incentives': totalCert,
+                    'Grand Total': totalGrand
+                }
+            ];
 
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `L&D_Report_${year}_${selectedBranch}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+            const ws = XLSX.utils.json_to_sheet(dataToExport);
+            
+            const colsWidths = [
+                { wch: 6 },   // No.
+                { wch: 15 },  // Month
+                { wch: 22 },  // Internal Training
+                { wch: 22 },  // Reading Incentives
+                { wch: 22 },  // External Training
+                { wch: 22 },  // Cert. Incentives
+                { wch: 22 }   // Grand Total
+            ];
+            ws['!cols'] = colsWidths;
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'HR Report');
+            XLSX.writeFile(wb, `L&D_Report_${year}_${selectedBranch.replace(/\s+/g, '_')}.xlsx`);
+        } catch (error) {
+            console.error('Failed to export XLSX', error);
+            alert('Failed to export Excel file. Please try again.');
+        }
     };
 
     const details = detailMonth !== null ? getDetailTransactions(months.indexOf(detailMonth)) : [];
@@ -328,7 +356,7 @@ const HRReportGenerator = () => {
                         onClick={handleExport}
                         className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-2xl font-black text-[10px] tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
                     >
-                        <Download size={14} /> EXPORT CSV
+                        <Download size={14} /> EXPORT XLSX
                     </button>
                 </div>
             </div>

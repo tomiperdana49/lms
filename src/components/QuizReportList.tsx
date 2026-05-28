@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Filter, Download, ChevronLeft, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
 import { API_BASE_URL } from '../config';
+import * as XLSX from 'xlsx';
 
 interface QuizReport {
     id: number;
@@ -204,20 +205,43 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
     };
 
     const handleExport = () => {
-        const csvContent = "data:text/csv;charset=utf-8,"
-            + "Date,Branch,Student,Course,Module,Score,Status\n"
-            + filteredRawReports.map(r => {
+        try {
+            const dataToExport = filteredRawReports.map((r, idx) => {
                 const status = r.score >= 80 ? "PASS" : "FAIL";
                 const modTitle = r.module_id ? r.module_title : "Final Assessment";
-                return `${new Date(r.date).toLocaleDateString()},${r.branch},"${r.student_name}","${r.course_title}","${modTitle}",${r.score},${status}`;
-            }).join("\n");
+                return {
+                    'No.': idx + 1,
+                    'Date': new Date(r.date).toLocaleDateString(),
+                    'Branch': r.branch,
+                    'Student': r.student_name,
+                    'Course': r.course_title,
+                    'Module': modTitle,
+                    'Score': r.score,
+                    'Status': status
+                };
+            });
 
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `quiz_report_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link);
-        link.click();
+            const ws = XLSX.utils.json_to_sheet(dataToExport);
+
+            const colsWidths = [
+                { wch: 6 },   // No.
+                { wch: 15 },  // Date
+                { wch: 25 },  // Branch
+                { wch: 25 },  // Student
+                { wch: 30 },  // Course
+                { wch: 25 },  // Module
+                { wch: 10 },  // Score
+                { wch: 12 }   // Status
+            ];
+            ws['!cols'] = colsWidths;
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Quiz Recap');
+            XLSX.writeFile(wb, `Quiz_Assessment_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+        } catch (error) {
+            console.error('Failed to export XLSX', error);
+            alert('Failed to export Excel file. Please try again.');
+        }
     };
 
     return (
@@ -238,7 +262,7 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
                         onClick={handleExport}
                         className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl hover:bg-green-700 transition"
                     >
-                        <Download size={18} /> Export CSV
+                        <Download size={18} /> Export XLSX
                     </button>
                 </div>
             </div>
