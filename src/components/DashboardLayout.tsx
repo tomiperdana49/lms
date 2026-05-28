@@ -8,7 +8,6 @@ import {
     Menu,
     X,
     Bell,
-    Search,
     LogOut,
     Award,
     Shield,
@@ -16,10 +15,13 @@ import {
     ChevronUp,
     TrendingUp,
     GraduationCap,
-    MessageSquarePlus
+    MessageSquarePlus,
+    CheckCircle,
+    AlertCircle
 } from 'lucide-react';
 import type { Page, Role, User } from '../types';
 import FeedbackModal from './FeedbackModal';
+import { API_BASE_URL } from '../config';
 
 interface DashboardLayoutProps {
     children: ReactNode;
@@ -55,6 +57,150 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
             setIsAdminOpen(true);
         }
     }, [activePage]);
+
+    // --- Header Notifications State & Logic ---
+    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+    const [notifications, setNotifications] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchNotifications = async () => {
+            if (!user?.email || !user?.name) return;
+
+            try {
+                const [meetingsRes, trainingRes, logsRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/api/meetings`),
+                    fetch(`${API_BASE_URL}/api/training`),
+                    fetch(`${API_BASE_URL}/api/logs`)
+                ]);
+
+                if (!meetingsRes.ok || !trainingRes.ok || !logsRes.ok) return;
+
+                const meetings = await meetingsRes.json();
+                const training = await trainingRes.json();
+                const logs = await logsRes.json();
+
+                // Get already read notification IDs from LocalStorage
+                let readIds: number[] = [];
+                try {
+                    const saved = localStorage.getItem(`lms_read_notifs_${user.email}`);
+                    if (saved) readIds = JSON.parse(saved);
+                } catch (e) { console.error(e); }
+
+                // 1. Meetings
+                const meetingNotifs = meetings
+                    .filter((m: any) => m.guests?.emails?.includes(user.email))
+                    .map((m: any) => {
+                        const notifId = m.id;
+                        return {
+                            id: notifId,
+                            title: 'Upcoming Meeting',
+                            message: `${m.title} at ${m.time} (${m.type})`,
+                            time: new Date(m.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                            type: 'INFO',
+                            isRead: readIds.includes(notifId)
+                        };
+                    });
+
+                // 2. Training Requests
+                const trainingNotifs = training
+                    .filter((t: any) => t.userName === user.name || (user.employee_id && t.employee_id === user.employee_id))
+                    .map((t: any) => {
+                        const notifId = t.id + 50000;
+                        return {
+                            id: notifId,
+                            title: `Training: ${t.status?.replace('_', ' ')}`,
+                            message: `Request for "${t.title}" is ${t.status?.toLowerCase().replace('_', ' ')}.`,
+                            time: new Date(t.submittedAt || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                            type: t.status === 'APPROVED' ? 'SUCCESS' : t.status === 'REJECTED' ? 'WARNING' : 'INFO',
+                            isRead: readIds.includes(notifId)
+                        };
+                    });
+
+                // 3. Reading Logs
+                const readingNotifs = logs
+                    .filter((l: any) => {
+                        const isOwnLog = (l.userName && l.userName.trim().toLowerCase() === user.name.trim().toLowerCase()) || 
+                                         (user.employee_id && l.employee_id === user.employee_id);
+                        const hasUpdate = ['Approved', 'Rejected', 'Cancelled'].includes(l.hrApprovalStatus) || l.status === 'Cancelled';
+                        return isOwnLog && hasUpdate;
+                    })
+                    .map((l: any) => {
+                        const notifId = l.id + 100000;
+                        let statusLabel = 'diperbarui';
+                        let type = 'INFO';
+                        
+                        if (l.hrApprovalStatus === 'Approved') {
+                            statusLabel = 'disetujui oleh HRD';
+                            type = 'SUCCESS';
+                        } else if (l.hrApprovalStatus === 'Rejected') {
+                            statusLabel = `ditolak oleh HRD${l.rejectionReason ? ` dengan alasan: "${l.rejectionReason}"` : ''}`;
+                            type = 'WARNING';
+                        } else if (l.hrApprovalStatus === 'Cancelled' || l.status === 'Cancelled') {
+                            statusLabel = `dibatalkan/dihapus${l.rejectionReason ? ` dengan alasan: "${l.rejectionReason}"` : ''}`;
+                            type = 'WARNING';
+                        }
+
+                        return {
+                            id: notifId,
+                            title: `Status Buku: ${l.hrApprovalStatus || l.status}`,
+                            message: `Buku "${l.title}" Anda telah ${statusLabel}.`,
+                            time: new Date(l.approvedAt || l.finishDate || l.date || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                            type,
+                            isRead: readIds.includes(notifId)
+                        };
+                    });
+
+                // Combine and Sort by latest (higher id means more recent)
+                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs].sort((a, b) => b.id - a.id);
+                setNotifications(all);
+            } catch (error) {
+                console.error("Failed to fetch header notifications", error);
+            }
+        };
+
+        fetchNotifications();
+        
+        // Refresh notifications every 60 seconds
+        const interval = setInterval(fetchNotifications, 60000);
+        return () => clearInterval(interval);
+    }, [user, userRole]);
+
+    useEffect(() => {
+        if (!isNotificationsOpen) return;
+        const handleOutsideClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest('.notification-btn-container')) {
+                setIsNotificationsOpen(false);
+            }
+        };
+        document.addEventListener('click', handleOutsideClick);
+        return () => document.removeEventListener('click', handleOutsideClick);
+    }, [isNotificationsOpen]);
+
+    const handleNotificationClick = (id: number) => {
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+        try {
+            const saved = localStorage.getItem(`lms_read_notifs_${user?.email || 'guest'}`);
+            const readList = saved ? JSON.parse(saved) : [];
+            if (!readList.includes(id)) {
+                readList.push(id);
+                localStorage.setItem(`lms_read_notifs_${user?.email || 'guest'}`, JSON.stringify(readList));
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const getNotificationIcon = (type: 'INFO' | 'SUCCESS' | 'WARNING') => {
+        switch (type) {
+            case 'SUCCESS':
+                return <CheckCircle size={14} className="text-emerald-600" />;
+            case 'WARNING':
+                return <AlertCircle size={14} className="text-amber-600" />;
+            default:
+                return <Bell size={14} className="text-blue-600" />;
+        }
+    };
     
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
     
@@ -287,23 +433,76 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                         >
                             <Menu size={24} />
                         </button>
-
-                        {/* Search Bar */}
-                        <div className="hidden md:flex items-center bg-gray-100 rounded-full px-4 py-2 w-64">
-                            <Search size={18} className="text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Search..."
-                                className="bg-transparent border-none focus:outline-none text-sm ml-2 w-full text-slate-700"
-                            />
-                        </div>
                     </div>
 
                     <div className="flex items-center gap-6">
-                        <button className="relative text-slate-500 hover:text-slate-700 transition-colors">
-                            <Bell size={20} />
-                            <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-                        </button>
+                        <div className="relative notification-btn-container">
+                            <button 
+                                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                                className="relative text-slate-500 hover:text-slate-700 transition-colors p-2 hover:bg-gray-100 rounded-full cursor-pointer flex items-center justify-center focus:outline-none"
+                            >
+                                <Bell size={20} />
+                                {notifications.filter(n => !n.isRead).length > 0 && (
+                                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                                )}
+                            </button>
+
+                            {/* Notifications Dropdown */}
+                            {isNotificationsOpen && (
+                                <div className="absolute right-0 mt-2 w-80 md:w-96 bg-white/95 backdrop-blur-md border border-slate-100 shadow-2xl rounded-3xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <div className="p-4 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+                                        <h4 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                                            <Bell size={16} className="text-blue-600" />
+                                            Notifications
+                                        </h4>
+                                        <span className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded-full">
+                                            {notifications.filter(n => !n.isRead).length} New
+                                        </span>
+                                    </div>
+                                    <div className="max-h-[320px] overflow-y-auto divide-y divide-slate-50 p-2 space-y-1">
+                                        {notifications.length === 0 ? (
+                                            <div className="text-center py-8 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                                                No notifications found
+                                            </div>
+                                        ) : (
+                                            notifications.map(notif => (
+                                                <div 
+                                                    key={notif.id} 
+                                                    onClick={() => handleNotificationClick(notif.id)}
+                                                    className={`p-3 rounded-2xl transition-all cursor-pointer flex gap-3 text-left 
+                                                        ${notif.isRead 
+                                                            ? 'bg-transparent opacity-60 hover:opacity-100' 
+                                                            : 'bg-blue-50/50 hover:bg-blue-50 border border-blue-50/50 shadow-sm'
+                                                        }
+                                                    `}
+                                                >
+                                                    <div className={`p-2 h-fit rounded-xl ${notif.isRead ? 'bg-slate-100 text-slate-400' : 'bg-blue-100 text-blue-600'}`}>
+                                                        {getNotificationIcon(notif.type)}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className={`text-xs font-bold ${notif.isRead ? 'text-slate-600' : 'text-slate-800'} truncate`}>{notif.title}</p>
+                                                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug break-words">{notif.message}</p>
+                                                        <p className="text-[9px] text-slate-400 mt-1">{notif.time}</p>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                    <div className="p-3 border-t border-slate-50 text-center bg-slate-50/30">
+                                        <button 
+                                            onClick={() => {
+                                                setNotifications(notifications.map(n => ({ ...n, isRead: true })));
+                                                const readIds = notifications.map(n => n.id);
+                                                localStorage.setItem(`lms_read_notifs_${user?.email || 'guest'}`, JSON.stringify(readIds));
+                                            }}
+                                            className="text-[10px] font-black text-blue-600 hover:text-blue-700 tracking-wider uppercase bg-transparent border-none cursor-pointer outline-none"
+                                        >
+                                            Mark all as read
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
 
                         <div className="flex items-center gap-3 pl-6 border-l border-gray-200">
                             <div className="text-right hidden sm:block">
