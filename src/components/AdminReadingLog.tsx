@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2, RefreshCw, BookOpen, Trophy, ArrowUp, ArrowDown, Save, Download } from 'lucide-react';
+import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2, RefreshCw, BookOpen, Trophy, ArrowUp, ArrowDown, Save, Download, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry, User, Employee } from '../types';
 import * as XLSX from 'xlsx';
@@ -49,6 +49,150 @@ const formatNumberWithDots = (val: number | string) => {
     const num = parseInt(String(val).replace(/\D/g, ''), 10);
     if (isNaN(num)) return '0';
     return new Intl.NumberFormat('id-ID').format(num);
+};
+
+interface ZoomableImageProps {
+    src: string;
+    alt: string;
+}
+
+const ZoomableImage = ({ src, alt }: ZoomableImageProps) => {
+    const [scale, setScale] = useState(1);
+    const [position, setPosition] = useState({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+    const handleZoomIn = () => {
+        setScale(prev => Math.min(prev + 0.5, 4));
+    };
+
+    const handleZoomOut = () => {
+        setScale(prev => {
+            const next = Math.max(prev - 0.5, 1);
+            if (next === 1) {
+                setPosition({ x: 0, y: 0 });
+            }
+            return next;
+        });
+    };
+
+    const handleReset = () => {
+        setScale(1);
+        setPosition({ x: 0, y: 0 });
+    };
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        if (scale <= 1) return;
+        e.preventDefault();
+        setIsDragging(true);
+        setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+    };
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (!isDragging || scale <= 1) return;
+        e.preventDefault();
+        setPosition({
+            x: e.clientX - dragStart.x,
+            y: e.clientY - dragStart.y
+        });
+    };
+
+    const handleMouseUpOrLeave = () => {
+        setIsDragging(false);
+    };
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (scale <= 1 || e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        setIsDragging(true);
+        setDragStart({ x: touch.clientX - position.x, y: touch.clientY - position.y });
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!isDragging || scale <= 1 || e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        setPosition({
+            x: touch.clientX - dragStart.x,
+            y: touch.clientY - dragStart.y
+        });
+    };
+
+    const handleDoubleClick = () => {
+        if (scale > 1) {
+            handleReset();
+        } else {
+            setScale(2.5);
+        }
+    };
+
+    return (
+        <div className="relative w-full h-[500px] overflow-hidden rounded-lg border border-slate-200 shadow-sm bg-slate-900 flex items-center justify-center group select-none">
+            {/* Image Canvas */}
+            <div 
+                className={`w-full h-full flex items-center justify-center transition-transform ${isDragging ? 'duration-0' : 'duration-200 ease-out'}`}
+                style={{
+                    transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                    cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in'
+                }}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUpOrLeave}
+                onMouseLeave={handleMouseUpOrLeave}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleMouseUpOrLeave}
+                onDoubleClick={handleDoubleClick}
+            >
+                <img 
+                    src={src} 
+                    alt={alt} 
+                    className="max-w-full max-h-full object-contain pointer-events-none"
+                />
+            </div>
+
+            {/* Control Bar Overlay */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-slate-950/80 backdrop-blur-md px-3.5 py-2 rounded-full shadow-xl border border-white/10 text-white z-10 transition-all opacity-90 group-hover:opacity-100">
+                <button 
+                    type="button"
+                    onClick={handleZoomOut}
+                    disabled={scale <= 1}
+                    className="p-1.5 rounded-full hover:bg-white/10 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
+                    title="Zoom Out"
+                >
+                    <ZoomOut size={16} />
+                </button>
+                <span className="text-xs font-mono font-bold w-12 text-center text-slate-300">
+                    {Math.round(scale * 100)}%
+                </span>
+                <button 
+                    type="button"
+                    onClick={handleZoomIn}
+                    disabled={scale >= 4}
+                    className="p-1.5 rounded-full hover:bg-white/10 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
+                    title="Zoom In"
+                >
+                    <ZoomIn size={16} />
+                </button>
+                <div className="w-[1px] h-4 bg-white/20 mx-1"></div>
+                <button 
+                    type="button"
+                    onClick={handleReset}
+                    disabled={scale === 1 && position.x === 0 && position.y === 0}
+                    className="p-1.5 rounded-full hover:bg-white/10 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
+                    title="Reset Zoom"
+                >
+                    <RotateCcw size={15} />
+                </button>
+            </div>
+            
+            {/* Zoom Help Prompt (only visible when not zoomed) */}
+            {scale === 1 && (
+                <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-sm px-2.5 py-1 rounded-md text-[10px] font-medium text-slate-300 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+                    Double-click or drag to pan
+                </div>
+            )}
+        </div>
+    );
 };
 
 const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
@@ -1721,7 +1865,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             )}
             {/* Photo Modal */}
             {photoModal.open && photoModal.log && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
                         <button onClick={() => setPhotoModal({ open: false, log: null })} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-white rounded-full p-1 shadow-sm">
                             <XCircle size={24} />
@@ -1729,13 +1873,13 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         <h3 className="text-xl font-bold text-slate-800 mb-6 pr-8">Evidence Photos for {photoModal.log.title}</h3>
 
                         <div className="flex flex-col gap-6">
-                            {photoModal.log.evidenceUrl && (
+                             {photoModal.log.evidenceUrl && (
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                                     <p className="font-bold text-slate-700 mb-3 flex items-center gap-2">
                                         <ImageIcon className="text-blue-500" size={18} />
                                         {photoModal.log.source === 'SIMAS' ? 'Borrowing Evidence Photo' : 'Evidence Photo'}
                                     </p>
-                                    <img src={photoModal.log.evidenceUrl.startsWith('http') ? photoModal.log.evidenceUrl : `${API_BASE_URL}${photoModal.log.evidenceUrl}`} alt="Borrowing" className="w-full h-auto max-h-[500px] object-contain rounded-lg border border-slate-200 shadow-sm bg-white" />
+                                    <ZoomableImage src={photoModal.log.evidenceUrl.startsWith('http') ? photoModal.log.evidenceUrl : `${API_BASE_URL}${photoModal.log.evidenceUrl}`} alt="Borrowing" />
                                 </div>
                             )}
 
@@ -1745,7 +1889,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                         <ImageIcon className="text-green-500" size={18} />
                                         Return Evidence Photo
                                     </p>
-                                    <img src={photoModal.log.returnEvidenceUrl.startsWith('http') ? photoModal.log.returnEvidenceUrl : `${API_BASE_URL}${photoModal.log.returnEvidenceUrl}`} alt="Return" className="w-full h-auto max-h-[500px] object-contain rounded-lg border border-slate-200 shadow-sm bg-white" />
+                                    <ZoomableImage src={photoModal.log.returnEvidenceUrl.startsWith('http') ? photoModal.log.returnEvidenceUrl : `${API_BASE_URL}${photoModal.log.returnEvidenceUrl}`} alt="Return" />
                                 </div>
                             )}
                         </div>
