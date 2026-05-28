@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2, RefreshCw, BookOpen, Trophy, ArrowUp, ArrowDown, Save } from 'lucide-react';
+import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2, RefreshCw, BookOpen, Trophy, ArrowUp, ArrowDown, Save, Download } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry, User, Employee } from '../types';
+import * as XLSX from 'xlsx';
 
 interface AdminReadingLogProps {
     onBack: () => void;
@@ -198,6 +199,78 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         };
         silentSync();
     }, []);
+
+    const handleExportXLSX = () => {
+        try {
+            // Process users using exact same filters and logic as table
+            const processed = filteredUsers.map(user => ({
+                user,
+                stats: getUserStats(user)
+            })).filter(item => item.stats.totalIncentiveRange > 0);
+
+            // Sort using exact same sort settings as table
+            processed.sort((a, b) => {
+                let valA: any, valB: any;
+                if (recapSort.key === 'name') {
+                    valA = a.user.name.toLowerCase();
+                    valB = b.user.name.toLowerCase();
+                } else if (recapSort.key === 'totalBooks') {
+                    valA = a.stats.totalBooksYear;
+                    valB = b.stats.totalBooksYear;
+                } else if (recapSort.key === 'verifiedCount') {
+                    valA = a.stats.verifiedCountRange;
+                    valB = b.stats.verifiedCountRange;
+                } else if (recapSort.key === 'milestone') {
+                    valA = a.stats.verifiedCountYear;
+                    valB = b.stats.verifiedCountYear;
+                } else if (recapSort.key === 'incentive') {
+                    valA = a.stats.totalIncentiveRange;
+                    valB = b.stats.totalIncentiveRange;
+                }
+
+                if (valA < valB) return recapSort.direction === 'asc' ? -1 : 1;
+                if (valA > valB) return recapSort.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            // Map to flat rows for Excel sheet
+            const dataToExport = processed.map((item, idx) => {
+                return {
+                    'No.': idx + 1,
+                    'Employee Name': item.user.name,
+                    'Email': item.user.email,
+                    'Branch': item.user.branch || 'Others',
+                    'Role': item.user.role?.replace('_', ' ') || 'STAFF',
+                    'Total Incentive (Period)': item.stats.totalIncentiveRange
+                };
+            });
+
+            // Create XLSX worksheet
+            const ws = XLSX.utils.json_to_sheet(dataToExport);
+            
+            // Format column widths beautifully
+            const colsWidths = [
+                { wch: 6 },   // No.
+                { wch: 30 },  // Employee Name
+                { wch: 30 },  // Email
+                { wch: 20 },  // Branch
+                { wch: 15 },  // Role
+                { wch: 25 }   // Total Incentive (Period)
+            ];
+            ws['!cols'] = colsWidths;
+
+            // Create workbook and write
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Recapitulation');
+
+            // Save workbook
+            const periodStr = `${startDate}_to_${endDate}`;
+            XLSX.writeFile(wb, `L&D_Reading_Recap_${selectedBranch.replace(/\s+/g, '_')}_${periodStr}.xlsx`);
+        } catch (error) {
+            console.error('Failed to export XLSX', error);
+            alert('Failed to export Excel file. Please try again.');
+        }
+    };
 
     const handleSyncSIMAS = async () => {
         if (isSyncing) return;
@@ -685,6 +758,16 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         <p className="text-slate-500">Manage validations and view reading statistics.</p>
                     </div>
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                        {viewMode === 'recap' && (
+                            <button
+                                onClick={handleExportXLSX}
+                                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-md w-full sm:w-auto cursor-pointer"
+                                title="Export recapitulation table to Excel (XLSX) matching active filters and sorting"
+                            >
+                                <Download size={18} />
+                                Export XLSX
+                            </button>
+                        )}
                         <button
                             onClick={handleSyncSIMAS}
                             disabled={isSyncing}
