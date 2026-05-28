@@ -117,7 +117,7 @@ const HRReportGenerator = () => {
 
         logs.filter(l => l.hrApprovalStatus === 'Approved' && l.incentiveAmount).forEach(l => {
             if (selectedBranch !== 'All' && l.location !== selectedBranch) return;
-            const dateToCheck = l.finishDate || l.date;
+            const dateToCheck = l.claimedAt || l.approvedAt || l.finishDate || l.date;
             if (isInPeriod(dateToCheck, range)) {
                 readingIncentive += safeNum(l.incentiveAmount);
             }
@@ -215,10 +215,10 @@ const HRReportGenerator = () => {
 
         logs.filter(l => l.hrApprovalStatus === 'Approved' && l.incentiveAmount).forEach(l => {
             if (selectedBranch !== 'All' && l.location !== selectedBranch) return;
-            const dateToCheck = l.finishDate || l.date;
+            const dateToCheck = l.claimedAt || l.approvedAt || l.finishDate || l.date;
             if (isInPeriod(dateToCheck, range)) {
                 txs.push({
-                    date: l.date,
+                    date: dateToCheck,
                     category: 'Reading Incentive',
                     item: l.title,
                     pic: l.userName || 'Unknown',
