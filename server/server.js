@@ -261,6 +261,16 @@ app.post('/api/login', async (req, res) => {
                         p = profileData.data || profileData;
                         console.log(`[NUSANET PROFILE] Full Data:`, JSON.stringify(p, null, 2)); // Debug log for structure
 
+                        // Check active status - only 'active' status is allowed to log in
+                        const activeStatus = p.active_status || (p.user && typeof p.user === 'object' ? p.user.active_status : null);
+                        if (activeStatus && activeStatus.toLowerCase() !== 'active') {
+                            console.log(`[NUSANET PROFILE] Access denied for ${loginId} - active_status: ${activeStatus}`);
+                            return res.status(403).json({
+                                success: false,
+                                message: `Access Restricted: Status akun Anda adalah '${activeStatus}'. Hanya status 'active' yang diizinkan untuk login.`
+                            });
+                        }
+
                         // Extract name from 'user' object or top level
                         if (p.user && typeof p.user === 'object') {
                             fullName = p.user.name || p.user.full_name || fullName;
