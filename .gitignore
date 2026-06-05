@@ -27,3 +27,4 @@ dist-ssr
 .env
 .opencode
 uploads/
+scratch/
