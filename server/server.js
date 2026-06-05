@@ -338,6 +338,27 @@ const ensureEmployeeColumnsExist = async (employeeData) => {
     }
 };
 
+const determineInitialRole = (employee) => {
+    if (!employee) return 'STAFF';
+    
+    const level = (employee.job_level || '').toLowerCase();
+    const position = (employee.job_position || '').toUpperCase();
+    
+    if (level === 'staff') {
+        return 'STAFF';
+    }
+    
+    if (position.includes('HR') && !position.includes('HRIS')) {
+        return 'HR';
+    }
+    
+    if (position.includes('SUPERVISOR') || position.includes('SPV') || position.includes('MANAGER')) {
+        return 'SUPERVISOR';
+    }
+    
+    return 'STAFF';
+};
+
 const syncEmployeeFromNusawork = async (email, token) => {
     if (!token) {
         console.warn(`[NUSANET SYNC] Cannot sync ${email}: No access token available.`);
@@ -466,21 +487,12 @@ const syncEmployeeFromNusawork = async (email, token) => {
         const existingUsers = await query('SELECT * FROM users WHERE email = ?', [email]);
         if (existingUsers.length > 0) {
             const localUser = existingUsers[0];
-            let finalRole = localUser.role;
-            const position = (dbFields.job_position || '').toUpperCase();
-
-            // Elevate role if it's STAFF but they are HR or supervisor/manager
-            if (position.includes('HR') && !position.includes('HRIS')) {
-                finalRole = 'HR';
-            } else if ((position.includes('SUPERVISOR') || position.includes('SPV') || position.includes('MANAGER')) && localUser.role === 'STAFF') {
-                finalRole = 'SUPERVISOR';
-            }
-
+            // Access/Role is preserved and NOT updated during sync/login to prevent overriding manual settings
             await query(
-                'UPDATE users SET name = ?, branch = ?, employee_id = ?, avatar = ?, role = ? WHERE email = ?',
-                [fullName, branchName, employeeId, photoProfile, finalRole, email]
+                'UPDATE users SET name = ?, branch = ?, employee_id = ?, avatar = ? WHERE email = ?',
+                [fullName, branchName, employeeId, photoProfile, email]
             );
-            console.log(`[NUSANET SYNC] Local users table updated for ${email}. Role: ${finalRole}`);
+            console.log(`[NUSANET SYNC] Local users table updated for ${email}. Role/Access preserved as ${localUser.role}.`);
         }
 
         return dbFields;
@@ -596,9 +608,20 @@ app.post('/api/login', async (req, res) => {
                     const id = Date.now().toString();
                     const fullName = loginId.split('@')[0].replace('.', ' ');
                     const avatar = `https://ui-avatars.com/api/?name=${fullName}&background=random`;
+
+                    let initialRole = 'STAFF';
+                    try {
+                        const employees = await querySimAsset('SELECT * FROM employees WHERE email = ?', [loginId]);
+                        if (employees.length > 0) {
+                            initialRole = determineInitialRole(employees[0]);
+                        }
+                    } catch (e) {
+                        console.error('[NUSANET AUTH] Failed to query employee for role:', e.message);
+                    }
+
                     await query('INSERT INTO users (id, email, password, name, role, avatar, branch) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                        [id, loginId, 'nusanet-oauth-placeholder', fullName, 'STAFF', avatar, 'Headquarters']);
-                    user = { id, email: loginId, name: fullName, role: 'STAFF', avatar, branch: 'Headquarters' };
+                        [id, loginId, 'nusanet-oauth-placeholder', fullName, initialRole, avatar, 'Headquarters']);
+                    user = { id, email: loginId, name: fullName, role: initialRole, avatar, branch: 'Headquarters' };
                 }
 
                 return res.json({
@@ -660,11 +683,13 @@ app.post('/api/auth/google', async (req, res) => {
             const branch = employeeHelper?.organization_name || 'Headquarters';
             const employeeId = employeeHelper ? employeeHelper.id_employee : null;
 
-            console.log(`[GOOGLE AUTH] Creating new user ${email} with default role STAFF`);
-            await query('INSERT INTO users (id, email, password, name, role, avatar, branch, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [id, email, 'google-oauth-placeholder', name, 'STAFF', avatar, branch, employeeId]);
+            const initialRole = determineInitialRole(employeeHelper);
 
-            user = { id, email, name, role: 'STAFF', avatar, branch, employee_id: employeeId };
+            console.log(`[GOOGLE AUTH] Creating new user ${email} with default role ${initialRole}`);
+            await query('INSERT INTO users (id, email, password, name, role, avatar, branch, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [id, email, 'google-oauth-placeholder', name, initialRole, avatar, branch, employeeId]);
+
+            user = { id, email, name, role: initialRole, avatar, branch, employee_id: employeeId };
         } else {
             // Ensure employee link is set if found
             if (!user.employee_id && employeeHelper) {
