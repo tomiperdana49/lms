@@ -388,6 +388,58 @@ const checkIsSupervisor = async (user) => {
     return false;
 };
 
+const findLocalUserByEmailOrId = async (email, employeeId) => {
+    let users = [];
+    if (employeeId) {
+        users = await query('SELECT * FROM users WHERE employee_id = ?', [employeeId]);
+        if (users.length > 0) return users[0];
+    }
+    if (email) {
+        users = await query('SELECT * FROM users WHERE email = ?', [email]);
+        if (users.length > 0) return users[0];
+    }
+    if (email && email.includes('@')) {
+        const [username, domain] = email.toLowerCase().split('@');
+        const allowedDomains = ['nusa.net.id', 'nusa.id', 'nusawork.com'];
+        if (allowedDomains.includes(domain)) {
+            const potentialUsers = await query('SELECT * FROM users WHERE email LIKE ?', [`${username}@%`]);
+            for (const u of potentialUsers) {
+                const uDomain = u.email.split('@')[1];
+                if (uDomain && allowedDomains.includes(uDomain.toLowerCase())) {
+                    return u;
+                }
+            }
+        }
+    }
+    return null;
+};
+
+const findLocalEmployeeByEmailOrId = async (email, employeeId) => {
+    let employees = [];
+    if (employeeId) {
+        employees = await querySimAsset('SELECT * FROM employees WHERE id_employee = ?', [employeeId]);
+        if (employees.length > 0) return employees[0];
+    }
+    if (email) {
+        employees = await querySimAsset('SELECT * FROM employees WHERE email = ?', [email]);
+        if (employees.length > 0) return employees[0];
+    }
+    if (email && email.includes('@')) {
+        const [username, domain] = email.toLowerCase().split('@');
+        const allowedDomains = ['nusa.net.id', 'nusa.id', 'nusawork.com'];
+        if (allowedDomains.includes(domain)) {
+            const potentialEmps = await querySimAsset('SELECT * FROM employees WHERE email LIKE ?', [`${username}@%`]);
+            for (const e of potentialEmps) {
+                const eDomain = e.email.split('@')[1];
+                if (eDomain && allowedDomains.includes(eDomain.toLowerCase())) {
+                    return e;
+                }
+            }
+        }
+    }
+    return null;
+};
+
 const syncEmployeeFromNusawork = async (identifier, token) => {
     if (!token) {
         console.warn(`[NUSANET SYNC] Cannot sync ${identifier}: No access token available.`);
@@ -422,28 +474,87 @@ const syncEmployeeFromNusawork = async (identifier, token) => {
         }
 
         const result = await response.json();
-        console.log(`[NUSANET SYNC] API Result:`, JSON.stringify(result, null, 2));
         
-        let empList = [];
-        if (result.data) {
-            if (Array.isArray(result.data.list)) {
-                empList = result.data.list;
-            } else if (Array.isArray(result.data)) {
-                empList = result.data;
-            } else if (result.data.data && Array.isArray(result.data.data)) {
-                empList = result.data.data;
+        const extractEmpList = (resObj) => {
+            if (resObj && resObj.data) {
+                if (Array.isArray(resObj.data.list)) return resObj.data.list;
+                if (Array.isArray(resObj.data)) return resObj.data;
+                if (resObj.data.data && Array.isArray(resObj.data.data)) return resObj.data.data;
+            } else if (Array.isArray(resObj)) {
+                return resObj;
             }
-        } else if (Array.isArray(result)) {
-            empList = result;
-        }
-        console.log(`[NUSANET SYNC] Extracted empList length: ${empList.length}`);
+            return [];
+        };
 
-        // Find the matching employee by email or employee ID case-insensitively
-        const employee = empList.find(e => 
-            (e.email && e.email.toLowerCase() === identifier.toLowerCase()) ||
-            (e.id_employee && e.id_employee.toLowerCase() === identifier.toLowerCase()) ||
-            (e.employee_id && e.employee_id.toLowerCase() === identifier.toLowerCase())
-        ) || empList[0];
+        let empList = extractEmpList(result);
+
+        // Self-healing fallback search queries for email/domain transitions
+        if (empList.length === 0 && identifier && identifier.includes('@')) {
+            const [username, domain] = identifier.toLowerCase().split('@');
+            const alternatives = [];
+            if (domain === 'nusa.net.id') {
+                alternatives.push(`${username}@nusa.id`);
+            } else if (domain === 'nusa.id') {
+                alternatives.push(`${username}@nusa.net.id`);
+            }
+            alternatives.push(username);
+
+            for (const altQuery of alternatives) {
+                console.log(`[NUSANET SYNC] No results for ${identifier}. Trying alternative search: ${altQuery}`);
+                try {
+                    const altRes = await fetch(filterUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            fields: { active_status: ["active"] },
+                            page_count: 999999,
+                            paginate: true,
+                            search: altQuery
+                        })
+                    });
+                    if (altRes.ok) {
+                        const altResult = await altRes.json();
+                        const altList = extractEmpList(altResult);
+                        if (altList.length > 0) {
+                            console.log(`[NUSANET SYNC] Found ${altList.length} potential matches for alternative search: ${altQuery}`);
+                            empList = altList;
+                            break;
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`[NUSANET SYNC] Alternative search ${altQuery} failed:`, e.message);
+                }
+            }
+        }
+
+        // Find the matching employee by email, ID or username prefix
+        let employee = null;
+        if (empList.length > 0) {
+            employee = empList.find(e => 
+                (e.email && e.email.toLowerCase() === identifier.toLowerCase()) ||
+                (e.id_employee && e.id_employee.toLowerCase() === identifier.toLowerCase()) ||
+                (e.employee_id && e.employee_id.toLowerCase() === identifier.toLowerCase())
+            );
+
+            if (!employee && identifier.includes('@')) {
+                const targetUser = identifier.toLowerCase().split('@')[0];
+                employee = empList.find(e => {
+                    if (e.email) {
+                        const empUser = e.email.toLowerCase().split('@')[0];
+                        return empUser === targetUser;
+                    }
+                    return false;
+                });
+            }
+
+            if (!employee) {
+                employee = empList[0];
+            }
+        }
 
         if (!employee) {
             console.warn(`[NUSANET SYNC] No employee found matching: ${identifier}`);
@@ -472,7 +583,6 @@ const syncEmployeeFromNusawork = async (identifier, token) => {
         // Gather all primitive values from the Nusawork response dynamically
         const dbFields = {};
         for (const [key, value] of Object.entries(employee)) {
-            // Skip objects/arrays
             if (value !== null && typeof value === 'object') {
                 continue;
             }
@@ -489,7 +599,6 @@ const syncEmployeeFromNusawork = async (identifier, token) => {
         dbFields.branch_id = branchId;
         dbFields.photo_profile = photoProfile;
         
-        // Always map standard job position/level defaults if they are missing
         if (!dbFields.job_position) dbFields.job_position = 'Staff';
         if (!dbFields.job_level) dbFields.job_level = 'Staff';
         if (!dbFields.organization_name) dbFields.organization_name = branchName;
@@ -500,11 +609,11 @@ const syncEmployeeFromNusawork = async (identifier, token) => {
 
         // 1. Sync to employees table in SimAsset/LMS DB dynamically
         if (employeeId) {
-            const existingEmp = await querySimAsset('SELECT * FROM employees WHERE id_employee = ?', [employeeId]);
+            const existingEmp = await findLocalEmployeeByEmailOrId(email, employeeId);
             const cols = Object.keys(dbFields);
             const vals = Object.values(dbFields);
 
-            if (existingEmp.length === 0) {
+            if (!existingEmp) {
                 console.log(`[NUSANET SYNC] Dynamically inserting employee record for ${fullName}`);
                 const placeholders = cols.map(() => '?').join(', ');
                 await querySimAsset(
@@ -514,22 +623,14 @@ const syncEmployeeFromNusawork = async (identifier, token) => {
             } else {
                 console.log(`[NUSANET SYNC] Dynamically updating employee record for ${fullName}`);
                 const fields = cols.map(c => `\`${c}\` = ?`).join(', ');
-                await querySimAsset(`UPDATE employees SET ${fields} WHERE id_employee = ?`, [...vals, employeeId]);
+                const empIdToUpdate = existingEmp.id_employee || employeeId;
+                await querySimAsset(`UPDATE employees SET ${fields} WHERE id_employee = ?`, [...vals, empIdToUpdate]);
             }
         }
 
         // 2. Sync to local users table
-        let existingUsers = [];
-        if (employeeId) {
-            existingUsers = await query('SELECT * FROM users WHERE employee_id = ?', [employeeId]);
-        }
-        if (existingUsers.length === 0) {
-            existingUsers = await query('SELECT * FROM users WHERE email = ?', [email]);
-        }
-
-        if (existingUsers.length > 0) {
-            const localUser = existingUsers[0];
-            // Access/Role is preserved and NOT updated during sync/login to prevent overriding manual settings
+        const localUser = await findLocalUserByEmailOrId(email, employeeId);
+        if (localUser) {
             if (localUser.email !== email) {
                 console.log(`[NUSANET SYNC] Email change detected for employee ${employeeId}. Updating local user email from ${localUser.email} to ${email}`);
                 await query(
@@ -584,28 +685,39 @@ app.post('/api/login', async (req, res) => {
             }
         }
 
-        // 2. First try: Local database check (including legacy users and demo accounts in DB)
-        const localUsers = await query(
-            'SELECT * FROM users WHERE (email = ? OR employee_id = ?) AND password = ?',
-            [loginId, loginId, cleanPassword]
-        );
+        // 2. First try: Local database check using our helper (handles email domain transitions)
+        let user = await findLocalUserByEmailOrId(loginId, null);
 
-        if (localUsers.length > 0) {
+        // Fallback for custom / demo accounts without proper email formats if not found by helper
+        if (!user) {
+            const localUsers = await query(
+                'SELECT * FROM users WHERE (email = ? OR employee_id = ?) AND password = ?',
+                [loginId, loginId, cleanPassword]
+            );
+            if (localUsers.length > 0) {
+                user = localUsers[0];
+            }
+        }
+
+        if (user && user.password === cleanPassword) {
             console.log(`[LOGIN SUCCESS] Local user found for ${loginId}`);
-            const user = localUsers[0];
 
             // Sync/update user details from Nusawork in background
             try {
-                const token = await getNusanetToken(user.email, cleanPassword);
+                let token = await getNusanetToken(user.email, cleanPassword);
+                if (!token) {
+                    console.log(`[LOGIN SYNC] Password token grant failed for ${user.email}. Trying client-level token...`);
+                    token = await getNusanetToken();
+                }
                 if (token) {
-                    await syncEmployeeFromNusawork(user.email, token);
+                    await syncEmployeeFromNusawork(user.employee_id || user.email, token);
                 }
             } catch (syncErr) {
                 console.error("[LOGIN SYNC] Failed to sync user details:", syncErr.message);
             }
 
             // Reload user info to return updated values
-            const updatedUsers = await query('SELECT * FROM users WHERE email = ?', [user.email]);
+            const updatedUsers = await query('SELECT * FROM users WHERE id = ?', [user.id]);
             const finalUser = updatedUsers[0] || user;
 
             const isSupervisor = await checkIsSupervisor(finalUser);
@@ -662,36 +774,27 @@ app.post('/api/login', async (req, res) => {
                 await syncEmployeeFromNusawork(loginId, accessToken);
 
                 // Find or Sync local record (it has been created or updated by syncEmployeeFromNusawork)
-                let usersList = [];
-                const employees = await querySimAsset('SELECT id_employee FROM employees WHERE email = ?', [loginId]);
-                if (employees.length > 0) {
-                    usersList = await query('SELECT * FROM users WHERE employee_id = ?', [employees[0].id_employee]);
-                }
-                if (usersList.length === 0) {
-                    usersList = await query('SELECT * FROM users WHERE email = ?', [loginId]);
-                }
-                let user = usersList[0];
+                const employeeHelper = await findLocalEmployeeByEmailOrId(loginId, null);
+                const employeeId = employeeHelper ? employeeHelper.id_employee : null;
+                let user = await findLocalUserByEmailOrId(loginId, employeeId);
 
                 if (!user) {
                     // Fallback create if somehow syncEmployeeFromNusawork failed to insert
                     console.log(`[NUSANET AUTH] Fallback create local user for ${loginId}`);
                     const id = Date.now().toString();
                     const fullName = loginId.split('@')[0].replace('.', ' ');
-                    const avatar = `https://ui-avatars.com/api/?name=${fullName}&background=random`;
+                    const avatar = employeeHelper?.photo_profile || `https://ui-avatars.com/api/?name=${fullName}&background=random`;
 
                     let initialRole = 'STAFF';
-                    try {
-                        const employees = await querySimAsset('SELECT * FROM employees WHERE email = ?', [loginId]);
-                        if (employees.length > 0) {
-                            initialRole = determineInitialRole(employees[0]);
-                        }
-                    } catch (e) {
-                        console.error('[NUSANET AUTH] Failed to query employee for role:', e.message);
+                    if (employeeHelper) {
+                        initialRole = determineInitialRole(employeeHelper);
                     }
 
-                    await query('INSERT INTO users (id, email, password, name, role, avatar, branch) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                        [id, loginId, 'nusanet-oauth-placeholder', fullName, initialRole, avatar, 'Headquarters']);
-                    user = { id, email: loginId, name: fullName, role: initialRole, avatar, branch: 'Headquarters' };
+                    await query('INSERT INTO users (id, email, password, name, role, avatar, branch, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                        [id, loginId, 'nusanet-oauth-placeholder', fullName, initialRole, avatar, 'Headquarters', employeeId]);
+                    
+                    const newUsers = await query('SELECT * FROM users WHERE email = ?', [loginId]);
+                    user = newUsers[0];
                 }
 
                 const isSupervisor = await checkIsSupervisor(user);
@@ -742,18 +845,10 @@ app.post('/api/auth/google', async (req, res) => {
         }
 
         // 2. Fetch/Create local user record
-        const employees = await querySimAsset('SELECT * FROM employees WHERE email = ?', [email]);
-        const employeeHelper = employees.length > 0 ? employees[0] : null;
+        const employeeHelper = await findLocalEmployeeByEmailOrId(email, null);
         const employeeId = employeeHelper ? employeeHelper.id_employee : null;
 
-        let users = [];
-        if (employeeId) {
-            users = await query('SELECT * FROM users WHERE employee_id = ?', [employeeId]);
-        }
-        if (users.length === 0) {
-            users = await query('SELECT * FROM users WHERE email = ?', [email]);
-        }
-        let user = users[0];
+        let user = await findLocalUserByEmailOrId(email, employeeId);
 
         if (!user) {
             // New User: Create with linked data
