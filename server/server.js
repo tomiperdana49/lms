@@ -388,9 +388,9 @@ const checkIsSupervisor = async (user) => {
     return false;
 };
 
-const syncEmployeeFromNusawork = async (email, token) => {
+const syncEmployeeFromNusawork = async (identifier, token) => {
     if (!token) {
-        console.warn(`[NUSANET SYNC] Cannot sync ${email}: No access token available.`);
+        console.warn(`[NUSANET SYNC] Cannot sync ${identifier}: No access token available.`);
         return null;
     }
 
@@ -398,7 +398,7 @@ const syncEmployeeFromNusawork = async (email, token) => {
     const filterUrl = `${baseUrl}/emp/api/v4.2/client/employee/filter?page=1`;
 
     try {
-        console.log(`[NUSANET SYNC] Querying filter API for email: ${email}`);
+        console.log(`[NUSANET SYNC] Querying filter API for email/ID: ${identifier}`);
         const response = await fetch(filterUrl, {
             method: 'POST',
             headers: {
@@ -412,7 +412,7 @@ const syncEmployeeFromNusawork = async (email, token) => {
                 },
                 page_count: 999999,
                 paginate: true,
-                search: email
+                search: identifier
             })
         });
 
@@ -438,19 +438,25 @@ const syncEmployeeFromNusawork = async (email, token) => {
         }
         console.log(`[NUSANET SYNC] Extracted empList length: ${empList.length}`);
 
-        // Find the matching employee by email case-insensitively
-        const employee = empList.find(e => e.email && e.email.toLowerCase() === email.toLowerCase()) || empList[0];
+        // Find the matching employee by email or employee ID case-insensitively
+        const employee = empList.find(e => 
+            (e.email && e.email.toLowerCase() === identifier.toLowerCase()) ||
+            (e.id_employee && e.id_employee.toLowerCase() === identifier.toLowerCase()) ||
+            (e.employee_id && e.employee_id.toLowerCase() === identifier.toLowerCase())
+        ) || empList[0];
+
         if (!employee) {
-            console.warn(`[NUSANET SYNC] No employee found matching email: ${email}`);
+            console.warn(`[NUSANET SYNC] No employee found matching: ${identifier}`);
             return null;
         }
 
         console.log(`[NUSANET SYNC] Match found: ${employee.full_name || employee.name} (${employee.id_employee || employee.employee_id})`);
 
-        const fullName = employee.full_name || employee.name || email.split('@')[0].replace('.', ' ');
+        const fullName = employee.full_name || employee.name || identifier.split('@')[0].replace('.', ' ');
         const employeeId = employee.id_employee || employee.employee_id || null;
         const branchName = employee.organization_name || employee.branch_name || (employee.branch ? employee.branch.name : 'Headquarters');
         const photoProfile = employee.photo_profile || employee.photo || `https://ui-avatars.com/api/?name=${fullName}&background=random`;
+        const email = employee.email || identifier;
 
         // Resolve branch_id from branchName
         let branchId = '020'; // Default to HQ
@@ -513,20 +519,35 @@ const syncEmployeeFromNusawork = async (email, token) => {
         }
 
         // 2. Sync to local users table
-        const existingUsers = await query('SELECT * FROM users WHERE email = ?', [email]);
+        let existingUsers = [];
+        if (employeeId) {
+            existingUsers = await query('SELECT * FROM users WHERE employee_id = ?', [employeeId]);
+        }
+        if (existingUsers.length === 0) {
+            existingUsers = await query('SELECT * FROM users WHERE email = ?', [email]);
+        }
+
         if (existingUsers.length > 0) {
             const localUser = existingUsers[0];
             // Access/Role is preserved and NOT updated during sync/login to prevent overriding manual settings
-            await query(
-                'UPDATE users SET name = ?, branch = ?, employee_id = ?, avatar = ? WHERE email = ?',
-                [fullName, branchName, employeeId, photoProfile, email]
-            );
+            if (localUser.email !== email) {
+                console.log(`[NUSANET SYNC] Email change detected for employee ${employeeId}. Updating local user email from ${localUser.email} to ${email}`);
+                await query(
+                    'UPDATE users SET email = ?, name = ?, branch = ?, employee_id = ?, avatar = ? WHERE id = ?',
+                    [email, fullName, branchName, employeeId, photoProfile, localUser.id]
+                );
+            } else {
+                await query(
+                    'UPDATE users SET name = ?, branch = ?, employee_id = ?, avatar = ? WHERE id = ?',
+                    [fullName, branchName, employeeId, photoProfile, localUser.id]
+                );
+            }
             console.log(`[NUSANET SYNC] Local users table updated for ${email}. Role/Access preserved as ${localUser.role}.`);
         }
 
         return dbFields;
     } catch (err) {
-        console.error(`[NUSANET SYNC] Exception during sync for ${email}:`, err);
+        console.error(`[NUSANET SYNC] Exception during sync for ${identifier}:`, err);
         return null;
     }
 };
@@ -641,7 +662,14 @@ app.post('/api/login', async (req, res) => {
                 await syncEmployeeFromNusawork(loginId, accessToken);
 
                 // Find or Sync local record (it has been created or updated by syncEmployeeFromNusawork)
-                let usersList = await query('SELECT * FROM users WHERE email = ?', [loginId]);
+                let usersList = [];
+                const employees = await querySimAsset('SELECT id_employee FROM employees WHERE email = ?', [loginId]);
+                if (employees.length > 0) {
+                    usersList = await query('SELECT * FROM users WHERE employee_id = ?', [employees[0].id_employee]);
+                }
+                if (usersList.length === 0) {
+                    usersList = await query('SELECT * FROM users WHERE email = ?', [loginId]);
+                }
                 let user = usersList[0];
 
                 if (!user) {
@@ -714,11 +742,18 @@ app.post('/api/auth/google', async (req, res) => {
         }
 
         // 2. Fetch/Create local user record
-        let users = await query('SELECT * FROM users WHERE email = ?', [email]);
-        let user = users[0];
-
         const employees = await querySimAsset('SELECT * FROM employees WHERE email = ?', [email]);
         const employeeHelper = employees.length > 0 ? employees[0] : null;
+        const employeeId = employeeHelper ? employeeHelper.id_employee : null;
+
+        let users = [];
+        if (employeeId) {
+            users = await query('SELECT * FROM users WHERE employee_id = ?', [employeeId]);
+        }
+        if (users.length === 0) {
+            users = await query('SELECT * FROM users WHERE email = ?', [email]);
+        }
+        let user = users[0];
 
         if (!user) {
             // New User: Create with linked data
@@ -726,7 +761,6 @@ app.post('/api/auth/google', async (req, res) => {
             const name = employeeHelper ? employeeHelper.full_name : email.split('@')[0].replace('.', ' ');
             const avatar = employeeHelper?.photo_profile || `https://ui-avatars.com/api/?name=${name}&background=random`;
             const branch = employeeHelper?.organization_name || 'Headquarters';
-            const employeeId = employeeHelper ? employeeHelper.id_employee : null;
 
             const initialRole = determineInitialRole(employeeHelper);
 
@@ -736,6 +770,12 @@ app.post('/api/auth/google', async (req, res) => {
 
             user = { id, email, name, role: initialRole, avatar, branch, employee_id: employeeId };
         } else {
+            // Update email in users table if it has changed
+            if (user.email !== email) {
+                console.log(`[GOOGLE AUTH] Email change detected. Updating users table email from ${user.email} to ${email} for user ID ${user.id}`);
+                await query('UPDATE users SET email = ? WHERE id = ?', [email, user.id]);
+                user.email = email;
+            }
             // Ensure employee link is set if found
             if (!user.employee_id && employeeHelper) {
                 await query('UPDATE users SET employee_id = ? WHERE id = ?', [employeeHelper.id_employee, user.id]);
@@ -947,7 +987,7 @@ app.post('/api/admin/sync-all-nusawork', async (req, res) => {
             return res.status(401).json({ success: false, message: 'Authentication failed: No active Nusawork session or token found. Please log out and log back in to renew your session.' });
         }
 
-        const users = await query('SELECT email FROM users');
+        const users = await query('SELECT email, employee_id FROM users');
         console.log(`[API] Found ${users.length} users in local DB to sync.`);
 
         // Respond immediately to prevent HTTP connection timeout (504 Gateway Timeout)
@@ -967,7 +1007,8 @@ app.post('/api/admin/sync-all-nusawork', async (req, res) => {
                 }
 
                 try {
-                    const synced = await syncEmployeeFromNusawork(user.email, token);
+                    const searchKey = user.employee_id || user.email;
+                    const synced = await syncEmployeeFromNusawork(searchKey, token);
                     if (synced) {
                         successCount++;
                     } else {
