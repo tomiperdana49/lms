@@ -1091,32 +1091,188 @@ app.post('/api/admin/sync-all-nusawork', async (req, res) => {
             message: `Synchronization started in the background for ${users.length} users. Please refresh the page in a few moments to see the updated data.`
         });
 
-        // Execute the sync in the background sequentially to avoid database schema lock conflicts
+        // Execute the sync in the background
         (async () => {
             let successCount = 0;
             let failCount = 0;
 
+            console.log(`[API SYNC] Fetching all active employees from Nusawork...`);
+            const baseUrl = process.env.NUSANET_BASE_URL || 'https://nusanet.app.nusawork.com';
+            const filterUrl = `${baseUrl}/emp/api/v4.2/client/employee/filter?page=1`;
+
+            const response = await fetch(filterUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    fields: {
+                        active_status: ["active"]
+                    },
+                    page_count: 999999,
+                    paginate: true
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Nusawork API returned status ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            const extractEmpList = (resObj) => {
+                if (resObj && resObj.data) {
+                    if (Array.isArray(resObj.data.list)) return resObj.data.list;
+                    if (Array.isArray(resObj.data)) return resObj.data;
+                    if (resObj.data.data && Array.isArray(resObj.data.data)) return resObj.data.data;
+                } else if (Array.isArray(resObj)) {
+                    return resObj;
+                }
+                return [];
+            };
+
+            const empList = extractEmpList(result);
+            console.log(`[API SYNC] Retrieved ${empList.length} employees from Nusawork.`);
+
+            if (empList.length === 0) {
+                console.warn(`[API SYNC] Empty employee list returned from Nusawork. Aborting bulk sync.`);
+                return;
+            }
+
+            // Build lookup maps
+            const empByEmpId = new Map();
+            const empByEmail = new Map();
+            const empByUsername = new Map();
+
+            for (const emp of empList) {
+                const empId = emp.id_employee || emp.employee_id;
+                if (empId) {
+                    empByEmpId.set(String(empId).toLowerCase(), emp);
+                }
+                if (emp.email) {
+                    const emailLower = emp.email.toLowerCase();
+                    empByEmail.set(emailLower, emp);
+                    
+                    const username = emailLower.split('@')[0];
+                    empByUsername.set(username, emp);
+                }
+            }
+
+            // Perform in-memory matching and database updates
             for (const user of users) {
                 if (!user.email || user.email.endsWith('@nusa.com')) {
                     continue;
                 }
 
                 try {
-                    const searchKey = user.employee_id || user.email;
-                    const synced = await syncEmployeeFromNusawork(searchKey, token);
-                    if (synced) {
-                        successCount++;
-                    } else {
-                        failCount++;
+                    let employee = null;
+
+                    // 1. Try by employee_id
+                    if (user.employee_id) {
+                        employee = empByEmpId.get(String(user.employee_id).toLowerCase());
                     }
+                    // 2. Try by email
+                    if (!employee && user.email) {
+                        employee = empByEmail.get(user.email.toLowerCase());
+                    }
+                    // 3. Try by username variant matching (net.id vs id)
+                    if (!employee && user.email && user.email.includes('@')) {
+                        const username = user.email.toLowerCase().split('@')[0];
+                        employee = empByUsername.get(username);
+                    }
+
+                    if (!employee) {
+                        console.log(`[API SYNC] Match not found in memory for ${user.email} (${user.employee_id}). Skipping.`);
+                        failCount++;
+                        continue;
+                    }
+
+                    // Extract and normalize values
+                    const fullName = employee.full_name || employee.name || user.email.split('@')[0].replace('.', ' ');
+                    const employeeId = employee.id_employee || employee.employee_id || null;
+                    const branchName = employee.organization_name || employee.branch_name || (employee.branch ? employee.branch.name : 'Headquarters');
+                    const photoProfile = employee.photo_profile || employee.photo || `https://ui-avatars.com/api/?name=${fullName}&background=random`;
+                    const email = employee.email || user.email;
+
+                    let branchId = '020';
+                    try {
+                        const branches = await querySimAsset('SELECT id_branch FROM branches WHERE name LIKE ?', [`%${branchName}%`]);
+                        if (branches.length > 0) {
+                            branchId = branches[0].id_branch;
+                        }
+                    } catch (e) {
+                        console.warn(`[API SYNC] Failed to query branch matching ${branchName}:`, e.message);
+                    }
+
+                    const dbFields = {};
+                    for (const [key, value] of Object.entries(employee)) {
+                        if (value !== null && typeof value === 'object') {
+                            continue;
+                        }
+                        const sanitizedKey = key.replace(/[^a-zA-Z0-9_]/g, '');
+                        if (sanitizedKey && sanitizedKey.toLowerCase() !== 'employee_id') {
+                            dbFields[sanitizedKey] = value !== undefined ? value : null;
+                        }
+                    }
+
+                    dbFields.full_name = fullName;
+                    dbFields.email = email;
+                    dbFields.id_employee = employeeId;
+                    dbFields.branch_id = branchId;
+                    dbFields.photo_profile = photoProfile;
+                    
+                    if (!dbFields.job_position) dbFields.job_position = 'Staff';
+                    if (!dbFields.job_level) dbFields.job_level = 'Staff';
+                    if (!dbFields.organization_name) dbFields.organization_name = branchName;
+                    if (!dbFields.status_join) dbFields.status_join = 'Permanent';
+
+                    await ensureEmployeeColumnsExist(dbFields);
+
+                    // 1. Sync to employees table
+                    if (employeeId) {
+                        const existingEmp = await findLocalEmployeeByEmailOrId(email, employeeId);
+                        const cols = Object.keys(dbFields);
+                        const vals = Object.values(dbFields);
+
+                        if (!existingEmp) {
+                            const placeholders = cols.map(() => '?').join(', ');
+                            await querySimAsset(
+                                `INSERT INTO employees (${cols.map(c => `\`${c}\``).join(', ')}) VALUES (${placeholders})`,
+                                vals
+                            );
+                        } else {
+                            const fields = cols.map(c => `\`${c}\` = ?`).join(', ');
+                            const empIdToUpdate = existingEmp.id_employee || employeeId;
+                            await querySimAsset(`UPDATE employees SET ${fields} WHERE id_employee = ?`, [...vals, empIdToUpdate]);
+                        }
+                    }
+
+                    // 2. Sync to users table
+                    const localUser = await findLocalUserByEmailOrId(email, employeeId);
+                    if (localUser) {
+                        if (localUser.email !== email) {
+                            console.log(`[API SYNC] Email change detected in bulk. Updating local user email from ${localUser.email} to ${email}`);
+                            await query(
+                                'UPDATE users SET email = ?, name = ?, branch = ?, employee_id = ?, avatar = ? WHERE id = ?',
+                                [email, fullName, branchName, employeeId, photoProfile, localUser.id]
+                            );
+                        } else {
+                            await query(
+                                'UPDATE users SET name = ?, branch = ?, employee_id = ?, avatar = ? WHERE id = ?',
+                                [fullName, branchName, employeeId, photoProfile, localUser.id]
+                            );
+                        }
+                    }
+                    successCount++;
                 } catch (err) {
-                    console.error(`[API] Error syncing user ${user.email}:`, err.message);
+                    console.error(`[API SYNC] Error syncing user ${user.email}:`, err.message);
                     failCount++;
                 }
             }
-            console.log(`[API] Bulk sync completed in background. Success: ${successCount}, Failed: ${failCount}`);
+            console.log(`[API SYNC] Bulk sync completed. Success: ${successCount}, Failed: ${failCount}`);
         })().catch(err => {
-            console.error('[API] Error in background bulk sync:', err);
+            console.error('[API SYNC] Error in background bulk sync:', err);
         });
 
     } catch (err) {
