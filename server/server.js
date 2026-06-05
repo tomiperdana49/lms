@@ -156,7 +156,340 @@ const querySimAsset = async (sql, params) => {
     return results;
 };
 
-// --- AUTH ROUTES ---
+
+// --- NUSANET INTEGRATION HELPERS ---
+let cachedNusanetToken = null;
+const TOKEN_FILE = path.join(__dirname, '../tmp/nusanet_token.json');
+
+const saveCachedToken = (token) => {
+    try {
+        fs.writeFileSync(TOKEN_FILE, JSON.stringify({ token, savedAt: Date.now() }), 'utf8');
+        cachedNusanetToken = token;
+        console.log(`[NUSANET OAUTH] Token saved to persistent cache.`);
+    } catch (e) {
+        console.error(`[NUSANET OAUTH] Failed to save token cache:`, e.message);
+    }
+};
+
+const loadCachedToken = () => {
+    if (cachedNusanetToken) return cachedNusanetToken;
+    try {
+        if (fs.existsSync(TOKEN_FILE)) {
+            const data = JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
+            // Cache token for up to 24 hours (86400000 ms)
+            if (Date.now() - data.savedAt < 86400000) {
+                cachedNusanetToken = data.token;
+                console.log(`[NUSANET OAUTH] Loaded token from persistent cache.`);
+                return cachedNusanetToken;
+            }
+        }
+    } catch (e) {
+        console.error(`[NUSANET OAUTH] Failed to load token cache:`, e.message);
+    }
+    return null;
+};
+
+const getNusanetToken = async (username, password) => {
+    const baseUrl = process.env.NUSANET_BASE_URL || 'https://nusanet.app.nusawork.com';
+    const authUrl = process.env.NUSANET_AUTH_URL || `${baseUrl}/auth/api/oauth/token`;
+    const clientId = process.env.NUSANET_CLIENT_ID || '4';
+    const clientSecret = process.env.NUSANET_CLIENT_SECRET || 'hltSSRhqOAqfA6VRsQIpa9Xfw9m3Ro8LXuTh4Omn';
+
+    // 1. Try to load from persistent cache first
+    const cached = loadCachedToken();
+    if (cached) return cached;
+
+    // 2. Try client_credentials (ideal for background sync/Google login)
+    try {
+        console.log(`[NUSANET OAUTH] Requesting client_credentials token...`);
+        const response = await fetch(authUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json',
+                'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+            },
+            body: new URLSearchParams({
+                grant_type: 'client_credentials',
+                client_id: clientId,
+                client_secret: clientSecret
+            })
+        });
+
+        const data = await response.json();
+        if (response.ok && data.access_token) {
+            console.log(`[NUSANET OAUTH] Client credentials token obtained successfully.`);
+            saveCachedToken(data.access_token);
+            return data.access_token;
+        } else {
+            console.warn(`[NUSANET OAUTH] Client credentials grant failed:`, data);
+        }
+    } catch (e) {
+        console.error(`[NUSANET OAUTH] Client credentials fetch error:`, e.message);
+    }
+
+    // 3. Try password grant using passed credentials
+    if (username && password) {
+        try {
+            console.log(`[NUSANET OAUTH] Requesting password token for user ${username}...`);
+            const response = await fetch(authUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'application/json',
+                    'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+                },
+                body: new URLSearchParams({
+                    grant_type: 'password',
+                    client_id: clientId,
+                    client_secret: clientSecret,
+                    username: username,
+                    password: password
+                })
+            });
+
+            const data = await response.json();
+            if (response.ok && data.access_token) {
+                console.log(`[NUSANET OAUTH] Password token obtained successfully for user ${username}.`);
+                saveCachedToken(data.access_token);
+                return data.access_token;
+            } else {
+                console.warn(`[NUSANET OAUTH] Password grant failed:`, data);
+            }
+        } catch (e) {
+            console.error(`[NUSANET OAUTH] Password fetch error:`, e.message);
+        }
+    }
+
+    // 4. Try password grant using admin credentials from env if configured
+    const adminEmail = process.env.NUSANET_ADMIN_EMAIL;
+    const adminPassword = process.env.NUSANET_ADMIN_PASSWORD;
+    if (adminEmail && adminPassword) {
+        try {
+            console.log(`[NUSANET OAUTH] Requesting password token for admin ${adminEmail}...`);
+            const response = await fetch(authUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'application/json',
+                    'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+                },
+                body: new URLSearchParams({
+                    grant_type: 'password',
+                    client_id: clientId,
+                    client_secret: clientSecret,
+                    username: adminEmail,
+                    password: adminPassword
+                })
+            });
+
+            const data = await response.json();
+            if (response.ok && data.access_token) {
+                console.log(`[NUSANET OAUTH] Password token obtained successfully for admin ${adminEmail}.`);
+                saveCachedToken(data.access_token);
+                return data.access_token;
+            } else {
+                console.warn(`[NUSANET OAUTH] Admin password grant failed:`, data);
+            }
+        } catch (e) {
+            console.error(`[NUSANET OAUTH] Admin password fetch error:`, e.message);
+        }
+    }
+
+    return null;
+};
+
+const ensureEmployeeColumnsExist = async (employeeData) => {
+    try {
+        const dbName = process.env.DB_NAME || 'lms';
+        const [cols] = await pool.query(
+            'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?',
+            [dbName, 'employees']
+        );
+        const existingColumns = new Set(cols.map(c => c.COLUMN_NAME.toLowerCase()));
+
+        for (const key of Object.keys(employeeData)) {
+            const sanitizedKey = key.replace(/[^a-zA-Z0-9_]/g, '');
+            if (!sanitizedKey) continue;
+            
+            const lowerKey = sanitizedKey.toLowerCase();
+            if (lowerKey === 'employee_id') {
+                continue;
+            }
+            
+            // Skip object/array properties to keep DB clean, only store primitives
+            if (employeeData[key] !== null && typeof employeeData[key] === 'object') {
+                continue;
+            }
+
+            if (!existingColumns.has(lowerKey)) {
+                console.log(`[DB MIGRATION] Column '${sanitizedKey}' is missing in 'employees' table. Creating it dynamically...`);
+                let type = 'VARCHAR(255)';
+                if (employeeData[key] && String(employeeData[key]).length > 255) {
+                    type = 'TEXT';
+                }
+                
+                await pool.query(`ALTER TABLE employees ADD COLUMN \`${sanitizedKey}\` ${type} NULL`);
+                console.log(`[DB MIGRATION] Column '${sanitizedKey}' created successfully.`);
+            }
+        }
+    } catch (err) {
+        console.error('[DB MIGRATION] Failed to dynamically ensure columns exist:', err.message);
+    }
+};
+
+const syncEmployeeFromNusawork = async (email, token) => {
+    if (!token) {
+        console.warn(`[NUSANET SYNC] Cannot sync ${email}: No access token available.`);
+        return null;
+    }
+
+    const baseUrl = process.env.NUSANET_BASE_URL || 'https://nusanet.app.nusawork.com';
+    const filterUrl = `${baseUrl}/emp/api/v4.2/client/employee/filter?page=1`;
+
+    try {
+        console.log(`[NUSANET SYNC] Querying filter API for email: ${email}`);
+        const response = await fetch(filterUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                fields: {
+                    active_status: ["active"]
+                },
+                page_count: 999999,
+                paginate: true,
+                search: email
+            })
+        });
+
+        if (!response.ok) {
+            console.error(`[NUSANET SYNC] Nusawork API returned status ${response.status}: ${response.statusText}`);
+            return null;
+        }
+
+        const result = await response.json();
+        console.log(`[NUSANET SYNC] API Result:`, JSON.stringify(result, null, 2));
+        
+        let empList = [];
+        if (result.data) {
+            if (Array.isArray(result.data.list)) {
+                empList = result.data.list;
+            } else if (Array.isArray(result.data)) {
+                empList = result.data;
+            } else if (result.data.data && Array.isArray(result.data.data)) {
+                empList = result.data.data;
+            }
+        } else if (Array.isArray(result)) {
+            empList = result;
+        }
+        console.log(`[NUSANET SYNC] Extracted empList length: ${empList.length}`);
+
+        // Find the matching employee by email case-insensitively
+        const employee = empList.find(e => e.email && e.email.toLowerCase() === email.toLowerCase()) || empList[0];
+        if (!employee) {
+            console.warn(`[NUSANET SYNC] No employee found matching email: ${email}`);
+            return null;
+        }
+
+        console.log(`[NUSANET SYNC] Match found: ${employee.full_name || employee.name} (${employee.id_employee || employee.employee_id})`);
+
+        const fullName = employee.full_name || employee.name || email.split('@')[0].replace('.', ' ');
+        const employeeId = employee.id_employee || employee.employee_id || null;
+        const branchName = employee.organization_name || employee.branch_name || (employee.branch ? employee.branch.name : 'Headquarters');
+        const photoProfile = employee.photo_profile || employee.photo || `https://ui-avatars.com/api/?name=${fullName}&background=random`;
+
+        // Resolve branch_id from branchName
+        let branchId = '020'; // Default to HQ
+        try {
+            const branches = await querySimAsset('SELECT id_branch FROM branches WHERE name LIKE ?', [`%${branchName}%`]);
+            if (branches.length > 0) {
+                branchId = branches[0].id_branch;
+            }
+        } catch (e) {
+            console.warn(`[NUSANET SYNC] Failed to query branch matching ${branchName}:`, e.message);
+        }
+
+        // Gather all primitive values from the Nusawork response dynamically
+        const dbFields = {};
+        for (const [key, value] of Object.entries(employee)) {
+            // Skip objects/arrays
+            if (value !== null && typeof value === 'object') {
+                continue;
+            }
+            const sanitizedKey = key.replace(/[^a-zA-Z0-9_]/g, '');
+            if (sanitizedKey && sanitizedKey.toLowerCase() !== 'employee_id') {
+                dbFields[sanitizedKey] = value !== undefined ? value : null;
+            }
+        }
+
+        // Ensure key LMS columns are present/normalized
+        dbFields.full_name = fullName;
+        dbFields.email = email;
+        dbFields.id_employee = employeeId;
+        dbFields.branch_id = branchId;
+        dbFields.photo_profile = photoProfile;
+        
+        // Always map standard job position/level defaults if they are missing
+        if (!dbFields.job_position) dbFields.job_position = 'Staff';
+        if (!dbFields.job_level) dbFields.job_level = 'Staff';
+        if (!dbFields.organization_name) dbFields.organization_name = branchName;
+        if (!dbFields.status_join) dbFields.status_join = 'Permanent';
+
+        // Check and dynamically add columns for any new/missing fields in employees table
+        await ensureEmployeeColumnsExist(dbFields);
+
+        // 1. Sync to employees table in SimAsset/LMS DB dynamically
+        if (employeeId) {
+            const existingEmp = await querySimAsset('SELECT * FROM employees WHERE id_employee = ?', [employeeId]);
+            const cols = Object.keys(dbFields);
+            const vals = Object.values(dbFields);
+
+            if (existingEmp.length === 0) {
+                console.log(`[NUSANET SYNC] Dynamically inserting employee record for ${fullName}`);
+                const placeholders = cols.map(() => '?').join(', ');
+                await querySimAsset(
+                    `INSERT INTO employees (${cols.map(c => `\`${c}\``).join(', ')}) VALUES (${placeholders})`,
+                    vals
+                );
+            } else {
+                console.log(`[NUSANET SYNC] Dynamically updating employee record for ${fullName}`);
+                const fields = cols.map(c => `\`${c}\` = ?`).join(', ');
+                await querySimAsset(`UPDATE employees SET ${fields} WHERE id_employee = ?`, [...vals, employeeId]);
+            }
+        }
+
+        // 2. Sync to local users table
+        const existingUsers = await query('SELECT * FROM users WHERE email = ?', [email]);
+        if (existingUsers.length > 0) {
+            const localUser = existingUsers[0];
+            let finalRole = localUser.role;
+            const position = (dbFields.job_position || '').toUpperCase();
+
+            // Elevate role if it's STAFF but they are HR or supervisor/manager
+            if (position.includes('HR') && !position.includes('HRIS')) {
+                finalRole = 'HR';
+            } else if ((position.includes('SUPERVISOR') || position.includes('SPV') || position.includes('MANAGER')) && localUser.role === 'STAFF') {
+                finalRole = 'SUPERVISOR';
+            }
+
+            await query(
+                'UPDATE users SET name = ?, branch = ?, employee_id = ?, avatar = ?, role = ? WHERE email = ?',
+                [fullName, branchName, employeeId, photoProfile, finalRole, email]
+            );
+            console.log(`[NUSANET SYNC] Local users table updated for ${email}. Role: ${finalRole}`);
+        }
+
+        return dbFields;
+    } catch (err) {
+        console.error(`[NUSANET SYNC] Exception during sync for ${email}:`, err);
+        return null;
+    }
+};
+
 // --- AUTH ROUTES ---
 app.post('/api/login', async (req, res) => {
     try {
@@ -198,7 +531,22 @@ app.post('/api/login', async (req, res) => {
         if (localUsers.length > 0) {
             console.log(`[LOGIN SUCCESS] Local user found for ${loginId}`);
             const user = localUsers[0];
-            return res.json({ success: true, user: { id: user.id, name: user.name, role: user.role, email: user.email, branch: user.branch, employee_id: user.employee_id } });
+
+            // Sync/update user details from Nusawork in background
+            try {
+                const token = await getNusanetToken(user.email, cleanPassword);
+                if (token) {
+                    await syncEmployeeFromNusawork(user.email, token);
+                }
+            } catch (syncErr) {
+                console.error("[LOGIN SYNC] Failed to sync user details:", syncErr.message);
+            }
+
+            // Reload user info to return updated values
+            const updatedUsers = await query('SELECT * FROM users WHERE email = ?', [user.email]);
+            const finalUser = updatedUsers[0] || user;
+
+            return res.json({ success: true, user: { id: finalUser.id, name: finalUser.name, role: finalUser.role, email: finalUser.email, branch: finalUser.branch, employee_id: finalUser.employee_id } });
         }
 
         // 3. Second try: Nusanet OAuth API (for those not yet in LMS or using Nusanet account)
@@ -231,172 +579,26 @@ app.post('/api/login', async (req, res) => {
             if (authResponse.ok && authData.access_token) {
                 console.log(`[NUSANET AUTH] Success for ${loginId}`);
                 const accessToken = authData.access_token;
+                
+                // Cache the token globally
+                saveCachedToken(accessToken);
 
-                // 3.1 Fetch User Session info (to get ID)
-                let nusanetUserId = null;
-                try {
-                    const sessionUrl = `${baseUrl}/auth/api/client/users/email/${loginId}`;
-                    const sessionResponse = await fetch(sessionUrl, {
-                        headers: { 'Authorization': `Bearer ${accessToken}` }
-                    });
-                    const sessionData = await sessionResponse.json();
-                    nusanetUserId = sessionData.id || sessionData.uid || (sessionData.data ? sessionData.data.id : null);
-                    console.log(`[NUSANET PROFILE] Found User ID: ${nusanetUserId}`);
-                } catch (e) { console.error("[NUSANET PROFILE] Error fetching session info:", e); }
+                // Sync and complete details via the new filter API
+                await syncEmployeeFromNusawork(loginId, accessToken);
 
-                // 3.2 Fetch Full Employee Detail (if ID found)
-                let fullName = loginId.split('@')[0].replace('.', ' ');
-                let employeeId = null;
-                let branchName = 'Headquarters';
-
-                let p = {};
-                if (nusanetUserId) {
-                    try {
-                        const profileUrl = `${baseUrl}/emp/api/v1.1/employee/${nusanetUserId}`;
-                        const profileResponse = await fetch(profileUrl, {
-                            headers: { 'Authorization': `Bearer ${accessToken}` }
-                        });
-                        const profileData = await profileResponse.json();
-                        // Adjust data mapping based on common Nusanet response structures
-                        p = profileData.data || profileData;
-                        console.log(`[NUSANET PROFILE] Full Data:`, JSON.stringify(p, null, 2)); // Debug log for structure
-
-                        // Check active status - only 'active' status is allowed to log in
-                        const activeStatus = p.active_status || (p.user && typeof p.user === 'object' ? p.user.active_status : null);
-                        if (activeStatus && activeStatus.toLowerCase() !== 'active') {
-                            console.log(`[NUSANET PROFILE] Access denied for ${loginId} - active_status: ${activeStatus}`);
-                            return res.status(403).json({
-                                success: false,
-                                message: `Access Restricted: Status akun Anda adalah '${activeStatus}'. Hanya status 'active' yang diizinkan untuk login.`
-                            });
-                        }
-
-                        // Extract name from 'user' object or top level
-                        if (p.user && typeof p.user === 'object') {
-                            fullName = p.user.name || p.user.full_name || fullName;
-                        } else {
-                            fullName = p.full_name || p.name || fullName;
-                        }
-
-                        employeeId = p.id_employee || p.employee_id || null;
-
-                        // Use organization_name as branch if available
-                        branchName = p.organization_name || p.branch_name || (p.branch ? p.branch.name : 'Headquarters');
-
-                        console.log(`[NUSANET PROFILE] Fetched detail for: ${fullName} (${employeeId}) at ${branchName}`);
-                    } catch (e) { console.error("[NUSANET PROFILE] Error fetching full profile:", e); }
-                }
-
-                // Determine LMS role from Nusanet roles OR Job Position
-                let lmsRole = 'STAFF';
-
-                // 1. Check Nusanet Roles
-                if (authData.role && authData.role.role_name) {
-                    const roles = Array.isArray(authData.role.role_name) ? authData.role.role_name : [authData.role.role_name];
-                    if (roles.some(r => r.toUpperCase().includes('ADMIN') || (r.toUpperCase().includes('HR') && !r.toUpperCase().includes('HRIS')))) {
-                        lmsRole = 'HR';
-                    } else if (roles.some(r => r.toUpperCase().includes('SPV') || r.toUpperCase().includes('SUPERVISOR'))) {
-                        lmsRole = 'SUPERVISOR';
-                    }
-                }
-
-                // 2. Check Job Position from Profile (More specific for HR Staff)
-                const position = p.job_position || p.job_position_name || p.position_name || '';
-                if (lmsRole === 'STAFF' && position.toUpperCase().includes('HR') && !position.toUpperCase().includes('HRIS')) {
-                    console.log(`[NUSANET AUTH] Elevating role to HR based on position: ${position}`);
-                    lmsRole = 'HR';
-                }
-
-                // Check SimAsset for ID if not found in Nusanet profile
-                if (!employeeId) {
-                    const employees = await querySimAsset('SELECT * FROM employees WHERE email = ?', [loginId]);
-                    if (employees.length > 0) {
-                        employeeId = employees[0].id_employee;
-                        if (!fullName || fullName.includes(' ')) fullName = employees[0].full_name;
-                    }
-                }
-
-                // 3.3 Find or Sync local record
+                // Find or Sync local record (it has been created or updated by syncEmployeeFromNusawork)
                 let usersList = await query('SELECT * FROM users WHERE email = ?', [loginId]);
                 let user = usersList[0];
-                const avatar = `https://ui-avatars.com/api/?name=${fullName}&background=random`;
 
                 if (!user) {
-                    console.log(`[NUSANET AUTH] Creating new local record for ${loginId} with default role STAFF`);
+                    // Fallback create if somehow syncEmployeeFromNusawork failed to insert
+                    console.log(`[NUSANET AUTH] Fallback create local user for ${loginId}`);
                     const id = Date.now().toString();
-                    await query('INSERT INTO users (id, email, password, name, role, avatar, branch, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                        [id, loginId, 'nusanet-oauth-placeholder', fullName, 'STAFF', avatar, branchName, employeeId]);
-
-                    user = { id, email: loginId, name: fullName, role: 'STAFF', avatar, branch: branchName, employee_id: employeeId };
-                } else {
-                    console.log(`[NUSANET AUTH] Syncing existing user data for ${loginId}`);
-                    // Role protection: Only auto-update role if it's an upgrade or the current role is STAFF.
-                    // This preserves manual overrides made by HR in the LMS (e.g. promoting someone to HR manually).
-                    let finalRole = user.role;
-                    if (lmsRole === 'HR') {
-                        finalRole = 'HR';
-                    } else if (lmsRole === 'SUPERVISOR' && user.role === 'STAFF') {
-                        finalRole = 'SUPERVISOR';
-                    }
-                    
-                    await query('UPDATE users SET name = ?, role = ?, branch = ?, employee_id = ? WHERE id = ?',
-                        [fullName, finalRole, branchName, employeeId, user.id]);
-                    user = { ...user, name: fullName, role: finalRole, branch: branchName, employee_id: employeeId };
-                }
-
-                // 3.4 Sync to employees table if missing (Requested by user)
-                if (employeeId) {
-                    try {
-                        const existingEmp = await querySimAsset('SELECT * FROM employees WHERE id_employee = ?', [employeeId]);
-                            // Try to find branch_id matching branchName
-                            let bid = null;
-                            try {
-                                const branches = await querySimAsset('SELECT id_branch FROM branches WHERE name LIKE ?', [`%${branchName}%`]);
-                                if (branches.length > 0) {
-                                    bid = branches[0].id_branch;
-                                } else {
-                                    bid = '020'; // Default to HO
-                                }
-                            } catch (e) {
-                                bid = '020';
-                            }
-
-                            // Sync/Upsert employee details
-                            const empData = {
-                                full_name: fullName,
-                                email: loginId,
-                                id_employee: employeeId,
-                                job_position: p.job_position || p.job_position_name || 'Staff',
-                                job_level: p.job_level_name || 'Staff',
-                                organization_name: p.organization_name || 'Nusanet',
-                                status_join: p.employee_status_name || 'Permanent',
-                                branch_id: bid,
-                                company_group: p.company_group_name || p.company_group || null,
-                                company: p.company_name || p.company || null,
-                                band: p.band_name || p.band || null,
-                                directorate: p.directorate_name || p.directorate || null,
-                                department: p.department_name || p.department || null,
-                                lob: p.lob_name || p.lob || null,
-                                division_type_mapping: p.division_type_mapping || null,
-                                gender: p.gender || null,
-                                birth_date: p.birth_date || null
-                            };
-
-                            if (existingEmp.length === 0) {
-                                console.log(`[NUSANET AUTH] Creating employee record for ${fullName}`);
-                                await querySimAsset(
-                                    'INSERT INTO employees (full_name, email, id_employee, job_position, job_level, organization_name, status_join, branch_id, company_group, company, band, directorate, department, lob, division_type_mapping, gender, birth_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                                    Object.values(empData)
-                                );
-                            } else {
-                                console.log(`[NUSANET AUTH] Updating employee record for ${fullName}`);
-                                const fields = Object.keys(empData).map(k => `${k} = ?`).join(', ');
-                                await querySimAsset(`UPDATE employees SET ${fields} WHERE id_employee = ?`, [...Object.values(empData), employeeId]);
-                            }
-                            console.log(`[NUSANET AUTH] Successfully synced employee: ${fullName}`);
-                    } catch (empErr) {
-                        console.error("[NUSANET AUTH] Error auto-creating employee:", empErr.message);
-                    }
+                    const fullName = loginId.split('@')[0].replace('.', ' ');
+                    const avatar = `https://ui-avatars.com/api/?name=${fullName}&background=random`;
+                    await query('INSERT INTO users (id, email, password, name, role, avatar, branch) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                        [id, loginId, 'nusanet-oauth-placeholder', fullName, 'STAFF', avatar, 'Headquarters']);
+                    user = { id, email: loginId, name: fullName, role: 'STAFF', avatar, branch: 'Headquarters' };
                 }
 
                 return res.json({
@@ -431,44 +633,31 @@ app.post('/api/auth/google', async (req, res) => {
             return res.status(403).json({ success: false, message: 'Access Restricted: Only @nusa.net.id, @nusawork.com, or @nusa.id emails are allowed.' });
         }
 
-        // 1. Check if user already exists in LMS
+        // 1. Try to sync/update user details from Nusawork in background
+        try {
+            const token = await getNusanetToken();
+            if (token) {
+                await syncEmployeeFromNusawork(email, token);
+            } else {
+                console.warn(`[GOOGLE LOGIN SYNC] Skip background sync for ${email}: No access token available. Set NUSANET_ADMIN_EMAIL and NUSANET_ADMIN_PASSWORD in .env for background syncing.`);
+            }
+        } catch (syncErr) {
+            console.error("[GOOGLE LOGIN SYNC] Failed to sync user details:", syncErr.message);
+        }
+
+        // 2. Fetch/Create local user record
         let users = await query('SELECT * FROM users WHERE email = ?', [email]);
         let user = users[0];
 
-        // 2. Check if employee exists in SimAsset (to get correct data)
         const employees = await querySimAsset('SELECT * FROM employees WHERE email = ?', [email]);
         const employeeHelper = employees.length > 0 ? employees[0] : null;
 
-        // Determine role based on job position
-        const jobPos = (employeeHelper && employeeHelper.job_position) ? employeeHelper.job_position.toUpperCase() : '';
-        const detectedRole = (jobPos.includes('HR') && !jobPos.includes('HRIS')) ? 'HR' : (jobPos.includes('SUPERVISOR') || jobPos.includes('SPV') || jobPos.includes('MANAGER') ? 'SUPERVISOR' : 'STAFF');
-
-        if (user) {
-            // Role protection: Only auto-update role if it's an upgrade or the current role is STAFF.
-            // This preserves manual overrides made by HR in the LMS.
-            let finalRole = user.role;
-            if (detectedRole === 'HR') {
-                finalRole = 'HR';
-            } else if (detectedRole === 'SUPERVISOR' && user.role === 'STAFF') {
-                finalRole = 'SUPERVISOR';
-            }
-
-            const needsUpdate = !user.employee_id && employeeHelper || user.role !== finalRole;
-
-            if (needsUpdate) {
-                console.log(`[GOOGLE AUTH] Updating existing user ${email}: role=${finalRole}, empId=${employeeHelper?.id_employee}`);
-                await query('UPDATE users SET employee_id = ?, role = ? WHERE id = ?',
-                    [employeeHelper?.id_employee || user.employee_id, finalRole, user.id]);
-                user.employee_id = employeeHelper?.id_employee || user.employee_id;
-                user.role = finalRole;
-            }
-        } else {
+        if (!user) {
             // New User: Create with linked data
             const id = Date.now().toString();
-            // Use Employee Name if available, otherwise format from email
             const name = employeeHelper ? employeeHelper.full_name : email.split('@')[0].replace('.', ' ');
-            const avatar = `https://ui-avatars.com/api/?name=${name}&background=random`;
-            const branch = 'Headquarters';
+            const avatar = employeeHelper?.photo_profile || `https://ui-avatars.com/api/?name=${name}&background=random`;
+            const branch = employeeHelper?.organization_name || 'Headquarters';
             const employeeId = employeeHelper ? employeeHelper.id_employee : null;
 
             console.log(`[GOOGLE AUTH] Creating new user ${email} with default role STAFF`);
@@ -476,6 +665,12 @@ app.post('/api/auth/google', async (req, res) => {
                 [id, email, 'google-oauth-placeholder', name, 'STAFF', avatar, branch, employeeId]);
 
             user = { id, email, name, role: 'STAFF', avatar, branch, employee_id: employeeId };
+        } else {
+            // Ensure employee link is set if found
+            if (!user.employee_id && employeeHelper) {
+                await query('UPDATE users SET employee_id = ? WHERE id = ?', [employeeHelper.id_employee, user.id]);
+                user.employee_id = employeeHelper.id_employee;
+            }
         }
 
         res.json({
@@ -609,6 +804,51 @@ app.get('/api/feedback/history', async (req, res) => {
     }
 });
 
+
+app.post('/api/admin/sync-all-nusawork', async (req, res) => {
+    console.log('[API] POST /api/admin/sync-all-nusawork - Request to bulk sync all users');
+    try {
+        const token = await getNusanetToken();
+        if (!token) {
+            return res.status(401).json({ success: false, message: 'Authentication failed: No active Nusawork session or token found. Please log out and log back in to renew your session.' });
+        }
+
+        const users = await query('SELECT email FROM users');
+        console.log(`[API] Found ${users.length} users in local DB to sync.`);
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const user of users) {
+            // Ignore default demo/bypass accounts
+            if (user.email.endsWith('@nusa.com')) {
+                continue;
+            }
+
+            try {
+                const synced = await syncEmployeeFromNusawork(user.email, token);
+                if (synced) {
+                    successCount++;
+                } else {
+                    failCount++;
+                }
+            } catch (err) {
+                console.error(`[API] Error syncing user ${user.email}:`, err.message);
+                failCount++;
+            }
+        }
+
+        res.json({
+            success: true,
+            message: `Synchronization completed. Success: ${successCount}, Failed: ${failCount}.`,
+            successCount,
+            failCount
+        });
+    } catch (err) {
+        console.error('[API] Error in /api/admin/sync-all-nusawork:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // --- USER ROUTES ---
 app.get('/api/users', async (req, res) => {

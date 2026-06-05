@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { Users, UserPlus, Mail, Lock, Shield, ArrowLeft, Edit, Briefcase, MapPin, Trash2 } from 'lucide-react';
+import { Users, UserPlus, Mail, Lock, Shield, ArrowLeft, Edit, Briefcase, MapPin, Trash2, RefreshCw } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Role, User, Employee } from '../types';
 import PopupNotification from './PopupNotification';
@@ -13,6 +13,8 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
     const [users, setUsers] = useState<User[]>([]);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [isSyncing, setIsSyncing] = useState(false);
+
     const [notification, setNotification] = useState<{ show: boolean; type: 'success' | 'error'; message: string }>({ show: false, type: 'success', message: '' });
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -124,6 +126,56 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
         }
     };
 
+    const handleSyncNusawork = async () => {
+        if (!window.confirm('Sync all users with Nusawork? This will update local profile details (position, branch, department, avatar, role etc.) based on active Nusawork data.')) return;
+        setIsSyncing(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/admin/sync-all-nusawork`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setNotification({
+                    show: true,
+                    type: 'success',
+                    message: data.message || 'Synchronization completed successfully!'
+                });
+                
+                // Reload users and employees to show updated data
+                const [usersRes, employeesRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/api/users`),
+                    fetch(`${API_BASE_URL}/api/employees`)
+                ]);
+                
+                if (usersRes.ok) {
+                    const usersData = await usersRes.json();
+                    if (Array.isArray(usersData)) setUsers(usersData);
+                }
+                
+                if (employeesRes.ok) {
+                    const empData = await employeesRes.json();
+                    if (Array.isArray(empData)) setEmployees(empData);
+                }
+            } else {
+                setNotification({
+                    show: true,
+                    type: 'error',
+                    message: data.message || 'Synchronization failed.'
+                });
+            }
+        } catch (err) {
+            console.error(err);
+            setNotification({
+                show: true,
+                type: 'error',
+                message: 'Error connecting to the synchronization service.'
+            });
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     if (userRole !== 'HR' && userRole !== 'HR_ADMIN') {
         return <div className="p-8 text-center text-red-500">Access Denied. HR Only.</div>;
     }
@@ -163,6 +215,14 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="flex-1 md:w-64 px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-purple-500 bg-white"
                     />
+                    <button
+                        onClick={handleSyncNusawork}
+                        disabled={isSyncing}
+                        className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg shadow-emerald-900/20 flex items-center gap-2 whitespace-nowrap transition-all"
+                    >
+                        <RefreshCw size={18} className={isSyncing ? "animate-spin" : ""} />
+                        {isSyncing ? 'Syncing...' : 'Sync Nusawork'}
+                    </button>
                     <button
                         onClick={() => {
                             setEditingUser(null);
