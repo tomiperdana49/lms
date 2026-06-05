@@ -1150,7 +1150,19 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                             <tbody className="divide-y divide-slate-100">
                                 {verificationLogs.map((log) => (
                                     <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4"><div><p className="font-bold text-slate-700 text-sm">{log.userName || 'Unknown'}</p><p className="text-xs text-slate-400">Staff</p></div></td>
+                                        <td className="px-6 py-4">
+                                            {(() => {
+                                                const emp = users.find(u => (log.employee_id && u.employee_id === log.employee_id) || (log.userName && u.name && log.userName.trim().toLowerCase() === u.name.trim().toLowerCase()));
+                                                return (
+                                                    <div className="flex flex-col">
+                                                        <p className="font-bold text-slate-700 text-sm">{log.userName || 'Unknown'}</p>
+                                                        {emp?.employee_id && <p className="text-[11px] text-slate-500 font-medium mt-0.5">ID: {emp.employee_id}</p>}
+                                                        {emp?.email && <p className="text-[11px] text-slate-400">{emp.email}</p>}
+                                                        {!emp?.employee_id && !emp?.email && <p className="text-[11px] text-slate-400">Staff</p>}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </td>
                                         <td className="px-6 py-4"><div className="flex flex-col gap-1"><span onClick={() => handleOpenDetailModal(log)} className="font-semibold text-slate-800 text-sm cursor-pointer hover:text-blue-600 transition-colors">{log.title}</span><span className="text-xs text-slate-500">{log.category}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit ${log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>{log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'Personal' : (log.source === 'SIMAS' ? 'SIMAS' : 'Office')}</span></div></td>
                                         <td className="px-6 py-4 text-sm text-slate-600">
                                             <div className="flex flex-col gap-1">
