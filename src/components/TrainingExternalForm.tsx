@@ -244,7 +244,7 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                         </div>
                     </div>
 
-                    {user.role === 'SUPERVISOR' && (
+                    {(user.role === 'SUPERVISOR' || (user as any).isSupervisor) && (
                         <button
                             onClick={() => onNavigate && onNavigate('external-approval')}
                             className="bg-white border border-slate-200 text-slate-800 px-5 py-2.5 rounded-2xl font-black text-xs shadow-sm hover:bg-slate-50 transition-all flex items-center gap-2"

@@ -359,6 +359,35 @@ const determineInitialRole = (employee) => {
     return 'STAFF';
 };
 
+const checkIsSupervisor = async (user) => {
+    if (!user) return false;
+    if (user.role === 'SUPERVISOR') return true;
+    
+    if (user.employee_id || user.name || user.email) {
+        try {
+            const subCount = await querySimAsset(
+                `SELECT COUNT(*) as count FROM employees 
+                 WHERE id_report_to = ? 
+                    OR id_report_to = ? 
+                    OR id_report_to LIKE ? 
+                    OR id_report_to = ?`, 
+                [
+                    user.employee_id || '___INVALID___', 
+                    user.name || '___INVALID___', 
+                    `%${user.email ? user.email.split('@')[0] : '___INVALID___'}%`,
+                    user.email || '___INVALID___'
+                ]
+            );
+            if (subCount[0] && subCount[0].count > 0) {
+                return true;
+            }
+        } catch (e) {
+            console.error('[DB] Failed to check supervisor status:', e.message);
+        }
+    }
+    return false;
+};
+
 const syncEmployeeFromNusawork = async (email, token) => {
     if (!token) {
         console.warn(`[NUSANET SYNC] Cannot sync ${email}: No access token available.`);
@@ -558,7 +587,20 @@ app.post('/api/login', async (req, res) => {
             const updatedUsers = await query('SELECT * FROM users WHERE email = ?', [user.email]);
             const finalUser = updatedUsers[0] || user;
 
-            return res.json({ success: true, user: { id: finalUser.id, name: finalUser.name, role: finalUser.role, email: finalUser.email, branch: finalUser.branch, employee_id: finalUser.employee_id } });
+            const isSupervisor = await checkIsSupervisor(finalUser);
+
+            return res.json({
+                success: true,
+                user: {
+                    id: finalUser.id,
+                    name: finalUser.name,
+                    role: finalUser.role,
+                    email: finalUser.email,
+                    branch: finalUser.branch,
+                    employee_id: finalUser.employee_id,
+                    isSupervisor
+                }
+            });
         }
 
         // 3. Second try: Nusanet OAuth API (for those not yet in LMS or using Nusanet account)
@@ -624,6 +666,8 @@ app.post('/api/login', async (req, res) => {
                     user = { id, email: loginId, name: fullName, role: initialRole, avatar, branch: 'Headquarters' };
                 }
 
+                const isSupervisor = await checkIsSupervisor(user);
+
                 return res.json({
                     success: true,
                     user: {
@@ -632,7 +676,8 @@ app.post('/api/login', async (req, res) => {
                         role: user.role,
                         email: user.email,
                         branch: user.branch,
-                        employee_id: user.employee_id
+                        employee_id: user.employee_id,
+                        isSupervisor
                     }
                 });
             } else {
@@ -698,6 +743,8 @@ app.post('/api/auth/google', async (req, res) => {
             }
         }
 
+        const isSupervisor = await checkIsSupervisor(user);
+
         res.json({
             success: true,
             user: {
@@ -706,7 +753,8 @@ app.post('/api/auth/google', async (req, res) => {
                 role: user.role,
                 email: user.email,
                 branch: user.branch,
-                employee_id: user.employee_id
+                employee_id: user.employee_id,
+                isSupervisor
             }
         });
     } catch (err) {
@@ -715,10 +763,71 @@ app.post('/api/auth/google', async (req, res) => {
     }
 });
 
+// --- APP CONFIG ENDPOINT ---
+app.get('/api/config', (req, res) => {
+    res.json({
+        moduleInternal: process.env.module_internal === 'true',
+        moduleExternal: process.env.module_external === 'true',
+        moduleIncentive: process.env.module_incentive_certification === 'true'
+    });
+});
+
 // --- SESSION EPOCH ENDPOINT (Force Logout Mechanism) ---
 app.get('/api/auth/session-epoch', (req, res) => {
     const currentEpoch = process.env.SESSION_EPOCH || 'v1';
     res.json({ success: true, epoch: currentEpoch });
+});
+
+// --- AUTH SESSION REFRESH ENDPOINT ---
+app.post('/api/auth/refresh', async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ success: false, message: 'Email is required' });
+        }
+
+        let users = await query('SELECT * FROM users WHERE email = ?', [email]);
+        let user = users[0];
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        const employees = await querySimAsset('SELECT * FROM employees WHERE email = ?', [email]);
+        const employeeHelper = employees.length > 0 ? employees[0] : null;
+
+        if (employeeHelper) {
+            const name = employeeHelper.full_name;
+            const avatar = employeeHelper.photo_profile || `https://ui-avatars.com/api/?name=${name}&background=random`;
+            const branch = employeeHelper.organization_name || 'Headquarters';
+            const employeeId = employeeHelper.id_employee;
+
+            await query('UPDATE users SET name = ?, avatar = ?, branch = ?, employee_id = ? WHERE id = ?',
+                [name, avatar, branch, employeeId, user.id]);
+
+            user.name = name;
+            user.avatar = avatar;
+            user.branch = branch;
+            user.employee_id = employeeId;
+        }
+
+        const isSupervisor = await checkIsSupervisor(user);
+
+        res.json({
+            success: true,
+            user: {
+                id: user.id,
+                name: user.name,
+                role: user.role,
+                email: user.email,
+                branch: user.branch,
+                employee_id: user.employee_id,
+                isSupervisor
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
 });
 
 // --- UPLOAD ROUTE ---

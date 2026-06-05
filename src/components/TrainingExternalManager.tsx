@@ -40,7 +40,7 @@ const StatusBadge = ({ status }: { status: string }) => {
     );
 };
 
-const TrainingExternalManager = ({ userRole, userName }: { userRole: string; userName?: string }) => {
+const TrainingExternalManager = ({ userRole, userName, user }: { userRole: string; userName?: string; user?: any }) => {
     // --- Data State ---
     const [requests, setRequests] = useState<TrainingRequest[]>([]);
     const [employees, setEmployees] = useState<any[]>([]);
@@ -154,6 +154,26 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
             (req.employee_id && e.id_employee === req.employee_id) ||
             (req.employeeName && e.full_name && e.full_name.trim().toLowerCase() === req.employeeName.trim().toLowerCase())
         );
+
+        // If the logged-in user is a supervisor (and not HR), only show requests of their subordinates
+        if (userRole === 'SUPERVISOR' && user && !user.role.includes('HR')) {
+            if (!emp) return false;
+            const supervisorId = user.employee_id || '___INVALID___';
+            const supervisorName = user.name || '___INVALID___';
+            const supervisorEmailPrefix = user.email ? user.email.split('@')[0] : '___INVALID___';
+            const supervisorEmail = user.email || '___INVALID___';
+            const reportsTo = emp.id_report_to;
+            if (!reportsTo) return false;
+
+            const isMySubordinate = 
+                reportsTo === supervisorId || 
+                reportsTo === supervisorName || 
+                reportsTo.toLowerCase() === supervisorEmailPrefix.toLowerCase() || 
+                reportsTo.toLowerCase() === supervisorEmail.toLowerCase();
+
+            if (!isMySubordinate) return false;
+        }
+
         const empBranch = emp?.branch_name || 'Others';
 
         if (selectedBranch !== 'All Branches' && empBranch !== selectedBranch) return false;
@@ -342,6 +362,26 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                 (req.employee_id && e.id_employee === req.employee_id) ||
                 (req.employeeName && e.full_name && e.full_name.trim().toLowerCase() === req.employeeName.trim().toLowerCase())
             );
+
+            // If the logged-in user is a supervisor (and not HR), only include requests of their subordinates
+            if (userRole === 'SUPERVISOR' && user && !user.role.includes('HR')) {
+                if (!emp) return;
+                const supervisorId = user.employee_id || '___INVALID___';
+                const supervisorName = user.name || '___INVALID___';
+                const supervisorEmailPrefix = user.email ? user.email.split('@')[0] : '___INVALID___';
+                const supervisorEmail = user.email || '___INVALID___';
+                const reportsTo = emp.id_report_to;
+                if (!reportsTo) return;
+
+                const isMySubordinate = 
+                    reportsTo === supervisorId || 
+                    reportsTo === supervisorName || 
+                    reportsTo.toLowerCase() === supervisorEmailPrefix.toLowerCase() || 
+                    reportsTo.toLowerCase() === supervisorEmail.toLowerCase();
+
+                if (!isMySubordinate) return;
+            }
+
             const empBranch = emp?.branch_name || 'Others';
 
             if (selectedBranch !== 'All Branches' && empBranch !== selectedBranch) return;

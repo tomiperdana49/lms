@@ -1,4 +1,4 @@
-import { BookOpen, Users, Calendar as CalendarIcon, Video, GraduationCap, Star } from 'lucide-react';
+import { BookOpen, Users, Calendar as CalendarIcon, Video, GraduationCap, Star, Briefcase, Award } from 'lucide-react';
 import type { Page, Role } from '../types';
 import LMSCalendar from './LMSCalendar';
 
@@ -7,11 +7,12 @@ interface DashboardHomeProps {
     userRole?: Role;
     userEmail?: string;
     userName?: string;
+    config?: { moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean };
 }
 
 import NotificationPanel from './NotificationPanel';
 
-const DashboardHome = ({ onNavigate, userRole, userEmail, userName }: DashboardHomeProps) => {
+const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: DashboardHomeProps) => {
     const baseMenuItems = [
         {
             title: 'Reading Log',
@@ -29,30 +30,30 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName }: DashboardH
             color: 'text-blue-600',
             bg: 'bg-blue-50'
         },
-        {
+        ...(config?.moduleInternal ? [{
             title: 'Internal Training',
             subtitle: 'Internal sessions',
             icon: <Users size={24} />,
             page: 'internal' as Page,
             color: 'text-purple-600',
             bg: 'bg-purple-50'
-        },
-        // {
-        //     title: 'External Training',
-        //     subtitle: 'External workshops',
-        //     icon: <Briefcase size={24} />,
-        //     page: 'external' as Page,
-        //     color: 'text-teal-600',
-        //     bg: 'bg-teal-50'
-        // },
-        // {
-        //     title: 'Incentives',
-        //     subtitle: 'Claim rewards',
-        //     icon: <Award size={24} />,
-        //     page: 'incentives' as Page,
-        //     color: 'text-amber-500',
-        //     bg: 'bg-amber-50'
-        // },
+        }] : []),
+        ...(config?.moduleExternal ? [{
+            title: 'External Training',
+            subtitle: 'External workshops',
+            icon: <Briefcase size={24} />,
+            page: 'external' as Page,
+            color: 'text-teal-600',
+            bg: 'bg-teal-50'
+        }] : []),
+        ...(config?.moduleIncentive ? [{
+            title: 'Incentives',
+            subtitle: 'Claim rewards',
+            icon: <Award size={24} />,
+            page: 'incentives' as Page,
+            color: 'text-amber-500',
+            bg: 'bg-amber-50'
+        }] : []),
         {
             title: 'Training Calendar',
             subtitle: 'Learning schedule',

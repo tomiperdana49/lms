@@ -31,6 +31,31 @@ function App() {
     return localStorage.getItem('lms_admin_view') || 'overview';
   });
 
+  const [config, setConfig] = useState<{ moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean }>({
+    moduleInternal: false,
+    moduleExternal: false,
+    moduleIncentive: false
+  });
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/config`);
+        if (res.ok) {
+          const data = await res.json();
+          setConfig({
+            moduleInternal: !!data.moduleInternal,
+            moduleExternal: !!data.moduleExternal,
+            moduleIncentive: !!data.moduleIncentive
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch config:', err);
+      }
+    };
+    fetchConfig();
+  }, []);
+
   useEffect(() => {
     if (user) {
       localStorage.setItem('lms_user', JSON.stringify(user));
@@ -50,6 +75,35 @@ function App() {
       localStorage.setItem('lms_admin_view', adminView);
     }
   }, [adminView]);
+
+  // Refresh user profile/supervisor status on page load (reload)
+  useEffect(() => {
+    const refreshUserSession = async () => {
+      const savedUser = localStorage.getItem('lms_user');
+      if (savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser);
+          if (parsed && parsed.email) {
+            const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: parsed.email })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.success && data.user) {
+                console.log('[AUTH] Session refreshed on reload:', data.user);
+                setUser(data.user);
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[AUTH] Failed to refresh session on reload:', err);
+        }
+      }
+    };
+    refreshUserSession();
+  }, []);
 
   // Session Epoch Check (Force logout if version mismatches)
   useEffect(() => {
@@ -116,8 +170,9 @@ function App() {
         onLogout={handleLogout}
         onRoleChange={(role) => setUser({ ...user!, role })}
         adminView={adminView}
+        config={config}
       >
-        {activePage === 'dashboard' && <DashboardHome onNavigate={setActivePage} userRole={userRole} userEmail={user?.email} userName={user?.name} />}
+        {activePage === 'dashboard' && <DashboardHome onNavigate={setActivePage} userRole={userRole} userEmail={user?.email} userName={user?.name} config={config} />}
         {activePage === 'reading-log' && (
           <ReadingLogPage
             user={user!}
@@ -134,8 +189,8 @@ function App() {
         )}
 
         {/* External Training: Team Approvals (For Supervisor) */}
-        {activePage === 'external-approval' && userRole === 'SUPERVISOR' && (
-          <TrainingExternalManager userRole={userRole} userName={user?.name} />
+        {activePage === 'external-approval' && (userRole === 'SUPERVISOR' || user?.isSupervisor) && (
+          <TrainingExternalManager userRole="SUPERVISOR" userName={user?.name} user={user} />
         )}
 
         {activePage === 'calendar' && <LMSCalendar userEmail={user?.email} />}

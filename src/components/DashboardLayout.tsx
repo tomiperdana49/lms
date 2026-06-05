@@ -17,7 +17,9 @@ import {
     GraduationCap,
     MessageSquarePlus,
     CheckCircle,
-    AlertCircle
+    AlertCircle,
+    FileText,
+    Globe
 } from 'lucide-react';
 import type { Page, Role, User } from '../types';
 import FeedbackModal from './FeedbackModal';
@@ -32,9 +34,10 @@ interface DashboardLayoutProps {
     onRoleChange: (role: Role) => void; 
     onLogout: () => void;
     adminView?: string;
+    config?: { moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean };
 }
 
-const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onLogout, adminView }: DashboardLayoutProps) => {
+const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onLogout, adminView, config }: DashboardLayoutProps) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
     const [isTrainingOpen, setIsTrainingOpen] = useState(() => {
@@ -211,14 +214,14 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { header: 'MANAGEMENT' },
         { icon: Users, label: 'User Management', id: 'admin-dashboard', view: 'users' },
         { icon: BookOpen, label: 'Online Modules Management', id: 'admin-dashboard', view: 'courses' },
-        { header: 'TRAINING' },
-        { icon: Users, label: 'Internal', id: 'admin-dashboard', view: 'meetings' },
-        // { icon: FileText, label: 'External', id: 'admin-dashboard', view: 'training' },
+        ...((config?.moduleInternal || config?.moduleExternal) ? [{ header: 'TRAINING' }] : []),
+        ...(config?.moduleInternal ? [{ icon: Users, label: 'Internal', id: 'admin-dashboard', view: 'meetings' }] : []),
+        ...(config?.moduleExternal ? [{ icon: FileText, label: 'External', id: 'admin-dashboard', view: 'training' }] : []),
         { header: 'REPORT' },
         { icon: Library, label: 'Reading Log', id: 'admin-dashboard', view: 'logs' },
         { icon: Award, label: 'Quiz Report', id: 'admin-dashboard', view: 'quiz-reports' },
         { icon: TrendingUp, label: 'HR Report', id: 'admin-dashboard', view: 'reports' },
-        // { icon: Award, label: 'Incentives', id: 'admin-dashboard', view: 'incentives' },
+        ...(config?.moduleIncentive ? [{ icon: Award, label: 'Incentives', id: 'admin-dashboard', view: 'incentives' }] : []),
     ];
 
     const menuItems = [
@@ -226,13 +229,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { icon: Library, label: 'Reading Log', id: 'reading-log' },
         { icon: BookOpen, label: 'Online Modules', id: 'courses' },
         { icon: Calendar, label: 'Calendar', id: 'calendar' },
-        // { icon: Award, label: 'Incentives', id: 'incentives' },
+        ...(config?.moduleIncentive ? [{ icon: Award, label: 'Incentives', id: 'incentives' }] : []),
     ];
 
     const trainingSubItems = [
-        { icon: Users, label: 'Internal', id: 'internal' },
-        // { icon: Globe, label: 'External', id: 'external' },
-        // ...(userRole === 'SUPERVISOR' ? [{ icon: Shield, label: 'External Approval', id: 'external-approval' }] : []),
+        ...(config?.moduleInternal ? [{ icon: Users, label: 'Internal', id: 'internal' }] : []),
+        ...(config?.moduleExternal ? [{ icon: Globe, label: 'External', id: 'external' }] : []),
+        ...(config?.moduleExternal && (userRole === 'SUPERVISOR' || user.isSupervisor) ? [{ icon: Shield, label: 'External Approval', id: 'external-approval' }] : []),
     ];
 
     const getInitials = (name: string) => {
@@ -303,46 +306,48 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                         ))}
 
                         {/* Training Dropdown */}
-                        <div className="pt-1">
-                            <button
-                                onClick={() => setIsTrainingOpen(!isTrainingOpen)}
-                                className={`
-                                    w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors text-left
-                                    ${activePage === 'internal' || activePage === 'external' || activePage === 'external-approval' || isTrainingOpen
-                                        ? 'bg-slate-800 text-white'
-                                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                                    }
-                                `}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <GraduationCap size={20} />
-                                    <span className="font-medium">Training</span>
-                                </div>
-                                {isTrainingOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                            </button>
-                            
-                            {isTrainingOpen && (
-                                <div className="mt-1 ml-4 space-y-1">
-                                    {trainingSubItems.map((sub, idx) => (
-                                        <button
-                                            key={idx}
-                                            onClick={() => {
-                                                onNavigate(sub.id as Page);
-                                                setIsSidebarOpen(false);
-                                            }}
-                                            className={`w-full flex items-center gap-3 px-6 py-2.5 text-sm rounded-xl transition-all
-                                                ${activePage === sub.id 
-                                                    ? 'text-white font-bold bg-blue-600 shadow-md translate-x-1' 
-                                                    : 'text-slate-400 hover:text-white hover:bg-slate-800'}
-                                            `}
-                                        >
-                                            <sub.icon size={16} className={activePage === sub.id ? 'opacity-100' : 'opacity-60'} />
-                                            <span>{sub.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                        {(config?.moduleInternal || config?.moduleExternal) && (
+                            <div className="pt-1">
+                                <button
+                                    onClick={() => setIsTrainingOpen(!isTrainingOpen)}
+                                    className={`
+                                        w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors text-left
+                                        ${activePage === 'internal' || activePage === 'external' || activePage === 'external-approval' || isTrainingOpen
+                                            ? 'bg-slate-800 text-white'
+                                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                        }
+                                    `}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <GraduationCap size={20} />
+                                        <span className="font-medium">Training</span>
+                                    </div>
+                                    {isTrainingOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                </button>
+                                
+                                {isTrainingOpen && (
+                                    <div className="mt-1 ml-4 space-y-1">
+                                        {trainingSubItems.map((sub, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => {
+                                                    onNavigate(sub.id as Page);
+                                                    setIsSidebarOpen(false);
+                                                }}
+                                                className={`w-full flex items-center gap-3 px-6 py-2.5 text-sm rounded-xl transition-all
+                                                    ${activePage === sub.id 
+                                                        ? 'text-white font-bold bg-blue-600 shadow-md translate-x-1' 
+                                                        : 'text-slate-400 hover:text-white hover:bg-slate-800'}
+                                                `}
+                                            >
+                                                <sub.icon size={16} className={activePage === sub.id ? 'opacity-100' : 'opacity-60'} />
+                                                <span>{sub.label}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Admin Panel Expandable */}
                         {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
