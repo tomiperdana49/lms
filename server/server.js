@@ -816,39 +816,45 @@ app.post('/api/admin/sync-all-nusawork', async (req, res) => {
         const users = await query('SELECT email FROM users');
         console.log(`[API] Found ${users.length} users in local DB to sync.`);
 
-        let successCount = 0;
-        let failCount = 0;
-
-        for (const user of users) {
-            // Ignore default demo/bypass accounts
-            if (user.email.endsWith('@nusa.com')) {
-                continue;
-            }
-
-            try {
-                const synced = await syncEmployeeFromNusawork(user.email, token);
-                if (synced) {
-                    successCount++;
-                } else {
-                    failCount++;
-                }
-            } catch (err) {
-                console.error(`[API] Error syncing user ${user.email}:`, err.message);
-                failCount++;
-            }
-        }
-
+        // Respond immediately to prevent HTTP connection timeout (504 Gateway Timeout)
         res.json({
             success: true,
-            message: `Synchronization completed. Success: ${successCount}, Failed: ${failCount}.`,
-            successCount,
-            failCount
+            message: `Synchronization started in the background for ${users.length} users. Please refresh the page in a few moments to see the updated data.`
         });
+
+        // Execute the sync in the background sequentially to avoid database schema lock conflicts
+        (async () => {
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const user of users) {
+                if (!user.email || user.email.endsWith('@nusa.com')) {
+                    continue;
+                }
+
+                try {
+                    const synced = await syncEmployeeFromNusawork(user.email, token);
+                    if (synced) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
+                } catch (err) {
+                    console.error(`[API] Error syncing user ${user.email}:`, err.message);
+                    failCount++;
+                }
+            }
+            console.log(`[API] Bulk sync completed in background. Success: ${successCount}, Failed: ${failCount}`);
+        })().catch(err => {
+            console.error('[API] Error in background bulk sync:', err);
+        });
+
     } catch (err) {
         console.error('[API] Error in /api/admin/sync-all-nusawork:', err);
         res.status(500).json({ error: err.message });
     }
 });
+
 
 // --- USER ROUTES ---
 app.get('/api/users', async (req, res) => {
