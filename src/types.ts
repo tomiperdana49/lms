@@ -226,6 +226,7 @@ export interface Employee {
     age?: number | string;
     age_group?: string;
     gender?: string;
+    id_report_to?: string;
 }
 
 export interface Asset {

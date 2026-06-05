@@ -241,7 +241,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                 <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-600 flex items-center text-sm">
                     <div className="w-12 text-center">ID</div>
                     <div className="flex-1 pl-2">Employee Name / Email</div>
-                    <div className="w-48">Position / Branch</div>
+                    <div className="w-48">Position / Branch / Report To</div>
                     <div className="w-32 text-center">LMS Status</div>
                     <div className="w-16 text-center">Action</div>
                 </div>
@@ -264,6 +264,10 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                         <div className="flex items-center gap-2 text-slate-400 text-xs">
                                             <MapPin size={12} />
                                             <span className="truncate">{emp.branch_name || 'No Branch'}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-slate-400 text-[11px] font-medium">
+                                            <Users size={12} className="text-slate-400" />
+                                            <span className="truncate text-slate-500">Report to: {emp.id_report_to || 'None'}</span>
                                         </div>
                                     </div>
                                 </div>
