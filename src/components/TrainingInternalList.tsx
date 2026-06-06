@@ -1184,11 +1184,12 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 <th className="px-6 py-3 text-center">Avg Pre-Test</th>
                                                                 <th className="px-6 py-3 text-center">Avg Post-Test</th>
                                                                  <th className="px-6 py-3 text-center">Avg Feedback</th>
+                                                                 <th className="px-6 py-3 text-right">Cost</th>
                                                                 <th className="px-6 py-3 text-center">Status</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-white">
-                                                            {meetings.filter(m => m.host === stat.host).map((m) => {
+                                                            {filteredMeetings.filter(m => m.host === stat.host).map((m) => {
                                                                 const meetingResults = allResults.filter(r => 
                                                                     Number(r.meetingId || (r as any).meeting_id) === Number(m.id) &&
                                                                     !(r as any).courseId && !(r as any).course_id
@@ -1226,24 +1227,20 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                     return acc;
                                                                 }, []);
 
-                                                                const completedParticipants = allParticipantIds.filter(email => {
-                                                                    const hasPre = meetingResults.some(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('PRE'));
-                                                                    const hasPost = meetingResults.some(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('POST'));
-                                                                    const hasFB = meetingFeedback.some(f => isParticipantMatch(f, email));
-                                                                    return hasPre && hasPost && hasFB;
-                                                                });
+                                                                const preParticipants = allParticipantIds.filter(email => meetingResults.some(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('PRE')));
+                                                                const postParticipants = allParticipantIds.filter(email => meetingResults.some(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('POST')));
+                                                                const fbParticipants = allParticipantIds.filter(email => meetingFeedback.some(f => isParticipantMatch(f, email)));
 
-                                                                // Calculate Averages based only on completedParticipants
-                                                                const preScores = completedParticipants.map(email => {
+                                                                const preScores = preParticipants.map(email => {
                                                                     const scores = meetingResults.filter(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('PRE')).map(r => Number(r.score) || 0);
                                                                     return Math.max(...scores, 0);
                                                                 });
-                                                                const postScores = completedParticipants.map(email => {
+                                                                const postScores = postParticipants.map(email => {
                                                                     const scores = meetingResults.filter(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('POST')).map(r => Number(r.score) || 0);
                                                                     return Math.max(...scores, 0);
                                                                 });
                                                                 const fbScoresList: number[] = [];
-                                                                completedParticipants.forEach(email => {
+                                                                fbParticipants.forEach(email => {
                                                                     const f = meetingFeedback.find(f => isParticipantMatch(f, email));
                                                                     const fData = f?.feedbackData || f?.feedback_data || f?.data || f?.response || f?.feedback;
                                                                     if (fData) {
@@ -1259,9 +1256,12 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 const avgPost = postScores.length > 0 ? Math.round(postScores.reduce((a,b) => a+b, 0) / postScores.length) : '-';
                                                                 const avgFeedback = fbScoresList.length > 0 ? (Math.round((fbScoresList.reduce((a,b) => a+b, 0) / fbScoresList.length) * 10) / 10).toFixed(1) : '-';
 
-                                                                const participantEmails = allParticipantIds.filter(email => {
-                                                                    return (m.guests?.emails || []).some(ge => ge.toLowerCase() === email || ge.toLowerCase().split('@')[0] === email.split('@')[0]);
-                                                                });
+                                                                const participantEmails = Array.from(new Set([
+                                                                    ...(m.guests?.emails || []).map((e: string) => e.toLowerCase()),
+                                                                    ...allParticipantIds.filter(email => {
+                                                                        return (m.guests?.emails || []).some((ge: string) => ge.toLowerCase() === email || ge.toLowerCase().split('@')[0] === email.split('@')[0]);
+                                                                    })
+                                                                ]));
 
                                                                 return (
                                                                     <Fragment key={m.id}>
@@ -1289,6 +1289,17 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                              </td>
                                                                              <td className="px-6 py-4 text-center">
                                                                                  <span className="text-xs font-black text-emerald-600">{avgFeedback}</span>
+                                                                             </td>
+                                                                             <td className="px-6 py-4 text-right">
+                                                                                 <span className="text-xs font-bold text-slate-700">
+                                                                                     {(() => {
+                                                                                         const totalCost = (m.costReport?.trainerIncentive || 0) + 
+                                                                                                         (m.costReport?.snackCost || 0) + 
+                                                                                                         (m.costReport?.lunchCost || 0) + 
+                                                                                                         (m.costReport?.otherCost || 0);
+                                                                                         return totalCost > 0 ? formatCurrency(totalCost) : '-';
+                                                                                     })()}
+                                                                                 </span>
                                                                              </td>
                                                                             <td className="px-6 py-4 text-center whitespace-nowrap">
                                                                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${m.costReport?.isPaid ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
