@@ -464,7 +464,7 @@ const syncEmployeeFromNusawork = async (identifier, token) => {
             },
             body: JSON.stringify({
                 fields: {
-                    active_status: ["active"]
+                    active_status: ["active", "Resign"]
                 },
                 page_count: 999999,
                 paginate: true,
@@ -514,7 +514,7 @@ const syncEmployeeFromNusawork = async (identifier, token) => {
                             'Accept': 'application/json'
                         },
                         body: JSON.stringify({
-                            fields: { active_status: ["active"] },
+                            fields: { active_status: ["active", "Resign"] },
                             page_count: 999999,
                             paginate: true,
                             search: altQuery
@@ -635,16 +635,17 @@ const syncEmployeeFromNusawork = async (identifier, token) => {
         // 2. Sync to local users table
         const localUser = await findLocalUserByEmailOrId(email, employeeId);
         if (localUser) {
+            const isActive = (employee.active_status && employee.active_status.toLowerCase() === 'active') ? 1 : 0;
             if (localUser.email !== email) {
                 console.log(`[NUSANET SYNC] Email change detected for employee ${employeeId}. Updating local user email from ${localUser.email} to ${email}`);
                 await query(
-                    'UPDATE users SET email = ?, name = ?, branch = ?, employee_id = ?, avatar = ? WHERE id = ?',
-                    [email, fullName, branchName, employeeId, photoProfile, localUser.id]
+                    'UPDATE users SET email = ?, name = ?, branch = ?, employee_id = ?, avatar = ?, is_active = ? WHERE id = ?',
+                    [email, fullName, branchName, employeeId, photoProfile, isActive, localUser.id]
                 );
             } else {
                 await query(
-                    'UPDATE users SET name = ?, branch = ?, employee_id = ?, avatar = ? WHERE id = ?',
-                    [fullName, branchName, employeeId, photoProfile, localUser.id]
+                    'UPDATE users SET name = ?, branch = ?, employee_id = ?, avatar = ?, is_active = ? WHERE id = ?',
+                    [fullName, branchName, employeeId, photoProfile, isActive, localUser.id]
                 );
             }
             console.log(`[NUSANET SYNC] Local users table updated for ${email}. Role/Access preserved as ${localUser.role}.`);
@@ -1255,16 +1256,17 @@ app.post('/api/admin/sync-all-nusawork', async (req, res) => {
                     // 2. Sync to users table
                     const localUser = await findLocalUserByEmailOrId(email, employeeId);
                     if (localUser) {
+                        const isActive = (employee.active_status && employee.active_status.toLowerCase() === 'active') ? 1 : 0;
                         if (localUser.email !== email) {
                             console.log(`[API SYNC] Email change detected in bulk. Updating local user email from ${localUser.email} to ${email}`);
                             await query(
-                                'UPDATE users SET email = ?, name = ?, branch = ?, employee_id = ?, avatar = ? WHERE id = ?',
-                                [email, fullName, branchName, employeeId, photoProfile, localUser.id]
+                                'UPDATE users SET email = ?, name = ?, branch = ?, employee_id = ?, avatar = ?, is_active = ? WHERE id = ?',
+                                [email, fullName, branchName, employeeId, photoProfile, isActive, localUser.id]
                             );
                         } else {
                             await query(
-                                'UPDATE users SET name = ?, branch = ?, employee_id = ?, avatar = ? WHERE id = ?',
-                                [fullName, branchName, employeeId, photoProfile, localUser.id]
+                                'UPDATE users SET name = ?, branch = ?, employee_id = ?, avatar = ?, is_active = ? WHERE id = ?',
+                                [fullName, branchName, employeeId, photoProfile, isActive, localUser.id]
                             );
                         }
                     }
