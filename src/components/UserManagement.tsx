@@ -281,9 +281,21 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                                 {linkedUser.role}
                                             </span>
                                             <span className="text-[10px] text-green-600 font-medium">Active Account</span>
+                                            {emp.active_status && (
+                                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg ${emp.active_status.toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                                    {emp.active_status}
+                                                </span>
+                                            )}
                                         </div>
                                     ) : (
-                                        <span className="text-xs text-slate-300 italic">No Access</span>
+                                        <div className="flex flex-col gap-1 items-center">
+                                            <span className="text-xs text-slate-300 italic">No Access</span>
+                                            {emp.active_status && (
+                                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg ${emp.active_status.toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                                    {emp.active_status}
+                                                </span>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                                 <div className="w-16 flex justify-center">

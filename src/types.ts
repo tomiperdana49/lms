@@ -214,6 +214,7 @@ export interface Employee {
     organization_name: string;
     status_join: string;
     branch_name?: string;
+    active_status?: string;
 
     // Extended fields for reporting
     company_group?: string;

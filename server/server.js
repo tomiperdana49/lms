@@ -190,6 +190,9 @@ const loadCachedToken = () => {
 };
 
 const getNusanetToken = async (username, password) => {
+    if (process.env.NUSANET_TOKEN) {
+        return process.env.NUSANET_TOKEN;
+    }
     const baseUrl = process.env.NUSANET_BASE_URL || 'https://nusanet.app.nusawork.com';
     const authUrl = process.env.NUSANET_AUTH_URL || `${baseUrl}/auth/api/oauth/token`;
     const clientId = process.env.NUSANET_CLIENT_ID || '4';
@@ -1109,7 +1112,7 @@ app.post('/api/admin/sync-all-nusawork', async (req, res) => {
                 },
                 body: JSON.stringify({
                     fields: {
-                        active_status: ["active"]
+                        active_status: ["active", "Resign"]
                     },
                     page_count: 999999,
                     paginate: true
