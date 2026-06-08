@@ -280,7 +280,9 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                                         'bg-green-100 text-green-700'}`}>
                                                 {linkedUser.role}
                                             </span>
-                                            <span className="text-[10px] text-green-600 font-medium">Active Account</span>
+                                            <span className={`text-[10px] font-medium ${emp.active_status && emp.active_status.toLowerCase() !== 'active' ? 'text-rose-600' : 'text-green-600'}`}>
+                                                {emp.active_status && emp.active_status.toLowerCase() !== 'active' ? 'Inactive Account' : 'Active Account'}
+                                            </span>
                                             {emp.active_status && (
                                                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg ${emp.active_status.toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
                                                     {emp.active_status}
