@@ -193,10 +193,11 @@ const getNusanetToken = async (username, password) => {
     if (process.env.NUSANET_TOKEN) {
         return process.env.NUSANET_TOKEN;
     }
-    const baseUrl = process.env.NUSANET_BASE_URL || 'https://nusanet.app.nusawork.com';
+    const baseUrl = process.env.NUSAWORK_BASE_URL || process.env.NUSANET_BASE_URL || 'https://nusanet.app.nusawork.com';
     const authUrl = process.env.NUSANET_AUTH_URL || `${baseUrl}/auth/api/oauth/token`;
-    const clientId = process.env.NUSANET_CLIENT_ID || '4';
-    const clientSecret = process.env.NUSANET_CLIENT_SECRET || 'hltSSRhqOAqfA6VRsQIpa9Xfw9m3Ro8LXuTh4Omn';
+    const clientId = process.env.NUSAWORK_CLIENT_ID || process.env.NUSANET_CLIENT_ID || '4';
+    const clientSecret = process.env.NUSAWORK_CLIENT_SECRET || process.env.NUSANET_CLIENT_SECRET || 'hltSSRhqOAqfA6VRsQIpa9Xfw9m3Ro8LXuTh4Omn';
+    const grantType = process.env.NUSAWORK_GRANT_TYPE || 'client_credentials';
 
     // 1. Try to load from persistent cache first
     const cached = loadCachedToken();
@@ -204,7 +205,7 @@ const getNusanetToken = async (username, password) => {
 
     // 2. Try client_credentials (ideal for background sync/Google login)
     try {
-        console.log(`[NUSANET OAUTH] Requesting client_credentials token...`);
+        console.log(`[NUSANET OAUTH] Requesting ${grantType} token...`);
         const response = await fetch(authUrl, {
             method: 'POST',
             headers: {
@@ -213,7 +214,7 @@ const getNusanetToken = async (username, password) => {
                 'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
             },
             body: new URLSearchParams({
-                grant_type: 'client_credentials',
+                grant_type: grantType,
                 client_id: clientId,
                 client_secret: clientSecret
             })
