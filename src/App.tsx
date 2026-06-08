@@ -130,7 +130,12 @@ function App() {
       }
     };
 
+    // Check immediately on load
     checkSessionEpoch();
+
+    // Check periodically every 30 seconds
+    const intervalId = setInterval(checkSessionEpoch, 30000);
+    return () => clearInterval(intervalId);
   }, []);
 
   // REPLACE THIS WITH YOUR ACTUAL GOOGLE CLIENT ID
