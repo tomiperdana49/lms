@@ -42,6 +42,7 @@ export interface User {
     employee_id?: string; // Linked SimAsset Employee ID
     employee_name?: string;
     isSupervisor?: boolean; // Dynamically computed if they have subordinates
+    organization_name?: string;
 }
 
 export interface Question {

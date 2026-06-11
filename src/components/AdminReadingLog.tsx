@@ -315,7 +315,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         name: emp.full_name,
                         email: emp.email,
                         branch: emp.branch_name,
-                        role: (emp.job_position?.includes('HR') && !emp.job_position?.includes('HRIS')) ? 'HR' : (emp.job_position?.includes('Supervisor') ? 'SUPERVISOR' : 'STAFF')
+                        role: (emp.job_position?.includes('HR') && !emp.job_position?.includes('HRIS')) ? 'HR' : (emp.job_position?.includes('Supervisor') ? 'SUPERVISOR' : 'STAFF'),
+                        organization_name: emp.organization_name
                     }));
                     setUsers(mapped);
                 }
@@ -378,28 +379,178 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             });
 
             // Map to flat rows for Excel sheet
-            const dataToExport = processed.map((item, idx) => {
-                return {
-                    'No.': idx + 1,
-                    'Employee Name': item.user.name,
-                    'Email': item.user.email,
-                    'Branch': item.user.branch || 'Others',
-                    'Role': item.user.role?.replace('_', ' ') || 'STAFF',
-                    'Total Incentive (Period)': item.stats.totalIncentiveRange
-                };
+            const dataToExport: any[] = [];
+            const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            const periodDate = new Date(endDate);
+            const monthName = monthNames[periodDate.getMonth()];
+
+            const formatTimestamp = (dateStr: string) => {
+                if (!dateStr) return '';
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) return dateStr;
+                const pad = (n: number) => String(n).padStart(2, '0');
+                return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+            };
+
+            // Calculate Grand Total
+            let grandTotal = 0;
+            processed.forEach(item => {
+                const userApprovedLogs = item.stats.logsRange.filter((l: ReadingLogEntry) => l.hrApprovalStatus === 'Approved');
+                userApprovedLogs.forEach((log: ReadingLogEntry) => {
+                    let baseAmount = 0;
+                    const cat = (log.category || '').trim().toLowerCase();
+                    if (cat === 'buku fiksi/novel' || cat === 'majalah' || cat === 'fiction') {
+                        baseAmount = 0;
+                    } else if (cat === 'komik bisnis/non fiksi' || cat === 'comic/manga' || cat === 'comic' || cat.includes('komik')) {
+                        baseAmount = 50000;
+                    } else {
+                        baseAmount = 100000;
+                    }
+                    
+                    let bonusAmount = 0;
+                    if (baseAmount > 0) {
+                        const currentSeq = getLogSequence(log);
+                        if (currentSeq === 5) {
+                            bonusAmount = 500000;
+                        }
+                    }
+                    
+                    grandTotal += (baseAmount + bonusAmount);
+                });
+            });
+
+            let isFirstRow = true;
+
+            processed.forEach(item => {
+                const userApprovedLogs = item.stats.logsRange.filter((l: ReadingLogEntry) => l.hrApprovalStatus === 'Approved');
+                if (userApprovedLogs.length === 0) return;
+                
+                let userTotalBase = 0;
+                let userTotalBonus = 0;
+
+                const logsData = userApprovedLogs.map((log: ReadingLogEntry) => {
+                    let baseAmount = 0;
+                    let bonusAmount = 0;
+
+                    const cat = (log.category || '').trim().toLowerCase();
+                    if (cat === 'buku fiksi/novel' || cat === 'majalah' || cat === 'fiction') {
+                        baseAmount = 0;
+                    } else if (cat === 'komik bisnis/non fiksi' || cat === 'comic/manga' || cat === 'comic' || cat.includes('komik')) {
+                        baseAmount = 50000;
+                    } else {
+                        baseAmount = 100000;
+                    }
+
+                    if (baseAmount > 0) {
+                        const currentSeq = getLogSequence(log);
+                        if (currentSeq === 5) {
+                            bonusAmount = 500000;
+                        }
+                    }
+
+                    userTotalBase += baseAmount;
+                    userTotalBonus += bonusAmount;
+
+                    return { log, baseAmount, bonusAmount };
+                });
+
+                const userTotalAmount = userTotalBase + userTotalBonus;
+
+                logsData.forEach(({ log, baseAmount, bonusAmount }, idx) => {
+                    const timestampStr = log.claimedAt || log.approvedAt || log.finishDate || log.date;
+
+                    let rowMonthName = monthName;
+                    if (timestampStr) {
+                        const d = new Date(timestampStr);
+                        if (!isNaN(d.getTime())) {
+                            let m = d.getMonth();
+                            if (d.getDate() >= 26) {
+                                m = (m + 1) % 12;
+                            }
+                            rowMonthName = monthNames[m];
+                        }
+                    }
+
+                    dataToExport.push({
+                        'Periode Bulan': rowMonthName,
+                        'Timestamp': formatTimestamp(timestampStr),
+                        'Employee Name': item.user.name,
+                        'Judul Buku': log.title || '',
+                        'Divisi': item.user.organization_name || item.user.role?.replace('_', ' ') || 'STAFF',
+                        'Cabang': item.user.branch || 'Others',
+                        'Insentif Buku': baseAmount,
+                        'Reward Tambahan': bonusAmount,
+                        'Insentif Total': idx === 0 ? userTotalAmount : null,
+                        'Total Penggunaan Budget Learning': null,
+                        _timestampStr: timestampStr
+                    });
+
+                    isFirstRow = false;
+                });
+            });
+
+            // Post-process sort dataToExport by Period Month, then by Name
+            dataToExport.forEach(d => {
+                const date = new Date(d._timestampStr);
+                let m = date.getMonth();
+                let y = date.getFullYear();
+                if (date.getDate() >= 26) {
+                    m = (m + 1) % 12;
+                    if (m === 0) y += 1;
+                }
+                d._sortMonth = y * 100 + m;
+                d._rawDate = date.getTime();
+            });
+
+            dataToExport.sort((a, b) => {
+                if (a._sortMonth !== b._sortMonth) return a._sortMonth - b._sortMonth;
+                const nameCmp = (a['Employee Name'] || '').localeCompare(b['Employee Name'] || '');
+                if (nameCmp !== 0) return nameCmp;
+                return a._rawDate - b._rawDate;
+            });
+
+            dataToExport.forEach(d => {
+                delete d._timestampStr;
+                delete d._sortMonth;
+                delete d._rawDate;
             });
 
             // Create XLSX worksheet
             const ws = XLSX.utils.json_to_sheet(dataToExport);
             
+            // Format numbers
+            const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+            for (let R = range.s.r + 1; R <= range.e.r; R++) {
+                const colG = XLSX.utils.encode_cell({ c: 6, r: R }); // Insentif Buku
+                const colH = XLSX.utils.encode_cell({ c: 7, r: R }); // Reward Tambahan
+                const colI = XLSX.utils.encode_cell({ c: 8, r: R }); // Insentif Total
+                const colJ = XLSX.utils.encode_cell({ c: 9, r: R }); // Total Budget
+                
+                if (ws[colG]) ws[colG].z = '#,##0';
+                if (ws[colH]) {
+                    if (ws[colH].v === 0) ws[colH].v = ''; 
+                    ws[colH].z = '#,##0';
+                }
+                if (ws[colI] && ws[colI].v !== null && ws[colI].v !== '') {
+                    ws[colI].z = '#,##0';
+                }
+                if (ws[colJ] && ws[colJ].v !== null && ws[colJ].v !== '') {
+                    ws[colJ].z = '#,##0';
+                }
+            }
+
             // Format column widths beautifully
             const colsWidths = [
-                { wch: 6 },   // No.
+                { wch: 15 },  // Periode Bulan
+                { wch: 20 },  // Timestamp
                 { wch: 30 },  // Employee Name
-                { wch: 30 },  // Email
-                { wch: 20 },  // Branch
-                { wch: 15 },  // Role
-                { wch: 25 }   // Total Incentive (Period)
+                { wch: 35 },  // Judul Buku
+                { wch: 15 },  // Divisi
+                { wch: 20 },  // Cabang
+                { wch: 15 },  // Insentif Buku
+                { wch: 20 },  // Reward Tambahan
+                { wch: 15 },  // Insentif Total
+                { wch: 35 }   // Total Penggunaan Budget Learning
             ];
             ws['!cols'] = colsWidths;
 
