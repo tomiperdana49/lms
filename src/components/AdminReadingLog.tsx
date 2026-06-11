@@ -419,8 +419,6 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 });
             });
 
-            let isFirstRow = true;
-
             processed.forEach(item => {
                 const userApprovedLogs = item.stats.logsRange.filter((l: ReadingLogEntry) => l.hrApprovalStatus === 'Approved');
                 if (userApprovedLogs.length === 0) return;
@@ -484,8 +482,6 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         'Total Penggunaan Budget Learning': null,
                         _timestampStr: timestampStr
                     });
-
-                    isFirstRow = false;
                 });
             });
 
