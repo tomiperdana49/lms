@@ -988,7 +988,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             if (filterStatus === 'all' && l.status === 'Cancelled') return false;
             if (filterStatus !== 'Cancel' && l.status === 'Cancelled') return false;
 
-            const emp = users.find(u => (l.employee_id && u.employee_id === l.employee_id) || (l.userName && u.name && l.userName.trim().toLowerCase() === u.name.trim().toLowerCase()));
+            let emp = users.find(u => l.employee_id && u.employee_id === l.employee_id);
+            if (!emp) emp = users.find(u => l.userName && u.name && l.userName.trim().toLowerCase() === u.name.trim().toLowerCase());
             const empBranch = emp?.branch || 'Others';
             if (selectedBranch !== 'All Branches' && empBranch !== selectedBranch) return false;
 
@@ -1299,7 +1300,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-4">
                                             {(() => {
-                                                const emp = users.find(u => (log.employee_id && u.employee_id === log.employee_id) || (log.userName && u.name && log.userName.trim().toLowerCase() === u.name.trim().toLowerCase()));
+                                                let emp = users.find(u => log.employee_id && u.employee_id === log.employee_id);
+                                                if (!emp) emp = users.find(u => log.userName && u.name && log.userName.trim().toLowerCase() === u.name.trim().toLowerCase());
                                                 return (
                                                     <div className="flex flex-col">
                                                         <p className="font-bold text-slate-700 text-sm">{log.userName || 'Unknown'}</p>
