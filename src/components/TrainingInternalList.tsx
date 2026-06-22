@@ -26,6 +26,17 @@ import type { Role, Meeting, CostReport, Employee, QuizResult, User } from '../t
 import PopupNotification from './PopupNotification';
 import ConfirmationModal from './ConfirmationModal';
 
+const renderTextWithLinks = (text: string) => {
+    if (!text) return null;
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.split(urlRegex).map((part, i) => {
+        if (part.match(urlRegex)) {
+            return <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline break-all">{part}</a>;
+        }
+        return <span key={i} className="whitespace-pre-wrap">{part}</span>;
+    });
+};
+
 interface TrainingInternalListProps {
     userRole: Role;
     user: User;
@@ -2342,7 +2353,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     <div className="flex gap-4 pt-2">
                                         <div className="w-8 flex justify-center pt-0.5"><FileText className="text-slate-400" size={20} /></div>
                                         <p className="text-sm text-slate-600 leading-relaxed">
-                                            {selectedMeeting.description}
+                                            {renderTextWithLinks(selectedMeeting.description)}
                                         </p>
                                     </div>
 
@@ -2381,7 +2392,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         const parts = selectedMeeting.time.split(' - ');
                                                         const startRaw = parts[0] ? parts[0].trim() : '09:00';
                                                         const endRaw = parts[1] ? parts[1].trim() : '10:00';
-                                                        const baseDate = new Date(selectedMeeting.date).toISOString().split('T')[0];
+                                                        const d = new Date(selectedMeeting.date);
+                                                        const baseDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                                                         const formatT = (t: string) => {
                                                             const match = t.match(/(\d{1,2}):(\d{2})/);
                                                             if (!match) return "00:00";
@@ -2414,7 +2426,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         const parts = selectedMeeting.time.split(' - ');
                                                         const startRaw = parts[0] ? parts[0].trim() : '09:00';
                                                         const endRaw = parts[1] ? parts[1].trim() : '10:00';
-                                                        const baseDate = new Date(selectedMeeting.date).toISOString().split('T')[0];
+                                                        const d = new Date(selectedMeeting.date);
+                                                        const baseDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                                                         const formatT = (t: string) => {
                                                             const match = t.match(/(\d{1,2}):(\d{2})/);
                                                             if (!match) return "00:00";

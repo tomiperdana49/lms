@@ -3,6 +3,17 @@ import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MoreHorizon
 import { API_BASE_URL } from '../config';
 import type { Role, Meeting, Incentive, TrainingRequest } from '../types';
 
+const renderTextWithLinks = (text: string) => {
+    if (!text) return null;
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.split(urlRegex).map((part, i) => {
+        if (part.match(urlRegex)) {
+            return <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline break-all">{part}</a>;
+        }
+        return <span key={i} className="whitespace-pre-wrap">{part}</span>;
+    });
+};
+
 interface CalendarEvent {
     id: number;
     title: string;
@@ -437,9 +448,9 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                                             )}
                                         </div>
 
-                                        <p className="text-xs text-slate-500 leading-relaxed italic border-l-2 border-slate-100 pl-4 mb-5">
-                                            {ev.description}
-                                        </p>
+                                        <div className="text-slate-600 text-sm whitespace-pre-wrap leading-relaxed mb-5">
+                                            {renderTextWithLinks(ev.description)}
+                                        </div>
 
                                         {ev.link && (
                                             <a 
