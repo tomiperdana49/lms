@@ -601,7 +601,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         // Assessment Validation
         const preQuestions = formData.pre_test_data?.questions || [];
         const postQuestions = formData.post_test_data?.questions || [];
-        if (preQuestions.length === 0 || postQuestions.length === 0) {
+        if (userRole !== 'HR' && userRole !== 'HR_ADMIN' && (preQuestions.length === 0 || postQuestions.length === 0)) {
             setNotification({ 
                 show: true, 
                 type: 'error', 
