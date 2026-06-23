@@ -71,7 +71,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [meetings, setMeetings] = useState<ExtendedMeeting[]>([]);
     const [selectedMeeting, setSelectedMeeting] = useState<ExtendedMeeting | null>(null);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
-    const [notification, setNotification] = useState<{ show: boolean; type: 'success' | 'error'; message: string; onClose?: () => void }>({ show: false, type: 'success', message: '' });
+    const [notification, setNotification] = useState<{ show: boolean; type: 'success' | 'error' | 'info'; message: string; onClose?: () => void }>({ show: false, type: 'success', message: '' });
 
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
@@ -108,7 +108,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         meetLink: '',
         description: '',
         pre_test_data: null as any,
-        post_test_data: null as any
+        post_test_data: null as any,
+        material_link: ''
     });
 
     // Email Invites State
@@ -514,7 +515,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             meetLink: meeting.meetLink || '',
             description: (meeting.description && meeting.description !== 'No description provided.') ? meeting.description : (meeting.agenda || ''),
             pre_test_data: meeting.pre_test_data || { questions: [] },
-            post_test_data: meeting.post_test_data || { questions: [] }
+            post_test_data: meeting.post_test_data || { questions: [] },
+            material_link: meeting.material_link || ''
         });
         setInvitedEmails(meeting.guests?.emails || []);
         setInvitedEmployeeIds((meeting.guests as any).employee_ids || []);
@@ -635,7 +637,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             },
             meetLink: formData.meetLink,
             pre_test_data: formData.pre_test_data,
-            post_test_data: formData.post_test_data
+            post_test_data: formData.post_test_data,
+            material_link: formData.material_link
         };
 
         if (isEditing && editId) {
@@ -666,6 +669,16 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     const savedMeeting = await res.json();
                     setMeetings([...meetings, safeMeeting(savedMeeting)]);
                     setNotification({ show: true, type: 'success', message: 'Meeting scheduled & invitations sent!' });
+
+                    // Open Google Calendar
+                    const fmtDate = formData.date.replace(/-/g, '');
+                    const startTimeStr = formData.startTime.replace(':', '') + '00';
+                    const endTimeStr = formData.endTime.replace(':', '') + '00';
+                    const startStr = `${fmtDate}T${startTimeStr}`;
+                    const endStr = `${fmtDate}T${endTimeStr}`;
+                    
+                    const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(formData.title)}&details=${encodeURIComponent(formData.description)}&location=${encodeURIComponent(formData.type === 'Online' ? (formData.meetLink || 'Online') : (formData.location || ''))}&dates=${startStr}/${endStr}&add=${finalEmails.join(',')}`;
+                    window.open(gcalUrl, '_blank');
                 }
             } catch (err) {
                 console.error(err);
@@ -698,7 +711,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     };
 
     const resetForm = () => {
-        setFormData({ title: '', date: '', startTime: '', endTime: '', host: '', host_id: '', type: 'Online', location: '', meetLink: '', description: '', pre_test_data: { questions: [] }, post_test_data: { questions: [] } });
+        setFormData({ title: '', date: '', startTime: '', endTime: '', host: '', host_id: '', type: 'Online', location: '', meetLink: '', description: '', pre_test_data: { questions: [] }, post_test_data: { questions: [] }, material_link: '' });
         setInvitedEmails([]);
         setInvitedEmployeeIds([]);
         setHostSearch('');
@@ -1741,8 +1754,21 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 onChange={e => setFormData({ ...formData, meetLink: e.target.value })}
                                             />
                                         </div>
-                                    </div>
+                                </div>
                                 )}
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Link Materi (Optional)</label>
+                                    <div className="relative mb-4">
+                                        <FileText size={18} className="absolute left-3.5 top-3 text-slate-400" />
+                                        <input
+                                            placeholder="Paste Google Drive / Material link here"
+                                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600"
+                                            value={formData.material_link}
+                                            onChange={e => setFormData({ ...formData, material_link: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
 
                                 {/* Email Invites */}
                                 <div>
@@ -2519,11 +2545,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         onClick={() => {
                                                             if (isHostOrHR) return; // Host doesn't take the test here
                                                             if (selectedMeeting.is_closed) {
-                                                                setNotification({ show: true, type: 'error', message: "Sesi ini sudah ditutup oleh Host." });
+                                                                setNotification({ show: true, type: 'info', message: "Sesi ini sudah ditutup oleh Host." });
                                                                 return;
                                                             }
                                                             if (!selectedMeeting.is_pre_test_active) {
-                                                                setNotification({ show: true, type: 'error', message: "Pre-Test belum dibuka oleh Host." });
+                                                                setNotification({ show: true, type: 'info', message: "Pre-Test belum dibuka oleh Host." });
                                                                 return;
                                                             }
                                                             if (meetingQuizResults.find(r => r.quizType === 'PRE')) return;
@@ -2585,16 +2611,16 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         onClick={() => {
                                                             if (isHostOrHR) return;
                                                             if (selectedMeeting.is_closed) {
-                                                                setNotification({ show: true, type: 'error', message: "Sesi ini sudah ditutup oleh Host." });
+                                                                setNotification({ show: true, type: 'info', message: "Sesi ini sudah ditutup oleh Host." });
                                                                 return;
                                                             }
                                                             if (!selectedMeeting.is_post_test_active) {
-                                                                setNotification({ show: true, type: 'error', message: "Post-Test belum dibuka oleh Host." });
+                                                                setNotification({ show: true, type: 'info', message: "Post-Test belum dibuka oleh Host." });
                                                                 return;
                                                             }
                                                             const preRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('PRE'));
                                                             if (!preRes) {
-                                                                setNotification({ show: true, type: 'error', message: "Silakan kerjakan Pre-Test terlebih dahulu." });
+                                                                setNotification({ show: true, type: 'info', message: "Silakan kerjakan Pre-Test terlebih dahulu." });
                                                                 return;
                                                             }
                                                             const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
@@ -2657,16 +2683,16 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         onClick={() => {
                                                             if (isHostOrHR) return;
                                                             if (selectedMeeting.is_closed) {
-                                                                setNotification({ show: true, type: 'error', message: "Sesi ini sudah ditutup oleh Host." });
+                                                                setNotification({ show: true, type: 'info', message: "Sesi ini sudah ditutup oleh Host." });
                                                                 return;
                                                             }
                                                             if (!selectedMeeting.is_feedback_active) {
-                                                                setNotification({ show: true, type: 'error', message: "Form Feedback belum dibuka oleh Host." });
+                                                                setNotification({ show: true, type: 'info', message: "Form Feedback belum dibuka oleh Host." });
                                                                 return;
                                                             }
                                                             const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
                                                             if (!postRes || (Number(postRes.score) || 0) < 80) {
-                                                                setNotification({ show: true, type: 'error', message: "Anda harus lulus Post-Test (Skor >= 80) sebelum mengisi feedback." });
+                                                                setNotification({ show: true, type: 'info', message: "Anda harus lulus Post-Test (Skor >= 80) sebelum mengisi feedback." });
                                                                 return;
                                                             }
                                                             if (userFeedback) return;
