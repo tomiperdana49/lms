@@ -19,7 +19,8 @@ import {
     Lock,
     Camera,
     Image as ImageIcon,
-    Search
+    Search,
+    Link
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Role, Meeting, CostReport, Employee, QuizResult, User } from '../types';
@@ -79,6 +80,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [meetingToDelete, setMeetingToDelete] = useState<number | null>(null);
     const [confirmMarkPaid, setConfirmMarkPaid] = useState<boolean>(false);
     const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+    const [closeSessionPhotoUrl, setCloseSessionPhotoUrl] = useState('');
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
 
     // Reporting State
@@ -616,7 +619,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             return;
         }
 
-        const finalEmails = [...new Set(invitedEmails)];
+        const hostEmail = employees.find(e => e.id_employee === formData.host_id)?.email;
+        const allEmails = hostEmail ? [...invitedEmails, hostEmail] : invitedEmails;
+        const finalEmails = [...new Set(allEmails)];
 
         const dateObj = new Date(formData.date);
         const meetingData = {
@@ -1759,7 +1764,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 )}
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Link Materi (Optional)</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Link Materi</label>
                                     <div className="relative mb-4">
                                         <FileText size={18} className="absolute left-3.5 top-3 text-slate-400" />
                                         <input
@@ -2362,6 +2367,18 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         </div>
                                     </div>
 
+                                    {selectedMeeting.material_link && (
+                                        <div className="flex gap-4">
+                                            <div className="w-8 flex justify-center pt-0.5"><Link className="text-slate-400" size={20} /></div>
+                                            <div>
+                                                <p className="font-semibold text-slate-700 text-sm">Link Materi</p>
+                                                <a href={selectedMeeting.material_link} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-600 hover:underline break-all block mt-0.5">
+                                                    {selectedMeeting.material_link}
+                                                </a>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="flex gap-4">
                                         <div className="w-8 flex justify-center pt-0.5"><Users className="text-slate-400" size={20} /></div>
                                         <div className="flex-1">
@@ -2867,20 +2884,102 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     />
                 </div>
             )}
-            {/* Confirmation Modal for Closing Session */}
-            <ConfirmationModal
-                isOpen={isCloseModalOpen}
-                onClose={() => setIsCloseModalOpen(false)}
-                onConfirm={() => {
-                    toggleMeetingStatus('is_closed', false);
-                    setIsCloseModalOpen(false);
-                }}
-                title="Tutup Sesi Training"
-                message="Apakah Anda yakin ingin menutup sesi ini? Setelah ditutup, peserta tidak akan bisa lagi mengakses assessment dan feedback."
-                confirmText="Ya, Tutup Sesi"
-                cancelText="Batal"
-                variant="danger"
-            />
+            {/* Custom Modal for Closing Session with Photo Upload */}
+            {isCloseModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-6 scale-100 animate-in zoom-in-95">
+                        <div className="flex flex-col items-center text-center">
+                            <div className={`p-3 rounded-full mb-4 bg-red-100 text-red-600`}>
+                                <Lock size={32} />
+                            </div>
+
+                            <h3 className="text-xl font-bold text-slate-800 mb-2">Tutup Sesi Training</h3>
+                            <p className="text-slate-500 mb-4 text-sm">Apakah Anda yakin ingin menutup sesi ini? Setelah ditutup, peserta tidak akan bisa lagi mengakses assessment dan feedback.</p>
+                            
+                            <div className="w-full text-left mb-6 relative">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Upload Training Photos <span className="text-red-500">*</span></label>
+                                <div className="relative">
+                                    <ImageIcon size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            try {
+                                                setIsUploadingPhoto(true);
+                                                const url = await uploadFileToServer(file);
+                                                setCloseSessionPhotoUrl(url);
+                                            } catch (err) {
+                                                setNotification({ show: true, type: 'error', message: 'Failed to upload photo.' });
+                                            } finally {
+                                                setIsUploadingPhoto(false);
+                                            }
+                                        }}
+                                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600 bg-slate-50 text-sm file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 cursor-pointer" 
+                                        disabled={isUploadingPhoto}
+                                    />
+                                </div>
+                                {isUploadingPhoto && <p className="text-xs text-indigo-600 font-bold mt-2">Uploading...</p>}
+                                {closeSessionPhotoUrl && (
+                                    <p className="text-xs text-emerald-600 font-bold mt-2 flex items-center gap-1"><CheckCircle size={12}/> Photo uploaded successfully.</p>
+                                )}
+                            </div>
+
+                            <div className="flex gap-3 w-full">
+                                <button
+                                    onClick={() => { setIsCloseModalOpen(false); setCloseSessionPhotoUrl(''); }}
+                                    className={`flex-1 py-2.5 rounded-xl border border-slate-200 font-bold transition-colors text-slate-600 hover:bg-slate-50`}
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    onClick={async () => { 
+                                        if(!selectedMeeting) return;
+                                        
+                                        const costReportPayload = {
+                                            ...selectedMeeting.costReport,
+                                            trainingPhotos: closeSessionPhotoUrl
+                                        };
+                                        const updatedMeeting = { 
+                                            ...selectedMeeting, 
+                                            is_closed: 1,
+                                            costReport: costReportPayload 
+                                        };
+
+                                        try {
+                                            const res = await fetch(`${API_BASE_URL}/api/meetings/${selectedMeeting.id}`, {
+                                                method: 'PUT',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify(updatedMeeting)
+                                            });
+
+                                            if (res.ok) {
+                                                const data = await res.json();
+                                                setSelectedMeeting(data);
+                                                setMeetings(prev => prev.map(m => m.id === data.id ? data : m));
+                                                setNotification({ show: true, type: 'success', message: `Sesi berhasil ditutup.` });
+                                            } else {
+                                                throw new Error("Failed to close session.");
+                                            }
+                                        } catch (e) {
+                                            console.error(e);
+                                            setNotification({ show: true, type: 'error', message: "Gagal menutup sesi." });
+                                        }
+                                        
+                                        setIsCloseModalOpen(false); 
+                                        setCloseSessionPhotoUrl(''); 
+                                    }}
+                                    className={`flex-1 py-2.5 rounded-xl text-white font-bold shadow-lg transition-colors bg-red-600 hover:bg-red-700 shadow-red-200 disabled:opacity-50 disabled:cursor-not-allowed`}
+                                    disabled={!closeSessionPhotoUrl || isUploadingPhoto}
+                                >
+                                    Ya, Tutup Sesi
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
