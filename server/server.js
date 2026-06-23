@@ -1965,11 +1965,15 @@ app.post('/api/meetings', async (req, res) => {
         let guests = m.guests || { status: 'Awaiting', count: 0, emails: [] };
         if (!guests.emails) guests.emails = [];
 
+        // Convert date to local YYYY-MM-DD
+        const d = new Date(m.date);
+        const localDate = new Date(d.getTime() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
+
         const result = await query(
             'INSERT INTO meetings (title, date, time, host, location, type, meetLink, agenda, guests_json, cost_report_json, employee_id, pre_test_link, material_link, post_test_link, feedback_link, pre_test_data, post_test_data, feedback_data, is_pre_test_active, is_post_test_active, is_feedback_active, is_closed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 m.title, 
-                new Date(m.date), 
+                localDate, 
                 m.time, 
                 m.host || 'HR Team', 
                 m.location, 
@@ -2027,11 +2031,15 @@ app.put('/api/meetings/:id', async (req, res) => {
         // Prepare Cost Report JSON
         let costReport = m.costReport || null;
 
+        // Convert date to local YYYY-MM-DD
+        const d = new Date(m.date);
+        const localDate = new Date(d.getTime() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
+
         await query(
             'UPDATE meetings SET title = ?, date = ?, time = ?, host = ?, location = ?, type = ?, meetLink = ?, agenda = ?, guests_json = ?, cost_report_json = ?, employee_id = ?, pre_test_link = ?, material_link = ?, post_test_link = ?, feedback_link = ?, pre_test_data = ?, post_test_data = ?, feedback_data = ?, is_pre_test_active = ?, is_post_test_active = ?, is_feedback_active = ?, is_closed = ? WHERE id = ?',
             [
                 m.title,
-                new Date(m.date),
+                localDate,
                 m.time,
                 m.host || 'HR Team',
                 m.location,
