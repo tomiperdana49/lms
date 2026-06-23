@@ -1491,9 +1491,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             </div>
                                         </div>
                                         <div className="flex flex-col items-end gap-2">
-                                            {meeting.is_closed && (
+                                            {meeting.is_closed ? (
                                                 <span className="px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-600 border border-red-100/50 flex items-center gap-1.5 shadow-sm">
                                                     <Lock size={10} /> CLOSED
+                                                </span>
+                                            ) : (
+                                                <span className="px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 border border-emerald-100/50 flex items-center gap-1.5 shadow-sm">
+                                                    <Zap size={10} className="animate-pulse" /> ACTIVE
                                                 </span>
                                             )}
                                             <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm ${meeting.type === 'Online'
