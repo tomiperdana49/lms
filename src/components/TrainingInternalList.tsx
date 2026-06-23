@@ -1682,8 +1682,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
                                                     {(function() {
                                                         const filtered = employees.filter(emp =>
-                                                            emp.full_name?.toLowerCase().includes(hostSearch.toLowerCase()) ||
-                                                            emp.id_employee?.toLowerCase().includes(hostSearch.toLowerCase())
+                                                            emp.active_status === 'Active' &&
+                                                            (emp.full_name?.toLowerCase().includes(hostSearch.toLowerCase()) ||
+                                                            emp.id_employee?.toLowerCase().includes(hostSearch.toLowerCase()))
                                                         ).slice(0, 50);
 
                                                         if (filtered.length === 0) {
@@ -1787,6 +1788,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
                                                     {(function() {
                                                         const filtered = employees.filter(emp =>
+                                                            emp.active_status === 'Active' &&
                                                             !invitedEmployeeIds.includes(emp.id_employee) &&
                                                             (emp.full_name?.toLowerCase().includes(participantSearch.toLowerCase()) ||
                                                                 emp.id_employee?.toLowerCase().includes(participantSearch.toLowerCase()))
