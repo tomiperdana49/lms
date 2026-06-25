@@ -684,9 +684,9 @@ app.post('/api/login', async (req, res) => {
         // Domain restriction check for email logins
         if (loginId.includes('@')) {
             const isDemoBypass = loginId.endsWith('@nusa.com');
-            const isCorporate = loginId.endsWith('@nusa.net.id') || loginId.endsWith('@nusawork.com') || loginId.endsWith('@nusa.id');
+            const isCorporate = loginId.endsWith('@nusawork.com') || loginId.endsWith('@nusa.id');
             if (!isDemoBypass && !isCorporate) {
-                return res.status(403).json({ success: false, message: 'Access Restricted: Only @nusa.net.id, @nusawork.com, or @nusa.id emails are allowed.' });
+                return res.status(403).json({ success: false, message: 'Access Restricted: Only @nusa.id or @nusawork.com emails are allowed.' });
             }
         }
 
@@ -833,8 +833,8 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/auth/google', async (req, res) => {
     try {
         const { email } = req.body;
-        if (!email || (!email.endsWith('@nusa.net.id') && !email.endsWith('@nusawork.com') && !email.endsWith('@nusa.id'))) {
-            return res.status(403).json({ success: false, message: 'Access Restricted: Only @nusa.net.id, @nusawork.com, or @nusa.id emails are allowed.' });
+        if (!email || (!email.endsWith('@nusawork.com') && !email.endsWith('@nusa.id'))) {
+            return res.status(403).json({ success: false, message: 'Access Restricted: Only @nusa.id or @nusawork.com emails are allowed.' });
         }
 
         // 1. Try to sync/update user details from Nusawork in background
