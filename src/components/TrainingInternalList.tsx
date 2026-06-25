@@ -2669,7 +2669,12 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                             <div className="space-y-2">
                                                 {/* Pre-Test */}
-                                                <div className="flex flex-col gap-2">
+                                                {(() => {
+                                                    let preTestData;
+                                                    try { preTestData = typeof selectedMeeting.pre_test_data === 'string' ? JSON.parse(selectedMeeting.pre_test_data || '{}') : (selectedMeeting.pre_test_data || {}); } catch(e) { preTestData = {}; }
+                                                    if (!Array.isArray(preTestData?.questions) || preTestData.questions.length === 0) return null;
+                                                    return (
+                                                        <div className="flex flex-col gap-2">
                                                     <button
                                                         onClick={() => {
                                                             if (isHostOrHR) return; // Host doesn't take the test here
@@ -2733,9 +2738,16 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         </div>
                                                     )}
                                                 </div>
+                                                    );
+                                                })()}
 
                                                 {/* Post-Test */}
-                                                <div className="flex flex-col gap-2">
+                                                {(() => {
+                                                    let postTestData;
+                                                    try { postTestData = typeof selectedMeeting.post_test_data === 'string' ? JSON.parse(selectedMeeting.post_test_data || '{}') : (selectedMeeting.post_test_data || {}); } catch(e) { postTestData = {}; }
+                                                    if (!Array.isArray(postTestData?.questions) || postTestData.questions.length === 0) return null;
+                                                    return (
+                                                        <div className="flex flex-col gap-2">
                                                     <button
                                                         onClick={() => {
                                                             if (isHostOrHR) return;
@@ -2805,6 +2817,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         </div>
                                                     )}
                                                 </div>
+                                                    );
+                                                })()}
 
                                                 {/* Feedback */}
                                                 <div className="flex flex-col gap-2">
@@ -2819,10 +2833,18 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 setNotification({ show: true, type: 'info', message: "Form Feedback belum dibuka oleh Host." });
                                                                 return;
                                                             }
-                                                            const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
-                                                            if (!postRes || (Number(postRes.score) || 0) < 80) {
-                                                                setNotification({ show: true, type: 'info', message: "Anda harus lulus Post-Test (Skor >= 80) sebelum mengisi feedback." });
-                                                                return;
+                                                            const hasPostTest = (() => {
+                                                                try {
+                                                                    const data = typeof selectedMeeting.post_test_data === 'string' ? JSON.parse(selectedMeeting.post_test_data || '{}') : (selectedMeeting.post_test_data || {});
+                                                                    return Array.isArray(data?.questions) && data.questions.length > 0;
+                                                                } catch (e) { return false; }
+                                                            })();
+                                                            if (hasPostTest) {
+                                                                const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
+                                                                if (!postRes || (Number(postRes.score) || 0) < 80) {
+                                                                    setNotification({ show: true, type: 'info', message: "Anda harus lulus Post-Test (Skor >= 80) sebelum mengisi feedback." });
+                                                                    return;
+                                                                }
                                                             }
                                                             if (userFeedback) return;
                                                             setShowFeedback(true);
@@ -2831,22 +2853,40 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                             ${(userFeedback || isHostOrHR) 
                                                                 ? 'cursor-default' 
                                                                 : (() => {
+                                                                    const hasPostTest = (() => {
+                                                                        try {
+                                                                            const data = typeof selectedMeeting.post_test_data === 'string' ? JSON.parse(selectedMeeting.post_test_data || '{}') : (selectedMeeting.post_test_data || {});
+                                                                            return Array.isArray(data?.questions) && data.questions.length > 0;
+                                                                        } catch (e) { return false; }
+                                                                    })();
                                                                     const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
-                                                                    const hasPassed = postRes && (Number(postRes.score) || 0) >= 80;
+                                                                    const hasPassed = hasPostTest ? (postRes && (Number(postRes.score) || 0) >= 80) : true;
                                                                     return (selectedMeeting.is_feedback_active && !selectedMeeting.is_closed && hasPassed) ? 'hover:border-indigo-300 cursor-pointer' : 'opacity-60 cursor-not-allowed';
                                                                 })()}`}
                                                     >
                                                         <div className="flex items-center gap-3">
                                                             <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${(() => {
+                                                                const hasPostTest = (() => {
+                                                                    try {
+                                                                        const data = typeof selectedMeeting.post_test_data === 'string' ? JSON.parse(selectedMeeting.post_test_data || '{}') : (selectedMeeting.post_test_data || {});
+                                                                        return Array.isArray(data?.questions) && data.questions.length > 0;
+                                                                    } catch (e) { return false; }
+                                                                })();
                                                                 const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
-                                                                const hasPassed = postRes && (Number(postRes.score) || 0) >= 80;
+                                                                const hasPassed = hasPostTest ? (postRes && (Number(postRes.score) || 0) >= 80) : true;
                                                                 if (userFeedback) return 'bg-emerald-100 text-emerald-600';
                                                                 if ((!selectedMeeting.is_feedback_active || selectedMeeting.is_closed || (!hasPassed && !isHostOrHR))) return 'bg-slate-50 text-slate-300';
                                                                 return 'bg-purple-50 text-purple-600 group-hover:bg-purple-500 group-hover:text-white';
                                                             })()}`}>
                                                                 {(() => {
+                                                                    const hasPostTest = (() => {
+                                                                        try {
+                                                                            const data = typeof selectedMeeting.post_test_data === 'string' ? JSON.parse(selectedMeeting.post_test_data || '{}') : (selectedMeeting.post_test_data || {});
+                                                                            return Array.isArray(data?.questions) && data.questions.length > 0;
+                                                                        } catch (e) { return false; }
+                                                                    })();
                                                                     const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
-                                                                    const hasPassed = postRes && (Number(postRes.score) || 0) >= 80;
+                                                                    const hasPassed = hasPostTest ? (postRes && (Number(postRes.score) || 0) >= 80) : true;
                                                                     return (selectedMeeting.is_feedback_active && !selectedMeeting.is_closed && (hasPassed || isHostOrHR)) ? <Users size={16} /> : <Lock size={16} />;
                                                                 })()}
                                                             </div>
