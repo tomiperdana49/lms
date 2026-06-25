@@ -2391,7 +2391,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         >
                             <div className="relative h-32 flex-shrink-0 bg-gradient-to-r from-indigo-500 to-purple-500">
                                 <div className="absolute top-4 right-4 flex gap-2">
-                                    {(effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') && (
+                                    {(effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' || (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id)) && (
                                         <>
                                             <button
                                                 onClick={() => openEditModal(selectedMeeting)}
