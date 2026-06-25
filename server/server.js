@@ -1287,8 +1287,101 @@ app.post('/api/admin/sync-all-nusawork', async (req, res) => {
     }
 });
 
-
 // --- USER ROUTES ---
+app.get('/api/learning-stats', async (req, res) => {
+    try {
+        const { email, employee_id } = req.query;
+        if (!email && !employee_id) return res.status(400).json({ error: 'Email or employee_id required' });
+        
+        let targetEmail = email;
+        let targetEmpId = employee_id;
+        
+        // Find employee if missing
+        if (!targetEmpId && targetEmail) {
+            const users = await query('SELECT employee_id FROM users WHERE email = ?', [targetEmail]);
+            if (users.length > 0) targetEmpId = users[0].employee_id;
+        }
+
+        let jamTraining = 0;
+        let biayaTraining = 0;
+        let jamBuku = 0;
+        let biayaBuku = 0;
+
+        // 1. Internal Training (meetings)
+        const meetings = await query("SELECT time, guests_json, cost_report_json FROM meetings WHERE type IN ('Offline', 'Online', 'Hybrid')");
+        for (const meeting of meetings) {
+            let isAttended = false;
+            let costReport = null;
+            let guests = null;
+            
+            try { if (meeting.cost_report_json) costReport = JSON.parse(meeting.cost_report_json); } catch(e){}
+            try { if (meeting.guests_json) guests = JSON.parse(meeting.guests_json); } catch(e){}
+            
+            // Check if attended from costReport first (more accurate)
+            if (costReport && costReport.attendees && targetEmail) {
+                if (costReport.attendees.includes(targetEmail)) isAttended = true;
+            } else if (costReport && costReport.attendee_ids && targetEmpId) {
+                if (costReport.attendee_ids.includes(targetEmpId)) isAttended = true;
+            } else if (guests && guests.emails && targetEmail) {
+                if (guests.emails.includes(targetEmail)) isAttended = true;
+            } else if (guests && guests.employee_ids && targetEmpId) {
+                if (guests.employee_ids.includes(targetEmpId)) isAttended = true;
+            }
+            
+            if (isAttended) {
+                // Parse duration
+                if (meeting.time) {
+                    const parts = meeting.time.split('-');
+                    if (parts.length === 2) {
+                        const parseTime = (t) => {
+                            const [h, m] = t.split(':').map(Number);
+                            return (h || 0) + (m || 0) / 60;
+                        };
+                        const startH = parseTime(parts[0].trim());
+                        const endH = parseTime(parts[1].trim());
+                        if (endH > startH) jamTraining += (endH - startH);
+                    }
+                }
+                
+                // Parse cost
+                if (costReport && costReport.participantsCount > 0) {
+                    const tInc = Number(costReport.trainerIncentive) || 0;
+                    const sCost = Number(costReport.snackCost) || 0;
+                    const lCost = Number(costReport.lunchCost) || 0;
+                    const oCost = Number(costReport.otherCost) || 0;
+                    const totalCost = tInc + sCost + lCost + oCost;
+                    biayaTraining += (totalCost / costReport.participantsCount);
+                }
+            }
+        }
+        
+        // 2. Baca Buku (reading_logs)
+        if (targetEmpId) {
+            const logs = await query("SELECT incentive_amount FROM reading_logs WHERE employee_id = ? AND hr_approval_status = 'Approved'", [targetEmpId]);
+            for (const log of logs) {
+                const incentive = Number(log.incentive_amount) || 0;
+                biayaBuku += incentive;
+                if (incentive === 100000) jamBuku += 15;
+                else if (incentive === 50000) jamBuku += 3;
+                else if (incentive > 0) jamBuku += (incentive / 100000) * 15; // Just in case
+            }
+        }
+        
+        res.json({
+            jamTraining: Math.round(jamTraining),
+            jamBuku: Math.round(jamBuku),
+            biayaTraining: Math.round(biayaTraining),
+            biayaBuku: Math.round(biayaBuku),
+            totalJam: Math.round(jamTraining + jamBuku),
+            totalBiaya: Math.round(biayaTraining + biayaBuku)
+        });
+
+    } catch (err) {
+        console.error('[API] Error in /api/learning-stats:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/users', async (req, res) => {
     try {
         const users = await query('SELECT * FROM users');

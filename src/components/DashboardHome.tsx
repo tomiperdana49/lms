@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import { BookOpen, Users, Calendar as CalendarIcon, Video, GraduationCap, Star, Briefcase, Award } from 'lucide-react';
 import type { Page, Role } from '../types';
 import LMSCalendar from './LMSCalendar';
+import { API_BASE_URL } from '../config';
 
 interface DashboardHomeProps {
     onNavigate?: (page: Page) => void;
@@ -13,6 +15,21 @@ interface DashboardHomeProps {
 import NotificationPanel from './NotificationPanel';
 
 const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: DashboardHomeProps) => {
+    const [learningStats, setLearningStats] = useState({ totalJam: 0, totalBiaya: 0 });
+
+    useEffect(() => {
+        if (userEmail) {
+            fetch(`${API_BASE_URL}/api/learning-stats?email=${encodeURIComponent(userEmail)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.error) {
+                        setLearningStats(data);
+                    }
+                })
+                .catch(err => console.error("Error fetching learning stats:", err));
+        }
+    }, [userEmail]);
+
     const baseMenuItems = [
         {
             title: 'Reading Log',
@@ -99,14 +116,16 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
                     {/* Quick Stats Bar */}
                     <div className="flex gap-4 w-full md:w-auto">
                         <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-white/10 flex-1 md:flex-none md:min-w-[140px] group hover:bg-white/15 transition-all text-center">
-                            <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-70">Learning Pulse</div>
-                            <div className="text-xl sm:text-2xl font-black tracking-tighter">Active</div>
-                            <div className="text-[9px] font-medium text-blue-200 mt-1">Account Status</div>
+                            <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-70">Jam Learning</div>
+                            <div className="text-xl sm:text-2xl font-black tracking-tighter">{learningStats.totalJam} Jam</div>
+                            <div className="text-[9px] font-medium text-blue-200 mt-1">Total Jam</div>
                         </div>
                         <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-white/10 flex-1 md:flex-none md:min-w-[140px] group hover:bg-white/15 transition-all text-center">
-                            <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-70">Year {new Date().getFullYear()}</div>
-                            <div className="text-xl sm:text-2xl font-black tracking-tighter">Premium</div>
-                            <div className="text-[9px] font-medium text-blue-200 mt-1">Membership</div>
+                            <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-70">Biaya Learning</div>
+                            <div className="text-xl sm:text-2xl font-black tracking-tighter">
+                                Rp {learningStats.totalBiaya.toLocaleString('id-ID')}
+                            </div>
+                            <div className="text-[9px] font-medium text-blue-200 mt-1">Total Biaya</div>
                         </div>
                     </div>
                 </div>
