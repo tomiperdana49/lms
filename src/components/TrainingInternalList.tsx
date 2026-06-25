@@ -3325,6 +3325,9 @@ const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChang
     const questions = data?.questions || [];
     const lastQuestionRef = useRef<HTMLDivElement>(null);
     const lastInputRef = useRef<HTMLTextAreaElement>(null);
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importUrl, setImportUrl] = useState('');
+    const [isImporting, setIsImporting] = useState(false);
 
     const addQuestion = () => {
         const newQs = [...questions, { question: '', options: ['', ''], correctAnswer: 0 }];
@@ -3334,6 +3337,34 @@ const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChang
             lastInputRef.current?.focus();
         }, 150);
     };
+
+    const importGForm = async () => {
+        if (!importUrl) return;
+        setIsImporting(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/utils/import-gform`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: importUrl })
+            });
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.error || 'Failed to import form');
+            if (result.questions && result.questions.length > 0) {
+                const newQs = [...questions, ...result.questions];
+                onChange({ ...data, questions: newQs });
+                alert(`Berhasil mengimpor ${result.questions.length} soal.`);
+                setShowImportModal(false);
+                setImportUrl('');
+            } else {
+                alert('Tidak ada soal pilihan ganda ditemukan di form tersebut.');
+            }
+        } catch (e: any) {
+            alert('Gagal mengimpor form: ' + e.message);
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
 
     const addOption = (qIdx: number) => {
         const newQs = [...questions];
@@ -3381,9 +3412,14 @@ const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChang
                      <div className={`w-2 h-2 rounded-full ${type === 'Pre-Test' ? 'bg-blue-500' : 'bg-indigo-500'}`} />
                      {type} Assessment
                  </h4>
-                 <button type="button" onClick={addQuestion} className="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-black hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-1">
-                     <Plus size={14} /> ADD QUESTION
-                 </button>
+                 <div className="flex items-center gap-2">
+                     <button type="button" onClick={() => setShowImportModal(true)} className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-black hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-1" title="Import soal dari Google Form">
+                         <Link size={14} /> IMPORT GOOGLE FORM
+                     </button>
+                     <button type="button" onClick={addQuestion} className="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-black hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-1">
+                         <Plus size={14} /> ADD QUESTION
+                     </button>
+                 </div>
              </div>
              {questions.length === 0 && (
                  <div className="py-8 px-4 border-2 border-dashed border-slate-100 rounded-2xl text-center">
@@ -3456,6 +3492,48 @@ const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChang
                      </div>
                  ))}
              </div>
+             
+             {showImportModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+                    <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                                <Link size={18} className="text-emerald-500" /> Import Google Form
+                            </h3>
+                            <button type="button" onClick={() => setShowImportModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <p className="text-sm text-slate-500 mb-4">Masukkan URL Google Form yang dapat diakses publik untuk mengimpor daftar pertanyaannya.</p>
+                        <input 
+                            type="url"
+                            autoFocus
+                            placeholder="https://docs.google.com/forms/d/..."
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none transition-all mb-6 bg-slate-50 focus:bg-white"
+                            value={importUrl}
+                            onChange={(e) => setImportUrl(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && importGForm()}
+                        />
+                        <div className="flex justify-end gap-3">
+                            <button 
+                                type="button" 
+                                onClick={() => setShowImportModal(false)}
+                                className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-colors text-sm"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                type="button" 
+                                disabled={isImporting || !importUrl}
+                                onClick={importGForm}
+                                className="px-5 py-2.5 rounded-xl font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isImporting ? 'Importing...' : 'Import Soal'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+             )}
         </div>
     );
 };

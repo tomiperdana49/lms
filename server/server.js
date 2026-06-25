@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import multer from 'multer';
 import pool, { initDB, simAssetPool } from './db.js';
 import nodemailer from 'nodemailer';
-
+import { extractGForm } from './import-gform.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -2951,6 +2951,18 @@ const DIST_DIR = path.join(__dirname, '../dist');
 if (fs.existsSync(DIST_DIR)) {
     app.use(express.static(DIST_DIR));
 }
+
+app.post('/api/utils/import-gform', async (req, res) => {
+    try {
+        const { url } = req.body;
+        if (!url) return res.status(400).json({ error: 'URL is required' });
+        const questions = await extractGForm(url);
+        res.json({ questions });
+    } catch (e) {
+        console.error('Import GForm Error:', e);
+        res.status(500).json({ error: e.message || 'Failed to import form' });
+    }
+});
 
 // Fallback
 if (fs.existsSync(DIST_DIR)) {
