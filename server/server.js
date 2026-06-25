@@ -2013,9 +2013,14 @@ app.get('/api/meetings/summary/:id', async (req, res) => {
         const quizResults = await query('SELECT quiz_type, COUNT(*) as count FROM quiz_results WHERE meeting_id = ? GROUP BY quiz_type', [id]);
         const feedbackResults = await query('SELECT COUNT(*) as count FROM course_feedback WHERE meeting_id = ?', [id]);
         
+        const allQuizResults = await query('SELECT * FROM quiz_results WHERE meeting_id = ?', [id]);
+        const allFeedbackResults = await query('SELECT * FROM course_feedback WHERE meeting_id = ?', [id]);
+        
         res.json({
             quiz: quizResults,
-            feedback: feedbackResults[0]?.count || 0
+            feedback: feedbackResults[0]?.count || 0,
+            allQuizResults,
+            allFeedbackResults
         });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });

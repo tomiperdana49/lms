@@ -176,8 +176,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [showQuiz, setShowQuiz] = useState<'PRE' | 'POST' | null>(null);
     const [showFeedback, setShowFeedback] = useState(false);
     const [meetingQuizResults, setMeetingQuizResults] = useState<QuizResult[]>([]);
-    const [meetingSummary, setMeetingSummary] = useState<{ quiz: { quiz_type: string, count: number }[], feedback: number } | null>(null);
+    const [meetingSummary, setMeetingSummary] = useState<{ quiz: { quiz_type: string, count: number }[], feedback: number, allQuizResults?: any[], allFeedbackResults?: any[] } | null>(null);
     const [userFeedback, setUserFeedback] = useState<any>(null);
+    const [showParticipantModal, setShowParticipantModal] = useState<'sudah' | 'belum' | null>(null);
 
     const fetchResults = async (mid: number) => {
         if (!user.email) return;
@@ -1031,6 +1032,109 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 confirmText="Yes, Cancel it"
                 variant="danger"
             />
+
+            {showParticipantModal && selectedMeeting && meetingSummary && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowParticipantModal(null)} />
+                    <div className="relative bg-white rounded-3xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                            <div>
+                                <h3 className="text-xl font-black text-slate-800">
+                                    {showParticipantModal === 'sudah' ? 'Peserta Sudah Selesai' : 'Peserta Belum Selesai'}
+                                </h3>
+                                <p className="text-xs font-medium text-slate-500 mt-1">Detail status assessment peserta</p>
+                            </div>
+                            <button onClick={() => setShowParticipantModal(null)} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-0">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Participant Name</th>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest text-center">Pre-Test</th>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest text-center">Post-Test</th>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest text-center">Feedback</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {(() => {
+                                        const results = meetingSummary.allQuizResults || [];
+                                        const feedbacks = meetingSummary.allFeedbackResults || [];
+                                        const guests = selectedMeeting.guests?.emails || [];
+                                        
+                                        const isMatch = (item: any, email: string) => {
+                                            if (!item) return false;
+                                            const idStr = (item.student_id || item.employee_id || item.user_id || item.email || item.user_email || '').toString().toLowerCase().trim();
+                                            const target = email.toLowerCase().trim();
+                                            if (idStr === target) return true;
+                                            if (target.includes('@') && idStr === target.split('@')[0]) return true;
+                                            const emp = employees.find(e => e.email?.toLowerCase() === target || String(e.id_employee).toLowerCase() === target || String(e.id).toLowerCase() === target);
+                                            if (emp) {
+                                                const empIds = [String(emp.id_employee).toLowerCase(), String(emp.id).toLowerCase(), emp.email?.toLowerCase()].filter(Boolean);
+                                                if (empIds.includes(idStr)) return true;
+                                            }
+                                            return false;
+                                        };
+
+                                        const renderedRows = guests.map((email: string) => {
+                                            const hasFeedback = feedbacks.some(f => isMatch(f, email));
+                                            const isDone = hasFeedback;
+                                            
+                                            if (showParticipantModal === 'sudah' && !isDone) return null;
+                                            if (showParticipantModal === 'belum' && isDone) return null;
+                                            
+                                            const emp = employees.find(e => e.email?.toLowerCase() === email.toLowerCase() || String(e.id_employee).toLowerCase() === email.toLowerCase());
+                                            const name = emp?.full_name || email;
+                                            
+                                            const preScores = results.filter(r => isMatch(r, email) && (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE')).map(r => Number(r.score) || 0);
+                                            const postScores = results.filter(r => isMatch(r, email) && (r.quizType || r.quiz_type || "").toUpperCase().includes('POST')).map(r => Number(r.score) || 0);
+                                            
+                                            const preScore = preScores.length > 0 ? Math.max(...preScores) : '-';
+                                            const postScore = postScores.length > 0 ? Math.max(...postScores) : '-';
+                                            
+                                            let fbScore: any = '-';
+                                            const f = feedbacks.find(f => isMatch(f, email));
+                                            if (f) {
+                                                const fData = f.feedbackData || f.feedback_data || f.data;
+                                                if (fData) {
+                                                    try {
+                                                        const data = typeof fData === 'string' ? JSON.parse(fData) : fData;
+                                                        const scores = Object.values(data || {}).filter(v => typeof v === 'number' || !isNaN(Number(v as any))).map(v => Number(v as any));
+                                                        if (scores.length > 0) fbScore = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
+                                                    } catch(e) {}
+                                                }
+                                            }
+                                            
+                                            return (
+                                                <tr key={email} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="px-6 py-4 font-bold text-slate-700">{name}</td>
+                                                    <td className="px-6 py-4 text-center font-black text-slate-600">{preScore}</td>
+                                                    <td className="px-6 py-4 text-center font-black text-slate-600">{postScore}</td>
+                                                    <td className="px-6 py-4 text-center font-black text-emerald-600">{fbScore}</td>
+                                                </tr>
+                                            );
+                                        }).filter(Boolean);
+
+                                        if (renderedRows.length === 0) {
+                                            return (
+                                                <tr>
+                                                    <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic">
+                                                        Tidak ada data peserta.
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }
+
+                                        return renderedRows;
+                                    })()}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Header / Hero Section */}
             <div className="bg-gradient-to-br from-indigo-700 via-indigo-600 to-blue-600 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden shrink-0">
@@ -2540,13 +2644,19 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                                     {!!meetingSummary && (
                                                         <div className="mb-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-2 shadow-inner">
-                                                            <div className="flex justify-between items-center">
+                                                            <div 
+                                                                className="flex justify-between items-center p-2 hover:bg-slate-100 rounded-xl cursor-pointer transition-colors"
+                                                                onClick={() => setShowParticipantModal('sudah')}
+                                                            >
                                                                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sudah Selesai</span>
                                                                 <span className="text-sm font-black text-emerald-600 bg-emerald-50 px-3 py-0.5 rounded-full border border-emerald-100">
                                                                     {meetingSummary.feedback || 0}
                                                                 </span>
                                                             </div>
-                                                            <div className="flex justify-between items-center">
+                                                            <div 
+                                                                className="flex justify-between items-center p-2 hover:bg-slate-100 rounded-xl cursor-pointer transition-colors"
+                                                                onClick={() => setShowParticipantModal('belum')}
+                                                            >
                                                                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Belum Selesai</span>
                                                                 <span className="text-sm font-black text-orange-600 bg-orange-50 px-3 py-0.5 rounded-full border border-orange-100">
                                                                     {Math.max(0, (selectedMeeting.guests?.emails?.length || 0) - (meetingSummary.feedback || 0))}
