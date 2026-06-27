@@ -1304,7 +1304,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                 if (!emp) emp = users.find(u => log.userName && u.name && log.userName.trim().toLowerCase() === u.name.trim().toLowerCase());
                                                 return (
                                                     <div className="flex flex-col">
-                                                        <p className="font-bold text-slate-700 text-sm">{log.userName || 'Unknown'}</p>
+                                                        <p className="font-bold text-slate-700 text-sm">{emp?.name || log.userName || 'Unknown'}</p>
                                                         {emp?.employee_id && <p className="text-[11px] text-slate-500 font-medium mt-0.5">ID: {emp.employee_id}</p>}
                                                         {emp?.email && <p className="text-[11px] text-slate-400">{emp.email}</p>}
                                                         {!emp?.employee_id && !emp?.email && <p className="text-[11px] text-slate-400">Staff</p>}
