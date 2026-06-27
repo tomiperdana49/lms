@@ -1834,7 +1834,13 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                             <div className="space-y-3 text-xs font-semibold text-slate-700">
                                 <div className="flex justify-between py-1.5 border-b border-slate-50">
                                     <span className="text-slate-400">Reader Name</span>
-                                    <span className="font-bold text-slate-800">{detailModal.log.userName || 'Unknown'}</span>
+                                    <span className="font-bold text-slate-800">
+                                        {(() => {
+                                            let emp = users.find(u => detailModal.log?.employee_id && u.employee_id === detailModal.log.employee_id);
+                                            if (!emp) emp = users.find(u => detailModal.log?.userName && u.name && detailModal.log.userName.trim().toLowerCase() === u.name.trim().toLowerCase());
+                                            return emp?.name || detailModal.log?.userName || 'Unknown';
+                                        })()}
+                                    </span>
                                 </div>
                                 {detailModal.log.employee_id && (
                                     <div className="flex justify-between py-1.5 border-b border-slate-50">
