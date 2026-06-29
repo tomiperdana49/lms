@@ -632,6 +632,12 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                     const approvedLogs = readingLogs.filter(l => l.hrApprovalStatus === 'Approved' && new Date(l.finishDate || l.date).getFullYear() === filterYear);
                     const totalApproved = approvedLogs.length;
                     const totalEarned = approvedLogs.reduce((acc, log) => acc + Number(log.incentiveAmount || 0), 0);
+                    const totalLearningHours = approvedLogs.reduce((acc, log) => {
+                        const amount = Number(log.incentiveAmount || 0);
+                        if (amount === 100000) return acc + 15;
+                        if (amount === 50000) return acc + 3;
+                        return acc;
+                    }, 0);
                     const progress = Math.min(100, (totalApproved / 5) * 100);
                     const totalRead = readingLogs.filter(l =>
                         new Date(l.finishDate || l.date).getFullYear() === filterYear &&
@@ -648,7 +654,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 <p className="text-blue-100/80 font-medium">Keep reading to unlock more rewards and knowledge.</p>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1 max-w-3xl">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-1 max-w-4xl">
                                 {/* Card 1: Books Count */}
                                 <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all">
                                     <div className="flex items-center gap-3 mb-3">
@@ -691,10 +697,24 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                         <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Total Earned</span>
                                     </div>
                                     <div className="flex flex-col">
-                                        <span className="text-2xl font-black tracking-tighter text-emerald-300">
+                                        <span className="text-xl font-black tracking-tighter text-emerald-300 truncate" title={formatCurrency(totalEarned)}>
                                             {formatCurrency(totalEarned)}
                                         </span>
                                         <span className="text-[10px] font-bold opacity-60">Claimed Incentives</span>
+                                    </div>
+                                </div>
+
+                                {/* Card 4: Reading Hours */}
+                                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="p-2 bg-purple-500 rounded-lg shadow-lg shadow-purple-500/20">
+                                            <Clock size={18} />
+                                        </div>
+                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Reading Hours</span>
+                                    </div>
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-3xl font-black tracking-tighter">{totalLearningHours}</span>
+                                        <span className="text-sm font-bold opacity-60">Hours</span>
                                     </div>
                                 </div>
                             </div>
