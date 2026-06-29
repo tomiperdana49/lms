@@ -633,10 +633,30 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                     const totalApproved = approvedLogs.length;
                     const totalEarned = approvedLogs.reduce((acc, log) => acc + Number(log.incentiveAmount || 0), 0);
                     const totalLearningHours = approvedLogs.reduce((acc, log) => {
-                        const amount = Number(log.incentiveAmount || 0);
-                        if (amount === 100000) return acc + 15;
-                        if (amount === 50000) return acc + 3;
-                        return acc;
+                        const category = log.category || '';
+                        if (category === 'Buku Fiksi/Novel' || category === 'Majalah') {
+                            return acc;
+                        } else if (category === 'Komik Bisnis/Non Fiksi') {
+                            return acc + 3;
+                        } else if ([
+                            'Buku Biografi dan Sejarah',
+                            'Buku Bisnis dan Manajemen',
+                            'Buku Paling Diminati',
+                            'Buku Pengembangan Diri',
+                            'Buku Religi dan Hubungan',
+                            'Buku Sales dan Marketing',
+                            'Buku Teknologi',
+                            'Buku Terlaris',
+                            'Buku Wajib Baca'
+                        ].includes(category)) {
+                            return acc + 15;
+                        } else {
+                            const amount = Number(log.incentiveAmount || 0);
+                            if (amount === 100000) return acc + 15;
+                            if (amount === 50000) return acc + 3;
+                            if (amount > 0) return acc + (amount / 100000) * 15;
+                            return acc;
+                        }
                     }, 0);
                     const progress = Math.min(100, (totalApproved / 5) * 100);
                     const totalRead = readingLogs.filter(l =>
@@ -697,7 +717,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                         <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Total Insentive</span>
                                     </div>
                                     <div className="flex flex-col">
-                                        <span className="text-xl font-black tracking-tighter text-emerald-300 truncate" title={formatCurrency(totalEarned)}>
+                                        <span className="text-lg font-black tracking-tighter text-emerald-300 whitespace-nowrap" title={formatCurrency(totalEarned)}>
                                             {formatCurrency(totalEarned)}
                                         </span>
                                         <span className="text-[10px] font-bold opacity-60">Claimed Incentives</span>

@@ -1367,13 +1367,36 @@ app.get('/api/learning-stats', async (req, res) => {
         
         // 2. Baca Buku (reading_logs)
         if (targetEmpId) {
-            const logs = await query("SELECT incentive_amount FROM reading_logs WHERE employee_id = ? AND hr_approval_status = 'Approved'", [targetEmpId]);
+            const logs = await query("SELECT incentive_amount, category FROM reading_logs WHERE employee_id = ? AND hr_approval_status = 'Approved'", [targetEmpId]);
+            // Biaya buku
             for (const log of logs) {
                 const incentive = Number(log.incentive_amount) || 0;
                 biayaBuku += incentive;
-                if (incentive === 100000) jamBuku += 15;
-                else if (incentive === 50000) jamBuku += 3;
-                else if (incentive > 0) jamBuku += (incentive / 100000) * 15; // Just in case
+                
+                const category = log.category || '';
+                
+                if (category === 'Buku Fiksi/Novel' || category === 'Majalah') {
+                    // 0 hours
+                } else if (category === 'Komik Bisnis/Non Fiksi') {
+                    jamBuku += 3;
+                } else if ([
+                    'Buku Biografi dan Sejarah',
+                    'Buku Bisnis dan Manajemen',
+                    'Buku Paling Diminati',
+                    'Buku Pengembangan Diri',
+                    'Buku Religi dan Hubungan',
+                    'Buku Sales dan Marketing',
+                    'Buku Teknologi',
+                    'Buku Terlaris',
+                    'Buku Wajib Baca'
+                ].includes(category)) {
+                    jamBuku += 15;
+                } else {
+                    // Fallback to old logic just in case an old entry has no category
+                    if (incentive === 100000) jamBuku += 15;
+                    else if (incentive === 50000) jamBuku += 3;
+                    else if (incentive > 0) jamBuku += (incentive / 100000) * 15;
+                }
             }
         }
         
