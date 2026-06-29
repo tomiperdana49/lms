@@ -754,7 +754,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                     <a href="https://simas.nusa.id/book/pinjam/" target="_blank" rel="noreferrer" className="flex-1 flex flex-col items-center justify-center gap-3 p-6 bg-gradient-to-br from-blue-600 to-cyan-600 text-white rounded-3xl shadow-xl shadow-blue-600/20 hover:shadow-blue-600/40 hover:-translate-y-1 transition-all group border border-white/10 relative overflow-hidden text-center cursor-pointer">
                         <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         <BookOpen size={32} className="group-hover:scale-110 transition-transform" />
-                        <span className="font-bold text-lg tracking-wide">Book from the Office</span>
+                        <span className="font-bold text-lg tracking-wide">Office Book / SIMAS</span>
                     </a>
                 </div>
 
