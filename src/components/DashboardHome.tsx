@@ -114,7 +114,7 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
                     </div>
 
                     {/* Quick Stats Bar */}
-                    <div className="flex gap-4 w-full md:w-auto">
+                    <div className="flex gap-4 w-full md:w-auto md:mr-12 lg:mr-24">
                         <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-white/10 flex-1 md:flex-none md:min-w-[140px] group hover:bg-white/15 transition-all text-center">
                             <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-70">Learning Hours</div>
                             <div className="text-xl sm:text-2xl font-black tracking-tighter">{learningStats.totalJam} Hours</div>
