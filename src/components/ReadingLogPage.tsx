@@ -1,5 +1,5 @@
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
-import { BookOpen, ArrowLeft, Search, Book, Trophy, Trash2, XCircle, CheckCircle, Upload, Clock, ChevronLeft, ChevronRight, Star, Wallet } from 'lucide-react';
+import { BookOpen, ArrowLeft, Search, Book, Trophy, Trash2, XCircle, CheckCircle, Clock, ChevronLeft, ChevronRight, Star, Wallet } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry, User } from '../types';
 import PopupNotification from './PopupNotification';
