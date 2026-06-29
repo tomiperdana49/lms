@@ -694,7 +694,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                         <div className="p-2 bg-emerald-500 rounded-lg shadow-lg shadow-emerald-500/20">
                                             <Wallet size={18} />
                                         </div>
-                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Total Earned</span>
+                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Total Insentive</span>
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-xl font-black tracking-tighter text-emerald-300 truncate" title={formatCurrency(totalEarned)}>
