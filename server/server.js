@@ -1312,7 +1312,7 @@ app.get('/api/learning-stats', async (req, res) => {
         let biayaBuku = 0;
 
         // 1. Internal Training (meetings)
-        const meetings = await query("SELECT time, guests_json, cost_report_json, host, employee_id FROM meetings WHERE type IN ('Offline', 'Online', 'Hybrid')");
+        const meetings = await query("SELECT time, guests_json, cost_report_json, host, employee_id FROM meetings WHERE type IN ('Offline', 'Online', 'Hybrid', 'Internal')");
         for (const meeting of meetings) {
             // Skip if the user is the host
             if ((targetName && meeting.host === targetName) || 
