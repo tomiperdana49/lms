@@ -69,6 +69,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const effectiveRole = isManagementMode ? userRole : 'STAFF';
 
     // --- State ---
+    const [learningStats, setLearningStats] = useState({ totalJam: 0, totalBiaya: 0, jamTraining: 0 });
     const [meetings, setMeetings] = useState<ExtendedMeeting[]>([]);
     const [selectedMeeting, setSelectedMeeting] = useState<ExtendedMeeting | null>(null);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -386,7 +387,20 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         } as ExtendedMeeting;
     };
 
-    // --- Fetch Meetings ---
+    // --- Fetch Data ---
+    useEffect(() => {
+        if (userEmail) {
+            fetch(`${API_BASE_URL}/api/learning-stats?email=${encodeURIComponent(userEmail)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.error) {
+                        setLearningStats(data);
+                    }
+                })
+                .catch(err => console.error("Error fetching learning stats:", err));
+        }
+    }, [userEmail]);
+
     useEffect(() => {
         fetch(`${API_BASE_URL}/api/meetings`)
             .then(res => res.json())
@@ -1155,47 +1169,55 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         </p>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                        <div className="flex bg-white/10 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 self-start">
-                            <button
-                                onClick={() => setListType('active')}
-                                className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${listType === 'active' ? 'bg-white text-indigo-600 shadow-xl' : 'text-blue-100 hover:text-white'}`}
-                            >
-                                Active
-                            </button>
-                            <button
-                                onClick={() => setListType('history')}
-                                className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${listType === 'history' ? 'bg-white text-indigo-600 shadow-xl' : 'text-blue-100 hover:text-white'}`}
-                            >
-                                History
-                            </button>
+                    <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto items-center">
+                        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/10 md:min-w-[140px] text-center shadow-lg">
+                            <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-80">Internal Training Hours</div>
+                            <div className="text-2xl font-black tracking-tighter text-white">{learningStats.jamTraining} <span className="text-base font-bold opacity-80 tracking-normal">Hours</span></div>
+                            <div className="text-[9px] font-medium text-blue-200 mt-1">Total Hours</div>
                         </div>
 
-                        {isManagementMode && (
-                            <div className="flex bg-white/10 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 self-start">
+                        <div className="flex flex-col gap-3 w-full sm:w-auto">
+                            <div className="flex bg-white/10 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 self-stretch sm:self-center shadow-lg">
                                 <button
-                                    onClick={() => toggleView('list')}
-                                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-xl' : 'text-blue-100 hover:text-white'}`}
+                                    onClick={() => setListType('active')}
+                                    className={`flex-1 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${listType === 'active' ? 'bg-white text-indigo-600 shadow-xl' : 'text-blue-100 hover:text-white'}`}
                                 >
-                                    List
+                                    Active
                                 </button>
                                 <button
-                                    onClick={() => toggleView('recap')}
-                                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${viewMode === 'recap' ? 'bg-white text-indigo-600 shadow-xl' : 'text-blue-100 hover:text-white'}`}
+                                    onClick={() => setListType('history')}
+                                    className={`flex-1 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${listType === 'history' ? 'bg-white text-indigo-600 shadow-xl' : 'text-blue-100 hover:text-white'}`}
                                 >
-                                    Recap
+                                    History
                                 </button>
                             </div>
-                        )}
 
-                        {viewMode === 'list' && (effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') && isManagementMode && (
-                            <button
-                                onClick={() => { setIsEditing(false); resetForm(); setIsCreateOpen(true); }}
-                                className="bg-white text-indigo-600 px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
-                            >
-                                <Plus size={18} /> New Session
-                            </button>
-                        )}
+                            {isManagementMode && (
+                                <div className="flex bg-white/10 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 self-stretch sm:self-center shadow-lg">
+                                    <button
+                                        onClick={() => toggleView('list')}
+                                        className={`flex-1 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-xl' : 'text-blue-100 hover:text-white'}`}
+                                    >
+                                        List
+                                    </button>
+                                    <button
+                                        onClick={() => toggleView('recap')}
+                                        className={`flex-1 px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${viewMode === 'recap' ? 'bg-white text-indigo-600 shadow-xl' : 'text-blue-100 hover:text-white'}`}
+                                    >
+                                        Recap
+                                    </button>
+                                </div>
+                            )}
+
+                            {viewMode === 'list' && (effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') && isManagementMode && (
+                                <button
+                                    onClick={() => { setIsEditing(false); resetForm(); setIsCreateOpen(true); }}
+                                    className="px-6 py-2.5 bg-white text-indigo-600 rounded-2xl font-black uppercase tracking-wider text-xs hover:shadow-xl hover:shadow-white/20 transition-all hover:scale-105 active:scale-95 border border-white/20 flex items-center justify-center gap-2 shadow-lg"
+                                >
+                                    <Plus size={16} /> Create Session
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
