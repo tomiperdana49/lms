@@ -141,6 +141,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
     const today = new Date().toLocaleDateString('en-CA');
 
+    const [privateModalOpen, setPrivateModalOpen] = useState(false);
     const [privateReportForm, setPrivateReportForm] = useState({
         title: '',
         category: '',
@@ -473,10 +474,10 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
     const handlePrivateReportSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        const { title, category, startDate, finishDate } = privateReportForm;
+        const { title, category, startDate, finishDate, link } = privateReportForm;
 
-        if (!title || !category || !startDate || !finishDate || !privateFile) {
-            setNotification({ show: true, type: 'error', message: 'Please complete all required fields: Title, Category, Start/Finish Date, and Evidence Photo.' });
+        if (!title || !category || !startDate || !finishDate || !link || !privateFile) {
+            setNotification({ show: true, type: 'error', message: 'Please complete all required fields: Title, Category, Start/Finish Date, Review Link, and Evidence Photo.' });
             return;
         }
 
@@ -702,61 +703,23 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                 })()}
             </div>
 
-            <div className="grid lg:grid-cols-3 gap-8">
-                {/* Form */}
-                <div className="lg:col-span-1">
-                    <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-visible sticky top-6 z-20">
-                        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
-                            <h2 className="font-bold text-lg text-slate-800 mb-1 flex items-center gap-2"><Book size={20} className="text-purple-600" /> Report Private Reading</h2>
-                            <p className="text-xs text-slate-500">Report personal books you finished reading</p>
-                        </div>
-                        <form onSubmit={handlePrivateReportSubmit} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Book Title <span className="text-red-500">*</span></label>
-                                <input required value={privateReportForm.title} onChange={e => setPrivateReportForm({ ...privateReportForm, title: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Enter book title..." />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Category</label>
-                                <SearchableDropdown
-                                    value={privateReportForm.category}
-                                    onChange={(val) => setPrivateReportForm({ ...privateReportForm, category: val })}
-                                    options={categories}
-                                    placeholder="Select Category..."
-                                />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div><label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Start Date <span className="text-red-500">*</span></label><input type="date" max={today} required value={privateReportForm.startDate} onChange={e => setPrivateReportForm({ ...privateReportForm, startDate: e.target.value })} onClick={(e) => e.currentTarget.showPicker()} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm" /></div>
-                                <div><label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Finish Date <span className="text-red-500">*</span></label><input type="date" required readOnly value={privateReportForm.finishDate} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-slate-50 text-slate-500 cursor-not-allowed" /></div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Review Link</label>
-                                <input type="url" value={privateReportForm.link} onChange={e => setPrivateReportForm({ ...privateReportForm, link: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500" placeholder="Goodreads / GDrive link..." />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-bold text-slate-500 mb-1 uppercase text-xs">Cover Photo Evidence <span className="text-red-500">*</span></label>
-                                <div className="space-y-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="relative overflow-hidden cursor-pointer bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg p-2 transition-colors">
-                                            <input type="file" onChange={(e) => handleFileChange(e, 'privateReport')} className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" />
-                                            <Upload size={18} className="text-slate-500" />
-                                        </div>
-                                        <span className={`text-xs ${privateFile ? 'text-green-600 font-bold' : 'text-slate-400'}`}>{privateFile ? 'Photo Selected' : 'Select cover photo'}</span>
-                                    </div>
-                                    {privatePreview && (
-                                        <div className="relative w-full h-48 rounded-xl overflow-hidden border border-slate-200 shadow-sm group">
-                                            <img src={privatePreview} alt="Preview" className="w-full h-full object-cover" />
-                                            <button type="button" onClick={() => { setPrivateFile(null); setPrivatePreview(''); }} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"><XCircle size={16} /></button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            <button type="submit" disabled={isLoading} className="w-full px-4 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 text-white bg-purple-600 hover:bg-purple-700">{isLoading ? 'Saving...' : 'Save'}</button>
-                        </form>
-                    </div>
+            <div className="flex flex-col gap-8">
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-6">
+                    <button onClick={() => setPrivateModalOpen(true)} className="flex-1 flex flex-col items-center justify-center gap-3 p-6 bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-3xl shadow-xl shadow-purple-600/20 hover:shadow-purple-600/40 hover:-translate-y-1 transition-all group border border-white/10 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <Book size={32} className="group-hover:scale-110 transition-transform" />
+                        <span className="font-bold text-lg tracking-wide">E-Book / Personal Book</span>
+                    </button>
+                    <a href="https://simas.nusa.id/book/pinjam/" target="_blank" rel="noreferrer" className="flex-1 flex flex-col items-center justify-center gap-3 p-6 bg-gradient-to-br from-blue-600 to-cyan-600 text-white rounded-3xl shadow-xl shadow-blue-600/20 hover:shadow-blue-600/40 hover:-translate-y-1 transition-all group border border-white/10 relative overflow-hidden text-center cursor-pointer">
+                        <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <BookOpen size={32} className="group-hover:scale-110 transition-transform" />
+                        <span className="font-bold text-lg tracking-wide">Book from the Office</span>
+                    </a>
                 </div>
 
                 {/* List */}
-                <div className="lg:col-span-2 space-y-4">
+                <div className="space-y-4">
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                         <div className="p-4 border-b border-slate-100 flex gap-3">
                             <div className="relative flex-1">
@@ -908,6 +871,63 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                     </div>
                 </div>
             </div>
+
+            {/* Private Report Modal */}
+            {privateModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
+                            <div>
+                                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Book size={20} className="text-purple-600" /> Report Private Reading</h3>
+                                <p className="text-sm text-slate-500">Report personal books you finished reading</p>
+                            </div>
+                            <button onClick={() => setPrivateModalOpen(false)} className="text-slate-400 hover:text-slate-600"><XCircle size={24} /></button>
+                        </div>
+                        <form onSubmit={handlePrivateReportSubmit} className="p-6 space-y-4 overflow-y-auto">
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Book Title <span className="text-red-500">*</span></label>
+                                <input required value={privateReportForm.title} onChange={e => setPrivateReportForm({ ...privateReportForm, title: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none" placeholder="Enter book title..." />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Category</label>
+                                <SearchableDropdown
+                                    value={privateReportForm.category}
+                                    onChange={(val) => setPrivateReportForm({ ...privateReportForm, category: val })}
+                                    options={categories}
+                                    placeholder="Select Category..."
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div><label className="block text-sm font-semibold text-slate-700 mb-1">Start Date <span className="text-red-500">*</span></label><input type="date" max={today} required value={privateReportForm.startDate} onChange={e => setPrivateReportForm({ ...privateReportForm, startDate: e.target.value })} onClick={(e) => e.currentTarget.showPicker()} className="w-full px-4 py-2 border border-slate-200 rounded-xl" /></div>
+                                <div><label className="block text-sm font-semibold text-slate-700 mb-1">Finish Date <span className="text-red-500">*</span></label><input type="date" required readOnly value={privateReportForm.finishDate} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-500 cursor-not-allowed" /></div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Review Link <span className="text-red-500">*</span></label>
+                                <input required type="url" value={privateReportForm.link} onChange={e => setPrivateReportForm({ ...privateReportForm, link: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none" placeholder="Goodreads / GDrive link..." />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Cover Photo Evidence <span className="text-red-500">*</span></label>
+                                <div className="space-y-3">
+                                    <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50 relative">
+                                        <input type="file" onChange={(e) => handleFileChange(e, 'privateReport')} className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" />
+                                        {privateFile ? (<div className="flex items-center justify-center gap-2 text-green-600 font-bold"><CheckCircle size={18} /> Photo Selected</div>) : (<span className="text-slate-500 text-sm">Click to select photo</span>)}
+                                    </div>
+                                    {privatePreview && (
+                                        <div className="relative h-40 rounded-xl overflow-hidden border">
+                                            <img src={privatePreview} alt="Preview" className="w-full h-full object-cover" />
+                                            <button type="button" onClick={() => { setPrivateFile(null); setPrivatePreview(''); }} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full"><XCircle size={14} /></button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="pt-4 flex gap-3">
+                                <button type="button" onClick={() => setPrivateModalOpen(false)} className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl outline-none">Cancel</button>
+                                <button type="submit" disabled={isLoading} className="flex-1 px-4 py-3 bg-purple-600 text-white font-bold rounded-xl shadow-lg">{isLoading ? 'Saving...' : 'Save Report'}</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Claim Modal */}
             {claimModalOpen && (
