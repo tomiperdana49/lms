@@ -356,7 +356,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     // Auto-open quiz if exists and not passed
                     // Check against REF to avoid stale closure
                     const currentResults = quizResultsRef.current;
-                    if (activeModule?.quiz && !activeModule.completed && (!currentResults[activeModule.id] || currentResults[activeModule.id] < 100)) {
+                    if (activeModule?.quiz && !activeModule.completed && (!currentResults[activeModule.id] || currentResults[activeModule.id] < 80)) {
                         setActiveQuiz({ quiz: activeModule.quiz, moduleId: activeModule.id, type: 'POST' });
                     }
                 }
@@ -432,7 +432,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             onStateChange: (event: { data: number }) => {
                                 if (event.data === window.YT.PlayerState.ENDED) {
                                     setIsVideoCompleted(true);
-                                    if (activeModule?.quiz && !activeModule.completed && (!quizResults[activeModule.id] || quizResults[activeModule.id] < 100)) {
+                                    if (activeModule?.quiz && !activeModule.completed && (!quizResults[activeModule.id] || quizResults[activeModule.id] < 80)) {
                                         setActiveQuiz({ quiz: activeModule.quiz, moduleId: activeModule.id, type: 'POST' });
                                     }
                                 }
@@ -515,8 +515,8 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
             
             // If all modules done, but final assessment exists and not passed yet
             if (!incompleteModule && c.assessment && !(c as any).isAssessmentPassed) {
-                // Check if already passed assessment with 100%
-                const passed = (assessmentScore !== null && assessmentScore >= 100);
+                // Check if already passed assessment with 80%
+                const passed = (assessmentScore !== null && assessmentScore >= 80);
                 
                 if (!passed) {
                     setActiveQuiz({ quiz: c.assessment, moduleId: undefined, type: 'POST' });
@@ -827,14 +827,14 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         <div className="bg-amber-50 border-b border-amber-100 px-6 py-3 flex items-center gap-3">
                             <AlertCircle size={18} className="text-amber-600 shrink-0" />
                             <p className="text-amber-800 text-sm font-medium">
-                                Passing Standard: <span className="font-bold">Min. Score {moduleId ? '100' : '80'}</span>
+                                Passing Standard: <span className="font-bold">Min. Score 80</span>
                                 {(() => {
                                     const score = moduleId ? quizResults[moduleId] : assessmentScore;
                                     if (score !== undefined && score !== null) {
                                         return (
                                             <>
                                                 <span className="mx-2 text-amber-300">|</span>
-                                                Last Score: <span className={`font-bold ${score < 100 ? 'text-red-600' : 'text-green-600'}`}>{score}</span>
+                                                Last Score: <span className={`font-bold ${score < 80 ? 'text-red-600' : 'text-green-600'}`}>{score}</span>
                                             </>
                                         );
                                     }
@@ -886,12 +886,12 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         {showFeedback ? (
                             <div className="flex items-center gap-4 flex-1 justify-between w-full">
                                 <div className="flex flex-col gap-2">
-                                    <div className={`px-4 py-2 rounded-lg font-bold text-sm inline-block w-fit ${lastScore >= (moduleId ? 100 : 80) || qType === 'PRE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    <div className={`px-4 py-2 rounded-lg font-bold text-sm inline-block w-fit ${lastScore >= 80 || qType === 'PRE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                         Score: {lastScore} / 100
                                     </div>
-                                    {lastScore < (moduleId ? 100 : 80) && qType === 'POST' && (
+                                    {lastScore < 80 && qType === 'POST' && (
                                         <p className="text-sm text-red-600 font-semibold animate-bounce mt-1">
-                                            ⚠️ Passing standard is {moduleId ? '100' : '80'}. Please answer correctly again.
+                                            ⚠️ Passing standard is 80. Please answer correctly again.
                                         </p>
                                     )}
                                 </div>
@@ -918,7 +918,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         }}
                                         className="bg-slate-900 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-blue-600 transition-colors shadow-lg"
                                     >
-                                        {lastScore < (moduleId ? 100 : 80) && qType === 'POST' ? 'Retry' : 'Continue'}
+                                        {lastScore < 80 && qType === 'POST' ? 'Retry' : 'Continue'}
                                     </button>
                             </div>
                         ) : (
@@ -962,7 +962,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                             }
 
                                             // Only auto-proceed if passed
-                                            const passingScore = moduleId ? 100 : 80;
+                                            const passingScore = 80;
                                             if (score >= passingScore) {
                                                 if (moduleId) {
                                                     setActiveQuiz(undefined);
@@ -1099,7 +1099,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                     {/* Control Buttons */}
                                     {activeModule?.quiz && activeModule.id ? (
                                         // If module has quiz, render Quiz Button first if not passed
-                                        (quizResults[activeModule.id] >= 100 || activeModule.completed) ? (
+                                        (quizResults[activeModule.id] >= 80 || activeModule.completed) ? (
                                             <div className="flex flex-col md:flex-row items-center gap-4">
                                                 <span className="bg-green-100 text-green-700 px-4 py-3 rounded-xl font-bold flex items-center gap-2">
                                                     <CheckCircle size={20} /> Passed {quizResults[activeModule.id] ? `: ${quizResults[activeModule.id]}%` : ''}
@@ -1138,7 +1138,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         <>
                                             {(() => {
                                                 if (!activeModule) return null;
-                                                const hasPassedQuiz = activeModule.quiz && activeModule.quiz.questions && activeModule.quiz.questions.length > 0 && (quizResults[activeModule.id] || 0) >= 100;
+                                                const hasPassedQuiz = activeModule.quiz && activeModule.quiz.questions && activeModule.quiz.questions.length > 0 && (quizResults[activeModule.id] || 0) >= 80;
                                                 const isAllowed = isVideoCompleted || hasPassedQuiz || activeModule.completed;
                                                 
                                                 if (!isAllowed) {
@@ -1174,7 +1174,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                     >
                                                         <PlayCircle size={20} /> Replay
                                                     </button>
-                                                    {activeModule?.quiz && activeModule.quiz.questions && activeModule.quiz.questions.length > 0 && activeModule.id && (!quizResults[activeModule.id] || quizResults[activeModule.id] < 100) ? (
+                                                    {activeModule?.quiz && activeModule.quiz.questions && activeModule.quiz.questions.length > 0 && activeModule.id && (!quizResults[activeModule.id] || quizResults[activeModule.id] < 80) ? (
                                                         <button
                                                             onClick={() => { if (activeModule) setActiveQuiz({ quiz: activeModule.quiz!, moduleId: activeModule.id, type: 'POST' }); }}
                                                             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all shadow-lg group"
@@ -1301,7 +1301,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     {activeCourse.assessment && (
                         <div className="p-4 pt-0 space-y-3">
                             {/* State 1: Ready to take Assessment */}
-                            {(!assessmentScore || assessmentScore < 100) ? (
+                            {(!assessmentScore || assessmentScore < 80) ? (
                                 <button
                                     onClick={() => {
                                         if (activeCourse.progress < 90) {
@@ -1326,8 +1326,8 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         <p className={`font-bold ${activeCourse.progress >= 90 ? 'text-indigo-900' : 'text-slate-500'}`}>Final Assessment (Final Exam)</p>
                                         <p className="text-[10px] text-slate-500 font-medium">
                                             {activeCourse.progress >= 90
-                                                ? (assessmentScore !== null && assessmentScore < 100 
-                                                    ? `Last Score: ${assessmentScore} (Min. 100). Please retry.`
+                                                ? (assessmentScore !== null && assessmentScore < 80 
+                                                    ? `Last Score: ${assessmentScore} (Min. 80). Please retry.`
                                                     : 'Click to Start Evaluation')
                                                 : 'Complete all materials to unlock'}
                                         </p>
