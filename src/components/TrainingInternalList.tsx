@@ -20,7 +20,8 @@ import {
     Camera,
     Image as ImageIcon,
     Search,
-    Link
+    Link,
+    UploadCloud
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Role, Meeting, CostReport, Employee, QuizResult, User } from '../types';
@@ -171,6 +172,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const startDateRef = useRef<HTMLInputElement>(null);
     const photoInputRef = useRef<HTMLInputElement>(null);
     const endDateRef = useRef<HTMLInputElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
 
     // Interactive Quiz/Feedback State
@@ -180,6 +182,220 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [meetingSummary, setMeetingSummary] = useState<{ quiz: { quiz_type: string, count: number }[], feedback: number, allQuizResults?: any[], allFeedbackResults?: any[] } | null>(null);
     const [userFeedback, setUserFeedback] = useState<any>(null);
     const [showParticipantModal, setShowParticipantModal] = useState<'sudah' | 'belum' | null>(null);
+
+    const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+            try {
+                const bstr = evt.target?.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                const wsname = wb.SheetNames[0];
+                const ws = wb.Sheets[wsname];
+                const rawData = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+                if (rawData.length === 0) throw new Error('Empty Excel file');
+                
+                // Find header row by finding the row with the most string elements
+                let headerRowIndex = 0;
+                let maxCols = 0;
+                for (let i = 0; i < Math.min(20, rawData.length); i++) {
+                    const cols = (rawData[i] || []).filter((c: any) => typeof c === 'string' && c.trim() !== '').length;
+                    if (cols > maxCols) {
+                        maxCols = cols;
+                        headerRowIndex = i;
+                    }
+                }
+                
+                const headers = rawData[headerRowIndex].map((h: any) => String(h || '').trim());
+                
+                // Convert back to object array using the found headers
+                const data = [];
+                const duplicateCount: Record<string, number> = {};
+                const finalHeaders = headers.map(h => {
+                    if (!h) return '';
+                    if (duplicateCount[h]) {
+                        duplicateCount[h]++;
+                        return `${h}_${duplicateCount[h] - 1}`;
+                    } else {
+                        duplicateCount[h] = 1;
+                        return h;
+                    }
+                });
+                
+                for (let i = headerRowIndex + 1; i < rawData.length; i++) {
+                    const rowArr = rawData[i];
+                    if (!rowArr || rowArr.length === 0 || rowArr.every(x => !x)) continue; // skip empty rows
+                    
+                    const rowObj: any = {};
+                    finalHeaders.forEach((h, colIdx) => {
+                        if (h) rowObj[h] = rowArr[colIdx];
+                    });
+                    data.push(rowObj);
+                }
+                
+                const groupedMeetings = new Map();
+                
+                // Helper to parse Indonesian month dates
+                const parseIndonesianDate = (dateStr: string) => {
+                    if (!dateStr) return null;
+                    const months: Record<string, string> = {
+                        'januari': '01', 'februari': '02', 'maret': '03', 'april': '04',
+                        'mei': '05', 'juni': '06', 'juli': '07', 'agustus': '08',
+                        'september': '09', 'oktober': '10', 'november': '11', 'desember': '12',
+                        'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05',
+                        'jun': '06', 'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
+                    };
+                    const lower = String(dateStr).toLowerCase();
+                    for (const [idMonth, numMonth] of Object.entries(months)) {
+                        if (lower.includes(idMonth)) {
+                            // Extract day, month, year
+                            const parts = lower.replace(/,/g, '').split(/\s+/);
+                            // Simple heuristic: parts usually [day, month, year]
+                            let day = parts.find(p => /^\d{1,2}$/.test(p)) || '01';
+                            let year = parts.find(p => /^\d{4}$/.test(p)) || new Date().getFullYear().toString();
+                            return `${year}-${numMonth}-${day.padStart(2, '0')}`;
+                        }
+                    }
+                    return null;
+                };
+                
+                data.forEach((row: any) => {
+                    let parsedDate = row.Date || row.date || row.Tanggal;
+                    if (typeof parsedDate === 'number') {
+                        parsedDate = new Date((parsedDate - (25567 + 1)) * 86400 * 1000).toISOString().split('T')[0];
+                    } else if (typeof parsedDate === 'string') {
+                        const indoDate = parseIndonesianDate(parsedDate);
+                        if (indoDate) {
+                            parsedDate = indoDate;
+                        } else {
+                            const d = new Date(parsedDate);
+                            if (!isNaN(d.getTime())) {
+                                parsedDate = d.toISOString().split('T')[0];
+                            }
+                        }
+                    }
+                    
+                    const title = row.Title || row.title || row['Judul / Training Name'] || row.Judul || 'Imported Training';
+                    
+                    const parseExcelTime = (val: any) => {
+                        if (typeof val === 'number') {
+                            const totalMinutes = Math.round(val * 24 * 60);
+                            let h = Math.floor(totalMinutes / 60);
+                            let m = totalMinutes % 60;
+                            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                        }
+                        return val ? String(val) : '';
+                    };
+
+                    const timeStart = parseExcelTime(row['Jam (Start)'] || row.Time || row.time || row.Waktu) || '09:00';
+                    const timeEnd = parseExcelTime(row['Jam (End)']);
+                    const time = timeEnd ? `${timeStart} - ${timeEnd}` : timeStart;
+                    const host = row['Nama Trainer / Facilitator'] || row.Host || row.host || row.Trainer || 'HR Team';
+                    
+                    const groupKey = `${title}_${parsedDate}_${time}_${host}`;
+                    
+                    if (!groupedMeetings.has(groupKey)) {
+                        groupedMeetings.set(groupKey, {
+                            title,
+                            date: parsedDate || new Date().toISOString().split('T')[0],
+                            time,
+                            host,
+                            type: row['Training Type'] || row.Type || row.type || row.Tipe || 'Offline',
+                            location: row.Location || row.location || row.Lokasi || '',
+                            description: row.Description || row.description || row.Deskripsi || '',
+                            material_link: row['Link Materi'] || '',
+                            is_closed: true,
+                            cost_report: {
+                                trainer: row['Insentif Trainer'] || 0,
+                                snack: row['Insentif Snack'] || 0,
+                                lunch: row['Insentif Lunch'] || 0,
+                                other: row['Insentif Other'] || 0,
+                                total: row['Insentif Total'] || 0,
+                                isPaid: row['Lapor Insentif']?.toString().toLowerCase().trim() === 'sudah' ? true : false,
+                                isFinalized: row['Lapor Insentif']?.toString().toLowerCase().trim() === 'sudah' ? true : false
+                            },
+                            participants: []
+                        });
+                    }
+                    
+                    const rawPreTest = row['Pre-Test_1'] !== undefined ? row['Pre-Test_1'] : row['Pre-Test'];
+                    const rawPostTest = row['Post-Test_1'] !== undefined ? row['Post-Test_1'] : row['Post-Test'];
+                    
+                    const parseScore = (val: any) => {
+                        if (val === undefined || val === null || val === '') return null;
+                        if (typeof val === 'number') return val;
+                        const num = Number(val);
+                        if (!isNaN(num)) return num;
+                        return null; 
+                    };
+
+                    const participant = {
+                        name: row['Peserta / Employee Name'] || '',
+                        employee_id: row['Employee ID'] || '',
+                        pre_test_score: parseScore(rawPreTest),
+                        post_test_score: parseScore(rawPostTest),
+                        feedback_score: parseScore(row['Feedback Training / PTE 1 Score'])
+                    };
+                    
+                    if (participant.name || participant.employee_id) {
+                        groupedMeetings.get(groupKey).participants.push(participant);
+                    }
+                });
+                
+                const formattedMeetings = Array.from(groupedMeetings.values()).map(m => {
+                    if (m.cost_report?.isPaid) {
+                        m.cost_report.attendee_ids = m.participants.map(p => p.employee_id).filter(Boolean);
+                        m.cost_report.attendees = m.participants.map(p => p.name).filter(Boolean); // If using emails, you'd map those, but here we fallback to name if emails are not in participants object directly during import
+                        m.cost_report.participantsCount = m.participants.length;
+                    }
+                    return m;
+                });
+                
+                if (formattedMeetings.length > 0) {
+                    const res = await fetch(`${API_BASE_URL}/api/meetings/bulk`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ meetings: formattedMeetings })
+                    });
+                    
+                    if (res.ok) {
+                        const result = await res.json();
+                        setNotification({ show: true, type: 'success', message: `Successfully imported ${result.count} meetings.` });
+                        // Refresh meetings
+                        fetch(`${API_BASE_URL}/api/meetings`)
+                            .then(res => res.json())
+                            .then(data => {
+                                const sorted = data.map(safeMeeting).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                                setMeetings(sorted);
+                            });
+                            
+                        // Refresh results and feedback for UI update
+                        if (isManagementMode) {
+                            fetch(`${API_BASE_URL}/api/quiz/results/all`)
+                                .then(r => r.json())
+                                .then(data => setAllResults(Array.isArray(data) ? data : (data.data || [])));
+                            fetch(`${API_BASE_URL}/api/feedback/all`)
+                                .then(r => r.json())
+                                .then(data => setAllFeedback(Array.isArray(data) ? data : (data.data || [])));
+                        }
+                    } else {
+                        const errData = await res.json().catch(() => ({}));
+                        throw new Error(errData.error || 'Failed to import data from backend');
+                    }
+                }
+            } catch (err: any) {
+                console.error("Import error:", err);
+                setNotification({ show: true, type: 'error', message: `Import Failed: ${err.message}` });
+            } finally {
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                }
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
 
     const fetchResults = async (mid: number) => {
         if (!user.email) return;
@@ -377,13 +593,23 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             if (emp) host = emp.full_name;
         }
 
+        let mappedCostReport = m.costReport;
+        if (mappedCostReport) {
+            // Map imported keys to UI expected keys if necessary
+            if ('trainer' in mappedCostReport && !('trainerIncentive' in mappedCostReport)) mappedCostReport.trainerIncentive = mappedCostReport.trainer;
+            if ('snack' in mappedCostReport && !('snackCost' in mappedCostReport)) mappedCostReport.snackCost = mappedCostReport.snack;
+            if ('lunch' in mappedCostReport && !('lunchCost' in mappedCostReport)) mappedCostReport.lunchCost = mappedCostReport.lunch;
+            if ('other' in mappedCostReport && !('otherCost' in mappedCostReport)) mappedCostReport.otherCost = mappedCostReport.other;
+        }
+
         return {
             ...m,
             host: host || m.host || 'Admin',
             type: m.type || (m.location && (m.location.toLowerCase().includes('meet') || m.location.toLowerCase().includes('http')) ? 'Online' : 'Offline'),
             description: m.description || m.agenda || 'No description provided.',
             shortDate: shortDate || 'TBD',
-            guests: m.guests || { status: 'Awaiting', count: 0, emails: [] }
+            guests: m.guests || { status: 'Awaiting', count: 0, emails: [] },
+            costReport: mappedCostReport
         } as ExtendedMeeting;
     };
 
@@ -1224,21 +1450,38 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 </div>
             </div>
 
-            {/* Export Bar (Above Filter) */}
-            {viewMode === 'recap' && (effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') && (
+            {/* Export & Import Bar (Above Filter) */}
+            {(effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') && isManagementMode && (
                 <div className="flex justify-end gap-3 -mb-4 relative z-10">
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        style={{ display: 'none' }}
+                        accept=".xlsx, .xls, .csv"
+                        onChange={handleImport}
+                    />
                     <button
-                        onClick={exportParticipantExcel}
-                        className="bg-white border border-slate-200 text-slate-600 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center gap-2 group"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="bg-white border border-slate-200 text-slate-600 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:border-indigo-500 hover:text-indigo-600 transition-all flex items-center gap-2 group"
                     >
-                        <FileText size={16} className="text-slate-400 group-hover:text-emerald-500" /> Export Participants (XLSX)
+                        <UploadCloud size={16} className="text-slate-400 group-hover:text-indigo-500" /> Import Data
                     </button>
-                    <button
-                        onClick={exportHostExcel}
-                        className="bg-white border border-slate-200 text-slate-600 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center gap-2 group"
-                    >
-                        <Users size={16} className="text-slate-400 group-hover:text-emerald-500" /> Export Hosts (XLSX)
-                    </button>
+                    {viewMode === 'recap' && (
+                        <>
+                            <button
+                                onClick={exportParticipantExcel}
+                                className="bg-white border border-slate-200 text-slate-600 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center gap-2 group"
+                            >
+                                <FileText size={16} className="text-slate-400 group-hover:text-emerald-500" /> Export Participants (XLSX)
+                            </button>
+                            <button
+                                onClick={exportHostExcel}
+                                className="bg-white border border-slate-200 text-slate-600 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center gap-2 group"
+                            >
+                                <Users size={16} className="text-slate-400 group-hover:text-emerald-500" /> Export Hosts (XLSX)
+                            </button>
+                        </>
+                    )}
                 </div>
             )}
 
@@ -1418,8 +1661,10 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                                                 const participantEmails = Array.from(new Set([
                                                                     ...(m.guests?.emails || []).map((e: string) => e.toLowerCase()),
+                                                                    ...((m.guests as any)?.employee_ids || []).map((e: string) => e.toLowerCase()),
                                                                     ...allParticipantIds.filter(email => {
-                                                                        return (m.guests?.emails || []).some((ge: string) => ge.toLowerCase() === email || ge.toLowerCase().split('@')[0] === email.split('@')[0]);
+                                                                        return (m.guests?.emails || []).some((ge: string) => ge.toLowerCase() === email || ge.toLowerCase().split('@')[0] === email.split('@')[0]) ||
+                                                                               ((m.guests as any)?.employee_ids || []).some((ge: string) => ge.toLowerCase() === email);
                                                                     })
                                                                 ]));
 
@@ -1552,10 +1797,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                                         if (fData) {
                                                                                                             try {
                                                                                                                 const data = typeof fData === 'string' ? JSON.parse(fData) : fData;
-                                                                                                                const scores = Object.values(data || {}).filter(v => typeof v === 'number' || !isNaN(Number(v))) as any[];
-                                                                                                                if (scores.length > 0) {
-                                                                                                                    const numericScores = scores.map(s => Number(s));
-                                                                                                                    const avg = Math.round((numericScores.reduce((a, b) => a + b, 0) / numericScores.length) * 10) / 10;
+                                                                                                                const ratingVal = data?.rating ?? data?.score ?? Object.values(data || {}).find(v => typeof v === 'number');
+                                                                                                                if (ratingVal !== undefined && ratingVal !== null && !isNaN(Number(ratingVal))) {
+                                                                                                                    const avg = Math.round(Number(ratingVal) * 10) / 10;
                                                                                                                     feedbackDisplay = <span className="text-emerald-600 font-bold">{avg} / 4</span>;
                                                                                                                 } else {
                                                                                                                     feedbackDisplay = <span className="text-emerald-500 font-bold">Sent</span>;
@@ -2511,18 +2755,23 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         <div className="w-8 flex justify-center pt-0.5"><Users className="text-slate-400" size={20} /></div>
                                         <div className="flex-1">
                                             <p className="font-semibold text-slate-700 text-sm mb-2">
-                                                {selectedMeeting.guests?.emails?.length || 0} Invited Guests
+                                                {Math.max(selectedMeeting.guests?.emails?.length || 0, (selectedMeeting.guests as any)?.employee_ids?.length || 0)} Invited Guests
                                             </p>
-                                            {selectedMeeting.guests?.emails && selectedMeeting.guests.emails.length > 0 ? (
+                                            {(selectedMeeting.guests?.emails?.length > 0 || (selectedMeeting.guests as any)?.employee_ids?.length > 0) ? (
                                                 <div className="flex flex-wrap gap-2">
-                                                    {selectedMeeting.guests.emails.map((email: string) => (
-                                                        <div key={email} className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-full border border-slate-100">
-                                                            <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold">
-                                                                {email.charAt(0).toUpperCase()}
+                                                    {Array.from(new Set([...(selectedMeeting.guests?.emails || []), ...((selectedMeeting.guests as any)?.employee_ids || [])])).map((guestEmail: any) => {
+                                                        const emailStr = String(guestEmail);
+                                                        const emp = (employees || []).find(e => e.email?.toLowerCase() === emailStr.toLowerCase() || String(e.id_employee).toLowerCase() === emailStr.toLowerCase());
+                                                        const displayEmail = emp?.full_name || emp?.email || emailStr;
+                                                        return (
+                                                            <div key={guestEmail} className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-full border border-slate-100">
+                                                                <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold">
+                                                                    {displayEmail.charAt(0).toUpperCase()}
+                                                                </div>
+                                                                <span className="text-xs text-slate-600">{displayEmail}</span>
                                                             </div>
-                                                            <span className="text-xs text-slate-600">{email}</span>
-                                                        </div>
-                                                    ))}
+                                                        );
+                                                    })}
                                                 </div>
                                             ) : (
                                                 <p className="text-xs text-slate-400 italic">No specific invites sent.</p>

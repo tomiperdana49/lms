@@ -105,12 +105,12 @@ const HRReportGenerator = () => {
 
         meetings.forEach(m => {
             if (selectedBranch !== 'All' && m.location !== selectedBranch) return;
-            if (m.costReport && isInPeriod(m.date, range)) {
+            if (m.costReport && m.costReport.isPaid && isInPeriod(m.date, range)) {
                 internalTraining += (
-                    safeNum(m.costReport.trainerIncentive) +
-                    safeNum(m.costReport.snackCost) +
-                    safeNum(m.costReport.lunchCost) +
-                    safeNum(m.costReport.otherCost) +
+                    safeNum(m.costReport.trainerIncentive ?? m.costReport.trainer) +
+                    safeNum(m.costReport.snackCost ?? m.costReport.snack) +
+                    safeNum(m.costReport.lunchCost ?? m.costReport.lunch) +
+                    safeNum(m.costReport.otherCost ?? m.costReport.other) +
                     (safeNum(m.costReport.audienceFee) * safeNum(m.costReport.participantsCount))
                 );
             }
@@ -189,19 +189,21 @@ const HRReportGenerator = () => {
 
         meetings.forEach(m => {
             if (selectedBranch !== 'All' && m.location !== selectedBranch) return;
-            if (m.costReport && isInPeriod(m.date, range)) {
-                const total = safeNum(m.costReport.trainerIncentive) +
-                    safeNum(m.costReport.snackCost) +
-                    safeNum(m.costReport.lunchCost) +
-                    safeNum(m.costReport.otherCost) +
-                    (safeNum(m.costReport.audienceFee) * safeNum(m.costReport.participantsCount));
+            if (m.costReport && m.costReport.isPaid && isInPeriod(m.date, range)) {
+                const trainerInc = safeNum(m.costReport.trainerIncentive ?? m.costReport.trainer);
+                const snackC = safeNum(m.costReport.snackCost ?? m.costReport.snack);
+                const lunchC = safeNum(m.costReport.lunchCost ?? m.costReport.lunch);
+                const otherC = safeNum(m.costReport.otherCost ?? m.costReport.other);
+                const audFee = safeNum(m.costReport.audienceFee);
+
+                const total = trainerInc + snackC + lunchC + otherC + (audFee * safeNum(m.costReport.participantsCount));
 
                 const details = [];
-                if (m.costReport.snackCost) details.push(`Snack: ${formatCurrency(m.costReport.snackCost)}`);
-                if (m.costReport.lunchCost) details.push(`Lunch: ${formatCurrency(m.costReport.lunchCost)}`);
-                if (m.costReport.trainerIncentive) details.push(`Trainer: ${formatCurrency(m.costReport.trainerIncentive)}`);
-                if (m.costReport.audienceFee) details.push(`Audience: ${formatCurrency(m.costReport.audienceFee)}/pax`);
-                if (m.costReport.otherCost) details.push(`Other: ${formatCurrency(m.costReport.otherCost)}`);
+                if (snackC) details.push(`Snack: ${formatCurrency(snackC)}`);
+                if (lunchC) details.push(`Lunch: ${formatCurrency(lunchC)}`);
+                if (trainerInc) details.push(`Trainer: ${formatCurrency(trainerInc)}`);
+                if (audFee) details.push(`Audience: ${formatCurrency(audFee)}/pax`);
+                if (otherC) details.push(`Other: ${formatCurrency(otherC)}`);
 
                 txs.push({
                     date: m.date,

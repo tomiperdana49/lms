@@ -14,7 +14,6 @@ const app = express();
 const PORT = process.env.PORT || 3003;
 
 app.use(cors());
-app.use(express.json());
 // Increase payload limit for large JSON (guests list etc)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -2130,6 +2129,83 @@ app.post('/api/meetings', async (req, res) => {
         }
 
         res.json(newMeeting);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/meetings/bulk', async (req, res) => {
+    try {
+        const meetings = req.body.meetings;
+        if (!Array.isArray(meetings)) return res.status(400).json({ error: 'Expected an array of meetings' });
+
+        const inserted = [];
+        for (const m of meetings) {
+            const participants = Array.isArray(m.participants) ? m.participants : [];
+            let guests = {
+                status: 'Awaiting',
+                count: participants.length,
+                employee_ids: participants.map(p => p.employee_id).filter(Boolean),
+                emails: [],
+                details: participants
+            };
+
+            const d = new Date(m.date);
+            let localDate;
+            if (isNaN(d.getTime())) {
+                localDate = new Date().toISOString().split('T')[0];
+            } else {
+                localDate = new Date(d.getTime() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
+            }
+
+            const result = await query(
+                'INSERT INTO meetings (title, date, time, host, location, type, meetLink, agenda, guests_json, cost_report_json, employee_id, pre_test_link, material_link, post_test_link, feedback_link, pre_test_data, post_test_data, feedback_data, is_pre_test_active, is_post_test_active, is_feedback_active, is_closed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    m.title || 'Untitled', 
+                    localDate, 
+                    m.time || '', 
+                    m.host || 'HR Team', 
+                    m.location || '', 
+                    m.type || 'Offline', 
+                    m.meetLink || '', 
+                    m.description || m.agenda || '', 
+                    JSON.stringify(guests), 
+                    m.cost_report ? JSON.stringify(m.cost_report) : null, 
+                    m.employee_id || null, 
+                    m.pre_test_link || '', 
+                    m.material_link || '', 
+                    m.post_test_link || '', 
+                    m.feedback_link || '',
+                    m.pre_test_data ? JSON.stringify(m.pre_test_data) : null,
+                    m.post_test_data ? JSON.stringify(m.post_test_data) : null,
+                    m.feedback_data ? JSON.stringify(m.feedback_data) : null,
+                    m.is_pre_test_active ? 1 : 0,
+                    m.is_post_test_active ? 1 : 0,
+                    m.is_feedback_active ? 1 : 0,
+                    m.is_closed ? 1 : 0
+                ]
+            );
+            
+            const meetingId = result.insertId;
+            
+            for (const p of participants) {
+                if (!p.employee_id && !p.name) continue;
+                const studentId = p.employee_id || `temp_${Math.random()}`;
+                const studentName = p.name || 'Unknown';
+                
+                if (p.pre_test_score !== null && p.pre_test_score !== '') {
+                    await query('INSERT INTO quiz_results (student_id, student_name, meeting_id, score, date, quiz_type, employee_id) VALUES (?, ?, ?, ?, NOW(), "PRE", ?)', [studentId, studentName, meetingId, p.pre_test_score, p.employee_id || null]);
+                }
+                if (p.post_test_score !== null && p.post_test_score !== '') {
+                    await query('INSERT INTO quiz_results (student_id, student_name, meeting_id, score, date, quiz_type, employee_id) VALUES (?, ?, ?, ?, NOW(), "POST", ?)', [studentId, studentName, meetingId, p.post_test_score, p.employee_id || null]);
+                }
+                if (p.feedback_score !== null && p.feedback_score !== '') {
+                    const fbData = JSON.stringify({ rating: p.feedback_score, imported: true });
+                    await query('INSERT INTO course_feedback (user_id, employee_id, meeting_id, feedback_data, submitted_at) VALUES (?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE feedback_data = ?, submitted_at = NOW()', [studentId, p.employee_id || null, meetingId, fbData, fbData]);
+                }
+            }
+            
+            inserted.push({ ...m, id: meetingId });
+        }
+        res.json({ success: true, count: inserted.length, meetings: inserted });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
