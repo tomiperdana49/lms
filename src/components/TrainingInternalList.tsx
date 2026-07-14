@@ -346,8 +346,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 
                 const formattedMeetings = Array.from(groupedMeetings.values()).map(m => {
                     if (m.cost_report?.isPaid) {
-                        m.cost_report.attendee_ids = m.participants.map(p => p.employee_id).filter(Boolean);
-                        m.cost_report.attendees = m.participants.map(p => p.name).filter(Boolean); // If using emails, you'd map those, but here we fallback to name if emails are not in participants object directly during import
+                        m.cost_report.attendee_ids = m.participants.map((p: any) => p.employee_id).filter(Boolean);
+                        m.cost_report.attendees = m.participants.map((p: any) => p.name).filter(Boolean); // If using emails, you'd map those, but here we fallback to name if emails are not in participants object directly during import
                         m.cost_report.participantsCount = m.participants.length;
                     }
                     return m;

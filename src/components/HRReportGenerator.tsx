@@ -107,10 +107,10 @@ const HRReportGenerator = () => {
             if (selectedBranch !== 'All' && m.location !== selectedBranch) return;
             if (m.costReport && m.costReport.isPaid && isInPeriod(m.date, range)) {
                 internalTraining += (
-                    safeNum(m.costReport.trainerIncentive ?? m.costReport.trainer) +
-                    safeNum(m.costReport.snackCost ?? m.costReport.snack) +
-                    safeNum(m.costReport.lunchCost ?? m.costReport.lunch) +
-                    safeNum(m.costReport.otherCost ?? m.costReport.other) +
+                    safeNum(m.costReport.trainerIncentive ?? (m.costReport as any).trainer) +
+                    safeNum(m.costReport.snackCost ?? (m.costReport as any).snack) +
+                    safeNum(m.costReport.lunchCost ?? (m.costReport as any).lunch) +
+                    safeNum(m.costReport.otherCost ?? (m.costReport as any).other) +
                     (safeNum(m.costReport.audienceFee) * safeNum(m.costReport.participantsCount))
                 );
             }
@@ -190,10 +190,10 @@ const HRReportGenerator = () => {
         meetings.forEach(m => {
             if (selectedBranch !== 'All' && m.location !== selectedBranch) return;
             if (m.costReport && m.costReport.isPaid && isInPeriod(m.date, range)) {
-                const trainerInc = safeNum(m.costReport.trainerIncentive ?? m.costReport.trainer);
-                const snackC = safeNum(m.costReport.snackCost ?? m.costReport.snack);
-                const lunchC = safeNum(m.costReport.lunchCost ?? m.costReport.lunch);
-                const otherC = safeNum(m.costReport.otherCost ?? m.costReport.other);
+                const trainerInc = safeNum(m.costReport.trainerIncentive ?? (m.costReport as any).trainer);
+                const snackC = safeNum(m.costReport.snackCost ?? (m.costReport as any).snack);
+                const lunchC = safeNum(m.costReport.lunchCost ?? (m.costReport as any).lunch);
+                const otherC = safeNum(m.costReport.otherCost ?? (m.costReport as any).other);
                 const audFee = safeNum(m.costReport.audienceFee);
 
                 const total = trainerInc + snackC + lunchC + otherC + (audFee * safeNum(m.costReport.participantsCount));
