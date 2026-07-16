@@ -70,7 +70,7 @@ declare global {
 const CoursePlayer = ({ user }: CoursePlayerProps) => {
     // --- State ---
     const [courses, setCourses] = useState<Course[]>([]);
-    const [viewMode, setViewMode] = useState<'list' | 'player'>('list');
+    const [viewMode, setViewMode] = useState<'list' | 'overview' | 'player'>('list');
     const [activeCourse, setActiveCourse] = useState<Course | null>(null);
     const [activeModuleId, setActiveModuleId] = useState<number | undefined>(undefined);
     const [activeQuiz, setActiveQuiz] = useState<{ quiz: Quiz; moduleId?: number; type: 'PRE' | 'POST' } | undefined>(undefined);
@@ -350,8 +350,8 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                 const ct = playerRef.current.getCurrentTime();
                 const dur = playerRef.current.getDuration();
 
-                // Mark completed if near end (95% or < 5s remaining)
-                if (!isAlreadyCompleted && dur > 0 && (ct >= dur - 5 || ct / dur > 0.95)) {
+                // Mark completed only when video is truly near the end (< 1s remaining)
+                if (!isAlreadyCompleted && dur > 0 && (dur - ct <= 1)) {
                     setIsVideoCompleted(true);
                     // Auto-open quiz if exists and not passed
                     // Check against REF to avoid stale closure
@@ -462,6 +462,19 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
     // Custom Controls Handlers
 
+
+    const handleSelectCourse = (course: Course) => {
+        if (!course) return;
+        const c = course as Course & { preScore?: number | null };
+        
+        // Jika sudah ada progress atau sudah pernah mengisi pre-test, lewati overview
+        if (c.progress > 0 || (c.preScore !== undefined && c.preScore !== null)) {
+            handleStartCourse(c);
+        } else {
+            setActiveCourse(c);
+            setViewMode('overview');
+        }
+    };
 
     const handleStartCourse = (course: Course) => {
         if (!course) return;
@@ -676,7 +689,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
                                 <div className="flex items-center gap-3">
                                     <button
-                                        onClick={() => handleStartCourse(course)}
+                                        onClick={() => handleSelectCourse(course)}
                                         className={`flex-1 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 active:scale-95 shadow-md
                                             ${course.progress === 100
                                                 ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -721,6 +734,58 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     message={popup.message}
                     onClose={() => setPopup(prev => ({ ...prev, isOpen: false }))}
                 />
+            </div>
+        );
+    }
+
+    if (viewMode === 'overview' && activeCourse) {
+        return (
+            <div className="max-w-4xl mx-auto p-4 md:p-8 animate-fade-in">
+                <button 
+                    onClick={handleBackToList}
+                    className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors mb-6 font-semibold"
+                >
+                    <ArrowLeft size={20} />
+                    Back to Modules
+                </button>
+                <div className="bg-white rounded-[32px] border border-slate-100 shadow-xl overflow-hidden flex flex-col">
+                    <div className="bg-slate-900 p-8 md:p-12 text-white relative">
+                        <div className="relative z-10">
+                            <h1 className="text-3xl md:text-4xl font-black mb-4 tracking-tight">
+                                {activeCourse.title}
+                            </h1>
+                            <div className="flex items-center gap-4 text-sm font-medium text-slate-300">
+                                <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
+                                    <Clock size={16} /> {activeCourse.duration}
+                                </div>
+                                <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
+                                    <BookOpen size={16} /> {activeCourse.modules?.length || 0} Modules
+                                </div>
+                            </div>
+                        </div>
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/20 rounded-full blur-3xl -mr-32 -mt-32"></div>
+                    </div>
+                    <div className="p-8 md:p-12 flex flex-col items-center">
+                        <div className="w-full max-w-2xl mb-8">
+                            <h3 className="text-xl font-bold text-slate-800 mb-4">Module Description</h3>
+                            <p className="text-slate-600 leading-relaxed text-lg">
+                                {activeCourse.description}
+                            </p>
+                        </div>
+                        <PopupNotification
+                            isOpen={popup.isOpen}
+                            type={popup.type}
+                            message={popup.message}
+                            onClose={() => setPopup(prev => ({ ...prev, isOpen: false }))}
+                        />
+                        <button
+                            onClick={() => handleStartCourse(activeCourse)}
+                            className="bg-indigo-600 text-white hover:bg-indigo-700 px-12 py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-200 transition-all active:scale-95 flex items-center gap-3"
+                        >
+                            Process <ChevronRight size={20} />
+                        </button>
+                    </div>
+                </div>
             </div>
         );
     }

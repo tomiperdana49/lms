@@ -5,8 +5,8 @@ import DashboardHome from './components/DashboardHome';
 import ReadingLogPage from './components/ReadingLogPage';
 import CoursePlayer from './components/CoursePlayer';
 import TrainingInternalList from './components/TrainingInternalList';
-import TrainingExternalForm from './components/TrainingExternalForm';
-import TrainingExternalManager from './components/TrainingExternalManager';
+
+import ExternalTraining from './components/ExternalTraining';
 import LMSCalendar from './components/LMSCalendar';
 import LoginPage from './components/LoginPage';
 import UserManagement from './components/UserManagement';
@@ -188,14 +188,12 @@ function App() {
         {activePage === 'internal' && <TrainingInternalList userRole={userRole} user={user!} isManagementMode={false} />}
 
 
-        {/* External Training: Request Form (For Everyone) */}
+        {/* External Training (Unified Component) */}
         {activePage === 'external' && (
-          <TrainingExternalForm user={user!} onNavigate={(p) => setActivePage(p as Page)} />
-        )}
-
-        {/* External Training: Team Approvals (For Supervisor) */}
-        {activePage === 'external-approval' && (userRole === 'SUPERVISOR' || user?.isSupervisor) && (
-          <TrainingExternalManager userRole="SUPERVISOR" userName={user?.name} user={user} />
+          <ExternalTraining 
+            currentUser={user!} 
+            isManagementMode={userRole === 'HR' || userRole === 'HR_ADMIN'} 
+          />
         )}
 
         {activePage === 'calendar' && <LMSCalendar userEmail={user?.email} />}

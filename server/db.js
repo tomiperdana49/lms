@@ -270,6 +270,41 @@ export const initDB = async () => {
             console.error("Error creating course_feedback table:", e);
         }
 
+        // MIGRATION: Add external_training_requests table
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS external_training_requests (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    employee_id VARCHAR(50),
+                    employee_name VARCHAR(255),
+                    category VARCHAR(50),
+                    title VARCHAR(255),
+                    vendor VARCHAR(255),
+                    location VARCHAR(255),
+                    start_date DATE,
+                    end_date DATE,
+                    status VARCHAR(50) DEFAULT 'Pending',
+                    registration_fee DECIMAL(15,2) DEFAULT 0,
+                    travel_flight_cost DECIMAL(15,2) DEFAULT 0,
+                    accommodation_cost DECIMAL(15,2) DEFAULT 0,
+                    miscellaneous_cost DECIMAL(15,2) DEFAULT 0,
+                    payment_method VARCHAR(50),
+                    attachment_link VARCHAR(500),
+                    approved_by VARCHAR(255),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            `);
+            console.log("Verified external_training_requests table exists.");
+        } catch (e) {
+            console.error("Error creating external_training_requests table:", e);
+        }
+
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN certificate_link VARCHAR(500)");
+            console.log("Added certificate_link column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
         connection.release();
     } catch (err) {
         console.error('Database initialization failed:', err);

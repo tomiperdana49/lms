@@ -235,7 +235,6 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
     const trainingSubItems = [
         ...(config?.moduleInternal ? [{ icon: Users, label: 'Internal', id: 'internal' }] : []),
         ...(config?.moduleExternal ? [{ icon: Globe, label: 'External', id: 'external' }] : []),
-        ...(config?.moduleExternal && (userRole === 'SUPERVISOR' || user.isSupervisor) ? [{ icon: Shield, label: 'External Approval', id: 'external-approval' }] : []),
     ];
 
     const getInitials = (name: string) => {

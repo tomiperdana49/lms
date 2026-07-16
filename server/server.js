@@ -1472,6 +1472,9 @@ app.put('/api/users/:id', async (req, res) => {
 
         Object.keys(updates).forEach(key => {
             if (allowedFields.includes(key)) {
+                if (key === 'password' && (!updates[key] || updates[key] === '')) {
+                    return; // Skip empty passwords
+                }
                 filteredUpdates[key] = updates[key];
             }
         });
@@ -2879,6 +2882,129 @@ app.get('/api/feedback/all', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- EXTERNAL TRAINING ENDPOINTS ---
+
+// 1. Employee creates new request
+app.post('/api/external-training/request', async (req, res) => {
+    try {
+        const { employee_id, employee_name, category, title, start_date, end_date, registration_fee, attachment_link, vendor, location } = req.body;
+        const result = await query(`
+            INSERT INTO external_training_requests 
+            (employee_id, employee_name, category, title, start_date, end_date, registration_fee, attachment_link, vendor, location)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [employee_id, employee_name, category, title, start_date || null, end_date || null, registration_fee || 0, attachment_link || '', vendor || '', location || '']);
+        res.json({ success: true, id: result.insertId });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 2. Employee views own requests
+app.get('/api/external-training/my-requests', async (req, res) => {
+    try {
+        const { employee_id } = req.query;
+        const queryStr = `
+            SELECT r.*, e.id_report_to as leader_name 
+            FROM external_training_requests r
+            LEFT JOIN employees e ON r.employee_id = e.id_employee
+            WHERE r.employee_id = ? 
+            ORDER BY r.created_at DESC
+        `;
+        const rows = await query(queryStr, [employee_id]);
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 3. Leader views requests from subordinates
+app.get('/api/external-training/subordinates', async (req, res) => {
+    try {
+        const { leader_id } = req.query;
+        if (!leader_id) return res.json([]);
+
+        // Get leader's info to find their user_id or name
+        const leaderInfo = await querySimAsset('SELECT user_id, full_name, nickname FROM employees WHERE id_employee = ?', [leader_id]);
+        if (leaderInfo.length === 0) return res.json([]);
+        const leader = leaderInfo[0];
+        const leaderUserId = leader.user_id;
+        const leaderFullName = leader.full_name;
+        const leaderNickName = leader.nickname || leaderFullName;
+
+        // Get all subordinates of this leader from SimAsset
+        const subordinatesResult = await querySimAsset(`
+            SELECT id_employee FROM employees
+            WHERE id_report_to_value = ? 
+               OR id_report_to = ? 
+               OR id_report_to = ?
+               OR id_report_to LIKE ? 
+               OR id_report_to LIKE ?
+        `, [leaderUserId, leaderFullName, leaderNickName, `${leaderFullName},%`, `%,${leaderFullName},%`]);
+        
+        const subordinateIds = subordinatesResult.map(s => s.id_employee);
+        if (subordinateIds.length === 0) return res.json([]);
+
+        const placeholders = subordinateIds.map(() => '?').join(',');
+        const rows = await query(`
+            SELECT * FROM external_training_requests 
+            WHERE employee_id IN (${placeholders}) 
+            ORDER BY created_at DESC
+        `, subordinateIds);
+        
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 4. Leader approves/rejects
+app.post('/api/external-training/approve', async (req, res) => {
+    try {
+        const { id, status, approved_by, rejection_reason } = req.body; // status should be 'Approved' or 'Rejected'
+        if (status === 'Rejected') {
+            await query('UPDATE external_training_requests SET status = ?, approved_by = ?, rejection_reason = ? WHERE id = ?', [status, approved_by, rejection_reason || null, id]);
+        } else {
+            await query('UPDATE external_training_requests SET status = ?, approved_by = ? WHERE id = ?', [status, approved_by, id]);
+        }
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 5. Admin views all requests
+app.get('/api/external-training/all', async (req, res) => {
+    try {
+        const rows = await query(`SELECT * FROM external_training_requests ORDER BY created_at DESC`);
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 6. HR views all approved/processed requests
+app.get('/api/external-training/hr', async (req, res) => {
+    try {
+        // HR usually wants to see Approved (needs action) or Processed (done)
+        const rows = await query(`SELECT * FROM external_training_requests WHERE status IN ('Approved', 'Processed') ORDER BY updated_at DESC`);
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 6. HR processes payment
+app.post('/api/external-training/hr-process', async (req, res) => {
+    try {
+        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link } = req.body;
+        
+        let sql = `UPDATE external_training_requests SET status = 'Processed', travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, payment_method = ?`;
+        let params = [travel_flight_cost || 0, accommodation_cost || 0, miscellaneous_cost || 0, payment_method];
+        
+        if (registration_fee !== undefined) {
+            sql += `, registration_fee = ?`;
+            params.push(registration_fee);
+        }
+        if (certificate_link !== undefined) {
+            sql += `, certificate_link = ?`;
+            params.push(certificate_link);
+        }
+        sql += ` WHERE id = ?`;
+        params.push(id);
+
+        await query(sql, params);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Admin Report Endpoint
 app.get('/api/admin/quiz-reports', async (req, res) => {
     try {
@@ -3124,6 +3250,29 @@ app.put('/api/training/:id', async (req, res) => {
         const r = updated[0];
 
         res.json(mapTrainingRequest(updated[0]));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+
+app.put('/api/external-training/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { cost, costTraining, costTransport, costAccommodation, costOthers, additionalCost, settlementNote, certificateLink } = req.body;
+
+        if (certificateLink) {
+            await query(
+                'UPDATE external_training_requests SET registration_fee = ?, travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, additional_cost = ?, settlement_note = ?, certificate_link = ? WHERE id = ?',
+                [costTraining || 0, costTransport || 0, costAccommodation || 0, costOthers || 0, additionalCost || 0, settlementNote || '', certificateLink, id]
+            );
+        } else {
+            await query(
+                'UPDATE external_training_requests SET registration_fee = ?, travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, additional_cost = ?, settlement_note = ? WHERE id = ?',
+                [costTraining || 0, costTransport || 0, costAccommodation || 0, costOthers || 0, additionalCost || 0, settlementNote || '', id]
+            );
+        }
+
+        const updated = await query('SELECT * FROM external_training_requests WHERE id = ?', [id]);
+        res.json(updated[0]);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

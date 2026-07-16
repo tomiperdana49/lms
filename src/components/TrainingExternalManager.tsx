@@ -12,7 +12,9 @@ import {
     TrendingUp,
     Users,
     Clock,
-    Download
+    Download,
+    Briefcase,
+    Link
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { TrainingRequest } from '../types';
@@ -53,16 +55,71 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     const [branches, setBranches] = useState<string[]>(['All Branches']);
     const [searchQuery, setSearchQuery] = useState('');
 
+    const fetchRequests = async () => {
+        try {
+            const trainRes = await fetch(`${API_BASE_URL}/api/external-training/all`);
+            if (trainRes.ok) {
+                const rawData = await trainRes.json();
+                const mapped = rawData.map((req: any) => ({
+                    id: req.id,
+                    employeeName: req.employee_name,
+                    employeeRole: req.category,
+                    title: req.title,
+                    vendor: req.vendor || 'N/A',
+                    location: req.location || 'N/A',
+                    cost: Number(req.registration_fee || 0) + Number(req.travel_flight_cost || 0) + Number(req.accommodation_cost || 0) + Number(req.miscellaneous_cost || 0),
+                    date: req.created_at || req.start_date || new Date().toISOString(),
+                    status: req.status === 'Processed' ? 'APPROVED' : (req.status === 'Approved' ? 'PENDING_HR' : (req.status === 'Pending' ? 'PENDING_SUPERVISOR' : 'REJECTED')),
+                    justification: `Dates: ${req.start_date ? new Date(req.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''} to ${req.end_date ? new Date(req.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}`,
+                    costTraining: req.registration_fee || 0,
+                    costTransport: req.travel_flight_cost || 0,
+                    costAccommodation: req.accommodation_cost || 0,
+                    costOthers: req.miscellaneous_cost || 0,
+                    evidenceUrl: (req.certificate_link || req.attachment_link) ? ((req.certificate_link || req.attachment_link).startsWith('/') ? `${API_BASE_URL}${req.certificate_link || req.attachment_link}` : (req.certificate_link || req.attachment_link)) : undefined,
+                    hrName: req.status === 'Processed' ? 'HR Processed' : '',
+                    supervisorName: req.approved_by,
+                    employee_id: req.employee_id,
+                    _original: req
+                }));
+                setRequests(mapped);
+            }
+        } catch (err) { console.error(err); }
+    };
+
     // --- Data Loading ---
     useEffect(() => {
         const loadInitialData = async () => {
             const [trainRes, empRes, branchRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/api/training`),
+                fetch(`${API_BASE_URL}/api/external-training/all`),
                 fetch(`${API_BASE_URL}/api/employees`),
                 fetch(`${API_BASE_URL}/api/branches`)
             ]);
 
-            if (trainRes.ok) setRequests(await trainRes.json());
+            if (trainRes.ok) {
+                const rawData = await trainRes.json();
+                const mapped = rawData.map((req: any) => ({
+                    id: req.id,
+                    employeeName: req.employee_name,
+                    employeeRole: req.category,
+                    title: req.title,
+                    vendor: req.vendor || 'N/A',
+                    location: req.location || 'N/A',
+                    cost: Number(req.registration_fee || 0) + Number(req.travel_flight_cost || 0) + Number(req.accommodation_cost || 0) + Number(req.miscellaneous_cost || 0),
+                    date: req.created_at || req.start_date || new Date().toISOString(),
+                    status: req.status === 'Processed' ? 'APPROVED' : (req.status === 'Approved' ? 'PENDING_HR' : (req.status === 'Pending' ? 'PENDING_SUPERVISOR' : 'REJECTED')),
+                    justification: `Dates: ${req.start_date ? new Date(req.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''} to ${req.end_date ? new Date(req.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}`,
+                    costTraining: req.registration_fee || 0,
+                    costTransport: req.travel_flight_cost || 0,
+                    costAccommodation: req.accommodation_cost || 0,
+                    costOthers: req.miscellaneous_cost || 0,
+                    evidenceUrl: (req.certificate_link || req.attachment_link) ? ((req.certificate_link || req.attachment_link).startsWith('/') ? `${API_BASE_URL}${req.certificate_link || req.attachment_link}` : (req.certificate_link || req.attachment_link)) : undefined,
+                    hrName: req.status === 'Processed' ? 'HR Processed' : '',
+                    supervisorName: req.approved_by,
+                    employee_id: req.employee_id,
+                    _original: req
+                }));
+                setRequests(mapped);
+            }
             if (empRes.ok) setEmployees(await empRes.json());
             if (branchRes.ok) {
                 const bData = await branchRes.json();
@@ -76,6 +133,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
 
     // --- Modal State ---
     const [selectedRequest, setSelectedRequest] = useState<TrainingRequest | null>(null);
+    const [hrCertificateFile, setHrCertificateFile] = useState<File | null>(null);
     const [isRejectMode, setIsRejectMode] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
     const [recapDetailUser, setRecapDetailUser] = useState<string | null>(null);
@@ -102,6 +160,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     const totalBreakdown = breakdownCost.training + breakdownCost.transport + breakdownCost.accommodation + breakdownCost.others;
 
     const [isSettlementOpen, setIsSettlementOpen] = useState(false);
+    const [settleCertificate, setSettleCertificate] = useState<File | null>(null);
     const [settleData, setSettleData] = useState({
         training: 0,
         transport: 0,
@@ -192,6 +251,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     };
 
     const handleAction = async (id: number, action: 'approve' | 'reject', reason?: string) => {
+        if (!selectedRequest) return;
         if (action === 'reject' && !reason) {
             alert("Please provide a rejection reason.");
             return;
@@ -199,25 +259,51 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
 
         try {
             const finalCost = isNaN(totalBreakdown) ? 0 : totalBreakdown;
-            const res = await fetch(`${API_BASE_URL}/api/training/${id}/approve`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action,
-                    reason,
-                    approverName: userName || 'Admin',
-                    ...(action === 'approve' ? {
-                        cost: finalCost,
-                        costTraining: breakdownCost.training,
-                        costTransport: breakdownCost.transport,
-                        costAccommodation: breakdownCost.accommodation,
-                        costOthers: breakdownCost.others
-                    } : {})
-                })
-            });
+            let res;
+            if (action === 'approve') {
+                let certLink = selectedRequest?._original?.certificate_link;
+                if (selectedRequest?._original?.category === 'Sertifikat' && !certLink && !hrCertificateFile) {
+                    alert("Please upload the certificate evidence before processing this request.");
+                    return;
+                }
+                if (hrCertificateFile) {
+                    const formData = new FormData();
+                    formData.append('file', hrCertificateFile);
+                    const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (uploadRes.ok) {
+                        const uploadData = await uploadRes.json();
+                        certLink = uploadData.fileUrl;
+                    }
+                }
+                res = await fetch(`${API_BASE_URL}/api/external-training/hr-process`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: selectedRequest.id,
+                        travel_flight_cost: breakdownCost.transport,
+                        accommodation_cost: breakdownCost.accommodation,
+                        miscellaneous_cost: breakdownCost.others,
+                        payment_method: selectedRequest._original?.payment_method || 'Reimbursement',
+                        registration_fee: breakdownCost.training,
+                        certificate_link: certLink
+                    })
+                });
+            } else {
+                res = await fetch(`${API_BASE_URL}/api/external-training/approve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: selectedRequest.id,
+                        status: 'Rejected',
+                        approved_by: userName || 'Admin'
+                    })
+                });
+            }
             if (res.ok) {
-                const updated = await res.json();
-                setRequests(requests.map(r => r.id === id ? updated : r));
+                await fetchRequests();
                 setSelectedRequest(null);
                 setIsRejectMode(false);
                 setRejectReason('');
@@ -318,6 +404,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             settlementNotes: req.rejectionReason || ''
         });
         setIsSettlementOpen(true);
+        setSettleCertificate(null);
     };
 
     const handleSaveSettlement = async () => {
@@ -326,7 +413,21 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             const newTotal = settleData.training + settleData.transport + settleData.accommodation + settleData.others;
             const excess = Math.max(0, newTotal - (selectedRequest.cost || 0));
 
-            const res = await fetch(`${API_BASE_URL}/api/training/${selectedRequest.id}`, {
+            let certLink = undefined;
+            if (settleCertificate) {
+                const formData = new FormData();
+                formData.append('file', settleCertificate);
+                const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (uploadRes.ok) {
+                    const uploadData = await uploadRes.json();
+                    certLink = uploadData.fileUrl;
+                }
+            }
+
+            const res = await fetch(`${API_BASE_URL}/api/external-training/${selectedRequest.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -336,15 +437,15 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     costAccommodation: settleData.accommodation,
                     costOthers: settleData.others,
                     additionalCost: excess,
-                    settlementNote: settleData.settlementNotes
+                    settlementNote: settleData.settlementNotes,
+                    certificateLink: certLink
                 })
             });
 
             if (res.ok) {
-                const updated = await res.json();
-                setRequests(requests.map(r => r.id === updated.id ? updated : r));
+                await fetchRequests();
                 setIsSettlementOpen(false);
-                setSelectedRequest(updated);
+                setSelectedRequest(null);
             }
         } catch (err) { console.error(err); }
     };
@@ -539,8 +640,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     ) : (
                         filteredRequests.map(req => (
                             <div key={req.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group relative">
-                                <div className="flex justify-between items-start">
-                                    <div className="space-y-3">
+                                <div className="flex flex-col md:flex-row md:items-start gap-4">
+                                    <div className="space-y-3 flex-1">
                                         <div className="flex items-center gap-3">
                                             <h4 className="text-lg font-black text-slate-900 group-hover:text-indigo-600 transition-colors leading-none">{req.title}</h4>
                                             <StatusBadge status={req.status} />
@@ -587,7 +688,30 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                         </div>
                                     </div>
 
+                                    {req.evidenceUrl && (
+                                        <div className="hidden lg:flex items-center justify-center mr-4">
+                                            {req.evidenceUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
+                                                <a href={req.evidenceUrl} target="_blank" rel="noreferrer" className="group/img relative block overflow-hidden rounded-xl border border-slate-100 shadow-sm w-40 h-28 shrink-0">
+                                                    <img src={req.evidenceUrl} alt="Certificate" className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-500" />
+                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <span className="text-white text-[10px] font-black uppercase tracking-widest">View Document</span>
+                                                    </div>
+                                                </a>
+                                            ) : (
+                                                <a href={req.evidenceUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center w-40 h-28 bg-slate-50 border border-slate-100 rounded-xl hover:bg-slate-100 hover:border-slate-300 transition-colors group/doc text-slate-400 hover:text-indigo-600 shrink-0">
+                                                    <FileText size={24} className="mb-2" />
+                                                    <span className="text-[9px] font-black uppercase tracking-widest text-center px-2">Open Document</span>
+                                                </a>
+                                            )}
+                                        </div>
+                                    )}
+
                                     <div className="flex items-center gap-2">
+                                        {req.evidenceUrl && (
+                                            <a href={req.evidenceUrl} target="_blank" rel="noreferrer" className="p-3 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all lg:hidden" title="View Certificate/Attachment">
+                                                <Link size={20} />
+                                            </a>
+                                        )}
                                         <button onClick={() => setSelectedRequest(req)} className="p-3 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="View Dossier">
                                             <FileText size={20} />
                                         </button>
@@ -651,118 +775,116 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
 
             {/* Modal Components */}
             {selectedRequest && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[50px] shadow-2xl w-full max-w-4xl overflow-hidden ring-1 ring-white/10 flex flex-col max-h-[95vh] animate-in zoom-in-95 duration-300">
-                        <div className="p-12 border-b border-slate-50 flex justify-between items-start bg-slate-50/50">
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
                             <div>
-                                <div className="flex items-center gap-4 mb-3">
-                                    <StatusBadge status={selectedRequest.status} />
-                                    <span className="text-slate-400 font-black text-[10px] uppercase tracking-widest">LTR-ID: {selectedRequest.id}</span>
-                                </div>
-                                <h2 className="text-4xl font-black text-slate-900 leading-tight">{selectedRequest.title}</h2>
-                                <p className="text-lg font-bold text-slate-400 mt-2">{selectedRequest.vendor} • {selectedRequest.location}</p>
+                                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                    <Briefcase size={20} className="text-indigo-600" /> Process Training Request
+                                </h3>
+                                <p className="text-sm text-slate-500">LTR-ID: {selectedRequest.id} • {selectedRequest.employeeName}</p>
                             </div>
-                            <button onClick={() => setSelectedRequest(null)} className="p-4 bg-white hover:bg-slate-100 rounded-3xl text-slate-300 hover:text-slate-600 transition-all shadow-sm">
-                                <XCircle size={32} />
-                            </button>
+                            <button onClick={() => setSelectedRequest(null)} className="text-slate-400 hover:text-slate-600"><XCircle size={24} /></button>
                         </div>
-
-                        <div className="p-12 overflow-y-auto space-y-12">
-                            <div className="grid md:grid-cols-2 gap-8">
-                                <div className="p-8 rounded-[40px] bg-slate-50 border border-slate-100 flex items-center gap-6">
-                                    <div className="w-16 h-16 rounded-[24px] bg-white text-indigo-600 flex items-center justify-center font-black text-2xl shadow-sm border border-slate-200">
-                                        {selectedRequest.employeeName.charAt(0)}
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Applicant Identity</p>
-                                        <p className="font-black text-slate-800 text-xl">{selectedRequest.employeeName}</p>
-                                        <p className="text-sm font-bold text-indigo-500 uppercase tracking-tight">{selectedRequest.employeeRole}</p>
-                                    </div>
-                                </div>
-                                <div className="p-8 rounded-[40px] bg-indigo-600 text-white flex flex-col justify-center">
-                                    <p className="text-[10px] font-black text-white/60 uppercase tracking-widest mb-1">Total Investment Approved</p>
-                                    <p className="text-3xl font-black">{formatCurrency(selectedRequest.cost || 0)}</p>
-                                </div>
+                        <div className="p-6 space-y-4 overflow-y-auto">
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Training Title</label>
+                                <input readOnly value={selectedRequest.title} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-700 cursor-not-allowed" />
                             </div>
-
-                            <div className="space-y-6">
-                                <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Strategic Justification</h5>
-                                <div className="p-10 bg-slate-50 rounded-[40px] border border-slate-100 italic font-bold text-slate-600 text-lg leading-relaxed">
-                                    "{selectedRequest.justification}"
-                                </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Vendor & Location</label>
+                                <input readOnly value={`${selectedRequest.vendor} - ${selectedRequest.location}`} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-700 cursor-not-allowed" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Strategic Justification</label>
+                                <textarea readOnly value={selectedRequest.justification} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-700 cursor-not-allowed resize-none" rows={2} />
                             </div>
 
                             {(userRole === 'HR' || userRole === 'HR_ADMIN') && selectedRequest.status === 'PENDING_HR' && (
-                                <div className="space-y-6">
-                                    <h5 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest ml-1">Finance Allocation Control</h5>
-                                    <div className="bg-indigo-50/50 rounded-[40px] p-10 border border-indigo-100 grid sm:grid-cols-2 gap-6">
-                                        {[
-                                            { label: 'Training Fee', field: 'training' },
-                                            { label: 'Travel Cost', field: 'transport' },
-                                            { label: 'Accommodation', field: 'accommodation' },
-                                            { label: 'Miscellaneous', field: 'others' }
-                                        ].map((item) => (
-                                            <div key={item.field}>
-                                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{item.label}</label>
-                                                <div className="relative">
-                                                    <span className="absolute left-5 top-3.5 font-black text-slate-300">Rp</span>
-                                                    <input
-                                                        type="text"
-                                                        value={new Intl.NumberFormat('id-ID').format((breakdownCost as any)[item.field])}
-                                                        onChange={(e) => {
-                                                            const val = Number(e.target.value.replace(/\D/g, ''));
-                                                            setBreakdownCost(prev => ({ ...prev, [item.field]: val }));
-                                                        }}
-                                                        className="w-full pl-12 pr-6 py-4 rounded-2xl border-2 border-indigo-100 focus:border-indigo-500 outline-none text-base font-black text-slate-700 bg-white transition-all shadow-sm"
-                                                    />
+                                <>
+                                    <div className="pt-4 border-t border-slate-100">
+                                        <h4 className="font-bold text-slate-800 mb-3">Finance Allocation</h4>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {[
+                                                { label: 'Training Fee', field: 'training' },
+                                                { label: 'Travel Cost', field: 'transport' },
+                                                { label: 'Accommodation', field: 'accommodation' },
+                                                { label: 'Miscellaneous', field: 'others' }
+                                            ].map((item) => (
+                                                <div key={item.field}>
+                                                    <label className="block text-xs font-semibold text-slate-700 mb-1">{item.label}</label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-3 top-2.5 text-slate-400 text-sm">Rp</span>
+                                                        <input
+                                                            type="text"
+                                                            value={new Intl.NumberFormat('id-ID').format((breakdownCost as any)[item.field])}
+                                                            onChange={(e) => {
+                                                                const val = Number(e.target.value.replace(/\D/g, ''));
+                                                                setBreakdownCost(prev => ({ ...prev, [item.field]: val }));
+                                                            }}
+                                                            className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-sm focus:border-indigo-500"
+                                                        />
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
+                                    </div>
+                                    {selectedRequest._original?.category === 'Sertifikat' && (
+                                        <div className="mt-4">
+                                            <label className="block text-sm font-semibold text-slate-700 mb-1">Upload Certificate Evidence</label>
+                                            <input
+                                                type="file"
+                                                accept="image/*,.pdf"
+                                                onChange={(e) => setHrCertificateFile(e.target.files ? e.target.files[0] : null)}
+                                                className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none text-sm"
+                                            />
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            
+                            {isRejectMode && (
+                                <div className="mt-4 p-4 bg-red-50 rounded-xl border border-red-100">
+                                    <label className="block text-sm font-semibold text-red-700 mb-1">Rejection Reason</label>
+                                    <input
+                                        autoFocus
+                                        placeholder="Enter reason..."
+                                        className="w-full px-4 py-2 border border-red-200 rounded-xl outline-none text-sm mb-3"
+                                        value={rejectReason}
+                                        onChange={(e) => setRejectReason(e.target.value)}
+                                    />
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setIsRejectMode(false)} className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl text-sm">Cancel</button>
+                                        <button onClick={() => handleAction(selectedRequest.id, 'reject', rejectReason)} className="flex-1 py-2 bg-red-600 text-white font-bold rounded-xl text-sm">Confirm Reject</button>
                                     </div>
                                 </div>
                             )}
+
                         </div>
 
-                        <div className="p-10 bg-slate-50 border-t border-slate-100 flex justify-between items-center gap-6">
-                            <div className="flex items-center gap-4">
+                        {!isRejectMode && (
+                            <div className="p-6 border-t border-slate-100 bg-slate-50 flex flex-wrap gap-3 rounded-b-2xl">
                                 {selectedRequest.evidenceUrl && (
-                                    <a href={selectedRequest.evidenceUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl text-[10px] font-black tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2">
-                                        <Download size={14} /> DOWNLOAD EVIDENCE
+                                    <a href={selectedRequest.evidenceUrl} target="_blank" rel="noopener noreferrer" className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl text-sm text-center">
+                                        Evidence
                                     </a>
                                 )}
-                                <button onClick={() => handlePrint(selectedRequest)} className="px-6 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl text-[10px] font-black tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2">
-                                    <Printer size={14} /> PRINT DOSSIER
+                                <button onClick={() => handlePrint(selectedRequest)} className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl text-sm flex items-center justify-center gap-2">
+                                    <Printer size={16} /> Print
                                 </button>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                                {isRejectMode ? (
-                                    <div className="flex gap-3 animate-in slide-in-from-right-4">
-                                        <input
-                                            autoFocus
-                                            placeholder="Enter rejection reason..."
-                                            className="px-6 py-3 rounded-2xl border-2 border-rose-200 outline-none font-bold text-sm min-w-[300px]"
-                                            value={rejectReason}
-                                            onChange={(e) => setRejectReason(e.target.value)}
-                                        />
-                                        <button onClick={() => handleAction(selectedRequest.id, 'reject', rejectReason)} className="px-8 py-3 bg-rose-600 text-white rounded-2xl font-black text-xs tracking-widest shadow-lg shadow-rose-100 active:scale-95 transition-all">REJECT NOW</button>
-                                        <button onClick={() => setIsRejectMode(false)} className="px-8 py-3 bg-white text-slate-400 rounded-2xl font-black text-xs tracking-widest border border-slate-200">CANCEL</button>
-                                    </div>
-                                ) : (
+                                
+                                {((userRole === 'SUPERVISOR' && selectedRequest.status === 'PENDING_SUPERVISOR') || (userRole === 'HR' && selectedRequest.status === 'PENDING_HR')) && (
                                     <>
-                                        {((userRole === 'SUPERVISOR' && selectedRequest.status === 'PENDING_SUPERVISOR') || (userRole === 'HR' && selectedRequest.status === 'PENDING_HR')) && (
-                                            <>
-                                                <button onClick={() => setIsRejectMode(true)} className="px-10 py-4 bg-white text-rose-600 border-2 border-rose-100 hover:border-rose-600 rounded-[24px] font-black text-xs tracking-[0.2em] transition-all">REJECT</button>
-                                                <button onClick={() => handleAction(selectedRequest.id, 'approve')} className="px-10 py-4 bg-indigo-600 text-white rounded-[24px] font-black text-xs tracking-[0.2em] shadow-xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all">APPROVE DOSSIER</button>
-                                            </>
-                                        )}
-                                        {selectedRequest.status === 'APPROVED' && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
-                                            <button onClick={() => handleOpenSettlement(selectedRequest)} className="px-10 py-4 bg-emerald-600 text-white rounded-[24px] font-black text-xs tracking-[0.2em] shadow-xl shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all">UPDATE SETTLEMENT</button>
-                                        )}
+                                        <button onClick={() => setIsRejectMode(true)} className="flex-1 py-2 bg-red-50 text-red-600 font-bold rounded-xl text-sm">Reject</button>
+                                        <button onClick={() => handleAction(selectedRequest.id, 'approve')} className="flex-[2] py-2 bg-indigo-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-indigo-700 transition-colors">Approve Request</button>
                                     </>
                                 )}
+                                
+                                {selectedRequest.status === 'APPROVED' && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                                    <button onClick={() => handleOpenSettlement(selectedRequest)} className="flex-[2] py-2 bg-emerald-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-emerald-700 transition-colors">Update Settlement</button>
+                                )}
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -770,8 +892,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             {/* Recap Detail Modal */}
             {recapDetailUser && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[50px] shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[90vh]">
-                        <div className="p-12 border-b border-slate-50 flex justify-between items-center bg-white">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="p-6 sm:p-5 border-b border-slate-50 flex justify-between items-center bg-white">
                             <div>
                                 <h2 className="font-black text-2xl text-slate-900 tracking-tight flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center"><FileText size={20} /></div>
@@ -779,10 +901,10 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                 </h2>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 ml-14">{selectedPeriod} • {selectedYear}</p>
                             </div>
-                            <button onClick={() => setRecapDetailUser(null)} className="p-4 hover:bg-slate-100 rounded-3xl text-slate-300 transition-colors"><XCircle size={24} /></button>
+                            <button onClick={() => setRecapDetailUser(null)} className="p-4 hover:bg-slate-100 rounded-lg text-slate-300 transition-colors"><XCircle size={24} /></button>
                         </div>
 
-                        <div className="overflow-y-auto p-12">
+                        <div className="overflow-y-auto p-6 sm:p-5">
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
                                     <tr>
@@ -819,8 +941,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                             </table>
                         </div>
 
-                        <div className="p-10 border-t border-slate-50 bg-slate-50/50 text-right">
-                            <button onClick={() => setRecapDetailUser(null)} className="px-10 py-4 bg-white border border-slate-200 text-slate-600 font-black rounded-3xl hover:bg-slate-100 transition-all text-xs tracking-widest shadow-sm">
+                        <div className="p-6 border-t border-slate-50 bg-slate-50/50 text-right">
+                            <button onClick={() => setRecapDetailUser(null)} className="px-10 py-4 bg-white border border-slate-200 text-slate-600 font-black rounded-lg hover:bg-slate-100 transition-all text-xs tracking-widest shadow-sm">
                                 CLOSE ARCHIVE
                             </button>
                         </div>
@@ -831,8 +953,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             {/* Settlement Modal */}
             {isSettlementOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
-                    <div className="bg-white rounded-[50px] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95">
-                        <div className="p-10 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+                        <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 shrink-0">
                             <div>
                                 <h2 className="font-black text-2xl text-slate-900 tracking-tight">Finance Settlement</h2>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Final Actual Expenditure Review</p>
@@ -840,7 +962,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                             <button onClick={() => setIsSettlementOpen(false)} className="p-3 hover:bg-slate-100 rounded-2xl text-slate-300 transition-colors"><XCircle size={24} /></button>
                         </div>
 
-                        <div className="p-10 space-y-6">
+                        <div className="p-6 space-y-6 overflow-y-auto">
                             <div className="grid grid-cols-2 gap-4">
                                 {[
                                     { label: 'Training Cost', field: 'training' },
@@ -866,7 +988,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                 ))}
                             </div>
 
-                            <div className="bg-emerald-900 p-8 rounded-[32px] text-white shadow-xl shadow-emerald-100">
+                            <div className="bg-emerald-900 p-5 rounded-xl text-white shadow-xl shadow-emerald-100">
                                 <div className="flex justify-between items-center">
                                     <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Total Actual Expenditure</span>
                                     <span className="text-2xl font-black">
@@ -875,10 +997,22 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                 </div>
                             </div>
 
+                            {selectedRequest?._original?.category === 'Sertifikat' && (
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Upload Certificate Evidence (Optional to Update)</label>
+                                    <input
+                                        type="file"
+                                        accept="image/*,.pdf"
+                                        onChange={(e) => setSettleCertificate(e.target.files ? e.target.files[0] : null)}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm text-slate-600 bg-white"
+                                    />
+                                </div>
+                            )}
+
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Settlement Notes</label>
                                 <textarea
-                                    className="w-full px-6 py-4 rounded-3xl bg-slate-50 border border-slate-100 focus:bg-white outline-none font-bold text-slate-700 text-sm resize-none"
+                                    className="w-full px-6 py-4 rounded-lg bg-slate-50 border border-slate-100 focus:bg-white outline-none font-bold text-slate-700 text-sm resize-none"
                                     rows={3}
                                     placeholder="Add notes for finance department..."
                                     value={settleData.settlementNotes}
@@ -887,7 +1021,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                             </div>
                         </div>
 
-                        <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-4">
+                        <div className="p-5 bg-slate-50 border-t border-slate-100 flex justify-end gap-4 shrink-0">
                             <button onClick={() => setIsSettlementOpen(false)} className="px-8 py-3 bg-white text-slate-400 rounded-2xl font-black text-xs tracking-widest border border-slate-200">CANCEL</button>
                             <button onClick={handleSaveSettlement} className="px-8 py-3 bg-emerald-600 text-white rounded-2xl font-black text-xs tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all">CONFIRM SETTLEMENT</button>
                         </div>

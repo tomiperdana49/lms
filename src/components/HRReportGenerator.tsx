@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 const HRReportGenerator = () => {
     // Data State
     const [requests, setRequests] = useState<TrainingRequest[]>([]);
+    const [externalRequests, setExternalRequests] = useState<any[]>([]);
     const [meetings, setMeetings] = useState<Meeting[]>([]);
     const [incentives, setIncentives] = useState<Incentive[]>([]);
     const [logs, setLogs] = useState<ReadingLogEntry[]>([]);
@@ -27,12 +28,13 @@ const HRReportGenerator = () => {
     const fetchData = async () => {
         setRefreshing(true);
         try {
-            const [reqRes, meetRes, incRes, logsRes, empRes] = await Promise.all([
+            const [reqRes, meetRes, incRes, logsRes, empRes, extRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/api/training`),
                 fetch(`${API_BASE_URL}/api/meetings`),
                 fetch(`${API_BASE_URL}/api/incentives`),
                 fetch(`${API_BASE_URL}/api/logs`),
-                fetch(`${API_BASE_URL}/api/employees`)
+                fetch(`${API_BASE_URL}/api/employees`),
+                fetch(`${API_BASE_URL}/api/external-training/all`)
             ]);
 
             if (reqRes.ok) setRequests(await reqRes.json());
@@ -40,6 +42,7 @@ const HRReportGenerator = () => {
             if (incRes.ok) setIncentives(await incRes.json());
             if (logsRes.ok) setLogs(await logsRes.json());
             if (empRes.ok) setEmployees(await empRes.json());
+            if (extRes.ok) setExternalRequests(await extRes.json());
         } catch (err) {
             console.error("Failed to fetch report data", err);
         } finally {
@@ -128,6 +131,17 @@ const HRReportGenerator = () => {
             if (selectedBranch !== 'All' && r.location !== selectedBranch) return;
             if (isInPeriod(r.date, range)) {
                 externalTraining += safeNum(r.cost) + safeNum(r.additionalCost);
+            }
+        });
+        
+        externalRequests.filter(r => r.status === 'Processed').forEach(r => {
+            if (selectedBranch !== 'All') {
+                const emp = employees.find(e => e.id_employee === r.employee_id);
+                if (emp?.branch_name !== selectedBranch) return;
+            }
+            const dateToCheck = r.updated_at || r.created_at || r.start_date;
+            if (isInPeriod(dateToCheck, range)) {
+                externalTraining += safeNum(r.registration_fee) + safeNum(r.travel_flight_cost) + safeNum(r.accommodation_cost) + safeNum(r.miscellaneous_cost);
             }
         });
 
@@ -244,6 +258,29 @@ const HRReportGenerator = () => {
                     pic: r.employeeName || 'Unknown',
                     details: details.join(', '),
                     amount: safeNum(r.cost) + safeNum(r.additionalCost)
+                });
+            }
+        });
+        
+        externalRequests.filter(r => r.status === 'Processed').forEach(r => {
+            if (selectedBranch !== 'All') {
+                const emp = employees.find(e => e.id_employee === r.employee_id);
+                if (emp?.branch_name !== selectedBranch) return;
+            }
+            const dateToCheck = r.updated_at || r.created_at || r.start_date;
+            if (isInPeriod(dateToCheck, range)) {
+                const details = [`Reg: ${formatCurrency(safeNum(r.registration_fee))}`];
+                if (safeNum(r.travel_flight_cost)) details.push(`Travel: ${formatCurrency(safeNum(r.travel_flight_cost))}`);
+                if (safeNum(r.accommodation_cost)) details.push(`Accomm: ${formatCurrency(safeNum(r.accommodation_cost))}`);
+                if (safeNum(r.miscellaneous_cost)) details.push(`Misc: ${formatCurrency(safeNum(r.miscellaneous_cost))}`);
+
+                txs.push({
+                    date: dateToCheck,
+                    category: 'External Training',
+                    item: r.title,
+                    pic: r.employee_name || 'Unknown',
+                    details: details.join(', '),
+                    amount: safeNum(r.registration_fee) + safeNum(r.travel_flight_cost) + safeNum(r.accommodation_cost) + safeNum(r.miscellaneous_cost)
                 });
             }
         });

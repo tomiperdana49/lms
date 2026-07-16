@@ -126,6 +126,7 @@ export interface TrainingRequest {
     supervisorName?: string;
     hrName?: string;
     employee_id?: string;
+    _original?: any;
 }
 
 export interface Meeting {
@@ -247,4 +248,29 @@ export interface Asset {
     brand: string;
     category_name?: string; // Joined
     sub_category_name?: string; // Joined
+}
+
+export interface ExternalTrainingRequest {
+    id: number;
+    employee_id?: string;
+    employee_name?: string;
+    category?: string;
+    title?: string;
+    start_date?: string;
+    end_date?: string;
+    status?: string;
+    registration_fee?: number;
+    travel_flight_cost?: number;
+    accommodation_cost?: number;
+    miscellaneous_cost?: number;
+    payment_method?: string;
+    attachment_link?: string;
+    approved_by?: string;
+    created_at?: string;
+    updated_at?: string;
+    certificate_link?: string;
+    vendor?: string;
+    location?: string;
+    leader_name?: string;
+    rejection_reason?: string;
 }
