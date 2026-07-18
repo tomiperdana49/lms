@@ -1052,18 +1052,193 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         }).sort((a, b) => b.totalCost - a.totalCost);
     };
 
-    const exportHostExcel = () => {
+    const exportHostExcel = async () => {
         const stats = getHostStats();
-        const data = stats.map(s => ({
-            "Host Name": s.host,
-            "Employee ID": s.host_id || '-',
-            "Sessions": s.sessions,
-            "Total Audience": s.totalParticipants,
-            "Trainer Incentive": s.totalTrainerIncentive,
-            "Total Cost": s.totalCost
-        }));
+        const dataRows: any[] = [];
+        let globalIndex = 1; // Start from 1
 
-        const ws = XLSX.utils.json_to_sheet(data);
+        // Fetch all quiz results and feedback for meetings in the filtered range
+        let allQuizResults: any[] = [];
+        const meetingFeedbackMap = new Map<number, any[]>();
+
+        try {
+            for (const hostStat of stats) {
+                for (const m of hostStat.meetings) {
+                    const mid = m.id;
+
+                    // Fetch ALL quiz results for this meeting (without user filter) using new endpoint
+                    try {
+                        const qRes = await fetch(`${API_BASE_URL}/api/quiz/results/meeting-all/${mid}`);
+                        if (qRes.ok) {
+                            const data = await qRes.json();
+                            if (Array.isArray(data)) {
+                                allQuizResults.push(...data);
+                            }
+                        }
+                    } catch(e) {}
+
+                    // Fetch feedback for this meeting - get from summary endpoint
+                    try {
+                        const sRes = await fetch(`${API_BASE_URL}/api/meetings/summary/${mid}`);
+                        if (sRes.ok) {
+                            const sData = await sRes.json();
+                            if (sData.allFeedbackResults && Array.isArray(sData.allFeedbackResults)) {
+                                meetingFeedbackMap.set(mid, sData.allFeedbackResults);
+                            } else {
+                                meetingFeedbackMap.set(mid, []);
+                            }
+                        } else {
+                            meetingFeedbackMap.set(mid, []);
+                        }
+                    } catch(e) {
+                        meetingFeedbackMap.set(mid, []);
+                    }
+                }
+            }
+        } catch(e) { console.error('Failed to fetch quiz results', e); }
+
+        stats.forEach(hostStat => {
+            hostStat.meetings.forEach(m => {
+                const meetingDate = new Date(m.date);
+
+                // Calculate quarter
+                const monthNum = meetingDate.getMonth() + 1;
+                const quarter = Math.ceil(monthNum / 3);
+
+                // Get ALL participants count (include Internship/PKL for Number of Participants)
+                const allParticipantEmails = Array.from(new Set([
+                    ...(m.guests?.emails || []).map((e: string) => e.toLowerCase()),
+                    ...((m.guests as any)?.employee_ids || []).map((e: string) => e.toLowerCase())
+                ]));
+
+                const totalParticipants = allParticipantEmails.length;
+
+                // Get valid participants count (exclude Internship/PKL for cost calculation)
+                const validParticipants = allParticipantEmails.filter(email => {
+                    const emp = employees.find(e =>
+                        e.email?.toLowerCase() === email ||
+                        String(e.id_employee) === email ||
+                        String(e.id) === email
+                    );
+                    if (emp && (emp.status_join === 'Internship' || emp.status_join === 'PKL')) {
+                        return false;
+                    }
+                    return true;
+                }).length;
+
+                // Get training hours from meeting time
+                let trainingHours = 0;
+                if (m.time) {
+                    const parts = m.time.split('-');
+                    if (parts.length === 2) {
+                        const parseTime = (t: string) => {
+                            const [h, min] = t.trim().split(':').map(Number);
+                            return (h || 0) + (min || 0) / 60;
+                        };
+                        const startH = parseTime(parts[0]);
+                        const endH = parseTime(parts[1]);
+                        if (endH > startH) {
+                            trainingHours = Math.round(endH - startH);
+                        }
+                    }
+                }
+
+                // Calculate costs
+                const costReport: any = m.costReport || {};
+                const trainingCost = Number(costReport.trainerIncentive || 0) +
+                                    Number(costReport.audienceFee || 0) * validParticipants;
+                const venueMealsCost = Number(costReport.snackCost || 0) +
+                                      Number(costReport.lunchCost || 0) +
+                                      Number(costReport.otherCost || 0);
+                const totalCost = trainingCost + venueMealsCost;
+
+                // Get feedback scores - calculate average from all participants for this meeting
+                let pte1: string | number = '-';
+                let materialScore: string | number = '-';
+                const meetingFeedbacks = meetingFeedbackMap.get(m.id) || [];
+
+                if (meetingFeedbacks && meetingFeedbacks.length > 0) {
+                    const allScores: number[] = [];
+                    for (const fb of meetingFeedbacks) {
+                        try {
+                            // Handle different feedback data formats
+                            let fbData = fb.feedback_data || fb.data || fb.response;
+                            if (typeof fbData === 'string') {
+                                fbData = JSON.parse(fbData);
+                            }
+                            if (fbData && typeof fbData === 'object') {
+                                const scores = Object.values(fbData)
+                                    .filter(v => typeof v === 'number' || !isNaN(Number(v)))
+                                    .map(v => Number(v));
+                                allScores.push(...scores);
+                            }
+                        } catch(e) {}
+                    }
+                    if (allScores.length > 0) {
+                        const avg = allScores.reduce((a, b) => a + b, 0) / allScores.length;
+                        pte1 = avg.toFixed(2);
+                        materialScore = avg.toFixed(2);
+                    }
+                }
+
+                // Get pre-test and post-test averages from fetched quiz results
+                let avgPre: string | number = '-';
+                let avgPost: string | number = '-';
+                const meetingQuizResults = allQuizResults.filter(r => {
+                    const rMeetingId = Number(r.meeting_id || r.meetingId);
+                    return rMeetingId === m.id;
+                });
+
+                const preScores = meetingQuizResults
+                    .filter(r => (r.quiz_type || r.quizType || '').toUpperCase().includes('PRE'))
+                    .map(r => Number(r.score) || 0);
+                const postScores = meetingQuizResults
+                    .filter(r => (r.quiz_type || r.quizType || '').toUpperCase().includes('POST'))
+                    .map(r => Number(r.score) || 0);
+
+                if (preScores.length > 0) avgPre = Math.round(preScores.reduce((a, b) => a + b, 0) / preScores.length);
+                if (postScores.length > 0) avgPost = Math.round(postScores.reduce((a, b) => a + b, 0) / postScores.length);
+
+                // Calculate % increment
+                let percentIncrement = '-';
+                if (avgPre !== '-' && avgPost !== '-' && Number(avgPre) > 0) {
+                    percentIncrement = (((Number(avgPost) - Number(avgPre)) / Number(avgPre)) * 100).toFixed(2) + '%';
+                }
+
+                dataRows.push({
+                    "No": globalIndex++,
+                    "Quarter": quarter,
+                    "Month": meetingDate.toLocaleString('en-US', { month: 'long' }),
+                    "Date": meetingDate.getDate(),
+                    "Years": meetingDate.getFullYear(),
+                    "Training Name": m.title,
+                    "Number of Participants\n(Jumlah peserta yang hadir training)": validParticipants,
+                    "Training Type": m.type || 'Internal',
+                    "ESG/HSE/OTHER": 'Other',
+                    "Competency Type": 'Behavioral',
+                    "Competency Name": 'Self Development',
+                    "Training Days": 1,
+                    "Training Hours": trainingHours,
+                    "Man Hours\n(Jumlah peserta present x Training hours)": totalParticipants * trainingHours,
+                    "Vendor": m.type === 'Online' ? '' : (m.location || 'Internal'),
+                    "Facilitator": m.host || '-',
+                    "Training Cost\n(Fee dari vendor)": Math.round(trainingCost),
+                    "Venue/Meals Cost\n(Fee dari tempat pelaksanaan training)": Math.round(venueMealsCost),
+                    "Total Cost\n(Training Cost + Venue/Meals)": Math.round(totalCost),
+                    "PTE 1\n(Average feedback survey)": pte1,
+                    "Material\n(Average penilaian feedbacksurvey terkait materi training)": materialScore,
+                    "Facilitator2": '-',
+                    "Venue & Meals": '-',
+                    "Pre-Test": avgPre === '-' ? '-' : String(avgPre),
+                    "Post-Test": avgPost === '-' ? '-' : String(avgPost),
+                    "% Increment\n(Nilai Post Test - Nilai Pre Test)/ Nilai Pre Test": percentIncrement,
+                    "PTE 3": '-',
+                    "Notes": '-'
+                });
+            });
+        });
+
+        const ws = XLSX.utils.json_to_sheet(dataRows);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Hosts");
         XLSX.writeFile(wb, `Internal_Training_Hosts_${startDate}_to_${endDate}.xlsx`);
