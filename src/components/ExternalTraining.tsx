@@ -9,8 +9,6 @@ import {
  DollarSign,
  Briefcase,
  Link,
- Save,
- User as UserIcon,
  Calendar
 } from 'lucide-react';
 import PopupNotification from './PopupNotification';

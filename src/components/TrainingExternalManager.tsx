@@ -12,7 +12,6 @@ import {
     TrendingUp,
     Users,
     Clock,
-    Download,
     Briefcase,
     Link
 } from 'lucide-react';
@@ -157,8 +156,6 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
         }
     }, [selectedRequest]);
 
-    const totalBreakdown = breakdownCost.training + breakdownCost.transport + breakdownCost.accommodation + breakdownCost.others;
-
     const [isSettlementOpen, setIsSettlementOpen] = useState(false);
     const [settleCertificate, setSettleCertificate] = useState<File | null>(null);
     const [settleData, setSettleData] = useState({
@@ -250,7 +247,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
         return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount);
     };
 
-    const handleAction = async (id: number, action: 'approve' | 'reject', reason?: string) => {
+    const handleAction = async (_id: number, action: 'approve' | 'reject', reason?: string) => {
         if (!selectedRequest) return;
         if (action === 'reject' && !reason) {
             alert("Please provide a rejection reason.");
@@ -258,7 +255,6 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
         }
 
         try {
-            const finalCost = isNaN(totalBreakdown) ? 0 : totalBreakdown;
             let res;
             if (action === 'approve') {
                 let certLink = selectedRequest?._original?.certificate_link;
