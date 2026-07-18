@@ -515,8 +515,18 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
 
 
-    const getPeriodDates = () => {
-        return [new Date(startDate), new Date(endDate + 'T23:59:59')];
+    // Helper to get local date string YYYY-MM-DD from a Date object
+    const getLocalDateString = (date: Date): string => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    // Helper to compare dates by local date string (ignores time/timezone)
+    const isWithinDateRange = (meetingDate: Date, startLocal: string, endLocal: string): boolean => {
+        const meetingDateString = getLocalDateString(meetingDate);
+        return meetingDateString >= startLocal && meetingDateString <= endLocal;
     };
 
     // List View State
@@ -544,10 +554,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         }
 
         const d = new Date(m.date);
-        const [start, end] = getPeriodDates();
 
-        // Date Range Range
-        if (d < start || d > end) return false;
+        // Date Range Filter - use local date comparison to avoid timezone issues
+        if (!isWithinDateRange(d, startDate, endDate)) return false;
 
         // Branch Filter (Host Database Mapping)
         const hostEmp = employees.find(e =>
@@ -971,15 +980,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
 
     const getHostStats = () => {
-        const [start, end] = getPeriodDates();
-
         // chunk meetings by host
         const hosts: Record<string, ExtendedMeeting[]> = {};
 
         meetings.forEach(m => {
             const d = new Date(m.date);
 
-            if (d < start || d > end) return;
+            // Date Range Filter - use local date comparison to avoid timezone issues
+            if (!isWithinDateRange(d, startDate, endDate)) return;
 
             // Branch Filter (Host Database Mapping)
             const hostEmp = employees.find(e =>
@@ -1114,6 +1122,15 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 return acc;
             }, []);
 
+            // Filter participants: exclude Internship/PKL from cost calculation
+            const validParticipantIds = allParticipantEmails.filter(id => {
+                const emp = employees.find(e => e.email?.toLowerCase() === id || String(e.id_employee).toLowerCase() === id || String(e.id).toLowerCase() === id);
+                if (emp && (emp.status_join === 'Internship' || emp.status_join === 'PKL')) {
+                    return false; // Exclude Internship/PKL
+                }
+                return true;
+            });
+
             allParticipantEmails.forEach(email => {
                 const emp = employees.find(e => e.email?.toLowerCase() === email || String(e.id_employee).toLowerCase() === email);
                 const name = emp?.full_name || email;
@@ -1150,11 +1167,18 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     ? (Number(avgPost) - Number(avgPre)).toFixed(0) + '%'
                     : '-';
 
-                const totalCost = (m.costReport?.trainerIncentive || 0) + 
-                                  (m.costReport?.snackCost || 0) + 
-                                  (m.costReport?.lunchCost || 0) + 
+                const totalCost = (m.costReport?.trainerIncentive || 0) +
+                                  (m.costReport?.snackCost || 0) +
+                                  (m.costReport?.lunchCost || 0) +
                                   (m.costReport?.otherCost || 0);
-                const totalCostPerParticipant = allParticipantEmails.length > 0 ? (totalCost / allParticipantEmails.length) : 0;
+
+                // Calculate cost per valid participant (exclude Internship/PKL from divisor)
+                const validCount = validParticipantIds.length;
+                const totalCostPerParticipant = validCount > 0 ? (totalCost / validCount) : 0;
+
+                // Check if current employee is Internship/PKL - if so, cost = 0
+                const isInternshipOrPKL = emp && (emp.status_join === 'Internship' || emp.status_join === 'PKL');
+                const participantCost = isInternshipOrPKL ? 0 : Math.round(totalCostPerParticipant);
 
                 dataRows.push([
                     globalIndex++,
@@ -1185,7 +1209,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     esc((m as any).participation_type || 'Targeted Participants'),
                     esc((m as any).vendor || 'Internal'),
                     esc(m.host),
-                    Math.round(totalCostPerParticipant),
+                    participantCost,
                     '-', // PTE 1
                     avgPre,
                     avgPost,
@@ -1302,12 +1326,32 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     {(() => {
                                         const results = meetingSummary.allQuizResults || [];
                                         const feedbacks = meetingSummary.allFeedbackResults || [];
-                                        const guests = selectedMeeting.guests?.emails || [];
-                                        
-                                        const isMatch = (item: any, email: string) => {
+
+                                        // Get participant list from multiple possible sources
+                                        let participants: string[] = [];
+                                        if (selectedMeeting.guests?.emails && selectedMeeting.guests.emails.length > 0) {
+                                            // Primary source: emails array
+                                            participants = selectedMeeting.guests.emails;
+                                        } else if (selectedMeeting.guests?.employee_ids && selectedMeeting.guests.employee_ids.length > 0) {
+                                            // Fallback: employee_ids array
+                                            participants = selectedMeeting.guests.employee_ids;
+                                        } else if (selectedMeeting.guests && Array.isArray((selectedMeeting.guests as any).details)) {
+                                            // Fallback: details array - extract employee_ids or names
+                                            participants = (selectedMeeting.guests as any).details.map((d: any) => d.employee_id || d.name).filter(Boolean);
+                                        } else if (results.length > 0) {
+                                            // Last resort: get unique student/employee IDs from quiz results
+                                            const ids = new Set<string>();
+                                            results.forEach(r => {
+                                                const id = r.student_id || r.employee_id;
+                                                if (id) ids.add(String(id));
+                                            });
+                                            participants = Array.from(ids);
+                                        }
+
+                                        const isMatch = (item: any, participantId: string) => {
                                             if (!item) return false;
                                             const idStr = (item.student_id || item.employee_id || item.user_id || item.email || item.user_email || '').toString().toLowerCase().trim();
-                                            const target = email.toLowerCase().trim();
+                                            const target = participantId.toLowerCase().trim();
                                             if (idStr === target) return true;
                                             if (target.includes('@') && idStr === target.split('@')[0]) return true;
                                             const emp = employees.find(e => e.email?.toLowerCase() === target || String(e.id_employee).toLowerCase() === target || String(e.id).toLowerCase() === target);
@@ -1318,24 +1362,24 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             return false;
                                         };
 
-                                        const renderedRows = guests.map((email: string) => {
-                                            const hasFeedback = feedbacks.some(f => isMatch(f, email));
+                                        const renderedRows = participants.map((participantId: string) => {
+                                            const hasFeedback = feedbacks.some(f => isMatch(f, participantId));
                                             const isDone = hasFeedback;
-                                            
+
                                             if (showParticipantModal === 'sudah' && !isDone) return null;
                                             if (showParticipantModal === 'belum' && isDone) return null;
-                                            
-                                            const emp = employees.find(e => e.email?.toLowerCase() === email.toLowerCase() || String(e.id_employee).toLowerCase() === email.toLowerCase());
-                                            const name = emp?.full_name || email;
-                                            
-                                            const preScores = results.filter(r => isMatch(r, email) && (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE')).map(r => Number(r.score) || 0);
-                                            const postScores = results.filter(r => isMatch(r, email) && (r.quizType || r.quiz_type || "").toUpperCase().includes('POST')).map(r => Number(r.score) || 0);
-                                            
+
+                                            const emp = employees.find(e => e.email?.toLowerCase() === participantId.toLowerCase() || String(e.id_employee).toLowerCase() === participantId.toLowerCase());
+                                            const name = emp?.full_name || participantId;
+
+                                            const preScores = results.filter(r => isMatch(r, participantId) && (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE')).map(r => Number(r.score) || 0);
+                                            const postScores = results.filter(r => isMatch(r, participantId) && (r.quizType || r.quiz_type || "").toUpperCase().includes('POST')).map(r => Number(r.score) || 0);
+
                                             const preScore = preScores.length > 0 ? Math.max(...preScores) : '-';
                                             const postScore = postScores.length > 0 ? Math.max(...postScores) : '-';
-                                            
+
                                             let fbScore: any = '-';
-                                            const f = feedbacks.find(f => isMatch(f, email));
+                                            const f = feedbacks.find(f => isMatch(f, participantId));
                                             if (f) {
                                                 const fData = f.feedbackData || f.feedback_data || f.data;
                                                 if (fData) {
@@ -1346,9 +1390,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     } catch(e) {}
                                                 }
                                             }
-                                            
+
                                             return (
-                                                <tr key={email} className="hover:bg-slate-50/50 transition-colors">
+                                                <tr key={participantId} className="hover:bg-slate-50/50 transition-colors">
                                                     <td className="px-6 py-4 font-bold text-slate-700">{name}</td>
                                                     <td className="px-6 py-4 text-center font-black text-slate-600">{preScore}</td>
                                                     <td className="px-6 py-4 text-center font-black text-slate-600">{postScore}</td>
@@ -1668,6 +1712,20 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                     })
                                                                 ]));
 
+                                                                // Filter out Internship/PKL from cost calculation
+                                                                const validParticipantEmails = participantEmails.filter(email => {
+                                                                    const emp = employees?.find(e =>
+                                                                        e.email?.toLowerCase() === email ||
+                                                                        String(e.id_employee) === email ||
+                                                                        String(e.id) === email
+                                                                    );
+                                                                    // Exclude Internship/PKL from cost calculation
+                                                                    if (emp && (emp.status_join === 'Internship' || emp.status_join === 'PKL')) {
+                                                                        return false;
+                                                                    }
+                                                                    return true;
+                                                                });
+
                                                                 return (
                                                                     <Fragment key={m.id}>
                                                                         <tr 
@@ -1812,6 +1870,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                                         }
                                                                                                     }
 
+                                                                                                    const isInternshipOrPKL = emp && (emp.status_join === 'Internship' || emp.status_join === 'PKL');
+
                                                                                                     return (
                                                                                                         <tr key={email} className="hover:bg-slate-50/50">
                                                                                                             <td className="px-4 py-2 text-slate-600 font-semibold">{emp?.full_name || email}</td>
@@ -1820,11 +1880,15 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                                             <td className="px-4 py-2 text-center">{feedbackDisplay}</td>
                                                                                                             <td className="px-4 py-2 text-right pr-6 font-bold text-slate-700">
                                                                                                                 {(() => {
-                                                                                                                    const totalCost = (m.costReport?.trainerIncentive || 0) + 
-                                                                                                                                    (m.costReport?.snackCost || 0) + 
-                                                                                                                                    (m.costReport?.lunchCost || 0) + 
+                                                                                                                    // Internship/PKL get cost = 0
+                                                                                                                    if (isInternshipOrPKL) return <span className="text-xs text-slate-400">-</span>;
+
+                                                                                                                    const totalCost = (m.costReport?.trainerIncentive || 0) +
+                                                                                                                                    (m.costReport?.snackCost || 0) +
+                                                                                                                                    (m.costReport?.lunchCost || 0) +
                                                                                                                                     (m.costReport?.otherCost || 0);
-                                                                                                                    const cpp = participantEmails.length > 0 ? totalCost / participantEmails.length : 0;
+                                                                                                                    // Divide by valid participants only (exclude Internship/PKL)
+                                                                                                                    const cpp = validParticipantEmails.length > 0 ? totalCost / validParticipantEmails.length : 0;
                                                                                                                     return cpp > 0 ? formatCurrency(cpp) : '-';
                                                                                                                 })()}
                                                                                                             </td>
@@ -2345,17 +2409,36 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 const meeting = meetings.find(m => m.id === reportingId);
                                                 const allEmails = meeting?.guests?.emails || [];
                                                 const allIds = (meeting?.guests as any)?.employee_ids || [];
-                                                setReportData({ ...reportData, attendees: allEmails, attendee_ids: allIds, participantsCount: Math.max(allEmails.length, allIds.length) });
+
+                                                // Filter out employees with status_join = 'Internship' or 'PKL' for cost calculation
+                                                const filteredIds = allIds.filter((empId: string) => {
+                                                    const emp = employees.find(e =>
+                                                        String(e.id_employee) === String(empId) ||
+                                                        String(e.id) === String(empId)
+                                                    );
+                                                    // Exclude Internship/PKL from cost calculation
+                                                    if (emp && (emp.status_join === 'Internship' || emp.status_join === 'PKL')) {
+                                                        return false;
+                                                    }
+                                                    return true;
+                                                });
+
+                                                setReportData({
+                                                    ...reportData,
+                                                    attendees: allEmails,
+                                                    attendee_ids: filteredIds,
+                                                    participantsCount: filteredIds.length
+                                                });
                                             }}
                                             className="text-[10px] font-bold text-blue-600 hover:underline"
                                         >
-                                            Select All
+                                            Select All (Excl. Internship/PKL)
                                         </button>
                                     </div>
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Actual Participants</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Actual Participants (Excl. Internship/PKL)</label>
                                     <input
                                         type="number"
                                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed outline-none font-bold"
@@ -2926,13 +3009,31 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                     {meetingSummary.feedback || 0}
                                                                 </span>
                                                             </div>
-                                                            <div 
+                                                            <div
                                                                 className="flex justify-between items-center p-2 hover:bg-slate-100 rounded-xl cursor-pointer transition-colors"
                                                                 onClick={() => setShowParticipantModal('belum')}
                                                             >
                                                                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Belum Selesai</span>
                                                                 <span className="text-sm font-black text-orange-600 bg-orange-50 px-3 py-0.5 rounded-full border border-orange-100">
-                                                                    {Math.max(0, (selectedMeeting.guests?.emails?.length || 0) - (meetingSummary.feedback || 0))}
+                                                                    {(() => {
+                                                                        // Get total participants from multiple possible sources
+                                                                        const guests = selectedMeeting.guests;
+                                                                        let totalParticipants = 0;
+
+                                                                        if (guests?.emails && Array.isArray(guests.emails) && guests.emails.length > 0) {
+                                                                            totalParticipants = guests.emails.length;
+                                                                        } else if (guests?.employee_ids && Array.isArray(guests.employee_ids) && guests.employee_ids.length > 0) {
+                                                                            totalParticipants = guests.employee_ids.length;
+                                                                        } else if (Array.isArray((guests as any).details) && (guests as any).details.length > 0) {
+                                                                            totalParticipants = (guests as any).details.length;
+                                                                        } else if (guests?.count) {
+                                                                            // Fallback to count field
+                                                                            totalParticipants = guests.count;
+                                                                        }
+
+                                                                        const completed = meetingSummary?.feedback || 0;
+                                                                        return Math.max(0, totalParticipants - completed);
+                                                                    })()}
                                                                 </span>
                                                             </div>
                                                         </div>
