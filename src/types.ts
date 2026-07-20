@@ -163,9 +163,10 @@ export interface Meeting {
     // Extended fields for reporting
     training_hours?: number;
     competency_type?: string;
-    competency_detail?: string;
+    competency_name?: string;
     participation_type?: string;
     vendor?: string;
+    training_gr_type?: string;  // ESG/HSE/Other
     esg_hse_other?: string;
     action_plan?: string;
     detail_participant_type?: string;

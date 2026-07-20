@@ -1415,9 +1415,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     const year = date.getFullYear();
                     return `${day}/${month}/${year}`;
                 };
-                // Format date as "Month Year" for Month column display
-                const formattedDateLong = mDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-                
                 // Helper to escape commas in CSV
                 const esc = (val: any) => {
                     if (val === null || val === undefined) return "";
