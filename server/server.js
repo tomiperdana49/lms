@@ -314,12 +314,12 @@ const ensureEmployeeColumnsExist = async (employeeData) => {
         for (const key of Object.keys(employeeData)) {
             const sanitizedKey = key.replace(/[^a-zA-Z0-9_]/g, '');
             if (!sanitizedKey) continue;
-            
+
             const lowerKey = sanitizedKey.toLowerCase();
             if (lowerKey === 'employee_id') {
                 continue;
             }
-            
+
             // Skip object/array properties to keep DB clean, only store primitives
             if (employeeData[key] !== null && typeof employeeData[key] === 'object') {
                 continue;
@@ -331,7 +331,7 @@ const ensureEmployeeColumnsExist = async (employeeData) => {
                 if (employeeData[key] && String(employeeData[key]).length > 255) {
                     type = 'TEXT';
                 }
-                
+
                 await pool.query(`ALTER TABLE employees ADD COLUMN \`${sanitizedKey}\` ${type} NULL`);
                 console.log(`[DB MIGRATION] Column '${sanitizedKey}' created successfully.`);
             }
@@ -343,29 +343,29 @@ const ensureEmployeeColumnsExist = async (employeeData) => {
 
 const determineInitialRole = (employee) => {
     if (!employee) return 'STAFF';
-    
+
     const level = (employee.job_level || '').toLowerCase();
     const position = (employee.job_position || '').toUpperCase();
-    
+
     if (level === 'staff') {
         return 'STAFF';
     }
-    
+
     if (position.includes('HR') && !position.includes('HRIS')) {
         return 'HR';
     }
-    
+
     if (position.includes('SUPERVISOR') || position.includes('SPV') || position.includes('MANAGER')) {
         return 'SUPERVISOR';
     }
-    
+
     return 'STAFF';
 };
 
 const checkIsSupervisor = async (user) => {
     if (!user) return false;
     if (user.role === 'SUPERVISOR') return true;
-    
+
     if (user.employee_id || user.name || user.email) {
         try {
             const subCount = await querySimAsset(
@@ -373,10 +373,10 @@ const checkIsSupervisor = async (user) => {
                  WHERE id_report_to = ? 
                     OR id_report_to = ? 
                     OR id_report_to LIKE ? 
-                    OR id_report_to = ?`, 
+                    OR id_report_to = ?`,
                 [
-                    user.employee_id || '___INVALID___', 
-                    user.name || '___INVALID___', 
+                    user.employee_id || '___INVALID___',
+                    user.name || '___INVALID___',
                     `%${user.email ? user.email.split('@')[0] : '___INVALID___'}%`,
                     user.email || '___INVALID___'
                 ]
@@ -477,7 +477,7 @@ const syncEmployeeFromNusawork = async (identifier, token) => {
         }
 
         const result = await response.json();
-        
+
         const extractEmpList = (resObj) => {
             if (resObj && resObj.data) {
                 if (Array.isArray(resObj.data.list)) return resObj.data.list;
@@ -537,7 +537,7 @@ const syncEmployeeFromNusawork = async (identifier, token) => {
         // Find the matching employee by email, ID or username prefix
         let employee = null;
         if (empList.length > 0) {
-            employee = empList.find(e => 
+            employee = empList.find(e =>
                 (e.email && e.email.toLowerCase() === identifier.toLowerCase()) ||
                 (e.id_employee && e.id_employee.toLowerCase() === identifier.toLowerCase()) ||
                 (e.employee_id && e.employee_id.toLowerCase() === identifier.toLowerCase())
@@ -601,7 +601,7 @@ const syncEmployeeFromNusawork = async (identifier, token) => {
         dbFields.id_employee = employeeId;
         dbFields.branch_id = branchId;
         dbFields.photo_profile = photoProfile;
-        
+
         if (!dbFields.job_position) dbFields.job_position = 'Staff';
         if (!dbFields.job_level) dbFields.job_level = 'Staff';
         if (!dbFields.organization_name) dbFields.organization_name = branchName;
@@ -770,7 +770,7 @@ app.post('/api/login', async (req, res) => {
             if (authResponse.ok && authData.access_token) {
                 console.log(`[NUSANET AUTH] Success for ${loginId}`);
                 const accessToken = authData.access_token;
-                
+
                 // Cache the token globally
                 saveCachedToken(accessToken);
 
@@ -796,7 +796,7 @@ app.post('/api/login', async (req, res) => {
 
                     await query('INSERT INTO users (id, email, password, name, role, avatar, branch, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                         [id, loginId, 'nusanet-oauth-placeholder', fullName, initialRole, avatar, 'Headquarters', employeeId]);
-                    
+
                     const newUsers = await query('SELECT * FROM users WHERE email = ?', [loginId]);
                     user = newUsers[0];
                 }
@@ -1003,14 +1003,14 @@ app.post('/api/feedback', async (req, res) => {
 
         // Optional sync to Google Sheets Apps Script Web App
         const sheetsScriptUrl = process.env.GOOGLE_FEEDBACK_SHEETS_URL;
-        
+
         if (sheetsScriptUrl) {
             try {
                 // Fetch with a short timeout to prevent blocking in case the script is slow
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 6000);
                 const hostUrl = process.env.VITE_API_BASE_URL || `http://localhost:${process.env.PORT || 8036}`;
-                
+
                 await fetch(sheetsScriptUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1157,7 +1157,7 @@ app.post('/api/admin/sync-all-nusawork', async (req, res) => {
                 if (emp.email) {
                     const emailLower = emp.email.toLowerCase();
                     empByEmail.set(emailLower, emp);
-                    
+
                     const username = emailLower.split('@')[0];
                     empByUsername.set(username, emp);
                 }
@@ -1225,7 +1225,7 @@ app.post('/api/admin/sync-all-nusawork', async (req, res) => {
                     dbFields.id_employee = employeeId;
                     dbFields.branch_id = branchId;
                     dbFields.photo_profile = photoProfile;
-                    
+
                     if (!dbFields.job_position) dbFields.job_position = 'Staff';
                     if (!dbFields.job_level) dbFields.job_level = 'Staff';
                     if (!dbFields.organization_name) dbFields.organization_name = branchName;
@@ -1291,10 +1291,10 @@ app.get('/api/learning-stats', async (req, res) => {
     try {
         const { email, employee_id } = req.query;
         if (!email && !employee_id) return res.status(400).json({ error: 'Email or employee_id required' });
-        
+
         let targetEmail = email;
         let targetEmpId = employee_id;
-        
+
         // Find employee if missing
         let targetName = null;
         if (targetEmail) {
@@ -1314,7 +1314,7 @@ app.get('/api/learning-stats', async (req, res) => {
         const meetings = await query("SELECT time, guests_json, cost_report_json, host, employee_id FROM meetings WHERE type IN ('Offline', 'Online', 'Hybrid', 'Internal')");
         for (const meeting of meetings) {
             // Skip if the user is the host
-            if ((targetName && meeting.host === targetName) || 
+            if ((targetName && meeting.host === targetName) ||
                 (targetEmpId && meeting.employee_id === targetEmpId)) {
                 continue;
             }
@@ -1322,10 +1322,10 @@ app.get('/api/learning-stats', async (req, res) => {
             let isAttended = false;
             let costReport = null;
             let guests = null;
-            
-            try { if (meeting.cost_report_json) costReport = JSON.parse(meeting.cost_report_json); } catch(e){}
-            try { if (meeting.guests_json) guests = JSON.parse(meeting.guests_json); } catch(e){}
-            
+
+            try { if (meeting.cost_report_json) costReport = JSON.parse(meeting.cost_report_json); } catch (e) { }
+            try { if (meeting.guests_json) guests = JSON.parse(meeting.guests_json); } catch (e) { }
+
             // Check if attended from costReport first (more accurate)
             if (costReport && costReport.attendees && targetEmail) {
                 if (costReport.attendees.includes(targetEmail)) isAttended = true;
@@ -1336,7 +1336,7 @@ app.get('/api/learning-stats', async (req, res) => {
             } else if (guests && guests.employee_ids && targetEmpId) {
                 if (guests.employee_ids.includes(targetEmpId)) isAttended = true;
             }
-            
+
             if (isAttended) {
                 // Parse duration
                 if (meeting.time) {
@@ -1351,7 +1351,7 @@ app.get('/api/learning-stats', async (req, res) => {
                         if (endH > startH) jamTraining += (endH - startH);
                     }
                 }
-                
+
                 // Parse cost
                 if (costReport && costReport.participantsCount > 0) {
                     const tInc = Number(costReport.trainerIncentive) || 0;
@@ -1363,7 +1363,7 @@ app.get('/api/learning-stats', async (req, res) => {
                 }
             }
         }
-        
+
         // 2. Baca Buku (reading_logs)
         if (targetEmpId) {
             const logs = await query("SELECT incentive_amount, category FROM reading_logs WHERE employee_id = ? AND hr_approval_status = 'Approved'", [targetEmpId]);
@@ -1371,9 +1371,9 @@ app.get('/api/learning-stats', async (req, res) => {
             for (const log of logs) {
                 const incentive = Number(log.incentive_amount) || 0;
                 biayaBuku += incentive;
-                
+
                 const category = log.category || '';
-                
+
                 if (category === 'Buku Fiksi/Novel' || category === 'Majalah') {
                     // 0 hours
                 } else if (category === 'Komik Bisnis/Non Fiksi') {
@@ -1398,7 +1398,7 @@ app.get('/api/learning-stats', async (req, res) => {
                 }
             }
         }
-        
+
         res.json({
             jamTraining: Math.round(jamTraining),
             jamBuku: Math.round(jamBuku),
@@ -1508,7 +1508,7 @@ const parseFlexibleDate = (timestamp) => {
         const parts = timestamp.split(' ');
         const dateStr = parts[0];
         const timeStr = parts[1] || '00:00:00';
-        
+
         const dateParts = dateStr.split('/');
         if (dateParts.length !== 3) return new Date(timestamp); // Fallback
 
@@ -1540,9 +1540,9 @@ const parseFlexibleDate = (timestamp) => {
 app.post('/api/simas/sync', async (req, res) => {
     try {
         const { employee_id, user_name } = req.body;
-        
+
         const baseUrl = process.env.SIMAS_API_BASE_URL || 'https://simas.nusa.id/';
-        let url = `${baseUrl}api/v2/book/loan`;
+        let url = `${baseUrl}api/book/loan`;
         const apiKey = process.env.SIMAS_API_KEY || '';
         const response = await fetch(url, { headers: { 'x-api-key': apiKey } });
 
@@ -1551,7 +1551,7 @@ app.post('/api/simas/sync', async (req, res) => {
         const dataJson = await response.json();
         if (dataJson.success && dataJson.data && dataJson.data.length > 0) {
             const simasData = dataJson.data[0];
-            
+
             // Get users to sync
             let usersToSync = [];
             if (employee_id && employee_id !== 'all') {
@@ -1579,7 +1579,7 @@ app.post('/api/simas/sync', async (req, res) => {
                             const sn = b.code;
                             const startDateRaw = b.loanHistory.loaning.loanPeriod;
                             const startDate = parseFlexibleDate(startDateRaw);
-                            
+
                             if (!startDate) {
                                 console.warn(`[SIMAS SYNC] Invalid date for ${targetName}: ${startDateRaw}`);
                                 continue;
@@ -1625,10 +1625,10 @@ app.post('/api/simas/sync', async (req, res) => {
                                 if (log.status !== 'Cancelled') {
                                     const simasEvidencePhoto = b.loanHistory.loaning.loanPhoto || '';
                                     const simasReturnEvidencePhoto = isReturned ? (b.loanHistory.return.returnPhoto || '') : '';
-                                    
+
                                     const dbEvidencePhoto = log.evidence_url || '';
                                     const dbReturnEvidencePhoto = log.return_evidence_url || '';
-                                    
+
                                     const updates = {};
                                     if (dbEvidencePhoto !== simasEvidencePhoto) {
                                         updates.evidence_url = simasEvidencePhoto;
@@ -1636,7 +1636,7 @@ app.post('/api/simas/sync', async (req, res) => {
                                     if (isReturned && dbReturnEvidencePhoto !== simasReturnEvidencePhoto) {
                                         updates.return_evidence_url = simasReturnEvidencePhoto;
                                     }
-                                    
+
                                     const updateKeys = Object.keys(updates);
                                     if (updateKeys.length > 0) {
                                         console.log(`[SIMAS SYNC] Updating photos for ${targetName} - ${b.name}:`, updates);
@@ -1670,10 +1670,10 @@ app.get('/api/logs', async (req, res) => {
                 await query('ALTER TABLE reading_logs ADD cancelled_by VARCHAR(255) DEFAULT NULL');
                 console.log("[MIGRATION] Column added successfully!");
             }
-        } catch (migErr) { 
-            console.error("[MIGRATION ERROR DETAILS]", migErr.message); 
+        } catch (migErr) {
+            console.error("[MIGRATION ERROR DETAILS]", migErr.message);
             // Attempt to create a test table to check permissions
-            try { await query('CREATE TABLE IF NOT EXISTS migration_test (id INT)'); } catch(e) { console.error("[PERMISSION TEST] Failed to create table:", e.message); }
+            try { await query('CREATE TABLE IF NOT EXISTS migration_test (id INT)'); } catch (e) { console.error("[PERMISSION TEST] Failed to create table:", e.message); }
         }
 
         const logs = await query('SELECT * FROM reading_logs ORDER BY date DESC');
@@ -1765,14 +1765,14 @@ app.patch('/api/logs/:id/cancel', async (req, res) => {
         const { reason, cancelledBy } = req.body;
         const finalReason = reason || 'Dibatalkan oleh Admin';
         const finalBy = cancelledBy || 'System/Admin';
-        
+
         console.log(`[CANCEL] ID: ${req.params.id}, Reason: ${finalReason}, By: ${finalBy}`);
-        
+
         const result = await query(
             'UPDATE reading_logs SET status = "Cancelled", hr_approval_status = "Cancelled", rejection_reason = ?, cancelled_at = ?, cancelled_by = ? WHERE id = ?',
             [finalReason, new Date(), finalBy, req.params.id]
         );
-        
+
         console.log(`[CANCEL] Update result:`, result);
         res.json({ success: true });
     } catch (err) {
@@ -1854,7 +1854,7 @@ app.put('/api/logs/:id', async (req, res) => {
         if (!updatedLogs || updatedLogs.length === 0) {
             return res.status(404).json({ error: 'Reading log not found after update' });
         }
-        
+
         const updated = updatedLogs[0];
 
         res.json({
@@ -1871,9 +1871,9 @@ app.put('/api/logs/:id', async (req, res) => {
             cancelledBy: updated.cancelled_by,
             claimedAt: updated.claimed_at
         });
-    } catch (err) { 
+    } catch (err) {
         console.error(`[API ERROR] Update Reading Log ${req.params.id} Failed:`, err);
-        res.status(500).json({ error: err.message }); 
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -2194,14 +2194,14 @@ app.post('/api/meetings/bulk', async (req, res) => {
                     0
                 ]
             );
-            
+
             const meetingId = result.insertId;
-            
+
             for (const p of participants) {
                 if (!p.employee_id && !p.name) continue;
                 const studentId = p.employee_id || `temp_${Math.random()}`;
                 const studentName = p.name || 'Unknown';
-                
+
                 if (p.pre_test_score !== null && p.pre_test_score !== '') {
                     await query('INSERT INTO quiz_results (student_id, student_name, meeting_id, score, date, quiz_type, employee_id) VALUES (?, ?, ?, ?, NOW(), "PRE", ?)', [studentId, studentName, meetingId, p.pre_test_score, p.employee_id || null]);
                 }
@@ -2213,7 +2213,7 @@ app.post('/api/meetings/bulk', async (req, res) => {
                     await query('INSERT INTO course_feedback (user_id, employee_id, meeting_id, feedback_data, submitted_at) VALUES (?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE feedback_data = ?, submitted_at = NOW()', [studentId, p.employee_id || null, meetingId, fbData, fbData]);
                 }
             }
-            
+
             inserted.push({ ...m, id: meetingId });
         }
         res.json({ success: true, count: inserted.length, meetings: inserted });
@@ -2338,7 +2338,7 @@ app.get('/api/courses-json', (req, res) => {
 
 const mapCourse = (c, modules) => {
     if (!c) return null;
-    
+
     // Helper to parse JSON safely
     const parseJSON = (data) => {
         if (!data) return undefined;
@@ -2392,7 +2392,7 @@ app.post('/api/courses', async (req, res) => {
     try {
         const c = req.body;
         console.log("CREATING NEW COURSE:", c.title);
-        
+
         const preAssessmentJSON = c.preAssessment ? JSON.stringify(c.preAssessment) : null;
         const assessmentJSON = c.assessment ? JSON.stringify(c.assessment) : null;
 
@@ -2436,11 +2436,11 @@ app.put('/api/courses/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const c = req.body;
-        
+
         // CLEANUP: Ensure we use the proper camelCase objects and IGNORE snake_case strings from DB
         const preAssessmentObj = c.preAssessment;
         const assessmentObj = c.assessment;
-        
+
         const preAssessmentJSON = preAssessmentObj ? JSON.stringify(preAssessmentObj) : null;
         const assessmentJSON = assessmentObj ? JSON.stringify(assessmentObj) : null;
 
@@ -2483,7 +2483,7 @@ app.put('/api/courses/:id', async (req, res) => {
         // b. Update or Insert
         for (const mod of incomingModules) {
             const isExisting = typeof mod.id === 'number' && existingIds.includes(mod.id);
-            
+
             if (isExisting) {
                 // UPDATE
                 await query(
@@ -2520,7 +2520,7 @@ app.put('/api/courses/:id', async (req, res) => {
         // Return updated
         const updatedCourseData = await query('SELECT * FROM courses WHERE id = ?', [id]);
         const updatedModulesData = await query('SELECT * FROM course_modules WHERE course_id = ?', [id]);
-        
+
         const mapped = mapCourse(updatedCourseData[0], updatedModulesData);
         console.log("SENDING BACK MAPPED COURSE:", mapped.title, "PreAssessment:", !!mapped.preAssessment);
         res.json(mapped);
@@ -2582,7 +2582,7 @@ app.get('/api/progress/:userId/:courseId', async (req, res) => {
 app.delete('/api/progress/:userId/:courseId', async (req, res) => {
     try {
         const { userId, courseId } = req.params;
-        
+
         // Robust Lookup: Find employee_id to ensure we clear all variations of the user's ID
         const userRows = await query('SELECT employee_id FROM users WHERE id = ? OR employee_id = ?', [userId, userId]);
         const employeeId = userRows.length > 0 ? userRows[0].employee_id : null;
@@ -2872,12 +2872,12 @@ app.post('/api/feedback/submit', async (req, res) => {
             'INSERT INTO course_feedback (user_id, employee_id, course_id, meeting_id, feedback_data, submitted_at) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE feedback_data = ?, submitted_at = ?',
             [userId, employeeId || null, courseId || null, meetingId || null, JSON.stringify(feedbackData), now, JSON.stringify(feedbackData), now]
         );
-        
+
         console.log(`[FEEDBACK] Saved for user ${userId}, meeting ${meetingId}`);
         res.json({ success: true });
-    } catch (err) { 
+    } catch (err) {
         console.error('[FEEDBACK ERROR]', err);
-        res.status(500).json({ error: err.message }); 
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -2959,7 +2959,7 @@ app.get('/api/external-training/subordinates', async (req, res) => {
                OR id_report_to LIKE ? 
                OR id_report_to LIKE ?
         `, [leaderUserId, leaderFullName, leaderNickName, `${leaderFullName},%`, `%,${leaderFullName},%`]);
-        
+
         const subordinateIds = subordinatesResult.map(s => s.id_employee);
         if (subordinateIds.length === 0) return res.json([]);
 
@@ -2969,7 +2969,7 @@ app.get('/api/external-training/subordinates', async (req, res) => {
             WHERE employee_id IN (${placeholders}) 
             ORDER BY created_at DESC
         `, subordinateIds);
-        
+
         res.json(rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3008,10 +3008,10 @@ app.get('/api/external-training/hr', async (req, res) => {
 app.post('/api/external-training/hr-process', async (req, res) => {
     try {
         const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link } = req.body;
-        
+
         let sql = `UPDATE external_training_requests SET status = 'Processed', travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, payment_method = ?`;
         let params = [travel_flight_cost || 0, accommodation_cost || 0, miscellaneous_cost || 0, payment_method];
-        
+
         if (registration_fee !== undefined) {
             sql += `, registration_fee = ?`;
             params.push(registration_fee);
