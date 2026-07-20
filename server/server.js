@@ -2098,30 +2098,34 @@ app.post('/api/meetings', async (req, res) => {
         const localDate = new Date(d.getTime() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
 
         const result = await query(
-            'INSERT INTO meetings (title, date, time, host, location, type, meetLink, agenda, guests_json, cost_report_json, employee_id, pre_test_link, material_link, post_test_link, feedback_link, pre_test_data, post_test_data, feedback_data, is_pre_test_active, is_post_test_active, is_feedback_active, is_closed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO meetings (title, date, time, host, location, type, meetLink, agenda, guests_json, cost_report_json, employee_id, competency_type, competency_name, training_gr_type, pre_test_link, material_link, post_test_link, feedback_link, pre_test_data, post_test_data, feedback_data, is_pre_test_active, is_post_test_active, is_feedback_active, is_closed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
-                m.title, 
-                localDate, 
-                m.time, 
-                m.host || 'HR Team', 
-                m.location, 
-                m.type || 'Offline', 
-                m.meetLink || '', 
-                m.description || m.agenda || '', 
-                JSON.stringify(guests), 
-                null, 
-                m.employee_id, 
-                m.pre_test_link || '', 
-                m.material_link || '', 
-                m.post_test_link || '', 
+                m.title,
+                localDate,
+                m.time,
+                m.host || 'HR Team',
+                m.location,
+                m.type || 'Offline',
+                m.meetLink || '',
+                m.description || m.agenda || '',
+                JSON.stringify(guests),
+                null,
+                m.employee_id,
+                m.competency_type || null,
+                m.competency_name || null,
+                m.training_gr_type || null,
+                m.pre_test_link || '',
+                m.material_link || '',
+                m.post_test_link || '',
                 m.feedback_link || '',
                 m.pre_test_data ? JSON.stringify(m.pre_test_data) : null,
                 m.post_test_data ? JSON.stringify(m.post_test_data) : null,
                 m.feedback_data ? JSON.stringify(m.feedback_data) : null,
-                m.is_pre_test_active ? 1 : 0,
-                m.is_post_test_active ? 1 : 0,
-                m.is_feedback_active ? 1 : 0,
-                m.is_closed ? 1 : 0
+                0,
+                0,
+                0,
+                0,
+                0
             ]
         );
 
@@ -2160,30 +2164,34 @@ app.post('/api/meetings/bulk', async (req, res) => {
             }
 
             const result = await query(
-                'INSERT INTO meetings (title, date, time, host, location, type, meetLink, agenda, guests_json, cost_report_json, employee_id, pre_test_link, material_link, post_test_link, feedback_link, pre_test_data, post_test_data, feedback_data, is_pre_test_active, is_post_test_active, is_feedback_active, is_closed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                'INSERT INTO meetings (title, date, time, host, location, type, meetLink, agenda, guests_json, cost_report_json, employee_id, competency_type, competency_name, training_gr_type, pre_test_link, material_link, post_test_link, feedback_link, pre_test_data, post_test_data, feedback_data, is_pre_test_active, is_post_test_active, is_feedback_active, is_closed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [
-                    m.title || 'Untitled', 
-                    localDate, 
-                    m.time || '', 
-                    m.host || 'HR Team', 
-                    m.location || '', 
-                    m.type || 'Offline', 
-                    m.meetLink || '', 
-                    m.description || m.agenda || '', 
-                    JSON.stringify(guests), 
-                    m.cost_report ? JSON.stringify(m.cost_report) : null, 
-                    m.employee_id || null, 
-                    m.pre_test_link || '', 
-                    m.material_link || '', 
-                    m.post_test_link || '', 
+                    m.title || 'Untitled',
+                    localDate,
+                    m.time || '',
+                    m.host || 'HR Team',
+                    m.location || '',
+                    m.type || 'Offline',
+                    m.meetLink || '',
+                    m.description || m.agenda || '',
+                    JSON.stringify(guests),
+                    m.cost_report ? JSON.stringify(m.cost_report) : null,
+                    m.employee_id || null,
+                    m.competency_type || null,
+                    m.competency_name || null,
+                    m.training_gr_type || null,
+                    m.pre_test_link || '',
+                    m.material_link || '',
+                    m.post_test_link || '',
                     m.feedback_link || '',
                     m.pre_test_data ? JSON.stringify(m.pre_test_data) : null,
                     m.post_test_data ? JSON.stringify(m.post_test_data) : null,
                     m.feedback_data ? JSON.stringify(m.feedback_data) : null,
-                    m.is_pre_test_active ? 1 : 0,
-                    m.is_post_test_active ? 1 : 0,
-                    m.is_feedback_active ? 1 : 0,
-                    m.is_closed ? 1 : 0
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
                 ]
             );
             
@@ -2258,7 +2266,7 @@ app.put('/api/meetings/:id', async (req, res) => {
         const localDate = new Date(d.getTime() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
 
         await query(
-            'UPDATE meetings SET title = ?, date = ?, time = ?, host = ?, location = ?, type = ?, meetLink = ?, agenda = ?, guests_json = ?, cost_report_json = ?, employee_id = ?, pre_test_link = ?, material_link = ?, post_test_link = ?, feedback_link = ?, pre_test_data = ?, post_test_data = ?, feedback_data = ?, is_pre_test_active = ?, is_post_test_active = ?, is_feedback_active = ?, is_closed = ? WHERE id = ?',
+            'UPDATE meetings SET title = ?, date = ?, time = ?, host = ?, location = ?, type = ?, meetLink = ?, agenda = ?, guests_json = ?, cost_report_json = ?, employee_id = ?, competency_type = ?, competency_name = ?, training_gr_type = ?, pre_test_link = ?, material_link = ?, post_test_link = ?, feedback_link = ?, pre_test_data = ?, post_test_data = ?, feedback_data = ?, is_pre_test_active = ?, is_post_test_active = ?, is_feedback_active = ?, is_closed = ? WHERE id = ?',
             [
                 m.title,
                 localDate,
@@ -2271,6 +2279,9 @@ app.put('/api/meetings/:id', async (req, res) => {
                 JSON.stringify(guests),
                 costReport ? JSON.stringify(costReport) : null,
                 m.employee_id,
+                m.competency_type || null,
+                m.competency_name || null,
+                m.training_gr_type || null,
                 m.pre_test_link || '',
                 m.material_link || '',
                 m.post_test_link || '',

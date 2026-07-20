@@ -21,7 +21,8 @@ import {
     Image as ImageIcon,
     Search,
     Link,
-    UploadCloud
+    UploadCloud,
+    MessageSquare
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Role, Meeting, CostReport, Employee, QuizResult, User } from '../types';
@@ -78,6 +79,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
+    const [editIsClosed, setEditIsClosed] = useState(false);
 
     const [meetingToDelete, setMeetingToDelete] = useState<number | null>(null);
     const [confirmMarkPaid, setConfirmMarkPaid] = useState<boolean>(false);
@@ -112,9 +114,12 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         location: '',
         meetLink: '',
         description: '',
+        competency_type: '' as string,
+        competency_name: '',
         pre_test_data: null as any,
         post_test_data: null as any,
-        material_link: ''
+        material_link: '',
+        training_gr_type: '' as string
     });
 
     // Email Invites State
@@ -182,6 +187,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [meetingSummary, setMeetingSummary] = useState<{ quiz: { quiz_type: string, count: number }[], feedback: number, allQuizResults?: any[], allFeedbackResults?: any[] } | null>(null);
     const [userFeedback, setUserFeedback] = useState<any>(null);
     const [showParticipantModal, setShowParticipantModal] = useState<'sudah' | 'belum' | null>(null);
+    const [showFeedbackList, setShowFeedbackList] = useState(false);
 
     const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -260,9 +266,30 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     }
                     return null;
                 };
+
+                // Helper to parse Indonesian number format (125,000 -> 125000)
+                const parseIndonesianNumber = (val: any): number => {
+                    if (val === undefined || val === null || val === '') return 0;
+                    if (typeof val === 'number') return val;
+                    // Remove comma as thousands separator
+                    const cleaned = String(val).replace(/,/g, '');
+                    const num = parseFloat(cleaned);
+                    return isNaN(num) ? 0 : num;
+                };
                 
                 data.forEach((row: any) => {
+                    // Handle new date format: "2 Januari 2026" or "Januari" + "2 Januari 2026"
                     let parsedDate = row.Date || row.date || row.Tanggal;
+
+                    // If we have separate month and date columns, combine them
+                    const monthColumn = row['Periode Bulan'] || row.PeriodeBulan || row.Bulan;
+                    if (monthColumn && !parsedDate) {
+                        parsedDate = `${String(monthColumn).trim()} ${String(row.Tanggal || '').replace(String(monthColumn).trim(), '').trim()}`;
+                    } else if (monthColumn && typeof parsedDate === 'string') {
+                        // Append month to existing date if needed
+                        parsedDate = `${String(monthColumn).trim()} ${parsedDate}`;
+                    }
+
                     if (typeof parsedDate === 'number') {
                         parsedDate = new Date((parsedDate - (25567 + 1)) * 86400 * 1000).toISOString().split('T')[0];
                     } else if (typeof parsedDate === 'string') {
@@ -276,7 +303,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                             }
                         }
                     }
-                    
+
+                    // Handle competency type and name from new columns
+                    const competencyType = row['Competency Type'] || row.CompetencyType || row['Kompetensi Jenis'] || '';
+                    const competencyName = row['Competency Name'] || row.CompetencyName || row['Nama Kompetensi'] || '';
+
                     const title = row.Title || row.title || row['Judul / Training Name'] || row.Judul || 'Imported Training';
                     
                     const parseExcelTime = (val: any) => {
@@ -295,24 +326,26 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     const host = row['Nama Trainer / Facilitator'] || row.Host || row.host || row.Trainer || 'HR Team';
                     
                     const groupKey = `${title}_${parsedDate}_${time}_${host}`;
-                    
+
                     if (!groupedMeetings.has(groupKey)) {
                         groupedMeetings.set(groupKey, {
                             title,
                             date: parsedDate || new Date().toISOString().split('T')[0],
                             time,
                             host,
+                            competency_type: competencyType,
+                            competency_name: competencyName,
                             type: row['Training Type'] || row.Type || row.type || row.Tipe || 'Offline',
                             location: row.Location || row.location || row.Lokasi || '',
                             description: row.Description || row.description || row.Deskripsi || '',
                             material_link: row['Link Materi'] || '',
                             is_closed: true,
                             cost_report: {
-                                trainer: row['Insentif Trainer'] || 0,
-                                snack: row['Insentif Snack'] || 0,
-                                lunch: row['Insentif Lunch'] || 0,
-                                other: row['Insentif Other'] || 0,
-                                total: row['Insentif Total'] || 0,
+                                trainer: parseIndonesianNumber(row['Insentif Trainer']),
+                                snack: parseIndonesianNumber(row['Insentif Snack']),
+                                lunch: parseIndonesianNumber(row['Insentif Lunch']),
+                                other: parseIndonesianNumber(row['Insentif Other']),
+                                total: parseIndonesianNumber(row['Insentif Total'] || row['Budget Learning per orang / Total Cost']),
                                 isPaid: row['Lapor Insentif']?.toString().toLowerCase().trim() === 'sudah' ? true : false,
                                 isFinalized: row['Lapor Insentif']?.toString().toLowerCase().trim() === 'sudah' ? true : false
                             },
@@ -320,23 +353,24 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         });
                     }
                     
-                    const rawPreTest = row['Pre-Test_1'] !== undefined ? row['Pre-Test_1'] : row['Pre-Test'];
-                    const rawPostTest = row['Post-Test_1'] !== undefined ? row['Post-Test_1'] : row['Post-Test'];
-                    
+                    // Handle Pre-Test and Post-Test from various column names (old and new format)
+                    const rawPreTest = row['Pre-Test_1'] ?? row['Pre-Test'] ?? row.PRE_TEST_DATA ?? null;
+                    const rawPostTest = row['Post-Test_1'] ?? row['Post-Test'] ?? row.POST_TEST_DATA ?? null;
+
                     const parseScore = (val: any) => {
                         if (val === undefined || val === null || val === '') return null;
                         if (typeof val === 'number') return val;
                         const num = Number(val);
                         if (!isNaN(num)) return num;
-                        return null; 
+                        return null;
                     };
 
                     const participant = {
-                        name: row['Peserta / Employee Name'] || '',
-                        employee_id: row['Employee ID'] || '',
+                        name: row['Peserta / Employee Name'] || row.Peserta || row.EmployeeName || '',
+                        employee_id: row['Employee ID'] || row['EmployeeID'] || row.EmployeeID || '',
                         pre_test_score: parseScore(rawPreTest),
                         post_test_score: parseScore(rawPostTest),
-                        feedback_score: parseScore(row['Feedback Training / PTE 1 Score'])
+                        feedback_score: parseScore(row['Feedback Training / PTE 1 Score'] ?? row.Feedback_Training ?? row.PTE_1_Score ?? null)
                     };
                     
                     if (participant.name || participant.employee_id) {
@@ -756,6 +790,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             if (foundEmp) hostId = foundEmp.id_employee;
         }
 
+        // Check if meeting is already closed - if so, lock the form to prevent reopening
+        const isMeetingClosed = meeting.is_closed === true || meeting.is_closed === 1;
+
         setFormData({
             title: meeting.title,
             date: formatDate(meeting.date),
@@ -767,10 +804,19 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             location: meeting.location || '',
             meetLink: meeting.meetLink || '',
             description: (meeting.description && meeting.description !== 'No description provided.') ? meeting.description : (meeting.agenda || ''),
+            competency_type: meeting.competency_type || '',
+            competency_name: meeting.competency_name || '',
             pre_test_data: meeting.pre_test_data || { questions: [] },
             post_test_data: meeting.post_test_data || { questions: [] },
-            material_link: meeting.material_link || ''
+            material_link: meeting.material_link || '',
+            training_gr_type: meeting.training_gr_type || ''
         });
+
+        // Preserve is_closed status - do not allow reopening a closed meeting
+        if (isMeetingClosed) {
+            setEditIsClosed(true);
+        }
+
         setInvitedEmails(meeting.guests?.emails || []);
         setInvitedEmployeeIds((meeting.guests as any).employee_ids || []);
         setIsCreateOpen(true);
@@ -870,8 +916,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         }
 
         const hostEmail = employees.find(e => e.id_employee === formData.host_id)?.email;
-        const allEmails = hostEmail ? [...invitedEmails, hostEmail] : invitedEmails;
-        const finalEmails = [...new Set(allEmails)];
+
+        // Build guest emails from employee_ids for email invites
+        const guestEmailsFromEmployees = invitedEmployeeIds
+            .map(id => employees.find(e => e.id_employee === id)?.email)
+            .filter((email): email is string => Boolean(email));
+
+        const allInviteeEmailsForCalendar = hostEmail ? [...guestEmailsFromEmployees, hostEmail] : guestEmailsFromEmployees;
 
         const dateObj = new Date(formData.date);
         const meetingData = {
@@ -884,30 +935,41 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             type: formData.type,
             location: formData.location,
             description: formData.description,
+            competency_type: formData.competency_type,
+            competency_name: formData.competency_name,
             guests: {
                 status: 'Awaiting',
-                count: Math.max(finalEmails.length, invitedEmployeeIds.length),
-                emails: finalEmails,
+                count: invitedEmployeeIds.length,  // Only employees (not host)
+                emails: guestEmailsFromEmployees,
                 employee_ids: invitedEmployeeIds
             },
             meetLink: formData.meetLink,
             pre_test_data: formData.pre_test_data,
             post_test_data: formData.post_test_data,
-            material_link: formData.material_link
+            material_link: formData.material_link,
+            training_gr_type: formData.training_gr_type
         };
 
         if (isEditing && editId) {
             // Update Existing
             try {
+                // Preserve is_closed status - do not allow reopening a closed meeting
+                const updatePayload = {
+                    ...meetingData,
+                    is_closed: editIsClosed ? true : false
+                };
+
                 const res = await fetch(`${API_BASE_URL}/api/meetings/${editId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(meetingData)
+                    body: JSON.stringify(updatePayload)
                 });
                 if (res.ok) {
                     const savedMeeting = await res.json();
+                    // Preserve is_closed status in local state after update
                     setMeetings(meetings.map(m => m.id === editId ? safeMeeting(savedMeeting) : m));
                     setNotification({ show: true, type: 'success', message: 'Meeting updated successfully!' });
+                    // Do NOT reset editIsClosed - keep it locked until modal closes
                 }
             } catch (err) {
                 console.error(err);
@@ -932,7 +994,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     const startStr = `${fmtDate}T${startTimeStr}`;
                     const endStr = `${fmtDate}T${endTimeStr}`;
                     
-                    const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(formData.title)}&details=${encodeURIComponent(formData.description)}&location=${encodeURIComponent(formData.type === 'Online' ? (formData.meetLink || 'Online') : (formData.location || ''))}&dates=${startStr}/${endStr}&add=${finalEmails.join(',')}`;
+                    const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(formData.title)}&details=${encodeURIComponent(formData.description)}&location=${encodeURIComponent(formData.type === 'Online' ? (formData.meetLink || 'Online') : (formData.location || ''))}&dates=${startStr}/${endStr}&add=${allInviteeEmailsForCalendar.join(',')}`;
                     window.open(gcalUrl, '_blank');
                 }
             } catch (err) {
@@ -966,7 +1028,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     };
 
     const resetForm = () => {
-        setFormData({ title: '', date: '', startTime: '', endTime: '', host: '', host_id: '', type: 'Online', location: '', meetLink: '', description: '', pre_test_data: { questions: [] }, post_test_data: { questions: [] }, material_link: '' });
+        setFormData({ title: '', date: '', startTime: '', endTime: '', host: '', host_id: '', type: 'Online', location: '', meetLink: '', description: '', competency_type: '', competency_name: '', pre_test_data: { questions: [] }, post_test_data: { questions: [] }, material_link: '', training_gr_type: '' });
         setInvitedEmails([]);
         setInvitedEmployeeIds([]);
         setHostSearch('');
@@ -975,6 +1037,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         setShowParticipantDropdown(false);
         setIsEditing(false);
         setEditId(null);
+        setEditIsClosed(false);
         setActiveCreateTab('details');
     };
 
@@ -1106,12 +1169,27 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 const quarter = Math.ceil(monthNum / 3);
 
                 // Get ALL participants count (include Internship/PKL for Number of Participants)
-                const allParticipantEmails = Array.from(new Set([
-                    ...(m.guests?.emails || []).map((e: string) => e.toLowerCase()),
-                    ...((m.guests as any)?.employee_ids || []).map((e: string) => e.toLowerCase())
-                ]));
+                // Use Map-based deduplication with employee_id as unique key to avoid counting same person twice
+                const participantMap = new Map<string, string>();
 
-                const totalParticipants = allParticipantEmails.length;
+                // Add from guests.employee_ids first
+                ((m.guests as any)?.employee_ids || []).forEach((empId: string) => {
+                    if (empId) participantMap.set(String(empId).toLowerCase().trim(), String(empId).toLowerCase().trim());
+                });
+
+                // Add from guests.emails, map to employee_id if possible
+                (m.guests?.emails || []).forEach((email: string) => {
+                    if (!email) return;
+                    const emp = employees.find(e => e.email?.toLowerCase() === email.toLowerCase());
+                    if (emp && String(emp.id_employee)) {
+                        participantMap.set(String(emp.id_employee).toLowerCase().trim(), String(emp.id_employee).toLowerCase().trim());
+                    } else {
+                        // Fallback: use email as key if no matching employee found
+                        participantMap.set(email.toLowerCase().trim(), email.toLowerCase().trim());
+                    }
+                });
+
+                const allParticipantEmails = Array.from(participantMap.values());
 
                 // Get valid participants count (exclude Internship/PKL for cost calculation)
                 const validParticipants = allParticipantEmails.filter(email => {
@@ -1214,13 +1292,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     "Training Name": m.title,
                     "Number of Participants\n(Jumlah peserta yang hadir training)": validParticipants,
                     "Training Type": m.type || 'Internal',
-                    "ESG/HSE/OTHER": 'Other',
-                    "Competency Type": 'Behavioral',
-                    "Competency Name": 'Self Development',
+                    "ESG/HSE/OTHER": m.training_gr_type || 'Other',
+                    "Competency Type": m.competency_type || '-',
+                    "Competency Name": m.competency_name || '-',
                     "Training Days": 1,
                     "Training Hours": trainingHours,
-                    "Man Hours\n(Jumlah peserta present x Training hours)": totalParticipants * trainingHours,
-                    "Vendor": m.type === 'Online' ? '' : (m.location || 'Internal'),
+                    "Man Hours\n(Jumlah peserta present x Training hours)": validParticipants * trainingHours,
+                    "Vendor": 'Internal',  // Internal training - always "Internal" for vendor column
                     "Facilitator": m.host || '-',
                     "Training Cost\n(Fee dari vendor)": Math.round(trainingCost),
                     "Venue/Meals Cost\n(Fee dari tempat pelaksanaan training)": Math.round(venueMealsCost),
@@ -1330,7 +1408,15 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 }
 
                 const mDate = new Date(m.date);
-                const formattedDate = mDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+                // Format date as DD/MM/YYYY for Start Date and End Date columns
+                const formatDDMMYYYY = (date: Date) => {
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const year = date.getFullYear();
+                    return `${day}/${month}/${year}`;
+                };
+                // Format date as "Month Year" for Month column display
+                const formattedDateLong = mDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
                 
                 // Helper to escape commas in CSV
                 const esc = (val: any) => {
@@ -1358,10 +1444,10 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 dataRows.push([
                     globalIndex++,
                     esc(name),
-                    esc(emp?.id_employee ? `="${emp.id_employee}"` : '-'),
+                    emp?.id_employee ? String(emp.id_employee).padStart(7, '0') : '-',  // ID dengan leading zeros (0202127)
                     "Internal",
                     esc(emp?.job_position || '-'),
-                    esc((emp as any)?.company_group || '-'),
+                    esc((emp as any)?.company_group || 'MAN'),  // Default to "MAN" for company group
                     esc(emp?.branch_name || '-'), // Swapped: branch_name to Company column
                     esc(emp?.job_level || '-'),
                     esc((emp as any)?.band || '-'),
@@ -1374,18 +1460,18 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     mDate.getFullYear(),
                     mDate.toLocaleString('default', { month: 'long' }),
                     mDate.getMonth() + 1,
-                    formattedDate,
-                    formattedDate,
+                    formatDDMMYYYY(mDate),  // Start Date - DD/MM/YYYY format
+                    formatDDMMYYYY(mDate),  // End Date - DD/MM/YYYY format
                     (m as any).training_hours || 0,
                     esc((m as any).competency_type || 'Core'),
-                    esc((m as any).competency_detail || '-'),
+                    esc((m as any).competency_name || '-'),  // Changed from competency_detail to competency_name
                     esc(m.title),
                     (avgPre !== '-' || avgPost !== '-' || avgFB !== '-') ? 'Present' : 'Absent',
                     esc((m as any).participation_type || 'Targeted Participants'),
-                    esc((m as any).vendor || 'Internal'),
+                    'Internal',
                     esc(m.host),
                     participantCost,
-                    '-', // PTE 1
+                    avgFB !== '-' ? avgFB : '-',  // PTE 1 Score - use actual feedback score
                     avgPre,
                     avgPost,
                     increment,
@@ -1402,9 +1488,10 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     })(),
                     esc((emp as any)?.age_group || '-'),
                     esc((emp as any)?.gender || '-'),
-                    esc((m as any).esg_hse_other || '-'),
-                    esc((m as any).action_plan || '-'),
-                    esc((m as any).detail_participant_type || '-')
+                    // ESG/HSE/Other: ambil dari training_gr_type yang tersimpan di database
+                    esc((m as any).training_gr_type || 'Other'),
+                    '-', // Action Plan (tidak ada data action plan)
+                    '-'  // Detail Participant Type
                 ]);
             });
         });
@@ -1526,32 +1613,60 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         const isMatch = (item: any, participantId: string) => {
                                             if (!item) return false;
                                             const idStr = (item.student_id || item.employee_id || item.user_id || item.email || item.user_email || '').toString().toLowerCase().trim();
+                                            const studentNameStr = (item.student_name || '').toString().toLowerCase().trim();
                                             const target = participantId.toLowerCase().trim();
+
+                                            // Match by ID
                                             if (idStr === target) return true;
                                             if (target.includes('@') && idStr === target.split('@')[0]) return true;
+
+                                            // Match by employee lookup
                                             const emp = employees.find(e => e.email?.toLowerCase() === target || String(e.id_employee).toLowerCase() === target || String(e.id).toLowerCase() === target);
                                             if (emp) {
                                                 const empIds = [String(emp.id_employee).toLowerCase(), String(emp.id).toLowerCase(), emp.email?.toLowerCase()].filter(Boolean);
                                                 if (empIds.includes(idStr)) return true;
+                                                // Also match by employee full name against student_name
+                                                if (studentNameStr && emp.full_name?.toLowerCase().includes(studentNameStr) || studentNameStr === emp.full_name?.toLowerCase()) return true;
                                             }
+
+                                            // Match by name directly (for cases where student_id is temp/random but student_name is correct)
+                                            const participantEmp = employees.find(e =>
+                                                e.full_name?.toLowerCase() === target ||
+                                                e.full_name?.toLowerCase().includes(target)
+                                            );
+                                            if (participantEmp && studentNameStr) {
+                                                if (studentNameStr === participantEmp.full_name?.toLowerCase()) return true;
+                                            }
+
                                             return false;
                                         };
 
                                         const renderedRows = participants.map((participantId: string) => {
+                                            // Get quiz results for this participant
+                                            const preScores = results.filter(r => isMatch(r, participantId) && (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE')).map(r => Number(r.score) || 0);
+                                            const postScores = results.filter(r => isMatch(r, participantId) && (r.quizType || r.quiz_type || "").toUpperCase().includes('POST')).map(r => Number(r.score) || 0);
+
+                                            const hasPreTest = preScores.length > 0;
+                                            const hasPostTest = postScores.length > 0;
                                             const hasFeedback = feedbacks.some(f => isMatch(f, participantId));
-                                            const isDone = hasFeedback;
+
+                                            // Participant is "done" only if they completed Pre-Test, Post-Test AND Feedback
+                                            const isDone = hasPreTest && hasPostTest && hasFeedback;
 
                                             if (showParticipantModal === 'sudah' && !isDone) return null;
                                             if (showParticipantModal === 'belum' && isDone) return null;
 
                                             const emp = employees.find(e => e.email?.toLowerCase() === participantId.toLowerCase() || String(e.id_employee).toLowerCase() === participantId.toLowerCase());
-                                            const name = emp?.full_name || participantId;
+                                            // Try to get name from guest details if not found in employees list
+                                            const guestDetails = (selectedMeeting.guests as any)?.details || [];
+                                            const matchingGuest = guestDetails.find((g: any) =>
+                                                String(g.employee_id) === String(participantId) ||
+                                                g.name?.toLowerCase() === participantId.toLowerCase()
+                                            );
+                                            const name = emp?.full_name || matchingGuest?.name || participantId;
 
-                                            const preScores = results.filter(r => isMatch(r, participantId) && (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE')).map(r => Number(r.score) || 0);
-                                            const postScores = results.filter(r => isMatch(r, participantId) && (r.quizType || r.quiz_type || "").toUpperCase().includes('POST')).map(r => Number(r.score) || 0);
-
-                                            const preScore = preScores.length > 0 ? Math.max(...preScores) : '-';
-                                            const postScore = postScores.length > 0 ? Math.max(...postScores) : '-';
+                                            const preScore = hasPreTest ? Math.max(...preScores) : '-';
+                                            const postScore = hasPostTest ? Math.max(...postScores) : '-';
 
                                             let fbScore: any = '-';
                                             const f = feedbacks.find(f => isMatch(f, participantId));
@@ -1878,14 +1993,38 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 const avgPost = postScores.length > 0 ? Math.round(postScores.reduce((a,b) => a+b, 0) / postScores.length) : '-';
                                                                 const avgFeedback = fbScoresList.length > 0 ? (Math.round((fbScoresList.reduce((a,b) => a+b, 0) / fbScoresList.length) * 10) / 10).toFixed(1) : '-';
 
-                                                                const participantEmails = Array.from(new Set([
-                                                                    ...(m.guests?.emails || []).map((e: string) => e.toLowerCase()),
-                                                                    ...((m.guests as any)?.employee_ids || []).map((e: string) => e.toLowerCase()),
-                                                                    ...allParticipantIds.filter(email => {
-                                                                        return (m.guests?.emails || []).some((ge: string) => ge.toLowerCase() === email || ge.toLowerCase().split('@')[0] === email.split('@')[0]) ||
-                                                                               ((m.guests as any)?.employee_ids || []).some((ge: string) => ge.toLowerCase() === email);
-                                                                    })
-                                                                ]));
+                                                                // Build unique participant list based on employee_id (primary key)
+                                                                const participantMap = new Map<string, string>();
+
+                                                                // Add from guests.employee_ids first
+                                                                ((m.guests as any)?.employee_ids || []).forEach((empId: string) => {
+                                                                    if (empId) participantMap.set(String(empId).toLowerCase().trim(), String(empId).toLowerCase().trim());
+                                                                });
+
+                                                                // Add from guests.emails, map to employee_id if possible
+                                                                (m.guests?.emails || []).forEach((email: string) => {
+                                                                    if (!email) return;
+                                                                    const emp = employees?.find(e => e.email?.toLowerCase() === email.toLowerCase());
+                                                                    if (emp && String(emp.id_employee)) {
+                                                                        participantMap.set(String(emp.id_employee).toLowerCase().trim(), String(emp.id_employee).toLowerCase().trim());
+                                                                    } else {
+                                                                        participantMap.set(email.toLowerCase().trim(), email.toLowerCase().trim());
+                                                                    }
+                                                                });
+
+                                                                // Add from allParticipantIds that match meeting guests
+                                                                allParticipantIds.forEach(email => {
+                                                                    const emp = employees?.find(e => e.email?.toLowerCase() === email.toLowerCase());
+                                                                    if (emp && String(emp.id_employee)) {
+                                                                        participantMap.set(String(emp.id_employee).toLowerCase().trim(), String(emp.id_employee).toLowerCase().trim());
+                                                                    } else if ((m.guests?.emails || []).some((ge: string) => ge.toLowerCase() === email.toLowerCase())) {
+                                                                        participantMap.set(email.toLowerCase().trim(), email.toLowerCase().trim());
+                                                                    } else if (((m.guests as any)?.employee_ids || []).some((ge: string) => String(ge).toLowerCase() === String(email).toLowerCase())) {
+                                                                        participantMap.set(String(email).toLowerCase().trim(), String(email).toLowerCase().trim());
+                                                                    }
+                                                                });
+
+                                                                const participantEmails = Array.from(participantMap.values());
 
                                                                 // Filter out Internship/PKL from cost calculation
                                                                 const validParticipantEmails = participantEmails.filter(email => {
@@ -2341,6 +2480,49 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     </div>
                                 </div>
 
+                                {/* Competency Type & Name */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Competency Type</label>
+                                        <select
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-600"
+                                            value={formData.competency_type}
+                                            onChange={e => setFormData({ ...formData, competency_type: e.target.value })}
+                                        >
+                                            <option value="">Select Type...</option>
+                                            <option value="Behavioral">Behavioral</option>
+                                            <option value="Core">Core</option>
+                                            <option value="Technical/Functional">Technical/Functional</option>
+                                            <option value="Managerial">Managerial</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Competency Name</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. Leadership"
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-semibold text-slate-700"
+                                            value={formData.competency_name}
+                                            onChange={e => setFormData({ ...formData, competency_name: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Training GRI Type */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Training GRI Type</label>
+                                    <select
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-600"
+                                        value={formData.training_gr_type}
+                                        onChange={e => setFormData({ ...formData, training_gr_type: e.target.value })}
+                                    >
+                                        <option value="">Select GRI Type...</option>
+                                        <option value="ESG">ESG (Environmental, Social, and Governance)</option>
+                                        <option value="HSE">HSE (Health, Safety, and Environment)</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+
                                 {/* Location & Link - Conditional */}
                                 {(formData.type === 'Offline' || formData.type === 'Hybrid') && (
                                     <div>
@@ -2422,9 +2604,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 onClick={() => {
                                                                     if (!invitedEmployeeIds.includes(emp.id_employee)) {
                                                                         setInvitedEmployeeIds([...invitedEmployeeIds, emp.id_employee]);
-                                                                        if (emp.email && !invitedEmails.includes(emp.email)) {
-                                                                            setInvitedEmails([...invitedEmails, emp.email]);
-                                                                        }
+                                                                        // Don't add email separately - we'll use employee_id for display
+                                                                        // Only track emails for external guests without employee records
                                                                     }
                                                                     setParticipantSearch("");
                                                                     setShowParticipantDropdown(false);
@@ -3013,20 +3194,20 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         <div className="w-8 flex justify-center pt-0.5"><Users className="text-slate-400" size={20} /></div>
                                         <div className="flex-1">
                                             <p className="font-semibold text-slate-700 text-sm mb-2">
-                                                {Math.max(selectedMeeting.guests?.emails?.length || 0, (selectedMeeting.guests as any)?.employee_ids?.length || 0)} Invited Guests
+                                                {selectedMeeting.guests?.count || (selectedMeeting.guests as any)?.employee_ids?.length || 0} Invited Guests
                                             </p>
-                                            {(selectedMeeting.guests?.emails?.length > 0 || (selectedMeeting.guests as any)?.employee_ids?.length > 0) ? (
+                                            {(selectedMeeting.guests?.count > 0) ? (
                                                 <div className="flex flex-wrap gap-2">
-                                                    {Array.from(new Set([...(selectedMeeting.guests?.emails || []), ...((selectedMeeting.guests as any)?.employee_ids || [])])).map((guestEmail: any) => {
-                                                        const emailStr = String(guestEmail);
-                                                        const emp = (employees || []).find(e => e.email?.toLowerCase() === emailStr.toLowerCase() || String(e.id_employee).toLowerCase() === emailStr.toLowerCase());
-                                                        const displayEmail = emp?.full_name || emp?.email || emailStr;
+                                                    {/* Display invited employees by employee_id */}
+                                                    {((selectedMeeting.guests as any)?.employee_ids || []).map((empId: string) => {
+                                                        const emp = (employees || []).find(e => e.id_employee === empId);
+                                                        const displayName = emp?.full_name || empId;
                                                         return (
-                                                            <div key={guestEmail} className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-full border border-slate-100">
+                                                            <div key={empId} className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-full border border-slate-100">
                                                                 <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold">
-                                                                    {displayEmail.charAt(0).toUpperCase()}
+                                                                    {displayName.charAt(0).toUpperCase()}
                                                                 </div>
-                                                                <span className="text-xs text-slate-600">{displayEmail}</span>
+                                                                <span className="text-xs text-slate-600">{displayName}</span>
                                                             </div>
                                                         );
                                                     })}
@@ -3043,6 +3224,97 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             {renderTextWithLinks(selectedMeeting.description)}
                                         </p>
                                     </div>
+
+                                    {/* Feedback Peserta - Show/Hide */}
+                                    {(() => {
+                                        const allFeedback = meetingSummary?.allFeedbackResults || [];
+                                        if (allFeedback.length === 0) return null;
+
+                                        // Group feedback by participant - use unique key based on email or employee_id
+                                        const feedbackByParticipant: any[] = [];
+                                        const processedKeys = new Set<string>();
+
+                                        for (const fb of allFeedback) {
+                                            // Get user identifier from multiple possible sources
+                                            const userEmail = (fb.user_email || fb.email || fb.user_id || '').toString().toLowerCase().trim();
+                                            const employeeId = (fb.employee_id || '').toString().toLowerCase().trim();
+
+                                            if (!userEmail && !employeeId) continue;
+
+                                            // Use email as primary key, fallback to employee_id
+                                            const uniqueKey = userEmail || `emp_${employeeId}`;
+                                            if (processedKeys.has(uniqueKey)) continue;
+
+                                            // Find matching employee
+                                            let emp: any = null;
+                                            if (userEmail) {
+                                                emp = employees.find(e => e.email?.toLowerCase() === userEmail);
+                                            }
+                                            if (!emp && employeeId) {
+                                                emp = employees.find(e => String(e.id_employee).toLowerCase() === employeeId);
+                                            }
+
+                                            // Get feedback answers from feedback_data JSON
+                                            let q11_text = '';
+                                            let q12_text = '';
+                                            try {
+                                                const fData = fb.feedback_data ? (typeof fb.feedback_data === 'string' ? JSON.parse(fb.feedback_data) : fb.feedback_data) : null;
+                                                if (fData && typeof fData === 'object') {
+                                                    q11_text = fData.q11 || '';
+                                                    q12_text = fData.q12 || '';
+                                                }
+                                            } catch(e) {}
+
+                                            // Only show participants with text answers for q11 or q12
+                                            if (q11_text || q12_text) {
+                                                feedbackByParticipant.push({
+                                                    name: 'Anonim', // Display as anonymous
+                                                    email: emp?.email || userEmail,
+                                                    q11: q11_text,
+                                                    q12: q12_text
+                                                });
+                                            }
+                                            processedKeys.add(uniqueKey);
+                                        }
+
+                                        if (feedbackByParticipant.length === 0) return null;
+
+                                        return (
+                                            <div className="mt-6 pt-4 border-t border-slate-50">
+                                                <button
+                                                    onClick={() => setShowFeedbackList(prev => !prev)}
+                                                    className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-purple-50 hover:bg-purple-100 rounded-lg transition-all"
+                                                >
+                                                    <h4 className="text-[10px] font-black text-purple-600 uppercase tracking-widest flex items-center gap-2">
+                                                        <MessageSquare size={14} /> Feedback Peserta
+                                                    </h4>
+                                                    <ChevronDown className={`text-purple-400 transition-transform ${showFeedbackList ? 'rotate-180' : ''}`} />
+                                                </button>
+
+                                                {showFeedbackList && (
+                                                    <div className="mt-3 space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+                                                        {feedbackByParticipant.map((fb, idx) => (
+                                                            <div key={idx} className="bg-white border border-slate-100 rounded-xl p-3 shadow-sm">
+                                                                <p className="text-xs font-bold text-slate-700 mb-2">{fb.name}</p>
+                                                                {fb.q11 && (
+                                                                    <div className="mb-2">
+                                                                        <p className="text-[9px] font-bold text-purple-500 uppercase tracking-wider mb-1">Hal yang sudah baik:</p>
+                                                                        <p className="text-xs text-slate-600">{fb.q11}</p>
+                                                                    </div>
+                                                                )}
+                                                                {fb.q12 && (
+                                                                    <div>
+                                                                        <p className="text-[9px] font-bold text-purple-500 uppercase tracking-wider mb-1">Yang perlu ditingkatkan:</p>
+                                                                        <p className="text-xs text-slate-600">{fb.q12}</p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
 
                                     {selectedMeeting.costReport?.trainingPhotos && (
                                         <div className="mt-6 pt-4 border-t border-slate-50">
@@ -3276,13 +3548,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                             <div className="flex flex-col">
                                                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Akses Pre-Test</span>
                                                             </div>
-                                                            <button 
+                                                            <button
                                                                 onClick={() => toggleMeetingStatus('is_pre_test_active', selectedMeeting.is_pre_test_active)}
-                                                                className={`px-3 py-1 rounded-full text-[10px] font-black transition-all border ${selectedMeeting.is_pre_test_active 
-                                                                    ? 'bg-emerald-500 text-white border-emerald-600' 
-                                                                    : 'bg-white text-slate-400 border-slate-200'}`}
+                                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${selectedMeeting.is_pre_test_active ? 'bg-emerald-500' : 'bg-slate-300'}`}
                                                             >
-                                                                {selectedMeeting.is_pre_test_active ? 'AKTIF' : 'NON-AKTIF'}
+                                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${selectedMeeting.is_pre_test_active ? 'translate-x-6' : 'translate-x-1'}`}/>
                                                             </button>
                                                         </div>
                                                     )}
@@ -3355,13 +3625,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                             <div className="flex flex-col">
                                                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Akses Post-Test</span>
                                                             </div>
-                                                            <button 
+                                                            <button
                                                                 onClick={() => toggleMeetingStatus('is_post_test_active', selectedMeeting.is_post_test_active)}
-                                                                className={`px-3 py-1 rounded-full text-[10px] font-black transition-all border ${selectedMeeting.is_post_test_active 
-                                                                    ? 'bg-emerald-500 text-white border-emerald-600' 
-                                                                    : 'bg-white text-slate-400 border-slate-200'}`}
+                                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${selectedMeeting.is_post_test_active ? 'bg-emerald-500' : 'bg-slate-300'}`}
                                                             >
-                                                                {selectedMeeting.is_post_test_active ? 'AKTIF' : 'NON-AKTIF'}
+                                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${selectedMeeting.is_post_test_active ? 'translate-x-6' : 'translate-x-1'}`}/>
                                                             </button>
                                                         </div>
                                                     )}
@@ -3455,13 +3723,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                             <div className="flex flex-col">
                                                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Akses Feedback</span>
                                                             </div>
-                                                            <button 
+                                                            <button
                                                                 onClick={() => toggleMeetingStatus('is_feedback_active', selectedMeeting.is_feedback_active)}
-                                                                className={`px-3 py-1 rounded-full text-[10px] font-black transition-all border ${selectedMeeting.is_feedback_active 
-                                                                    ? 'bg-emerald-500 text-white border-emerald-600' 
-                                                                    : 'bg-white text-slate-400 border-slate-200'}`}
+                                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${selectedMeeting.is_feedback_active ? 'bg-emerald-500' : 'bg-slate-300'}`}
                                                             >
-                                                                {selectedMeeting.is_feedback_active ? 'AKTIF' : 'NON-AKTIF'}
+                                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${selectedMeeting.is_feedback_active ? 'translate-x-6' : 'translate-x-1'}`}/>
                                                             </button>
                                                         </div>
                                                     )}
@@ -3521,9 +3787,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     setShowQuiz(null);
                                     
                                     if (showQuiz === 'POST' && score < 80) {
-                                        setNotification({ 
-                                            show: true, 
-                                            type: 'error', 
+                                        setNotification({
+                                            show: true,
+                                            type: 'info',
                                             message: `Nilai Anda: ${score}. Skor minimal untuk lulus adalah 80. Silakan coba lagi.`,
                                             onClose: () => {
                                                 // Reopen the quiz

@@ -65,7 +65,10 @@ CREATE TABLE IF NOT EXISTS meetings (
     agenda TEXT,
     guests_json JSON,
     cost_report_json JSON,
-    employee_id VARCHAR(50)
+    employee_id VARCHAR(50),
+    competency_type VARCHAR(100),
+    competency_name VARCHAR(255),
+    training_gr_type VARCHAR(100)
 );
 
 CREATE TABLE IF NOT EXISTS courses (
