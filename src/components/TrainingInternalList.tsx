@@ -1397,21 +1397,23 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 const start = parts[0].trim(); // '09:30'
                 const end = parts[1].trim();   // '15:30'
 
-                const [startH, startM] = start.split(':').map(Number);
-                const [endH, endM] = end.split(':').map(Number);
+                const [startH, startM] = start.split(':').map(Number) as [number, number];
+                const [endH, endM] = end.split(':').map(Number) as [number, number];
 
                 if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) return 0;
 
-                const startDate = new Date(2024, 0, 1, startH, startM);
-                const endDate = new Date(2024, 0, 1, endH, endM);
+                // Convert to minutes for calculation
+                const startMinutes = startH * 60 + startM;
+                const endMinutes = endH * 60 + endM;
 
                 // Handle case where end time is next day (e.g., 22:00 - 02:00)
-                if (endDate < startDate) {
-                    endDate.setDate(endDate.getDate() + 1);
+                let totalMinutes = endMinutes - startMinutes;
+                if (totalMinutes < 0) {
+                    totalMinutes += 24 * 60;
                 }
 
-                const diffMs = endDate - startDate;
-                const diffHours = diffMs / (1000 * 60 * 60);
+                const diffHours = Math.round((totalMinutes / 60) * 2) / 2; // Round to nearest 0.5 hour
+                return diffHours;
                 return Math.round(diffHours * 2) / 2; // Round to nearest 0.5 hour
             } catch (e) {
                 return 0;
@@ -1575,7 +1577,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         if (!participationTypes) return 'Targeted Participants';
 
                         // Try to match by employee_id first, then email
-                        const empId = emp?.id_employee || id;
+                        const empId = emp?.id_employee || email;
                         if (participationTypes[empId]) {
                             return participationTypes[empId];
                         }
