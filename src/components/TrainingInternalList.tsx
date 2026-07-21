@@ -96,6 +96,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         lunchCost: 0,
         otherCost: 0,
         participantsCount: 0,
+        participationType: 'Targeted Participants',
         isFinalized: false,
         trainingPhotos: ''
     });
@@ -308,6 +309,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     const competencyType = row['Competency Type'] || row.CompetencyType || row['Kompetensi Jenis'] || '';
                     const competencyName = row['Competency Name'] || row.CompetencyName || row['Nama Kompetensi'] || '';
 
+                    // Handle Training GRI Type (ESG, HSE, Other)
+                    const trainingGrType = row['ESG, HSE, Other'] || row['ESG_HSE_Other'] || row.training_gr_type || null;
+
                     const title = row.Title || row.title || row['Judul / Training Name'] || row.Judul || 'Imported Training';
                     
                     const parseExcelTime = (val: any) => {
@@ -335,6 +339,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                             host,
                             competency_type: competencyType,
                             competency_name: competencyName,
+                            training_gr_type: trainingGrType,
                             type: row['Training Type'] || row.Type || row.type || row.Tipe || 'Offline',
                             location: row.Location || row.location || row.Lokasi || '',
                             description: row.Description || row.description || row.Deskripsi || '',
@@ -353,9 +358,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         });
                     }
                     
+                    const employeeId = row['Employee ID'] || row['EmployeeID'] || row.EmployeeID || '';
+
                     // Handle Pre-Test and Post-Test from various column names (old and new format)
                     const rawPreTest = row['Pre-Test_1'] ?? row['Pre-Test'] ?? row.PRE_TEST_DATA ?? null;
                     const rawPostTest = row['Post-Test_1'] ?? row['Post-Test'] ?? row.POST_TEST_DATA ?? null;
+
+                    // Handle Participation Type per participant
+                    const participationType = row['Participation Type'] || row['participation_type'] || 'Targeted Participants';
 
                     const parseScore = (val: any) => {
                         if (val === undefined || val === null || val === '') return null;
@@ -365,25 +375,40 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         return null;
                     };
 
+                    // Store participation type for this participant (use employee_id as key)
+                    if (employeeId && !((groupedMeetings.get(groupKey) as any).participationTypesByEmployee?.[employeeId])) {
+                        groupedMeetings.get(groupKey).participationTypesByEmployee =
+                            groupedMeetings.get(groupKey).participationTypesByEmployee || {};
+                        groupedMeetings.get(groupKey).participationTypesByEmployee[employeeId] = participationType;
+                    }
+
                     const participant = {
                         name: row['Peserta / Employee Name'] || row.Peserta || row.EmployeeName || '',
-                        employee_id: row['Employee ID'] || row['EmployeeID'] || row.EmployeeID || '',
+                        employee_id: employeeId,
                         pre_test_score: parseScore(rawPreTest),
                         post_test_score: parseScore(rawPostTest),
                         feedback_score: parseScore(row['Feedback Training / PTE 1 Score'] ?? row.Feedback_Training ?? row.PTE_1_Score ?? null)
                     };
-                    
+
                     if (participant.name || participant.employee_id) {
                         groupedMeetings.get(groupKey).participants.push(participant);
                     }
                 });
-                
+
+                // Build participationTypesByEmployee from parsed data into cost_report
                 const formattedMeetings = Array.from(groupedMeetings.values()).map(m => {
                     if (m.cost_report?.isPaid) {
                         m.cost_report.attendee_ids = m.participants.map((p: any) => p.employee_id).filter(Boolean);
-                        m.cost_report.attendees = m.participants.map((p: any) => p.name).filter(Boolean); // If using emails, you'd map those, but here we fallback to name if emails are not in participants object directly during import
+                        m.cost_report.attendees = m.participants.map((p: any) => p.name).filter(Boolean);
                         m.cost_report.participantsCount = m.participants.length;
                     }
+
+                    // Copy participationTypesByEmployee from meeting to cost_report if exists
+                    if ((m as any).participationTypesByEmployee) {
+                        if (!m.cost_report) m.cost_report = {};
+                        (m.cost_report as any).participationTypesByEmployee = (m as any).participationTypesByEmployee;
+                    }
+
                     return m;
                 });
                 
@@ -643,6 +668,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             if ('snack' in mappedCostReport && !('snackCost' in mappedCostReport)) mappedCostReport.snackCost = mappedCostReport.snack;
             if ('lunch' in mappedCostReport && !('lunchCost' in mappedCostReport)) mappedCostReport.lunchCost = mappedCostReport.lunch;
             if ('other' in mappedCostReport && !('otherCost' in mappedCostReport)) mappedCostReport.otherCost = mappedCostReport.other;
+
+            // Map participationTypesByEmployee to m.participation_types for export compatibility (if needed)
+            if (mappedCostReport.participationTypesByEmployee) {
+                m.participation_types = mappedCostReport.participationTypesByEmployee;
+            }
         }
 
         return {
@@ -877,6 +907,17 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     };
 
     const validateReport = () => {
+        // Check if meeting is closed - only closed meetings can be finalized by HR
+        const meeting = meetings.find(m => m.id === reportingId);
+        if (meeting && !meeting.is_closed) {
+            setNotification({
+                show: true,
+                type: 'error',
+                message: 'Cannot finalize report. Training session is still ACTIVE - wait until session is CLOSED.'
+            });
+            return false;
+        }
+
         if ((reportData.participantsCount || 0) <= 0) {
             setNotification({ show: true, type: 'error', message: 'Participants count must be at least 1.' });
             return false;
@@ -953,6 +994,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         if (isEditing && editId) {
             // Update Existing
             try {
+                console.log('DEBUG: training_gr_type value:', formData.training_gr_type);
+                console.log('DEBUG: updatePayload:', JSON.stringify({
+                    title: meetingData.title,
+                    competency_name: meetingData.competency_name,
+                    training_gr_type: meetingData.training_gr_type
+                }, null, 2));
+
                 // Preserve is_closed status - do not allow reopening a closed meeting
                 const updatePayload = {
                     ...meetingData,
@@ -1325,19 +1373,50 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const exportParticipantExcel = () => {
         const dataRows: any[] = [];
         const headers = [
-            "No", "Employee Name", "ID", "Training Type", "Designation", 
-            "Company Group", "Company", "Grade", "Band", "Directorate", 
-            "Division", "Department", "LOB", "Divison Type Mapping", 
-            "Quarter", "Year", "Month", "Month by number", "Start Date", 
-            "End Date", "Training Hours", "Competencies Type", "Competency Detail", 
-            "Training Name", "Attendance", "Participation Type", "Vendor", 
-            "Facilitator", "Total Cost", "PTE 1 Score", "Pre-Test", 
-            "Post-Test", "%Increment", "PTE 3", "Age", "Age Group", 
-            "Gender", "ESG, HSE, Other", "Action Plan", "Detail Participant Type"
+            "No", "Employee Name", "ID", "Training Type", "Designation",
+            "Company Group", "Company", "Grade", "Band", "Directorate",
+            "Division", "Department", "LOB", "Divison Type Mapping",
+            "Quarter", "Year", "Month", "Month by number", "Start Date",
+            "End Date", "Training Hours", "Competencies Type", "Competency Detail",
+            "ESG, HSE, Other", "Training Name", "Attendance", "Participation Type", "Vendor",
+            "Facilitator", "Total Cost", "PTE 1 Score", "Pre-Test",
+            "Post-Test", "%Increment", "PTE 3", "Age", "Age Group",
+            "Gender", "Action Plan", "Detail Participant Type"
         ];
 
         const filtered = filteredMeetings;
         let globalIndex = 1;
+
+        // Helper to calculate duration from time string like '09:30 - 15:30'
+        const calculateDuration = (timeStr: string): number => {
+            if (!timeStr || !timeStr.includes('-')) return 0;
+            try {
+                const parts = timeStr.split('-');
+                if (parts.length !== 2) return 0;
+
+                const start = parts[0].trim(); // '09:30'
+                const end = parts[1].trim();   // '15:30'
+
+                const [startH, startM] = start.split(':').map(Number);
+                const [endH, endM] = end.split(':').map(Number);
+
+                if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) return 0;
+
+                const startDate = new Date(2024, 0, 1, startH, startM);
+                const endDate = new Date(2024, 0, 1, endH, endM);
+
+                // Handle case where end time is next day (e.g., 22:00 - 02:00)
+                if (endDate < startDate) {
+                    endDate.setDate(endDate.getDate() + 1);
+                }
+
+                const diffMs = endDate - startDate;
+                const diffHours = diffMs / (1000 * 60 * 60);
+                return Math.round(diffHours * 2) / 2; // Round to nearest 0.5 hour
+            } catch (e) {
+                return 0;
+            }
+        };
 
         filtered.forEach(m => {
             const meetingResults = allResults.filter(r => 
@@ -1457,14 +1536,54 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     mDate.getFullYear(),
                     mDate.toLocaleString('default', { month: 'long' }),
                     mDate.getMonth() + 1,
-                    formatDDMMYYYY(mDate),  // Start Date - DD/MM/YYYY format
-                    formatDDMMYYYY(mDate),  // End Date - DD/MM/YYYY format
-                    (m as any).training_hours || 0,
+
+                    // Calculate Start Date based on date + startTime from meeting time string
+                    (() => {
+                        let startDate = m.date || '';
+                        if (m.time && m.time.includes('-')) {
+                            const parts = m.time.split('-');
+                            if (parts.length >= 1) {
+                                // First part has the start time info, date is already in m.date
+                                startDate = m.date;
+                            }
+                        }
+                        return formatDDMMYYYY(new Date(startDate));
+                    })(),  // Start Date
+
+                    // Calculate End Date - if multi-day, use end time from meeting
+                    (() => {
+                        let endDate = m.date || ''; // Default to same date
+
+                        // If we have both start and end times (multi-day event)
+                        // For now assume single day events, so end date = start date
+                        return formatDDMMYYYY(new Date(endDate));
+                    })(),  // End Date
+
+                    // Calculate Training Hours from time string like '09:30 - 15:30'
+                    (() => {
+                        const hours = calculateDuration(m.time || '');
+                        return `${hours}:00`;  // Format as "X:00" or "X.5:00"
+                    })(),
                     esc((m as any).competency_type || 'Core'),
-                    esc((m as any).competency_name || '-'),  // Changed from competency_detail to competency_name
+                    esc((m as any).competency_name || '-'),
+                    esc((m as any).training_gr_type || 'Other'),  // ESG, HSE, Other - posisi sesuai template
                     esc(m.title),
                     (avgPre !== '-' || avgPost !== '-' || avgFB !== '-') ? 'Present' : 'Absent',
-                    esc((m as any).participation_type || 'Targeted Participants'),
+                    (() => {
+                        // Get participation type for this employee from costReport.participationTypesByEmployee
+                        const participationTypes = (m as any).costReport?.participationTypesByEmployee;
+                        if (!participationTypes) return 'Targeted Participants';
+
+                        // Try to match by employee_id first, then email
+                        const empId = emp?.id_employee || id;
+                        if (participationTypes[empId]) {
+                            return participationTypes[empId];
+                        }
+                        if (emp?.email && participationTypes[emp.email]) {
+                            return participationTypes[emp.email];
+                        }
+                        return 'Targeted Participants'; // Default
+                    })(),
                     'Internal',
                     esc(m.host),
                     participantCost,
@@ -1483,10 +1602,31 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         }
                         return '-';
                     })(),
-                    esc((emp as any)?.age_group || '-'),
+                    // Calculate Age Group based on age from birth_date
+                    (() => {
+                        let age = 0;
+
+                        // Try to get age directly or calculate from birth_date
+                        if ((emp as any)?.age) {
+                            age = parseInt((emp as any).age);
+                        } else if ((emp as any)?.birth_date) {
+                            const birth = new Date((emp as any).birth_date);
+                            const diff = Date.now() - birth.getTime();
+                            const ageDate = new Date(diff);
+                            age = Math.abs(ageDate.getUTCFullYear() - 1970);
+                        }
+
+                        if (age <= 0) return '-';
+
+                        // Determine age group range
+                        if (age < 25) return '20-30 years';
+                        if (age <= 30) return '20-30 years';
+                        if (age <= 40) return '31-40 years';
+                        if (age <= 50) return '41-50 years';
+                        if (age <= 60) return '51-60 years';
+                        return '>60 years';
+                    })(),
                     esc((emp as any)?.gender || '-'),
-                    // ESG/HSE/Other: ambil dari training_gr_type yang tersimpan di database
-                    esc((m as any).training_gr_type || 'Other'),
                     '-', // Action Plan (tidak ada data action plan)
                     '-'  // Detail Participant Type
                 ]);
@@ -1643,12 +1783,39 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             const preScores = results.filter(r => isMatch(r, participantId) && (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE')).map(r => Number(r.score) || 0);
                                             const postScores = results.filter(r => isMatch(r, participantId) && (r.quizType || r.quiz_type || "").toUpperCase().includes('POST')).map(r => Number(r.score) || 0);
 
+                                            // Get pre/post test questions from meeting data to determine if tests are required
+                                            let preQuestions: any[] = [];
+                                            let postQuestions: any[] = [];
+                                            try {
+                                                const preTestData = typeof selectedMeeting.pre_test_data === 'string'
+                                                    ? JSON.parse(selectedMeeting.pre_test_data || '{}')
+                                                    : (selectedMeeting.pre_test_data || {});
+                                                preQuestions = preTestData.questions || [];
+                                            } catch(e) {}
+
+                                            try {
+                                                const postTestData = typeof selectedMeeting.post_test_data === 'string'
+                                                    ? JSON.parse(selectedMeeting.post_test_data || '{}')
+                                                    : (selectedMeeting.post_test_data || {});
+                                                postQuestions = postTestData.questions || [];
+                                            } catch(e) {}
+
+                                            // Check if pre/post tests are required (have questions defined)
+                                            const requiresPreTest = preQuestions.length > 0;
+                                            const requiresPostTest = postQuestions.length > 0;
+
                                             const hasPreTest = preScores.length > 0;
                                             const hasPostTest = postScores.length > 0;
                                             const hasFeedback = feedbacks.some(f => isMatch(f, participantId));
 
-                                            // Participant is "done" only if they completed Pre-Test, Post-Test AND Feedback
-                                            const isDone = hasPreTest && hasPostTest && hasFeedback;
+                                            // Participant is "done" if:
+                                            // - They completed Feedback (required for all)
+                                            // - AND they completed Pre-Test (if required)
+                                            // - AND they completed Post-Test (if required)
+                                            // If no tests are defined (external training), only feedback completion matters
+                                            const isDone = hasFeedback &&
+                                                (!requiresPreTest || hasPreTest) &&
+                                                (!requiresPostTest || hasPostTest);
 
                                             if (showParticipantModal === 'sudah' && !isDone) return null;
                                             if (showParticipantModal === 'belum' && isDone) return null;
@@ -2724,32 +2891,100 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 <div className="space-y-2">
                                                     {invitedEmployeeIdsList.map((id: string) => {
                                                         const emp = employees.find(e => e.id_employee === id);
+                                                        const participationTypes = reportData.participationTypesByEmployee || {};
+                                                        const currentType = participationTypes[id] || 'Targeted Participants';
+
                                                         return (
-                                                            <label key={id} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-100 cursor-pointer hover:border-indigo-200 transition-colors">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
-                                                                    checked={(reportData.attendee_ids || []).includes(id)}
-                                                                    onChange={() => toggleAttendee("", id)}
-                                                                />
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-sm text-slate-700 font-bold">{emp?.full_name || id}</span>
-                                                                    <span className="text-[10px] text-slate-400">{id} {emp?.branch_name ? `• ${emp.branch_name}` : ''}</span>
+                                                            <div key={id} className={`flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-100 ${reportData.isPaid ? 'opacity-60 pointer-events-none' : ''}`}>
+                                                                <label className="flex items-center gap-3 flex-1 cursor-pointer hover:border-indigo-200 transition-colors">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                                        checked={(reportData.attendee_ids || []).includes(id)}
+                                                                        onChange={() => toggleAttendee("", id)}
+                                                                    />
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-sm text-slate-700 font-bold">{emp?.full_name || id}</span>
+                                                                        <span className="text-[10px] text-slate-400">{id} {emp?.branch_name ? `• ${emp.branch_name}` : ''}</span>
+                                                                    </div>
+                                                                </label>
+                                                                <div className="flex items-center gap-3">
+                                                                    <label className="flex items-center gap-2 cursor-pointer hover:text-indigo-600 transition-colors">
+                                                                        <input
+                                                                            type="radio"
+                                                                            name={`participation-${id}`}
+                                                                            className="w-3.5 h-3.5 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                                                                            checked={currentType === 'Targeted Participants'}
+                                                                            onChange={() => {
+                                                                                const newTypes = { ...participationTypes, [id]: 'Targeted Participants' as const };
+                                                                                setReportData({ ...reportData, participationTypesByEmployee: newTypes });
+                                                                            }}
+                                                                        />
+                                                                        <span className="text-xs text-slate-600 font-semibold">TARGET</span>
+                                                                    </label>
+                                                                    <label className="flex items-center gap-2 cursor-pointer hover:text-indigo-600 transition-colors">
+                                                                        <input
+                                                                            type="radio"
+                                                                            name={`participation-${id}`}
+                                                                            className="w-3.5 h-3.5 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                                                                            checked={currentType === 'Self Registered'}
+                                                                            onChange={() => {
+                                                                                const newTypes = { ...participationTypes, [id]: 'Self Registered' as const };
+                                                                                setReportData({ ...reportData, participationTypesByEmployee: newTypes });
+                                                                            }}
+                                                                        />
+                                                                        <span className="text-xs text-slate-600 font-semibold">SELF</span>
+                                                                    </label>
                                                                 </div>
-                                                            </label>
+                                                            </div>
                                                         );
                                                     })}
-                                                    {invitedEmailsList.filter((email: string) => !employees.some(emp => emp.email === email)).map((email: string) => (
-                                                        <label key={email} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-100 cursor-pointer hover:border-slate-200 transition-colors">
-                                                            <input
-                                                                type="checkbox"
-                                                                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
-                                                                checked={(reportData.attendees || []).includes(email)}
-                                                                onChange={() => toggleAttendee(email)}
-                                                            />
-                                                            <span className="text-sm text-slate-700 font-medium truncate">{email}</span>
-                                                        </label>
-                                                    ))}
+                                                    {invitedEmailsList.filter((email: string) => !employees.some(emp => emp.email === email)).map((email: string) => {
+                                                        const participationTypes = reportData.participationTypesByEmployee || {};
+                                                        const currentType = participationTypes[email] || 'Targeted Participants';
+
+                                                        return (
+                                                            <div key={email} className={`flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-100 ${reportData.isPaid ? 'opacity-60 pointer-events-none' : ''}`}>
+                                                                <label className="flex items-center gap-3 flex-1 cursor-pointer hover:border-indigo-200 transition-colors">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                                        checked={(reportData.attendees || []).includes(email)}
+                                                                        onChange={() => toggleAttendee(email)}
+                                                                    />
+                                                                    <span className="text-sm text-slate-700 font-medium truncate">{email}</span>
+                                                                </label>
+                                                                <div className="flex items-center gap-3">
+                                                                    <label className="flex items-center gap-2 cursor-pointer hover:text-indigo-600 transition-colors">
+                                                                        <input
+                                                                            type="radio"
+                                                                            name={`participation-${email}`}
+                                                                            className="w-3.5 h-3.5 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                                                                            checked={currentType === 'Targeted Participants'}
+                                                                            onChange={() => {
+                                                                                const newTypes = { ...participationTypes, [email]: 'Targeted Participants' as const };
+                                                                                setReportData({ ...reportData, participationTypesByEmployee: newTypes });
+                                                                            }}
+                                                                        />
+                                                                        <span className="text-xs text-slate-600 font-semibold">TARGET</span>
+                                                                    </label>
+                                                                    <label className="flex items-center gap-2 cursor-pointer hover:text-indigo-600 transition-colors">
+                                                                        <input
+                                                                            type="radio"
+                                                                            name={`participation-${email}`}
+                                                                            className="w-3.5 h-3.5 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                                                                            checked={currentType === 'Self Registered'}
+                                                                            onChange={() => {
+                                                                                const newTypes = { ...participationTypes, [email]: 'Self Registered' as const };
+                                                                                setReportData({ ...reportData, participationTypesByEmployee: newTypes });
+                                                                            }}
+                                                                        />
+                                                                        <span className="text-xs text-slate-600 font-semibold">SELF</span>
+                                                                    </label>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             );
                                         })()}
@@ -2935,17 +3170,36 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         <CheckCircle size={18} /> Report Paid & Locked
                                     </div>
                                 ) : (
-                                    <button
-                                        onClick={(e) => { 
-                                            e.preventDefault(); 
-                                            if (validateReport()) {
-                                                setConfirmMarkPaid(true); 
-                                            }
-                                        }}
-                                        className="flex-[2] py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2"
-                                    >
-                                        Mark Paid
-                                    </button>
+                                    (() => {
+                                        // Check if meeting is closed - only closed meetings can be paid by HR
+                                        const meeting = meetings.find(m => m.id === reportingId);
+                                        const isClosed = meeting?.is_closed;
+
+                                        return (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    if (isClosed && validateReport()) {
+                                                        setConfirmMarkPaid(true);
+                                                    }
+                                                }}
+                                                disabled={!isClosed}
+                                                className={`flex-[2] py-3 font-bold rounded-xl flex items-center justify-center gap-2 transition-all ${
+                                                    isClosed
+                                                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 cursor-pointer'
+                                                        : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                                }`}
+                                            >
+                                                {!isClosed ? (
+                                                    <>
+                                                        <Lock size={18} /> Session Still Open
+                                                    </>
+                                                ) : (
+                                                    <>Mark Paid</>
+                                                )}
+                                            </button>
+                                        );
+                                    })()
                                 )}
                             </div>
                         </div >

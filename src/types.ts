@@ -181,6 +181,8 @@ export interface CostReport {
     participantsCount: number; // Actual attendance
     attendees?: string[]; // List of emails of attendees
     attendee_ids?: string[]; // List of employee_ids of attendees
+    participationType?: 'Targeted Participants' | 'Self Registered'; // Deprecated: Replaced by per-participant mapping
+    participationTypesByEmployee?: Record<string, 'Targeted Participants' | 'Self Registered'>; // New: Participation type per employee (key = employee_id or email)
     isFinalized: boolean;
     isPaid?: boolean;
     evidenceLink?: string; // Link to drive/materials
