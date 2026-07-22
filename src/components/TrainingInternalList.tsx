@@ -2723,11 +2723,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 )}
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Link Materi</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Presentation Link</label>
                                     <div className="relative mb-4">
                                         <FileText size={18} className="absolute left-3.5 top-3 text-slate-400" />
                                         <input
-                                            placeholder="Paste Google Drive / Material link here"
+                                            placeholder="Paste Google Drive / Presentation link here"
                                             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600"
                                             value={formData.material_link}
                                             onChange={e => setFormData({ ...formData, material_link: e.target.value })}
@@ -3434,10 +3434,15 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     {selectedMeeting.material_link && (
                                         <div className="flex gap-4">
                                             <div className="w-8 flex justify-center pt-0.5"><Link className="text-slate-400" size={20} /></div>
-                                            <div>
-                                                <p className="font-semibold text-slate-700 text-sm">Link Materi</p>
-                                                <a href={selectedMeeting.material_link} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-600 hover:underline break-all block mt-0.5">
-                                                    {selectedMeeting.material_link}
+                                            <div className="flex-1">
+                                                <p className="font-semibold text-slate-700 text-sm mb-1">Presentation Link</p>
+                                                <a
+                                                    href={selectedMeeting.material_link}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors"
+                                                >
+                                                    Open Presentation ↗
                                                 </a>
                                             </div>
                                         </div>
