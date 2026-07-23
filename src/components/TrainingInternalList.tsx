@@ -1362,17 +1362,25 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                 const allParticipantEmails = Array.from(participantMap.values());
 
-                // Get valid participants count (exclude Internship/PKL for cost calculation)
+                // Get attended participants from attendance checklist
+                const attendedIdsSet = new Set((m.costReport?.attendee_ids || []).map(id => String(id).toLowerCase().trim()));
+
+                // Get valid participants count (only attended + exclude Internship/PKL)
                 const validParticipants = allParticipantEmails.filter(email => {
                     const emp = employees.find(e =>
                         e.email?.toLowerCase() === email ||
                         String(e.id_employee) === email ||
                         String(e.id) === email
                     );
-                    if (emp && (emp.status_join === 'Internship' || emp.status_join === 'PKL')) {
-                        return false;
-                    }
-                    return true;
+                    // Exclude non-attended participants
+                        if (!attendedIdsSet.has(String(emp?.id_employee || email).toLowerCase().trim())) {
+                            return false;
+                        }
+                        // Exclude Internship/PKL
+                        if (emp && (emp.status_join === 'Internship' || emp.status_join === 'PKL')) {
+                            return false;
+                        }
+                        return true;
                 }).length;
 
                 // Get training hours from meeting time
@@ -1451,7 +1459,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 // Calculate % increment
                 let percentIncrement = '-';
                 if (avgPre !== '-' && avgPost !== '-' && Number(avgPre) > 0) {
-                    percentIncrement = (((Number(avgPost) - Number(avgPre)) / Number(avgPre)) * 100).toFixed(2) + '%';
+                                        percentIncrement = (((Number(avgPost) - Number(avgPre)) / Number(avgPre)) * 100).toFixed(2) + '%';
                 }
 
                 dataRows.push({
@@ -1503,7 +1511,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             "End Date", "Training Hours", "Competencies Type", "Competency Detail",
             "ESG, HSE, Other", "Training Name", "Attendance", "Participation Type", "Vendor",
             "Facilitator", "Total Cost", "PTE 1 Score", "Pre-Test",
-            "Post-Test", "%Increment", "PTE 3", "Age", "Age Group",
+            "Post-Test", "% Increment", "PTE 3", "Age", "Age Group",
             "Gender", "Action Plan", "Detail Participant Type"
         ];
 
@@ -1625,8 +1633,10 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     return String(val).replace(/,/g, ' ');
                 };
 
-                const increment = (avgPre !== '-' && avgPost !== '-') 
-                    ? (Number(avgPost) - Number(avgPre)).toFixed(0) + '%'
+                // Calculate % increment: (Post Test - Pre Test) / Pre Test
+                // Calculate % increment: (Post Test - Pre Test) / Pre Test as percentage
+                const increment = (avgPre !== '-' && avgPost !== '-' && Number(avgPre) > 0) 
+                    ? (((Number(avgPost) - Number(avgPre)) / Number(avgPre)) * 100).toFixed(2) + '%'
                     : '-';
 
                 const totalCost = (m.costReport?.trainerIncentive || 0) +
@@ -2448,12 +2458,18 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 const participantEmails = Array.from(participantMap.values());
 
                                                                 // Filter out Internship/PKL from cost calculation
+                                                                // Get attended participants for cost division
+                                                                const attendedIdsSet = new Set((m.costReport?.attendee_ids || []).map(id => String(id).toLowerCase().trim()));
                                                                 const validParticipantEmails = participantEmails.filter(email => {
                                                                     const emp = employees?.find(e =>
                                                                         e.email?.toLowerCase() === email ||
                                                                         String(e.id_employee) === email ||
                                                                         String(e.id) === email
                                                                     );
+                                                                    // Exclude non-attended participants from cost calculation
+                                                                    if (!attendedIdsSet.has(String(emp?.id_employee || email).toLowerCase().trim())) {
+                                                                        return false;
+                                                                    }
                                                                     // Exclude Internship/PKL from cost calculation
                                                                     if (emp && (emp.status_join === 'Internship' || emp.status_join === 'PKL')) {
                                                                         return false;
@@ -2508,7 +2524,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                         </tr>
                                                                         {expandedMeetings[m.id] && (
                                                                             <tr className="bg-indigo-50/20">
-                                                                                <td colSpan={5} className="p-0">
+                                                                                <td colSpan={7} className="p-0">
                                                                                     <div className="mx-6 my-2 border border-indigo-100/50 rounded-xl overflow-hidden bg-white shadow-inner animate-in slide-in-from-top-2 duration-200">
                                                                                         <table className="w-full text-[10px]">
                                                                                             <thead className="bg-slate-50/50 text-slate-400 font-black uppercase tracking-widest border-b border-slate-50">
@@ -2517,13 +2533,15 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                                     <th className="px-4 py-2 text-center">Pre-Test</th>
                                                                                                     <th className="px-4 py-2 text-center">Post-Test</th>
                                                                                                     <th className="px-4 py-2 text-center">Feedback</th>
+                                                                                                    <th className="px-4 py-2 text-center">Attendance</th>
+                                                                                                    <th className="px-4 py-2 text-center">Participation Type</th>
                                                                                                     <th className="px-4 py-2 text-right pr-6">Cost</th>
                                                                                                 </tr>
                                                                                             </thead>
 <tbody className="divide-y divide-slate-50">
                                                                                                 {participantEmails.length === 0 ? (
                                                                                                     <tr>
-                                                                                                        <td colSpan={5} className="px-4 py-4 text-center italic text-slate-400">No participants recorded for this session.</td>
+                                                                                                        <td colSpan={7} className="px-4 py-4 text-center italic text-slate-400">No participants recorded for this session.</td>
                                                                                                     </tr>
                                                                                                 ) : participantEmails.map(email => {
                                                                                                     const findById = (item: any, id: string) => {
@@ -2590,9 +2608,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                                         if (fData) {
                                                                                                             try {
                                                                                                                 const data = typeof fData === 'string' ? JSON.parse(fData) : fData;
-                                                                                                                const ratingVal = data?.rating ?? data?.score ?? Object.values(data || {}).find(v => typeof v === 'number');
+                                                                                                                // Calculate average of ALL numeric values (same as popup modal)
+                                                                                const allScores = Object.values(data || {}).filter(v => typeof v === "number" && !isNaN(v)).map(v => Number(v));
+                                                                                const ratingVal = allScores.length > 0 ? allScores.reduce((a, b) => a + b, 0) / allScores.length : null;
                                                                                                                 if (ratingVal !== undefined && ratingVal !== null && !isNaN(Number(ratingVal))) {
-                                                                                                                    const avg = Math.round(Number(ratingVal) * 10) / 10;
+                                                                                                                    const avg = Number(ratingVal);
                                                                                                                     feedbackDisplay = <span className="text-emerald-600 font-bold">{avg} / 4</span>;
                                                                                                                 } else {
                                                                                                                     feedbackDisplay = <span className="text-emerald-500 font-bold">Sent</span>;
@@ -2613,10 +2633,44 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                                             <td className="px-4 py-2 text-center font-bold text-slate-500">{pre}</td>
                                                                                                             <td className="px-4 py-2 text-center font-bold text-indigo-600">{post}</td>
                                                                                                             <td className="px-4 py-2 text-center">{feedbackDisplay}</td>
+                                                                                                            {/* Attendance */}
+                                                                                                            <td className="px-4 py-2 text-center">
+                                                                                                                {(() => {
+                                                                                                                    const attendedIds = m.costReport?.attendee_ids || [];
+                                                                                                                    const isAttended = attendedIds.some(id => 
+                                                                                                                        String(id).toLowerCase() === email.toLowerCase() ||
+                                                                                                                        String(emp?.id_employee).toLowerCase() === String(id).toLowerCase()
+                                                                                                                    );
+                                                                                                                    return isAttended ? 
+                                                                                                                        <svg className="w-5 h-5 text-green-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> :
+                                                                                                                        <svg className="w-5 h-5 text-slate-300 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
+                                                                                                                })()}
+                                                                                                            </td>
+                                                                                                            {/* Participation Type */}
+                                                                                                            <td className="px-4 py-2 text-center">
+                                                                                                                {(() => {
+                                                                                                                    const participationTypes = m.costReport?.participationTypesByEmployee || {};
+                                                                                                                    let pType: string = 'Targeted Participants';
+                                                                                                                    if (emp && participationTypes[emp.id_employee]) {
+                                                                                                                        pType = participationTypes[emp.id_employee];
+                                                                                                                    } else if (participationTypes[email]) {
+                                                                                                                        pType = participationTypes[email];
+                                                                                                                    }
+                                                                                                                    return <span className="text-xs font-semibold">{pType}</span>;
+                                                                                                                })()}
+                                                                                                            </td>
                                                                                                             <td className="px-4 py-2 text-right pr-6 font-bold text-slate-700">
                                                                                                                 {(() => {
                                                                                                                     // Internship/PKL get cost = 0
                                                                                                                     if (isInternshipOrPKL) return <span className="text-xs text-slate-400">-</span>;
+
+                                                                                                                    // Non-attended participants get cost = 0
+                                                                                                                    const attendedIds = m.costReport?.attendee_ids || [];
+                                                                                                                    const isAttendedThis = attendedIds.some(id => 
+                                                                                                                        String(id).toLowerCase() === email.toLowerCase() ||
+                                                                                                                        String(emp?.id_employee).toLowerCase() === String(id).toLowerCase()
+                                                                                                                    );
+                                                                                                                    if (!isAttendedThis) return <span className="text-xs text-slate-400">-</span>;
 
                                                                                                                     const totalCost = (m.costReport?.trainerIncentive || 0) +
                                                                                                                                     (m.costReport?.snackCost || 0) +
