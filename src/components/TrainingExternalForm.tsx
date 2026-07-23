@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { Briefcase, Send, Clock, DollarSign, Building, AlertTriangle, MapPin, CreditCard, CheckCircle2, ChevronRight, FileText, Calendar } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import PopupNotification from './PopupNotification';
 
@@ -30,6 +31,7 @@ interface TrainingRequest {
 }
 
 const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role: string }; onNavigate?: (page: string) => void }) => {
+    const { t } = useTranslation('trainingExternalForm');
     // --- State ---
     const [requests, setRequests] = useState<TrainingRequest[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -140,11 +142,11 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                     paymentMethod: 'REIMBURSEMENT', bankName: '', accountNumber: '', reason: '',
                     agreedToBond: false, agreedToPenalty: false, evidenceUrl: ''
                 });
-                setNotification({ show: true, type: 'success', message: "Request submitted successfully! Please wait for approval." });
+                setNotification({ show: true, type: 'success', message: t('notifications.submitSuccess') });
             }
         } catch (err) {
             console.error(err);
-            setNotification({ show: true, type: 'error', message: "Failed to submit request." });
+            setNotification({ show: true, type: 'error', message: t('notifications.submitError') });
         } finally {
             setIsLoading(false);
         }
@@ -156,7 +158,7 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
             printWindow.document.write(`
                 <html>
                 <head>
-                    <title>Training Approval - ${req.id}</title>
+                    <title>${t('print.documentTitle', { id: req.id })}</title>
                     <style>
                         body { font-family: 'Inter', sans-serif; padding: 50px; color: #1e293b; line-height: 1.6; }
                         .header { text-align: center; margin-bottom: 50px; border-bottom: 2px solid #f1f5f9; padding-bottom: 30px; }
@@ -172,18 +174,18 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                 </head>
                 <body>
                     <div class="header">
-                        <div class="title">External Training Certificate of Approval</div>
-                        <div class="doc-id">Reference: LTR-${req.id}</div>
+                        <div class="title">${t('print.certificateTitle')}</div>
+                        <div class="doc-id">${t('print.referenceLabel', { id: req.id })}</div>
                     </div>
-                    
+
                     <div class="grid">
                         <div>
-                            <div class="label">Employee Name</div>
+                            <div class="label">${t('print.employeeNameLabel')}</div>
                             <div class="value">${req.employeeName || req.userName}</div>
                             <div style="font-size: 13px; color: #64748b; font-weight: 500;">${req.employeeRole}</div>
                         </div>
                         <div>
-                            <div class="label">Approval Date</div>
+                            <div class="label">${t('print.approvalDateLabel')}</div>
                             <div class="value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
                         </div>
                     </div>
@@ -191,11 +193,11 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                     <div class="box">
                         <div class="grid" style="margin-bottom: 0;">
                             <div>
-                                <div class="label">Training Program</div>
+                                <div class="label">${t('print.trainingProgramLabel')}</div>
                                 <div class="value">${req.title}</div>
                             </div>
                             <div>
-                                <div class="label">Vendor / Provider</div>
+                                <div class="label">${t('print.vendorLabel')}</div>
                                 <div class="value">${req.vendor}</div>
                             </div>
                         </div>
@@ -203,16 +205,16 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
 
                     <div class="grid">
                         <div>
-                            <div class="label">Total Approved Budget</div>
+                            <div class="label">${t('print.totalBudgetLabel')}</div>
                             <div class="value" style="font-size: 20px; color: #0f172a;">${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(req.cost)}</div>
                         </div>
                         <div style="text-align: right;">
-                             <div class="stamp">Approved by HR</div>
+                             <div class="stamp">${t('print.approvedByHrStamp')}</div>
                         </div>
                     </div>
 
                     <div class="footer">
-                        Nusa Learning Management System • Official Document
+                        ${t('print.footer')}
                     </div>
                 </body>
                 </html>
@@ -239,8 +241,8 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                             <Briefcase size={32} strokeWidth={2.5} />
                         </div>
                         <div>
-                            <h1 className="text-4xl font-black text-slate-900 tracking-tight">External Training</h1>
-                            <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1">Nusa LMS • Advanced Learning Requests</p>
+                            <h1 className="text-4xl font-black text-slate-900 tracking-tight">{t('header.title')}</h1>
+                            <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1">{t('header.subtitle')}</p>
                         </div>
                     </div>
 
@@ -250,7 +252,7 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                             className="bg-white border border-slate-200 text-slate-800 px-5 py-2.5 rounded-2xl font-black text-xs shadow-sm hover:bg-slate-50 transition-all flex items-center gap-2"
                         >
                             <CheckCircle2 size={16} className="text-indigo-600" />
-                            TEAM REQUESTS
+                            {t('header.teamRequests')}
                         </button>
                     )}
                 </div>
@@ -263,36 +265,36 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                         <div className="space-y-6">
                             <h3 className="text-xs font-black text-indigo-600 uppercase tracking-[0.2em] flex items-center gap-3">
                                 <span className="w-8 h-[2px] bg-indigo-600 rounded-full"></span>
-                                Training Fundamentals
+                                {t('form.section1Title')}
                             </h3>
-                            
+
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Training / Certification Name</label>
-                                    <input 
-                                        required 
-                                        name="title" 
-                                        value={formData.title} 
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{t('form.trainingNameLabel')}</label>
+                                    <input
+                                        required
+                                        name="title"
+                                        value={formData.title}
                                         onChange={handleChange}
-                                        placeholder="e.g. Strategic Management Masterclass"
-                                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all font-bold text-slate-800 placeholder-slate-300" 
+                                        placeholder={t('form.trainingNamePlaceholder')}
+                                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all font-bold text-slate-800 placeholder-slate-300"
                                     />
                                 </div>
 
                                 <div className="grid sm:grid-cols-2 gap-6">
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Provider / Vendor</label>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{t('form.vendorLabel')}</label>
                                         <div className="relative">
                                             <Building size={18} className="absolute left-5 top-4.5 text-slate-300" />
-                                            <input required name="vendor" value={formData.vendor} onChange={handleChange} placeholder="Institution Name"
+                                            <input required name="vendor" value={formData.vendor} onChange={handleChange} placeholder={t('form.vendorPlaceholder')}
                                                 className="w-full pl-14 pr-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-slate-800 transition-all" />
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Location / Venue</label>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{t('form.locationLabel')}</label>
                                         <div className="relative">
                                             <MapPin size={18} className="absolute left-5 top-4.5 text-slate-300" />
-                                            <input required name="location" value={formData.location} onChange={handleChange} placeholder="City or Online"
+                                            <input required name="location" value={formData.location} onChange={handleChange} placeholder={t('form.locationPlaceholder')}
                                                 className="w-full pl-14 pr-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-slate-800 transition-all" />
                                         </div>
                                     </div>
@@ -300,15 +302,15 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
 
                                 <div className="grid sm:grid-cols-2 gap-6">
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Proposed Date</label>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{t('form.dateLabel')}</label>
                                         <input required type="date" name="date" value={formData.date} onChange={handleChange}
                                             className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-slate-800 transition-all" />
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Course Duration</label>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{t('form.durationLabel')}</label>
                                         <div className="relative">
                                             <Clock size={18} className="absolute left-5 top-4.5 text-slate-300" />
-                                            <input required name="duration" value={formData.duration} onChange={handleChange} placeholder="e.g. 5 Working Days"
+                                            <input required name="duration" value={formData.duration} onChange={handleChange} placeholder={t('form.durationPlaceholder')}
                                                 className="w-full pl-14 pr-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-slate-800 transition-all" />
                                         </div>
                                     </div>
@@ -320,16 +322,16 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                         <div className="space-y-6">
                             <h3 className="text-xs font-black text-emerald-600 uppercase tracking-[0.2em] flex items-center gap-3">
                                 <span className="w-8 h-[2px] bg-emerald-600 rounded-full"></span>
-                                Investment & Disbursement
+                                {t('form.section2Title')}
                             </h3>
 
                             <div className="bg-slate-50/80 rounded-[32px] p-8 border border-slate-100 space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {[
-                                        { label: 'Registration Fee', name: 'costTraining' },
-                                        { label: 'Travel / Flight', name: 'costTransport' },
-                                        { label: 'Accommodation', name: 'costAccommodation' },
-                                        { label: 'Miscellaneous', name: 'costOthers' }
+                                        { label: t('form.registrationFee'), name: 'costTraining' },
+                                        { label: t('form.travelFlight'), name: 'costTransport' },
+                                        { label: t('form.accommodation'), name: 'costAccommodation' },
+                                        { label: t('form.miscellaneous'), name: 'costOthers' }
                                     ].map((field) => (
                                         <div key={field.name}>
                                             <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{field.label}</label>
@@ -349,7 +351,7 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                                 </div>
 
                                 <div className="pt-6 border-t border-slate-200/60">
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Total Training Investment</label>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">{t('form.totalInvestmentLabel')}</label>
                                     <div className="relative">
                                         <div className="absolute left-6 top-4 font-black text-indigo-600">Rp</div>
                                         <input readOnly type="text" name="cost" value={formData.cost}
@@ -359,11 +361,11 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                             </div>
 
                             <div className="space-y-4">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Preferred Settlement Method</label>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{t('form.settlementMethodLabel')}</label>
                                 <div className="grid sm:grid-cols-2 gap-4">
                                     {[
-                                        { id: 'REIMBURSEMENT', title: 'Reimbursement', icon: CreditCard, desc: 'Pay personally first and claim later with evidence.' },
-                                        { id: 'DIRECT', title: 'Direct Payment', icon: Building, desc: 'Nusa Finance transfers directly to the Vendor.' }
+                                        { id: 'REIMBURSEMENT', title: t('form.reimbursementTitle'), icon: CreditCard, desc: t('form.reimbursementDesc') },
+                                        { id: 'DIRECT', title: t('form.directPaymentTitle'), icon: Building, desc: t('form.directPaymentDesc') }
                                     ].map((method) => (
                                         <label key={method.id} className={`cursor-pointer group relative rounded-[28px] p-6 border-2 transition-all duration-300 ${formData.paymentMethod === method.id ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-200' : 'bg-white border-slate-100 hover:border-indigo-200 text-slate-600'}`}>
                                             <input type="radio" name="paymentMethod" value={method.id} checked={formData.paymentMethod === method.id} onChange={handleChange} className="hidden" />
@@ -386,13 +388,13 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                         <div className="space-y-6">
                             <h3 className="text-xs font-black text-rose-600 uppercase tracking-[0.2em] flex items-center gap-3">
                                 <span className="w-8 h-[2px] bg-rose-600 rounded-full"></span>
-                                Corporate Governance
+                                {t('form.section3Title')}
                             </h3>
 
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Justification for Training</label>
-                                    <textarea required name="reason" value={formData.reason} onChange={handleChange} rows={3} placeholder="Describe how this program will impact your professional growth and company goals..."
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{t('form.justificationLabel')}</label>
+                                    <textarea required name="reason" value={formData.reason} onChange={handleChange} rows={3} placeholder={t('form.justificationPlaceholder')}
                                         className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white focus:ring-4 focus:ring-indigo-100 outline-none resize-none font-bold text-slate-700" />
                                 </div>
 
@@ -401,17 +403,17 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                                         <div className="flex items-start gap-4">
                                             <AlertTriangle className="text-amber-500 mt-1 shrink-0" size={20} />
                                             <div>
-                                                <h5 className="font-black text-amber-900 text-xs mb-2 uppercase tracking-wide">Mandatory Policy</h5>
+                                                <h5 className="font-black text-amber-900 text-xs mb-2 uppercase tracking-wide">{t('form.mandatoryPolicyTitle')}</h5>
                                                 <ul className="space-y-2 text-[11px] font-bold text-amber-800/70 list-disc list-inside">
-                                                    <li>Staff must achieve passing certification standard.</li>
-                                                    <li>Failure to pass incurs 50% personal cost liability.</li>
-                                                    <li>Original certificates must be deposited to HR Dept.</li>
+                                                    <li>{t('form.policyItem1')}</li>
+                                                    <li>{t('form.policyItem2')}</li>
+                                                    <li>{t('form.policyItem3')}</li>
                                                 </ul>
                                             </div>
                                         </div>
                                         <label className="flex items-center gap-4 mt-6 p-4 bg-white/50 rounded-2xl cursor-pointer hover:bg-white transition-all border border-amber-200/50">
                                             <input type="checkbox" name="agreedToPenalty" checked={formData.agreedToPenalty} onChange={handleChange} className="w-5 h-5 text-amber-600 rounded-lg focus:ring-amber-500 border-amber-200" />
-                                            <span className="text-[11px] font-black text-amber-900 leading-tight">I acknowledge and accept the 50% cost penalty in event of training failure.</span>
+                                            <span className="text-[11px] font-black text-amber-900 leading-tight">{t('form.penaltyAgreement')}</span>
                                         </label>
                                     </div>
 
@@ -420,16 +422,15 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                                             <div className="flex items-start gap-4">
                                                 <Briefcase className="text-indigo-600 mt-1 shrink-0" size={20} />
                                                 <div>
-                                                    <h5 className="font-black text-indigo-900 text-xs mb-2 uppercase tracking-wide">Service Bond Required</h5>
+                                                    <h5 className="font-black text-indigo-900 text-xs mb-2 uppercase tracking-wide">{t('form.serviceBondTitle')}</h5>
                                                     <p className="text-[11px] font-bold text-indigo-700/70 leading-relaxed">
-                                                        Total investment exceeds the threshold (Rp {BOND_THRESHOLD.toLocaleString()}).
-                                                        This training requires a formal Service Bond agreement.
+                                                        {t('form.serviceBondDesc', { threshold: BOND_THRESHOLD.toLocaleString() })}
                                                     </p>
                                                 </div>
                                             </div>
                                             <label className="flex items-center gap-4 mt-6 p-4 bg-white/50 rounded-2xl cursor-pointer hover:bg-white transition-all border border-indigo-200/50">
                                                 <input type="checkbox" name="agreedToBond" checked={formData.agreedToBond} onChange={handleChange} className="w-5 h-5 text-indigo-600 rounded-lg focus:ring-indigo-500 border-indigo-200" />
-                                                <span className="text-[11px] font-black text-indigo-900 leading-tight">I am willing to enter a formal Service Bond agreement for this training.</span>
+                                                <span className="text-[11px] font-black text-indigo-900 leading-tight">{t('form.bondAgreement')}</span>
                                             </label>
                                         </div>
                                     )}
@@ -437,12 +438,12 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                             </div>
                         </div>
 
-                        <button 
-                            type="submit" 
+                        <button
+                            type="submit"
                             disabled={isSubmitDisabled}
                             className="w-full bg-slate-900 hover:bg-indigo-600 disabled:bg-slate-200 text-white font-black py-6 rounded-3xl shadow-2xl shadow-slate-900/20 flex items-center justify-center gap-3 transition-all transform active:scale-95 tracking-[0.15em] text-xs"
                         >
-                            {isLoading ? 'PROCESSING...' : <><Send size={18} /> CONFIRM SUBMISSION</>}
+                            {isLoading ? t('form.processing') : <><Send size={18} /> {t('form.confirmSubmission')}</>}
                         </button>
                     </form>
                 </div>
@@ -455,8 +456,8 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                         <Clock size={32} strokeWidth={2.5} />
                     </div>
                     <div>
-                        <h2 className="text-2xl font-black text-slate-900 tracking-tight">Timeline</h2>
-                        <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1">Submission & Approval History</p>
+                        <h2 className="text-2xl font-black text-slate-900 tracking-tight">{t('history.title')}</h2>
+                        <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1">{t('history.subtitle')}</p>
                     </div>
                 </div>
 
@@ -466,8 +467,8 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                             <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-6 text-slate-200 shadow-sm">
                                 <FileText size={36} />
                             </div>
-                            <h3 className="text-slate-800 font-black text-lg">No Records Found</h3>
-                            <p className="text-slate-400 text-sm mt-2">Your training history will appear here.</p>
+                            <h3 className="text-slate-800 font-black text-lg">{t('history.noRecordsTitle')}</h3>
+                            <p className="text-slate-400 text-sm mt-2">{t('history.noRecordsMessage')}</p>
                         </div>
                     ) : (
                         requests.map(req => (
@@ -499,19 +500,19 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                                         <div className="flex items-center justify-between text-[10px] font-black text-slate-400">
                                             <div className="flex items-center gap-2">
                                                 <div className={`w-2 h-2 rounded-full ${req.supervisorName || user.role !== 'STAFF' ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
-                                                LEADER OK
+                                                {t('history.leaderOk')}
                                             </div>
                                             <ChevronRight size={14} />
                                             <div className="flex items-center gap-2">
                                                 <div className={`w-2 h-2 rounded-full ${req.hrName ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
-                                                HR FINAL OK
+                                                {t('history.hrFinalOk')}
                                             </div>
                                         </div>
                                     </div>
 
                                     {req.status === 'REJECTED' && req.rejectionReason && (
                                         <div className="mt-4 p-4 bg-rose-50 rounded-2xl border border-rose-100">
-                                            <p className="text-[10px] font-black text-rose-900 uppercase mb-2">Rejection Note</p>
+                                            <p className="text-[10px] font-black text-rose-900 uppercase mb-2">{t('history.rejectionNote')}</p>
                                             <p className="text-xs text-rose-700 italic leading-relaxed">"{req.rejectionReason}"</p>
                                         </div>
                                     )}
@@ -521,7 +522,7 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                                             onClick={() => handlePrint(req)}
                                             className="mt-5 w-full py-3 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-2xl text-[11px] font-black flex items-center justify-center gap-2 transition-all border border-emerald-100"
                                         >
-                                            <FileText size={14} /> DOWNLOAD APPROVAL CERTIFICATE
+                                            <FileText size={14} /> {t('history.downloadCertificate')}
                                         </button>
                                     )}
                                 </div>

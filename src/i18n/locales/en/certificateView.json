@@ -1,0 +1,14 @@
+{
+  "header": "Course Certificate",
+  "generateFailedAlert": "Failed to generate certificate. Please try again.",
+  "certificateTitle": "Certificate",
+  "ofCompletion": "of Completion",
+  "certifiesThat": "This certifies that",
+  "completedCourse": "has successfully completed the course",
+  "awardedOn": "Awarded on {{date}}",
+  "courseInstructor": "Course Instructor",
+  "directorOfLearning": "Director of Learning",
+  "downloadPrompt": "Please download your certificate to complete the course.",
+  "generating": "Generating...",
+  "downloadCertificate": "Download Certificate"
+}

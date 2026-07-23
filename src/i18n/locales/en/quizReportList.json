@@ -1,0 +1,42 @@
+{
+  "header": {
+    "title": "Quiz & Assessment Recapitulation",
+    "subtitle": "Monitor staff performance (grouped by user)."
+  },
+  "exportButton": "Export XLSX",
+  "searchPlaceholder": "Search student or course...",
+  "allBranches": "All Branches",
+  "noReportsFound": "No reports found for this filter.",
+  "activitiesCount": "{{count}} Activities",
+  "coursesCompleted": "Courses Completed",
+  "table": {
+    "date": "Date",
+    "course": "Course",
+    "preTest": "Pre-Test",
+    "postTest": "Post-Test",
+    "status": "Status"
+  },
+  "status": {
+    "valid": "Valid",
+    "fail": "Fail"
+  },
+  "pagination": "Page {{current}} of {{total}}",
+  "unknownStudent": "Unknown Student",
+  "unknownCourse": "Unknown Course",
+  "unknownBranch": "Unknown",
+  "exportFailedAlert": "Failed to export Excel file. Please try again.",
+  "export": {
+    "sheetName": "Quiz Recap",
+    "no": "No.",
+    "date": "Date",
+    "branch": "Branch",
+    "student": "Student",
+    "course": "Course",
+    "module": "Module",
+    "score": "Score",
+    "status": "Status",
+    "finalAssessment": "Final Assessment",
+    "pass": "PASS",
+    "fail": "FAIL"
+  }
+}

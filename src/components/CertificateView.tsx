@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { Download, X, Award } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface CertificateViewProps {
     studentName: string;
@@ -12,6 +13,7 @@ interface CertificateViewProps {
 }
 
 const CertificateView: React.FC<CertificateViewProps> = ({ studentName, courseTitle, date, onClose, onDownloadComplete }) => {
+    const { t } = useTranslation('certificateView');
     const certificateRef = useRef<HTMLDivElement>(null);
     const [isDownloading, setIsDownloading] = useState(false);
 
@@ -42,7 +44,7 @@ const CertificateView: React.FC<CertificateViewProps> = ({ studentName, courseTi
             onDownloadComplete();
         } catch (err) {
             console.error("Certificate generation failed", err);
-            alert("Failed to generate certificate. Please try again.");
+            alert(t('generateFailedAlert'));
         } finally {
             setIsDownloading(false);
         }
@@ -56,7 +58,7 @@ const CertificateView: React.FC<CertificateViewProps> = ({ studentName, courseTi
                 <div className="p-4 bg-slate-100 border-b border-slate-200 flex justify-between items-center">
                     <h3 className="font-bold text-slate-700 flex items-center gap-2">
                         <Award className="text-amber-500" />
-                        Course Certificate
+                        {t('header')}
                     </h3>
                     <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full text-slate-500 transition-colors">
                         <X size={20} />
@@ -87,22 +89,22 @@ const CertificateView: React.FC<CertificateViewProps> = ({ studentName, courseTi
                             </div>
 
                             <h1 className="text-4xl md:text-5xl font-bold text-slate-800 uppercase tracking-widest text-shadow-sm">
-                                Certificate
+                                {t('certificateTitle')}
                             </h1>
                             <p className="text-xl md:text-2xl font-light text-slate-500 italic">
-                                of Completion
+                                {t('ofCompletion')}
                             </p>
 
                             <div className="w-24 h-1 bg-amber-400 mx-auto my-6"></div>
 
-                            <p className="text-lg text-slate-600">This certifies that</p>
+                            <p className="text-lg text-slate-600">{t('certifiesThat')}</p>
 
                             <h2 className="text-3xl md:text-4xl font-bold text-blue-900 border-b-2 border-slate-100 pb-2 inline-block px-12 font-sans">
                                 {studentName}
                             </h2>
 
                             <p className="text-lg text-slate-600 mt-6">
-                                has successfully completed the course
+                                {t('completedCourse')}
                             </p>
 
                             <h3 className="text-2xl md:text-3xl font-bold text-slate-800 my-4 font-sans">
@@ -110,14 +112,14 @@ const CertificateView: React.FC<CertificateViewProps> = ({ studentName, courseTi
                             </h3>
 
                             <p className="text-slate-500">
-                                Awarded on {new Date(date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                                {t('awardedOn', { date: new Date(date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) })}
                             </p>
 
                             {/* Signatures */}
                             <div className="flex justify-between items-end mt-16 px-12 pt-12">
                                 <div className="flex flex-col items-center gap-2">
                                     <div className="w-40 border-b border-slate-400"></div>
-                                    <span className="text-sm font-bold text-slate-900 font-sans">Course Instructor</span>
+                                    <span className="text-sm font-bold text-slate-900 font-sans">{t('courseInstructor')}</span>
                                 </div>
 
                                 <div className="flex flex-col items-center gap-2">
@@ -125,7 +127,7 @@ const CertificateView: React.FC<CertificateViewProps> = ({ studentName, courseTi
                                         <Award size={96} />
                                     </div>
                                     <div className="w-40 border-b border-slate-400 z-10"></div>
-                                    <span className="text-sm font-bold text-slate-900 font-sans">Director of Learning</span>
+                                    <span className="text-sm font-bold text-slate-900 font-sans">{t('directorOfLearning')}</span>
                                 </div>
                             </div>
                         </div>
@@ -136,7 +138,7 @@ const CertificateView: React.FC<CertificateViewProps> = ({ studentName, courseTi
                 {/* Footer Controls */}
                 <div className="p-6 border-t border-slate-200 bg-white flex flex-col md:flex-row justify-between items-center gap-4">
                     <p className="text-sm text-slate-500 text-center md:text-left">
-                        Please download your certificate to complete the course.
+                        {t('downloadPrompt')}
                     </p>
                     <button
                         onClick={handleDownload}
@@ -144,10 +146,10 @@ const CertificateView: React.FC<CertificateViewProps> = ({ studentName, courseTi
                         className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all flex items-center gap-2 w-full md:w-auto justify-center"
                     >
                         {isDownloading ? (
-                            <>Generating...</>
+                            <>{t('generating')}</>
                         ) : (
                             <>
-                                <Download size={20} /> Download Certificate
+                                <Download size={20} /> {t('downloadCertificate')}
                             </>
                         )}
                     </button>

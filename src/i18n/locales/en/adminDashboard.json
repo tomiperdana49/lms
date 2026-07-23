@@ -1,0 +1,27 @@
+{
+  "mobileHeader": "Admin Panel",
+  "stats": {
+    "totalStaff": "Total Staff",
+    "booksRead": "Books Read",
+    "trainingInternal": "Training Internal",
+    "pendingRequests": "Pending Requests",
+    "trendVsLastMonth": "{{trend}} vs last month"
+  },
+  "recentActivity": {
+    "title": "Recent User Activity",
+    "viewAll": "View All",
+    "unknownUser": "Unknown User",
+    "read": "read",
+    "noRecentActivity": "No recent activity.",
+    "completed": "Completed",
+    "reading": "Reading"
+  },
+  "quickActions": {
+    "title": "Quick Actions",
+    "scheduleMeeting": "Schedule Meeting",
+    "addNewStaff": "Add New Staff"
+  },
+  "calendar": {
+    "title": "Training Calendar"
+  }
+}

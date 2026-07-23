@@ -1,0 +1,140 @@
+{
+  "errorBoundary": {
+    "title": "Terjadi kesalahan",
+    "message": "Kami tidak dapat memuat halaman Insentif."
+  },
+  "notifications": {
+    "uploadFailed": "Gagal mengunggah file",
+    "selectPaymentAndReward": "Silakan pilih Frekuensi Pembayaran dan Jumlah Reward.",
+    "incentiveUpdated": "Insentif berhasil diperbarui.",
+    "errorUpdatingIncentive": "Gagal memperbarui insentif.",
+    "incentiveDenied": "Permintaan insentif ditolak.",
+    "denyFailed": "Gagal menolak permintaan.",
+    "denyError": "Terjadi kesalahan saat menolak permintaan.",
+    "incentiveCanceled": "Insentif dibatalkan.",
+    "cancelFailed": "Gagal membatalkan insentif.",
+    "cancelError": "Terjadi kesalahan saat membatalkan insentif.",
+    "markedPaid": "Insentif ditandai sebagai DIBAYAR.",
+    "markPaidFailed": "Gagal menandai sebagai dibayar.",
+    "markPaidError": "Gagal memperbarui status pembayaran.",
+    "recordDeleted": "Data insentif dihapus.",
+    "deleteFailed": "Gagal menghapus insentif.",
+    "deleteError": "Gagal menghapus data.",
+    "completeCertificateData": "Silakan lengkapi semua data sertifikat.",
+    "certificateProofRequired": "Bukti sertifikat wajib diunggah.",
+    "requestSubmitted": "Permintaan terkirim! Menunggu verifikasi HR."
+  },
+  "confirmations": {
+    "denyTitle": "Tolak Permintaan",
+    "denyMessage": "Apakah Anda yakin ingin menolak permintaan ini?",
+    "cancelTitle": "Batalkan Insentif",
+    "cancelMessage": "Apakah Anda yakin ingin membatalkan insentif ini? Ini akan menghentikan pembayaran mendatang namun tetap menyimpan riwayat.",
+    "paidTitle": "Konfirmasi Pembayaran",
+    "paidMessage": "Tandai insentif ini sebagai DIBAYAR? Ini akan memindahkannya ke Riwayat.",
+    "deleteTitle": "Hapus Insentif",
+    "deleteMessage": "Apakah Anda yakin ingin menghapus permanen data insentif ini? Tindakan ini tidak dapat dibatalkan.",
+    "confirmButton": "Ya, Lanjutkan"
+  },
+  "months": {
+    "January": "Januari",
+    "February": "Februari",
+    "March": "Maret",
+    "April": "April",
+    "May": "Mei",
+    "June": "Juni",
+    "July": "Juli",
+    "August": "Agustus",
+    "September": "September",
+    "October": "Oktober",
+    "November": "November",
+    "December": "Desember"
+  },
+  "hero": {
+    "badge": "Ikhtisar Insentif",
+    "title": "Total Penghasilan Anda",
+    "subtitle": "Apresiasi atas dedikasi dan pengembangan keterampilan Anda tahun ini.",
+    "paidIncentives": "Insentif Terbayar",
+    "monthlyActive": "Aktif Bulanan"
+  },
+  "quickAction": {
+    "title": "Klaim Insentif",
+    "description": "Punya sertifikat baru? Unggah sekarang untuk mengklaim reward Anda.",
+    "uploadButton": "Unggah Sertifikat"
+  },
+  "tabs": {
+    "pending": "Menunggu ({{count}})",
+    "active": "Reward Aktif",
+    "request": "Permintaan Saya",
+    "history": "Riwayat",
+    "summary": "Laporan Ringkasan"
+  },
+  "summary": {
+    "yearLabel": "Tahun:",
+    "branchLabel": "Cabang:",
+    "employeeName": "Nama Karyawan",
+    "totalCerts": "Total Sertifikat",
+    "details": "Detail",
+    "totalPayout": "Total Pembayaran",
+    "noData": "Tidak ada insentif aktif untuk {{year}}."
+  },
+  "table": {
+    "employeeInfo": "Info Karyawan",
+    "certificateDetails": "Detail Sertifikat",
+    "validity": "Masa Berlaku",
+    "reward": "Reward (IDR)",
+    "frequency": "Frekuensi",
+    "currentStatus": "Status Saat Ini",
+    "actions": "Aksi",
+    "activeCertificates": "{{count}} Sertifikat Aktif",
+    "viewCertificate": "Lihat Sertifikat",
+    "oneTime": "Satu Kali",
+    "monthly": "Bulanan",
+    "paidIn": "Dibayar pada {{period}}",
+    "pendingPayout": "Menunggu Pembayaran ({{period}})",
+    "active": "Aktif",
+    "processing": "Diproses",
+    "expired": "Kedaluwarsa",
+    "canceled": "Dibatalkan",
+    "idLabel": "(ID: {{id}})"
+  },
+  "actions": {
+    "markPaid": "Tandai Dibayar",
+    "edit": "Edit",
+    "cancel": "Batal",
+    "deletePermanent": "Hapus Permanen",
+    "approve": "Setujui",
+    "deny": "Tolak",
+    "delete": "Hapus"
+  },
+  "requestModal": {
+    "title": "Unggah Sertifikat",
+    "close": "Tutup",
+    "certificateName": "Nama Sertifikat",
+    "certificateNamePlaceholder": "misal. AWS Certified",
+    "description": "Deskripsi / Catatan",
+    "descriptionPlaceholder": "Deskripsi singkat...",
+    "validFrom": "Berlaku Dari",
+    "validUntil": "Berlaku Sampai",
+    "uploadImage": "Unggah Sertifikat (Gambar)",
+    "certificatePreviewAlt": "Pratinjau Sertifikat",
+    "uploaded": "Terunggah",
+    "submit": "Kirim untuk Verifikasi"
+  },
+  "approvalModal": {
+    "updateTitle": "Perbarui Insentif",
+    "approveTitle": "Setujui Insentif",
+    "modifyDetails": "Ubah detail untuk {{name}}",
+    "setReward": "Atur reward bulanan untuk {{name}}",
+    "paymentFrequency": "Frekuensi Pembayaran",
+    "recurring": "Berulang (Bulanan)",
+    "oneTimeOnly": "Hanya Sekali",
+    "selectReward": "Pilih Jumlah Reward (IDR)",
+    "cancel": "Batal",
+    "update": "Perbarui",
+    "confirm": "Konfirmasi"
+  },
+  "common": {
+    "unknown": "Tidak Diketahui",
+    "others": "Lainnya"
+  }
+}

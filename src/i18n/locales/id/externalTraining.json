@@ -1,0 +1,81 @@
+{
+  "title": "Pelatihan Eksternal",
+  "tabs": {
+    "myRequests": "Permintaan Saya",
+    "teamApprovals": "Persetujuan Tim"
+  },
+  "form": {
+    "newRequest": "Permintaan Baru",
+    "category": "Kategori",
+    "categoryTraining": "Pelatihan",
+    "categoryCertificate": "Sertifikat",
+    "categoryModule": "Modul",
+    "titleLabel": "Judul / Nama Kursus",
+    "titlePlaceholder": "cth. Kepemimpinan Lanjutan",
+    "vendor": "Penyedia",
+    "vendorPlaceholder": "cth. Coursera",
+    "location": "Lokasi",
+    "locationPlaceholder": "cth. Jakarta (Online)",
+    "startDate": "Tanggal Mulai",
+    "endDate": "Tanggal Selesai",
+    "registrationFee": "Biaya Pendaftaran (Rp)",
+    "attachmentLink": "Tautan Lampiran (Opsional)",
+    "attachmentPlaceholder": "Tautan Google Drive, dll.",
+    "submitting": "Mengirim...",
+    "submitRequest": "Kirim Permintaan"
+  },
+  "status": {
+    "pendingWithApprover": "Menunggu ({{name}})",
+    "defaultSupervisor": "Supervisor",
+    "pendingHr": "Menunggu (HR)",
+    "approved": "Disetujui",
+    "rejected": "Ditolak"
+  },
+  "categoryLabels": {
+    "Training": "Pelatihan",
+    "Sertifikat": "Sertifikat",
+    "Modul": "Modul"
+  },
+  "statusLabels": {
+    "Pending": "Menunggu",
+    "Approved": "Disetujui",
+    "Rejected": "Ditolak",
+    "Processed": "Diproses"
+  },
+  "empty": {
+    "noRequests": "Belum ada permintaan pelatihan eksternal.",
+    "allCaughtUpTitle": "Semua Sudah Ditangani!",
+    "allCaughtUpMessage": "Saat ini tidak ada permintaan pelatihan eksternal yang menunggu dari tim Anda."
+  },
+  "request": {
+    "registrationLabel": "Daftar: {{amount}}",
+    "paymentVia": "Pembayaran via",
+    "rejectionReasonLabel": "Alasan Penolakan:"
+  },
+  "team": {
+    "idLabel": "ID: {{id}}",
+    "schedule": "Jadwal",
+    "registrationFee": "Biaya Pendaftaran",
+    "vendor": "Penyedia",
+    "viewAttachment": "Lihat Lampiran",
+    "approve": "Setujui",
+    "reject": "Tolak",
+    "statusLabel": "Status"
+  },
+  "rejectModal": {
+    "title": "Tolak Permintaan Pelatihan",
+    "subtitle": "Mohon berikan alasan untuk menolak permintaan ini.",
+    "placeholder": "Ketik alasan di sini...",
+    "cancel": "Batal",
+    "confirmReject": "Konfirmasi Penolakan"
+  },
+  "notifications": {
+    "submitSuccess": "Permintaan berhasil dikirim!",
+    "submitFailed": "Gagal mengirim permintaan",
+    "statusUpdated": "Permintaan berhasil {{status}}",
+    "statusApproved": "disetujui",
+    "statusRejected": "ditolak",
+    "updateFailed": "Gagal memperbarui permintaan",
+    "updateError": "Terjadi kesalahan saat memperbarui permintaan"
+  }
+}

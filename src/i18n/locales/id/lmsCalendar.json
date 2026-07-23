@@ -1,0 +1,41 @@
+{
+  "weekDaysShort": ["M", "S", "S", "R", "K", "J", "S"],
+  "weekDaysFull": ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"],
+  "today": "Hari Ini",
+  "tagline": "Sistem Manajemen Pembelajaran Nusa • Jadwal",
+  "eventDetails": "Detail Acara",
+  "clearSchedule": "Jadwal Kosong",
+  "noEventsForDate": "Tidak ada acara atau tenggat waktu untuk tanggal ini.",
+  "joinMeeting": "GABUNG RAPAT",
+  "agenda": "Agenda",
+  "tasksCount_other": "{{count}} Tugas",
+  "noEventsScheduled": "Tidak ada acara yang dijadwalkan.",
+  "allDay": "Sepanjang Hari",
+  "eventTypes": {
+    "INTERNAL": "RAPAT",
+    "EXTERNAL": "EKSTERNAL",
+    "DEADLINE": "TENGGAT",
+    "INCENTIVE": "INSENTIF"
+  },
+  "modal": {
+    "title": "Jadwal Baru",
+    "eventTitleLabel": "Judul Acara",
+    "eventTitlePlaceholder": "cth. Sinkronisasi Proyek",
+    "dateLabel": "Tanggal",
+    "platformLabel": "Platform",
+    "platformOnline": "Tautan Online",
+    "platformOffline": "Luring / Ruangan",
+    "platformHybrid": "Sesi Hybrid",
+    "startTimeLabel": "Waktu Mulai",
+    "endTimeLabel": "Waktu Selesai",
+    "confirmButton": "KONFIRMASI JADWAL"
+  },
+  "eventContent": {
+    "trainingTitleWithEmployee": "Pelatihan: {{title}} ({{employeeName}})",
+    "trainingTitle": "Pelatihan: {{title}}",
+    "providerJustification": "Penyedia: {{vendor}}. Justifikasi: {{justification}}",
+    "statusLabel": "Status: {{status}}",
+    "incentiveEndTitle": "Insentif Berakhir: {{courseName}} - {{employeeName}}",
+    "incentivePeriodEnds": "Periode insentif berakhir."
+  }
+}

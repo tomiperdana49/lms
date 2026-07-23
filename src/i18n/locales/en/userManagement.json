@@ -1,0 +1,72 @@
+{
+  "backToDashboard": "Back to Dashboard",
+  "title": "User Management",
+  "subtitle": "Manage staff access and roles ({{count}} Employees total).",
+  "searchPlaceholder": "Search employee...",
+  "syncNusawork": "Sync Nusawork",
+  "syncing": "Syncing...",
+  "addUser": "Add User",
+  "accessDenied": "Access Denied. HR Only.",
+  "loading": "Loading...",
+  "table": {
+    "id": "ID",
+    "employeeNameEmail": "Employee Name / Email",
+    "positionBranchReportTo": "Position / Branch / Report To",
+    "lmsStatus": "LMS Status",
+    "action": "Action"
+  },
+  "roles": {
+    "STAFF": "Staff",
+    "SUPERVISOR": "Supervisor",
+    "HR": "HR Admin",
+    "HR_ADMIN": "HR Admin"
+  },
+  "employee": {
+    "noBranch": "No Branch",
+    "reportTo": "Report to: {{id}}",
+    "reportToNone": "None",
+    "inactiveAccount": "Inactive Account",
+    "activeAccount": "Active Account",
+    "noAccess": "No Access",
+    "noEmployeesFound": "No employees found."
+  },
+  "actions": {
+    "editAccess": "Edit LMS Access",
+    "revokeAccess": "Revoke LMS Access",
+    "createAccount": "Create LMS Account"
+  },
+  "modal": {
+    "editUser": "Edit User",
+    "createUser": "Create New User",
+    "close": "Close",
+    "fullName": "Full Name",
+    "email": "Email",
+    "password": "Password",
+    "passwordKeepCurrent": "(Leave blank to keep current)",
+    "role": "Role",
+    "roleStaff": "Staff",
+    "roleSupervisor": "Supervisor",
+    "roleHrAdmin": "HR Admin",
+    "employeeLink": "SimAsset Employee Link (Optional)",
+    "noLink": "-- No Link --",
+    "updateUser": "Update User",
+    "createAccount": "Create Account"
+  },
+  "confirm": {
+    "deleteUser": "Are you sure you want to delete this user? This will revoke their access to the LMS.",
+    "syncNusawork": "Sync all users with Nusawork? This will update local profile details (position, branch, department, avatar, role etc.) based on active Nusawork data."
+  },
+  "notifications": {
+    "loadFailed": "Failed to load data.",
+    "userUpdated": "User updated successfully!",
+    "updateFailed": "Failed to update user",
+    "userCreated": "User created successfully!",
+    "createFailed": "Failed to create user",
+    "userDeleted": "User deleted successfully!",
+    "deleteFailed": "Failed to delete user",
+    "deleteError": "Error deleting user",
+    "syncSuccess": "Synchronization completed successfully!",
+    "syncFailed": "Synchronization failed.",
+    "syncError": "Error connecting to the synchronization service."
+  }
+}

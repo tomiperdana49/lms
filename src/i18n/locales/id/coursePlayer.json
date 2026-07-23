@@ -1,0 +1,90 @@
+{
+  "hero": {
+    "badge": "Pusat Belajar",
+    "title": "Modul Pembelajaran Online",
+    "subtitle": "Akses modul premium untuk meningkatkan keterampilan profesional Anda.",
+    "studentsBadge": "Peserta"
+  },
+  "card": {
+    "completed": "Selesai",
+    "progressLabel": "Progres",
+    "review": "Tinjau",
+    "continue": "Lanjutkan",
+    "start": "Mulai",
+    "cancelProgressTooltip": "Batalkan Progres"
+  },
+  "cancelModal": {
+    "title": "Batalkan Progres",
+    "message": "Apakah Anda yakin ingin membatalkan progres untuk modul \"{{title}}\"? Semua nilai kuis dan riwayat belajar akan dihapus.",
+    "confirmText": "Ya, Batalkan Progres"
+  },
+  "overview": {
+    "backToModules": "Kembali ke Modul",
+    "modulesCount": "{{count}} Modul",
+    "moduleDescription": "Deskripsi Modul",
+    "process": "Proses"
+  },
+  "player": {
+    "videoUnavailable": "Sumber video tidak tersedia",
+    "materialTitleFallback": "Judul Materi",
+    "durationFallback": "00:00",
+    "moduleHint": "Kuasai modul ini untuk meningkatkan keterampilan Anda. Tonton video hingga selesai untuk membuka langkah berikutnya.",
+    "passed": "Lulus",
+    "passedWithScore": "Lulus: {{score}}%",
+    "finishAndContinue": "Selesaikan & Lanjutkan",
+    "checkingStatus": "Memeriksa Status...",
+    "takeQuiz": "Kerjakan Kuis",
+    "takeQuizWithQuestions": "Kerjakan Kuis ({{count}} Soal)",
+    "watchToUnlockQuiz": "Tonton video hingga selesai untuk membuka Kuis",
+    "watchUntilFinished": "Tonton hingga selesai",
+    "replay": "Putar Ulang",
+    "startModuleQuiz": "Mulai Kuis Modul"
+  },
+  "sidebar": {
+    "materialList": "Daftar Materi",
+    "materialsCompleted": "{{completed}} / {{total}} Materi Selesai",
+    "preTestScore": "Nilai Pre-Test",
+    "modulePreTest": "Pre-Test Modul",
+    "mandatory": "WAJIB",
+    "moduleQuiz": "Kuis Modul",
+    "moduleQuizWithScore": "Kuis Modul: {{score}}",
+    "finalAssessmentTitle": "Penilaian Akhir (Ujian Akhir)",
+    "finalAssessmentRetry": "Nilai Terakhir: {{score}} (Min. 80). Silakan coba lagi.",
+    "finalAssessmentStart": "Klik untuk Memulai Evaluasi",
+    "finalAssessmentLocked": "Selesaikan semua materi untuk membuka",
+    "finalAssessmentCompleted": "Penilaian Akhir Selesai",
+    "finalScore": "Nilai Akhir: {{score}} / 100. Anda telah lulus modul ini.",
+    "downloadCertificate": "Unduh Sertifikat (PDF)"
+  },
+  "quiz": {
+    "preTest": "Pre-Test",
+    "moduleQuiz": "Kuis Modul",
+    "finalAssessment": "Penilaian Akhir",
+    "passingStandard": "Standar Kelulusan:",
+    "minScore": "Nilai Min. {{score}}",
+    "lastScore": "Nilai Terakhir:",
+    "answerCarefully": "Silakan jawab dengan teliti.",
+    "score": "Nilai: {{score}} / 100",
+    "retryWarning": "⚠️ Standar kelulusan adalah {{score}}. Silakan jawab dengan benar lagi.",
+    "retry": "Coba Lagi",
+    "continue": "Lanjutkan",
+    "submitAnswers": "Kirim Jawaban"
+  },
+  "notifications": {
+    "moduleInProgress": "Anda memiliki modul yang sedang berlangsung: \"{{title}}\". Selesaikan atau batalkan modul tersebut sebelum memulai modul baru.",
+    "noMaterials": "Modul ini belum memiliki materi atau bahan ajar.",
+    "progressCancelled": "Progres modul berhasil dibatalkan.",
+    "cancelProgressFailed": "Gagal membatalkan progres.",
+    "saveProgressFailed": "Gagal menyimpan progres.",
+    "allModulesFinished": "Semua materi video telah selesai! Silakan lanjutkan ke Penilaian Akhir.",
+    "allMaterialsCompleted": "Semua materi telah selesai!",
+    "moduleCompleted": "Modul Selesai!",
+    "savingProgressError": "Terjadi kesalahan saat menyimpan progres",
+    "answerAllQuestions": "Silakan jawab semua pertanyaan!",
+    "passedCourse": "Selamat! Anda telah lulus modul ini.",
+    "submitScoreFailed": "Gagal mengirim nilai.",
+    "certificateDownloaded": "Sertifikat berhasil diunduh!",
+    "certificateGenerationFailed": "Gagal membuat sertifikat.",
+    "finalAssessmentRequired": "Anda harus menyelesaikan semua materi video & kuis sebelum mengikuti Penilaian Akhir."
+  }
+}

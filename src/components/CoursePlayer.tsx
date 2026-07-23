@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { PlayCircle, Lock, ChevronRight, BookOpen, ArrowLeft, X, Clock, CheckCircle, Award, AlertCircle, XCircle, Download, Calendar } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { useTranslation } from 'react-i18next';
 import CertificateTemplate from './CertificateTemplate';
 import { API_BASE_URL } from '../config';
 import type { Course, Quiz, User } from '../types';
@@ -68,6 +69,7 @@ declare global {
 }
 
 const CoursePlayer = ({ user }: CoursePlayerProps) => {
+    const { t } = useTranslation('coursePlayer');
     // --- State ---
     const [courses, setCourses] = useState<Course[]>([]);
     const [viewMode, setViewMode] = useState<'list' | 'overview' | 'player'>('list');
@@ -488,10 +490,10 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
         );
 
         if (activeInProgressCourse) {
-            setPopup({ 
-                type: 'error', 
-                message: `You have a module currently in progress: "${activeInProgressCourse.title}". Please finish or cancel that module before starting a new one.`, 
-                isOpen: true 
+            setPopup({
+                type: 'error',
+                message: t('notifications.moduleInProgress', { title: activeInProgressCourse.title }),
+                isOpen: true
             });
             return;
         }
@@ -500,7 +502,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
         // Safety: If course is empty
         if ((!c.modules || c.modules.length === 0) && !c.preAssessment) {
-            setPopup({ type: 'error', message: 'This course does not have any materials or modules yet.', isOpen: true });
+            setPopup({ type: 'error', message: t('notifications.noMaterials'), isOpen: true });
             return;
         }
 
@@ -573,7 +575,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
             });
             
             if (res.ok) {
-                setPopup({ type: 'success', message: 'Module progress successfully cancelled.', isOpen: true });
+                setPopup({ type: 'success', message: t('notifications.progressCancelled'), isOpen: true });
                 // Reset local state for this course
                 setQuizResults({});
                 setAssessmentScore(null);
@@ -583,7 +585,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                 throw new Error();
             }
         } catch (e) {
-            setPopup({ type: 'error', message: 'Failed to cancel progress.', isOpen: true });
+            setPopup({ type: 'error', message: t('notifications.cancelProgressFailed'), isOpen: true });
         } finally {
             setCourseToCancel(null);
         }
@@ -598,13 +600,13 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         <div className="max-w-xl text-center md:text-left">
                             <div className="inline-flex items-center gap-2 bg-indigo-500/20 backdrop-blur-md px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border border-white/10 mb-4">
                                 <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></div>
-                                Learning Hub
+                                {t('hero.badge')}
                             </div>
                             <h1 className="text-3xl md:text-4xl font-black mb-3 tracking-tight">
-                                Online Learning Modules
+                                {t('hero.title')}
                             </h1>
                             <p className="text-slate-400 text-sm font-medium leading-relaxed max-w-lg opacity-90">
-                                Access premium modules to enhance your professional skills.
+                                {t('hero.subtitle')}
                             </p>
                         </div>
                         <div className="hidden lg:block">
@@ -615,12 +617,12 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                     "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop"
                                 ].map((url, i) => (
                                     <div key={i} className="w-12 h-12 rounded-full border-4 border-slate-900 overflow-hidden shadow-xl ring-2 ring-indigo-500/10">
-                                        <img src={url} alt="Student" className="w-full h-full object-cover" />
+                                        <img src={url} alt={t('hero.studentsBadge')} className="w-full h-full object-cover" />
                                     </div>
                                 ))}
                                 <div className="w-12 h-12 rounded-full border-4 border-slate-900 bg-indigo-600 flex flex-col items-center justify-center shadow-xl ring-2 ring-indigo-500/10">
                                     <span className="text-[10px] font-black text-white leading-none">1k+</span>
-                                    <span className="text-[6px] font-bold text-indigo-200 uppercase tracking-tighter">Students</span>
+                                    <span className="text-[6px] font-bold text-indigo-200 uppercase tracking-tighter">{t('hero.studentsBadge')}</span>
                                 </div>
                             </div>
                         </div>
@@ -649,7 +651,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                     <div className="absolute bottom-4 left-4 flex flex-col items-start gap-1.5">
                                         <div className="bg-emerald-500 text-white px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-md flex items-center gap-1.5">
                                             <CheckCircle size={10} />
-                                            Completed
+                                            {t('card.completed')}
                                         </div>
                                         {(course as any).completedAt && (
                                             <div className="bg-white/95 backdrop-blur-sm px-2 py-1 rounded-lg text-[8px] font-bold text-emerald-700 border border-emerald-100 shadow-sm flex items-center gap-1">
@@ -676,7 +678,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                 {/* Progress Section */}
                                 <div className="mb-6 space-y-2">
                                     <div className="flex justify-between items-center text-[10px] font-bold">
-                                        <span className="text-slate-400 uppercase tracking-widest">Progress</span>
+                                        <span className="text-slate-400 uppercase tracking-widest">{t('card.progressLabel')}</span>
                                         <span className="text-indigo-600">{Math.round(course.progress)}%</span>
                                     </div>
                                     <div className="h-1.5 w-full bg-slate-50 rounded-full overflow-hidden">
@@ -698,10 +700,10 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                     : 'bg-slate-900 text-white hover:bg-indigo-600'
                                             }`}
                                     >
-                                        {course.progress === 100 ? 'Review' : (course.progress > 0 || (course as any).preScore !== null) ? 'Continue' : 'Start'}
+                                        {course.progress === 100 ? t('card.review') : (course.progress > 0 || (course as any).preScore !== null) ? t('card.continue') : t('card.start')}
                                         <ChevronRight size={14} />
                                     </button>
-                                    
+
                                     {(course.progress > 0 || (course as any).preScore !== null) && course.progress < 100 && (
                                         <button
                                             onClick={(e) => {
@@ -709,7 +711,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                 handleCancelCourse(course);
                                             }}
                                             className="p-3.5 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all flex items-center justify-center shadow-sm"
-                                            title="Cancel Progress"
+                                            title={t('card.cancelProgressTooltip')}
                                         >
                                             <XCircle size={16} />
                                         </button>
@@ -723,9 +725,9 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     isOpen={!!courseToCancel}
                     onClose={() => setCourseToCancel(null)}
                     onConfirm={confirmCancelCourse}
-                    title="Cancel Progress"
-                    message={`Are you sure you want to cancel progress for module "${courseToCancel?.title}"? All quiz scores and learning history will be deleted.`}
-                    confirmText="Yes, Cancel Progress"
+                    title={t('cancelModal.title')}
+                    message={t('cancelModal.message', { title: courseToCancel?.title })}
+                    confirmText={t('cancelModal.confirmText')}
                     variant="danger"
                 />
                 <PopupNotification
@@ -746,7 +748,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors mb-6 font-semibold"
                 >
                     <ArrowLeft size={20} />
-                    Back to Modules
+                    {t('overview.backToModules')}
                 </button>
                 <div className="bg-white rounded-[32px] border border-slate-100 shadow-xl overflow-hidden flex flex-col">
                     <div className="bg-slate-900 p-8 md:p-12 text-white relative">
@@ -759,7 +761,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                     <Clock size={16} /> {activeCourse.duration}
                                 </div>
                                 <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
-                                    <BookOpen size={16} /> {activeCourse.modules?.length || 0} Modules
+                                    <BookOpen size={16} /> {t('overview.modulesCount', { count: activeCourse.modules?.length || 0 })}
                                 </div>
                             </div>
                         </div>
@@ -767,7 +769,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     </div>
                     <div className="p-8 md:p-12 flex flex-col items-center">
                         <div className="w-full max-w-2xl mb-8">
-                            <h3 className="text-xl font-bold text-slate-800 mb-4">Module Description</h3>
+                            <h3 className="text-xl font-bold text-slate-800 mb-4">{t('overview.moduleDescription')}</h3>
                             <p className="text-slate-600 leading-relaxed text-lg">
                                 {activeCourse.description}
                             </p>
@@ -782,7 +784,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             onClick={() => handleStartCourse(activeCourse)}
                             className="bg-indigo-600 text-white hover:bg-indigo-700 px-12 py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-200 transition-all active:scale-95 flex items-center gap-3"
                         >
-                            Process <ChevronRight size={20} />
+                            {t('overview.process')} <ChevronRight size={20} />
                         </button>
                     </div>
                 </div>
@@ -807,7 +809,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
             if (!res.ok) {
                 const errorData = await res.json().catch(() => ({}));
-                setPopup({ type: 'error', message: errorData.error || 'Failed to save progress.', isOpen: true });
+                setPopup({ type: 'error', message: errorData.error || t('notifications.saveProgressFailed'), isOpen: true });
                 return;
             }
 
@@ -837,18 +839,18 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
             } else {
                 // Last module finished
                 if (updatedCourse.assessment) {
-                    setPopup({ 
-                        type: 'success', 
-                        message: 'All video materials are finished! Please proceed to the Final Assessment.', 
-                        isOpen: true 
+                    setPopup({
+                        type: 'success',
+                        message: t('notifications.allModulesFinished'),
+                        isOpen: true
                     });
                 } else {
-                    setPopup({ type: 'success', message: 'All materials are completed!', isOpen: true });
+                    setPopup({ type: 'success', message: t('notifications.allMaterialsCompleted'), isOpen: true });
                 }
             }
         } catch (err) {
             console.error("Completion error", err);
-            setPopup({ type: 'error', message: 'Error saving progress', isOpen: true });
+            setPopup({ type: 'error', message: t('notifications.savingProgressError'), isOpen: true });
         }
     };
 
@@ -868,7 +870,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     <div className="p-6 md:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                         <div>
                             <span className="text-xs font-bold text-blue-600 tracking-wider uppercase mb-1 block">
-                                {qType === 'PRE' ? 'Pre-Test' : (moduleId ? 'Module Quiz' : 'Final Assessment')}
+                                {qType === 'PRE' ? t('quiz.preTest') : (moduleId ? t('quiz.moduleQuiz') : t('quiz.finalAssessment'))}
                             </span>
                             <h2 className="font-bold text-2xl text-slate-900">{quiz.title}</h2>
                         </div>
@@ -892,20 +894,20 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         <div className="bg-amber-50 border-b border-amber-100 px-6 py-3 flex items-center gap-3">
                             <AlertCircle size={18} className="text-amber-600 shrink-0" />
                             <p className="text-amber-800 text-sm font-medium">
-                                Passing Standard: <span className="font-bold">Min. Score {moduleId ? 100 : 80}</span>
+                                {t('quiz.passingStandard')} <span className="font-bold">{t('quiz.minScore', { score: moduleId ? 100 : 80 })}</span>
                                 {(() => {
                                     const score = moduleId ? quizResults[moduleId] : assessmentScore;
                                     if (score !== undefined && score !== null) {
                                         return (
                                             <>
                                                 <span className="mx-2 text-amber-300">|</span>
-                                                Last Score: <span className={`font-bold ${score < (moduleId ? 100 : 80) ? 'text-red-600' : 'text-green-600'}`}>{score}</span>
+                                                {t('quiz.lastScore')} <span className={`font-bold ${score < (moduleId ? 100 : 80) ? 'text-red-600' : 'text-green-600'}`}>{score}</span>
                                             </>
                                         );
                                     }
                                     return null;
                                 })()}
-                                . Please answer carefully.
+                                {' '}{t('quiz.answerCarefully')}
                             </p>
                         </div>
                     )}
@@ -952,11 +954,11 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             <div className="flex items-center gap-4 flex-1 justify-between w-full">
                                 <div className="flex flex-col gap-2">
                                     <div className={`px-4 py-2 rounded-lg font-bold text-sm inline-block w-fit ${lastScore >= (moduleId ? 100 : 80) || qType === 'PRE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                        Score: {lastScore} / 100
+                                        {t('quiz.score', { score: lastScore })}
                                     </div>
                                     {lastScore < (moduleId ? 100 : 80) && qType === 'POST' && (
                                         <p className="text-sm text-red-600 font-semibold animate-bounce mt-1">
-                                            ⚠️ Passing standard is {moduleId ? 100 : 80}. Please answer correctly again.
+                                            {t('quiz.retryWarning', { score: moduleId ? 100 : 80 })}
                                         </p>
                                     )}
                                 </div>
@@ -977,20 +979,20 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                 // Also close quiz if it's the Final Assessment and passed
                                                 if (lastScore >= 80 && qType === 'POST' && !moduleId) {
                                                     setActiveQuiz(undefined);
-                                                    setPopup({ type: 'success', message: 'Congratulations! You have passed this course.', isOpen: true });
+                                                    setPopup({ type: 'success', message: t('notifications.passedCourse'), isOpen: true });
                                                 }
                                             }
                                         }}
                                         className="bg-slate-900 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-blue-600 transition-colors shadow-lg"
                                     >
-                                        {lastScore < (moduleId ? 100 : 80) && qType === 'POST' ? 'Retry' : 'Continue'}
+                                        {lastScore < (moduleId ? 100 : 80) && qType === 'POST' ? t('quiz.retry') : t('quiz.continue')}
                                     </button>
                             </div>
                         ) : (
                             <button
                                 onClick={async () => {
                                     if (Object.keys(quizAnswers).length < quiz.questions.length) {
-                                        setPopup({ type: 'error', message: 'Please answer all questions!', isOpen: true });
+                                        setPopup({ type: 'error', message: t('notifications.answerAllQuestions'), isOpen: true });
                                         return;
                                     }
                                     
@@ -1038,10 +1040,10 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                     setActiveQuiz(undefined);
                                                     setQuizAnswers({});
                                                     setShowFeedback(false);
-                                                    setPopup({ type: 'success', message: 'Congratulations! You have passed this course.', isOpen: true });
+                                                    setPopup({ type: 'success', message: t('notifications.passedCourse'), isOpen: true });
                                                 }
                                             } else {
-                                                // Show feedback with Score and "Coba Lagi"
+                                                // Show feedback with Score and Retry
                                                 setShowFeedback(true);
                                             }
                                         } else {
@@ -1054,12 +1056,12 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                             }
                                         }
                                     } catch {
-                                        setPopup({ type: 'error', message: 'Failed to submit score.', isOpen: true });
+                                        setPopup({ type: 'error', message: t('notifications.submitScoreFailed'), isOpen: true });
                                     }
                                 }}
                                 className="w-full bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg"
                             >
-                                Submit Answers
+                                {t('quiz.submitAnswers')}
                             </button>
                         )}
                     </div>
@@ -1104,10 +1106,10 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
             // Hide it back
             if (parent) parent.style.display = 'none';
             element.style.display = 'none';
-            setPopup({ type: 'success', message: 'Certificate downloaded successfully!', isOpen: true });
+            setPopup({ type: 'success', message: t('notifications.certificateDownloaded'), isOpen: true });
         } catch (err) {
             console.error('Certificate generation failed:', err);
-            setPopup({ type: 'error', message: 'Failed to generate certificate.', isOpen: true });
+            setPopup({ type: 'error', message: t('notifications.certificateGenerationFailed'), isOpen: true });
         } finally {
             setIsDownloading(false);
         }
@@ -1138,7 +1140,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                 ) : (
                                     <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 bg-slate-900/50 backdrop-blur-sm">
                                         <PlayCircle size={64} className="mb-4 opacity-50" />
-                                        <p>Video source not available</p>
+                                        <p>{t('player.videoUnavailable')}</p>
                                     </div>
                                 )}
                             </div>
@@ -1149,15 +1151,15 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                             <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-8 justify-between items-start">
                                 <div>
                                     <div className="flex-1">
-                                        <h1 className="text-2xl font-bold text-white mb-2">{activeModule?.title || "Material Title"}</h1>
+                                        <h1 className="text-2xl font-bold text-white mb-2">{activeModule?.title || t('player.materialTitleFallback')}</h1>
                                         <div className="flex items-center gap-4 text-white/60 text-sm">
                                             <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full backdrop-blur-md">
-                                                <Clock size={14} /> {activeModule?.duration || "00:00"}
+                                                <Clock size={14} /> {activeModule?.duration || t('player.durationFallback')}
                                             </div>
                                         </div>
                                     </div>
                                     <p className="text-slate-400 leading-relaxed max-w-2xl mt-4">
-                                        Master this module to advance your skills. Watch the video completely to unlock the next steps.
+                                        {t('player.moduleHint')}
                                     </p>
                                 </div>
                                 <div className="flex gap-3">
@@ -1167,21 +1169,21 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         (quizResults[activeModule.id] >= 100 || activeModule.completed) ? (
                                             <div className="flex flex-col md:flex-row items-center gap-4">
                                                 <span className="bg-green-100 text-green-700 px-4 py-3 rounded-xl font-bold flex items-center gap-2">
-                                                    <CheckCircle size={20} /> Passed {quizResults[activeModule.id] ? `: ${quizResults[activeModule.id]}%` : ''}
+                                                    <CheckCircle size={20} /> {quizResults[activeModule.id] ? t('player.passedWithScore', { score: quizResults[activeModule.id] }) : t('player.passed')}
                                                 </span>
                                                 {!activeModule.completed && (
                                                     <button
                                                         onClick={() => handleCompleteActiveModule()}
                                                         className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700 shadow-lg flex items-center gap-2 transition-all hover:scale-105"
                                                     >
-                                                        Finish & Continue <ChevronRight size={18} />
+                                                        {t('player.finishAndContinue')} <ChevronRight size={18} />
                                                     </button>
                                                 )}
                                             </div>
                                         ) : loadingResults ? (
                                             <button disabled className="bg-slate-300 text-slate-500 px-6 py-3 rounded-xl font-bold shadow-sm flex items-center gap-2 cursor-wait">
                                                 <div className="w-5 h-5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></div>
-                                                Checking Status...
+                                                {t('player.checkingStatus')}
                                             </button>
                                         ) : (
                                             <div className="flex flex-col items-end gap-2">
@@ -1190,11 +1192,11 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                     onClick={() => setActiveQuiz({ quiz: activeModule.quiz!, moduleId: activeModule.id, type: 'POST' })}
                                                     className={`px-8 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2 ${(!isVideoCompleted && !activeModule.completed) ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500 animate-pulse'}`}
                                                 >
-                                                    {(!isVideoCompleted && !activeModule.completed) && <Lock size={18} />} Take Quiz {(activeModule.quiz.questions && activeModule.quiz.questions.length > 0) ? `(${activeModule.quiz.questions.length} Questions)` : ''}
+                                                    {(!isVideoCompleted && !activeModule.completed) && <Lock size={18} />} {(activeModule.quiz.questions && activeModule.quiz.questions.length > 0) ? t('player.takeQuizWithQuestions', { count: activeModule.quiz.questions.length }) : t('player.takeQuiz')}
                                                 </button>
                                                 {(!isVideoCompleted && !activeModule.completed) && (
                                                     <span className="text-amber-600 text-sm font-medium flex items-center gap-1">
-                                                        <AlertCircle size={14} /> Watch video until the end to unlock the Quiz
+                                                        <AlertCircle size={14} /> {t('player.watchToUnlockQuiz')}
                                                     </span>
                                                 )}
                                             </div>
@@ -1212,7 +1214,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                             disabled={true}
                                                             className="px-6 py-3 rounded-xl font-bold bg-slate-700 text-slate-400 cursor-not-allowed flex items-center gap-2"
                                                         >
-                                                            <Lock size={18} /> Watch until finished
+                                                            <Lock size={18} /> {t('player.watchUntilFinished')}
                                                         </button>
                                                     );
                                                 }
@@ -1237,21 +1239,21 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                         }}
                                                         className="px-6 py-3 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all flex items-center gap-2"
                                                     >
-                                                        <PlayCircle size={20} /> Replay
+                                                        <PlayCircle size={20} /> {t('player.replay')}
                                                     </button>
                                                     {activeModule?.quiz && activeModule.quiz.questions && activeModule.quiz.questions.length > 0 && activeModule.id && (!quizResults[activeModule.id] || quizResults[activeModule.id] < 100) ? (
                                                         <button
                                                             onClick={() => { if (activeModule) setActiveQuiz({ quiz: activeModule.quiz!, moduleId: activeModule.id, type: 'POST' }); }}
                                                             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all shadow-lg group"
                                                         >
-                                                            <BookOpen size={20} className="group-hover:scale-110 transition-transform" /> Start Module Quiz
+                                                            <BookOpen size={20} className="group-hover:scale-110 transition-transform" /> {t('player.startModuleQuiz')}
                                                         </button>
                                                     ) : (
                                                         <button
                                                             onClick={() => handleCompleteActiveModule()}
                                                             className="px-6 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2 bg-green-600 text-white hover:bg-green-500 hover:shadow-green-500/20 group"
                                                         >
-                                                            <CheckCircle size={20} className="group-hover:scale-110 transition-transform" /> Finish & Continue
+                                                            <CheckCircle size={20} className="group-hover:scale-110 transition-transform" /> {t('player.finishAndContinue')}
                                                         </button>
                                                     )}
                                                 </div>
@@ -1269,14 +1271,14 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     <div className="p-6 border-b border-slate-100 bg-white sticky top-0 font-sans">
                         <div className="flex justify-between items-start mb-1">
                             <div>
-                                <h3 className="font-bold text-slate-800 text-lg">Material List</h3>
+                                <h3 className="font-bold text-slate-800 text-lg">{t('sidebar.materialList')}</h3>
                                 <p className="text-sm text-slate-400">
-                                    {activeCourse.modules.filter(m => m.completed).length} / {activeCourse.modules.length} Materials Completed
+                                    {t('sidebar.materialsCompleted', { completed: activeCourse.modules.filter(m => m.completed).length, total: activeCourse.modules.length })}
                                 </p>
                             </div>
                             {activeCourse.preAssessment && preAssessmentScore !== null && (
                                 <div className="text-right">
-                                    <div className="text-[10px] font-bold text-amber-600 uppercase tracking-tight">Pre-Test Score</div>
+                                    <div className="text-[10px] font-bold text-amber-600 uppercase tracking-tight">{t('sidebar.preTestScore')}</div>
                                     <div className="text-lg font-black text-amber-500">{preAssessmentScore}</div>
                                 </div>
                             )}
@@ -1295,8 +1297,8 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         <BookOpen size={20} />
                                     </div>
                                     <div className="flex-1">
-                                        <p className="font-bold text-amber-900 leading-tight">Module Pre-Test</p>
-                                        <p className="text-[10px] text-amber-700 font-medium uppercase tracking-wider mt-1">MANDATORY</p>
+                                        <p className="font-bold text-amber-900 leading-tight">{t('sidebar.modulePreTest')}</p>
+                                        <p className="text-[10px] text-amber-700 font-medium uppercase tracking-wider mt-1">{t('sidebar.mandatory')}</p>
                                     </div>
                                     <ChevronRight size={18} className="text-amber-400" />
                                 </button>
@@ -1350,8 +1352,8 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                     <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider
                                                             ${quizResults[mod.id] !== undefined ? 'text-green-600' : 'text-slate-400 opacity-60'}
                                                         `}>
-                                                        <BookOpen size={12} /> 
-                                                        Module Quiz{quizResults[mod.id] !== undefined ? `: ${quizResults[mod.id]}` : ''}
+                                                        <BookOpen size={12} />
+                                                        {quizResults[mod.id] !== undefined ? t('sidebar.moduleQuizWithScore', { score: quizResults[mod.id] }) : t('sidebar.moduleQuiz')}
                                                     </div>
                                                 )}
                                             </div>
@@ -1370,7 +1372,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                 <button
                                     onClick={() => {
                                         if (activeCourse.progress < 90) {
-                                            setPopup({ type: 'error', message: 'You must complete all video materials & quizzes before taking the Final Assessment.', isOpen: true });
+                                            setPopup({ type: 'error', message: t('notifications.finalAssessmentRequired'), isOpen: true });
                                             return;
                                         }
                                         if (activeCourse.assessment) {
@@ -1388,13 +1390,13 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         <Award size={20} />
                                     </div>
                                     <div>
-                                        <p className={`font-bold ${activeCourse.progress >= 90 ? 'text-indigo-900' : 'text-slate-500'}`}>Final Assessment (Final Exam)</p>
+                                        <p className={`font-bold ${activeCourse.progress >= 90 ? 'text-indigo-900' : 'text-slate-500'}`}>{t('sidebar.finalAssessmentTitle')}</p>
                                         <p className="text-[10px] text-slate-500 font-medium">
                                             {activeCourse.progress >= 90
-                                                ? (assessmentScore !== null && assessmentScore < 80 
-                                                    ? `Last Score: ${assessmentScore} (Min. 80). Please retry.`
-                                                    : 'Click to Start Evaluation')
-                                                : 'Complete all materials to unlock'}
+                                                ? (assessmentScore !== null && assessmentScore < 80
+                                                    ? t('sidebar.finalAssessmentRetry', { score: assessmentScore })
+                                                    : t('sidebar.finalAssessmentStart'))
+                                                : t('sidebar.finalAssessmentLocked')}
                                         </p>
                                     </div>
                                 </button>
@@ -1404,9 +1406,9 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         <CheckCircle size={20} />
                                     </div>
                                     <div>
-                                        <p className="font-bold text-green-900">Final Assessment Completed</p>
+                                        <p className="font-bold text-green-900">{t('sidebar.finalAssessmentCompleted')}</p>
                                         <p className="text-xs text-green-700 mb-4">
-                                            Final Score: {assessmentScore} / 100. You have passed this course.
+                                            {t('sidebar.finalScore', { score: assessmentScore })}
                                         </p>
                                         <button
                                             onClick={handleDownloadCertificate}
@@ -1418,7 +1420,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                             ) : (
                                                 <Download size={18} />
                                             )}
-                                            Download Certificate (PDF)
+                                            {t('sidebar.downloadCertificate')}
                                         </button>
                                     </div>
                                 </div>
@@ -1444,11 +1446,11 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                 onClose={() => {
                     setPopup(prev => ({ ...prev, isOpen: false }));
                     // If it was the final module completion message
-                    if (popup.message.includes('Final Assessment')) {
+                    if (popup.message === t('notifications.allModulesFinished')) {
                         if (activeCourse?.assessment) {
                             setActiveQuiz({ quiz: activeCourse.assessment, moduleId: undefined, type: 'POST' });
                         }
-                    } else if (popup.message === 'Module Completed!' || popup.message === 'All materials are completed!') {
+                    } else if (popup.message === t('notifications.moduleCompleted') || popup.message === t('notifications.allMaterialsCompleted')) {
                         handleBackToList();
                     }
                 }}

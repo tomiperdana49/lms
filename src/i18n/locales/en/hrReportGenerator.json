@@ -1,0 +1,95 @@
+{
+  "months": {
+    "january": "January",
+    "february": "February",
+    "march": "March",
+    "april": "April",
+    "may": "May",
+    "june": "June",
+    "july": "July",
+    "august": "August",
+    "september": "September",
+    "october": "October",
+    "november": "November",
+    "december": "December"
+  },
+  "export": {
+    "sheetName": "HR Report",
+    "noColumn": "No.",
+    "monthColumn": "Month",
+    "internalTrainingColumn": "Internal Training",
+    "readingIncentivesColumn": "Reading Incentives",
+    "externalTrainingColumn": "External Training",
+    "certIncentivesColumn": "Cert. Incentives",
+    "grandTotalColumn": "Grand Total",
+    "ytdTotalRow": "YTD TOTAL",
+    "failedAlert": "Failed to export Excel file. Please try again."
+  },
+  "transactions": {
+    "internalTraining": "Internal Training",
+    "readingIncentive": "Reading Incentive",
+    "externalTraining": "External Training",
+    "certIncentiveOneTime": "Cert. Incentive (One-Time)",
+    "certIncentiveRecurring": "Cert. Incentive (Recurring)",
+    "unknown": "Unknown",
+    "snackDetail": "Snack: {{amount}}",
+    "lunchDetail": "Lunch: {{amount}}",
+    "trainerDetail": "Trainer: {{amount}}",
+    "audienceDetail": "Audience: {{amount}}/pax",
+    "otherDetail": "Other: {{amount}}",
+    "categoryDetail": "Category: {{category}}",
+    "mainCostDetail": "Main Cost: {{amount}}",
+    "additionalDetail": "Addtl: {{amount}}",
+    "registrationDetail": "Reg: {{amount}}",
+    "travelDetail": "Travel: {{amount}}",
+    "accommodationDetail": "Accomm: {{amount}}",
+    "miscDetail": "Misc: {{amount}}",
+    "statusRewardDetail": "Status: {{status}} • Reward: {{amount}}"
+  },
+  "header": {
+    "title": "HR Report Generator",
+    "subtitle": "Nusa LMS • Enterprise Expenditure Intelligence",
+    "refresh": "REFRESH",
+    "exportXlsx": "EXPORT XLSX"
+  },
+  "stats": {
+    "ytdTotalInvestment": "YTD Total Investment",
+    "avgMonthlySpend": "Avg Monthly Spend",
+    "topAllocation": "Top Allocation",
+    "yearAnalysis": "Year Analysis",
+    "calendarPeriod": "Calendar Period"
+  },
+  "categories": {
+    "internal": "Internal",
+    "external": "External",
+    "reading": "Reading",
+    "cert": "Cert."
+  },
+  "filters": {
+    "allBranches": "ALL BRANCHES",
+    "filtersActive": "FILTERS ACTIVE"
+  },
+  "table": {
+    "month": "Month",
+    "internal": "Internal",
+    "reading": "Reading",
+    "external": "External",
+    "certInc": "Cert. Inc",
+    "grandTotal": "Grand Total",
+    "audit": "Audit",
+    "ytdTotal": "YTD TOTAL"
+  },
+  "modal": {
+    "header": "Monthly Audit Hub • {{month}} {{year}}",
+    "subtitle": "Consolidated Ledger Overview • {{branch}}",
+    "noTransactions": "Zero transactions found for this period",
+    "timestamp": "Timestamp",
+    "categorization": "Categorization",
+    "transactionItem": "Transaction Item",
+    "professionalPic": "Professional PIC",
+    "netAmount": "Net Amount",
+    "system": "SYSTEM",
+    "monthlyAggregate": "MONTHLY AGGREGATE",
+    "closeAuditHub": "CLOSE AUDIT HUB"
+  }
+}

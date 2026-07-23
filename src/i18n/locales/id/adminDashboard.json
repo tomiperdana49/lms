@@ -1,0 +1,27 @@
+{
+  "mobileHeader": "Panel Admin",
+  "stats": {
+    "totalStaff": "Total Karyawan",
+    "booksRead": "Buku Dibaca",
+    "trainingInternal": "Pelatihan Internal",
+    "pendingRequests": "Permintaan Tertunda",
+    "trendVsLastMonth": "{{trend}} dari bulan lalu"
+  },
+  "recentActivity": {
+    "title": "Aktivitas Pengguna Terbaru",
+    "viewAll": "Lihat Semua",
+    "unknownUser": "Pengguna Tidak Diketahui",
+    "read": "membaca",
+    "noRecentActivity": "Belum ada aktivitas terbaru.",
+    "completed": "Selesai",
+    "reading": "Sedang Membaca"
+  },
+  "quickActions": {
+    "title": "Aksi Cepat",
+    "scheduleMeeting": "Jadwalkan Pertemuan",
+    "addNewStaff": "Tambah Karyawan Baru"
+  },
+  "calendar": {
+    "title": "Kalender Pelatihan"
+  }
+}

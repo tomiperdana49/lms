@@ -1,0 +1,140 @@
+{
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "message": "We couldn't load the Incentive page."
+  },
+  "notifications": {
+    "uploadFailed": "Failed to upload file",
+    "selectPaymentAndReward": "Please select Payment Frequency and Reward Amount.",
+    "incentiveUpdated": "Incentive updated successfully.",
+    "errorUpdatingIncentive": "Error updating incentive.",
+    "incentiveDenied": "Incentive request denied.",
+    "denyFailed": "Failed to deny request.",
+    "denyError": "Error denying request.",
+    "incentiveCanceled": "Incentive canceled.",
+    "cancelFailed": "Failed to cancel incentive.",
+    "cancelError": "Error canceling incentive.",
+    "markedPaid": "Incentive marked as PAID.",
+    "markPaidFailed": "Failed to mark as paid.",
+    "markPaidError": "Error updating payment status.",
+    "recordDeleted": "Incentive record deleted.",
+    "deleteFailed": "Failed to delete incentive.",
+    "deleteError": "Error deleting record.",
+    "completeCertificateData": "Please complete all certificate data.",
+    "certificateProofRequired": "Certificate proof is required.",
+    "requestSubmitted": "Request submitted! Waiting for HR verification."
+  },
+  "confirmations": {
+    "denyTitle": "Deny Request",
+    "denyMessage": "Are you sure you want to deny this request?",
+    "cancelTitle": "Cancel Incentive",
+    "cancelMessage": "Are you sure you want to cancel this incentive? This will stop future payments but preserve history.",
+    "paidTitle": "Confirm Payment",
+    "paidMessage": "Mark this incentive as PAID? This will move it to History.",
+    "deleteTitle": "Delete Incentive",
+    "deleteMessage": "Are you sure you want to permanently delete this incentive record? This action cannot be undone.",
+    "confirmButton": "Yes, Proceed"
+  },
+  "months": {
+    "January": "January",
+    "February": "February",
+    "March": "March",
+    "April": "April",
+    "May": "May",
+    "June": "June",
+    "July": "July",
+    "August": "August",
+    "September": "September",
+    "October": "October",
+    "November": "November",
+    "December": "December"
+  },
+  "hero": {
+    "badge": "Incentive Overview",
+    "title": "Your Total Earnings",
+    "subtitle": "Appreciation for your dedication and skill development this year.",
+    "paidIncentives": "Paid Incentives",
+    "monthlyActive": "Monthly Active"
+  },
+  "quickAction": {
+    "title": "Claim Incentive",
+    "description": "Got a new certificate? Upload now to claim your reward.",
+    "uploadButton": "Upload Certificate"
+  },
+  "tabs": {
+    "pending": "Pending ({{count}})",
+    "active": "Active Rewards",
+    "request": "My Requests",
+    "history": "History",
+    "summary": "Summary Report"
+  },
+  "summary": {
+    "yearLabel": "Year:",
+    "branchLabel": "Branch:",
+    "employeeName": "Employee Name",
+    "totalCerts": "Total Certs",
+    "details": "Details",
+    "totalPayout": "Total Payout",
+    "noData": "No active incentives found for {{year}}."
+  },
+  "table": {
+    "employeeInfo": "Employee Info",
+    "certificateDetails": "Certificate Details",
+    "validity": "Validity",
+    "reward": "Reward (IDR)",
+    "frequency": "Frequency",
+    "currentStatus": "Current Status",
+    "actions": "Actions",
+    "activeCertificates": "{{count}} Active Certificate(s)",
+    "viewCertificate": "View Certificate",
+    "oneTime": "One-Time",
+    "monthly": "Monthly",
+    "paidIn": "Paid in {{period}}",
+    "pendingPayout": "Pending Payout ({{period}})",
+    "active": "Active",
+    "processing": "Processing",
+    "expired": "Expired",
+    "canceled": "Canceled",
+    "idLabel": "(ID: {{id}})"
+  },
+  "actions": {
+    "markPaid": "Mark Paid",
+    "edit": "Edit",
+    "cancel": "Cancel",
+    "deletePermanent": "Delete Permanent",
+    "approve": "Approve",
+    "deny": "Deny",
+    "delete": "Delete"
+  },
+  "requestModal": {
+    "title": "Upload Certificate",
+    "close": "Close",
+    "certificateName": "Certificate Name",
+    "certificateNamePlaceholder": "e.g. AWS Certified",
+    "description": "Description / Notes",
+    "descriptionPlaceholder": "Brief description...",
+    "validFrom": "Valid From",
+    "validUntil": "Valid Until",
+    "uploadImage": "Upload Certificate (Image)",
+    "certificatePreviewAlt": "Certificate Preview",
+    "uploaded": "Uploaded",
+    "submit": "Submit for Verification"
+  },
+  "approvalModal": {
+    "updateTitle": "Update Incentive",
+    "approveTitle": "Approve Incentive",
+    "modifyDetails": "Modify details for {{name}}",
+    "setReward": "Set the monthly reward for {{name}}",
+    "paymentFrequency": "Payment Frequency",
+    "recurring": "Recurring (Monthly)",
+    "oneTimeOnly": "One-Time Only",
+    "selectReward": "Select Reward Amount (IDR)",
+    "cancel": "Cancel",
+    "update": "Update",
+    "confirm": "Confirm"
+  },
+  "common": {
+    "unknown": "Unknown",
+    "others": "Others"
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "backToDashboard": "Kembali ke Dasbor",
+  "title": "Manajemen Pengguna",
+  "subtitle": "Kelola akses dan peran staf (total {{count}} Karyawan).",
+  "searchPlaceholder": "Cari karyawan...",
+  "syncNusawork": "Sinkron Nusawork",
+  "syncing": "Menyinkronkan...",
+  "addUser": "Tambah Pengguna",
+  "accessDenied": "Akses Ditolak. Khusus HR.",
+  "loading": "Memuat...",
+  "table": {
+    "id": "ID",
+    "employeeNameEmail": "Nama Karyawan / Email",
+    "positionBranchReportTo": "Jabatan / Cabang / Melapor Ke",
+    "lmsStatus": "Status LMS",
+    "action": "Aksi"
+  },
+  "roles": {
+    "STAFF": "Staf",
+    "SUPERVISOR": "Supervisor",
+    "HR": "HR Admin",
+    "HR_ADMIN": "HR Admin"
+  },
+  "employee": {
+    "noBranch": "Tanpa Cabang",
+    "reportTo": "Melapor ke: {{id}}",
+    "reportToNone": "Tidak ada",
+    "inactiveAccount": "Akun Tidak Aktif",
+    "activeAccount": "Akun Aktif",
+    "noAccess": "Tanpa Akses",
+    "noEmployeesFound": "Karyawan tidak ditemukan."
+  },
+  "actions": {
+    "editAccess": "Edit Akses LMS",
+    "revokeAccess": "Cabut Akses LMS",
+    "createAccount": "Buat Akun LMS"
+  },
+  "modal": {
+    "editUser": "Edit Pengguna",
+    "createUser": "Buat Pengguna Baru",
+    "close": "Tutup",
+    "fullName": "Nama Lengkap",
+    "email": "Email",
+    "password": "Kata Sandi",
+    "passwordKeepCurrent": "(Kosongkan untuk mempertahankan yang sekarang)",
+    "role": "Peran",
+    "roleStaff": "Staf",
+    "roleSupervisor": "Supervisor",
+    "roleHrAdmin": "HR Admin",
+    "employeeLink": "Tautan Karyawan SimAsset (Opsional)",
+    "noLink": "-- Tanpa Tautan --",
+    "updateUser": "Perbarui Pengguna",
+    "createAccount": "Buat Akun"
+  },
+  "confirm": {
+    "deleteUser": "Apakah Anda yakin ingin menghapus pengguna ini? Tindakan ini akan mencabut akses mereka ke LMS.",
+    "syncNusawork": "Sinkronkan semua pengguna dengan Nusawork? Tindakan ini akan memperbarui detail profil lokal (jabatan, cabang, departemen, avatar, peran, dll.) berdasarkan data Nusawork yang aktif."
+  },
+  "notifications": {
+    "loadFailed": "Gagal memuat data.",
+    "userUpdated": "Pengguna berhasil diperbarui!",
+    "updateFailed": "Gagal memperbarui pengguna",
+    "userCreated": "Pengguna berhasil dibuat!",
+    "createFailed": "Gagal membuat pengguna",
+    "userDeleted": "Pengguna berhasil dihapus!",
+    "deleteFailed": "Gagal menghapus pengguna",
+    "deleteError": "Terjadi kesalahan saat menghapus pengguna",
+    "syncSuccess": "Sinkronisasi berhasil diselesaikan!",
+    "syncFailed": "Sinkronisasi gagal.",
+    "syncError": "Terjadi kesalahan saat menghubungkan ke layanan sinkronisasi."
+  }
+}

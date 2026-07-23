@@ -1,5 +1,6 @@
 
 import { AlertCircle, CheckCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ConfirmationModalProps {
     isOpen: boolean;
@@ -23,16 +24,21 @@ const ConfirmationModal = ({
     onConfirm,
     title,
     message,
-    confirmText = 'Confirm',
-    cancelText = 'Cancel',
+    confirmText,
+    cancelText,
     variant = 'danger',
     hideConfirm = false,
     showInput = false,
-    inputPlaceholder = 'Masukkan catatan...',
+    inputPlaceholder,
     inputValue = '',
     onInputChange = () => { }
 }: ConfirmationModalProps) => {
+    const { t } = useTranslation('confirmationModal');
     if (!isOpen) return null;
+
+    const resolvedConfirmText = confirmText ?? t('confirm');
+    const resolvedCancelText = cancelText ?? t('cancel');
+    const resolvedInputPlaceholder = inputPlaceholder ?? t('inputPlaceholder');
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
@@ -54,7 +60,7 @@ const ConfirmationModal = ({
                             <textarea
                                 value={inputValue}
                                 onChange={(e) => onInputChange(e.target.value)}
-                                placeholder={inputPlaceholder}
+                                placeholder={resolvedInputPlaceholder}
                                 className="w-full px-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none min-h-[80px]"
                                 required
                             />
@@ -66,7 +72,7 @@ const ConfirmationModal = ({
                             onClick={onClose}
                             className={`flex-1 py-2.5 rounded-xl border border-slate-200 font-bold transition-colors ${hideConfirm ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg' : 'text-slate-600 hover:bg-slate-50'}`}
                         >
-                            {cancelText}
+                            {resolvedCancelText}
                         </button>
                         {!hideConfirm && (
                             <button
@@ -77,7 +83,7 @@ const ConfirmationModal = ({
                                                 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
                                     }`}
                             >
-                                {confirmText}
+                                {resolvedConfirmText}
                             </button>
                         )}
                     </div>

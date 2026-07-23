@@ -2,15 +2,18 @@ import { useState, type FormEvent } from 'react';
 import { LogIn, Lock, Mail } from 'lucide-react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { jwtDecode } from "jwt-decode";
+import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { User } from '../types';
 import PopupNotification from './PopupNotification';
+import LanguageSwitcher from './LanguageSwitcher';
 
 interface LoginPageProps {
     onLogin: (user: User) => void;
 }
 
 const LoginPage = ({ onLogin }: LoginPageProps) => {
+    const { t } = useTranslation('loginPage');
     const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -45,7 +48,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                 setNotification({
                     show: true,
                     type: 'error',
-                    message: `Login Failed: ${data.message} (Status: ${response.status})`
+                    message: t('loginFailed', { message: data.message, status: response.status })
                 });
                 setIsLoading(false);
             }
@@ -54,7 +57,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
             setNotification({
                 show: true,
                 type: 'error',
-                message: `Connection Error: ${err instanceof Error ? err.message : 'Unknown error'}`
+                message: t('connectionError', { message: err instanceof Error ? err.message : 'Unknown error' })
             });
             setIsLoading(false);
         }
@@ -81,18 +84,22 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                 // Google login success - go straight to dashboard
                 onLogin(data.user);
             } else {
-                setNotification({ show: true, type: 'error', message: data.message || 'Google Login Failed' });
+                setNotification({ show: true, type: 'error', message: data.message || t('googleLoginFailed') });
                 setIsLoading(false);
             }
         } catch (err) {
             console.error(err);
-            setNotification({ show: true, type: 'error', message: 'Google Login Error' });
+            setNotification({ show: true, type: 'error', message: t('googleLoginError') });
             setIsLoading(false);
         }
     };
 
     return (
         <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+            <div className="absolute top-4 right-4">
+                <LanguageSwitcher variant="dark" />
+            </div>
+
             <PopupNotification
                 isOpen={notification.show}
                 type={notification.type}
@@ -105,14 +112,14 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                     <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
                         <LogIn className="text-white" size={32} />
                     </div>
-                    <h1 className="text-2xl font-bold text-white tracking-wider">LMS NUSA</h1>
-                    <p className="text-blue-100 text-sm mt-1">Learning Management System</p>
+                    <h1 className="text-2xl font-bold text-white tracking-wider">{t('title')}</h1>
+                    <p className="text-blue-100 text-sm mt-1">{t('subtitle')}</p>
                 </div>
 
                 <div className="p-8">
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">{t('emailLabel')}</label>
                             <div className="relative">
                                 <Mail className="absolute left-3 top-3 text-slate-400" size={18} />
                                 <input
@@ -120,14 +127,14 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                                     value={identifier}
                                     onChange={(e) => setIdentifier(e.target.value)}
                                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                                    placeholder="Email"
+                                    placeholder={t('emailPlaceholder')}
                                     required
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">{t('passwordLabel')}</label>
                             <div className="relative">
                                 <Lock className="absolute left-3 top-3 text-slate-400" size={18} />
                                 <input
@@ -146,7 +153,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                             disabled={isLoading}
                             className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {isLoading ? 'Signing in...' : 'Sign In'}
+                            {isLoading ? t('signingIn') : t('signIn')}
                         </button>
 
                         <div className="relative my-6">
@@ -154,7 +161,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                                 <div className="w-full border-t border-slate-200"></div>
                             </div>
                             <div className="relative flex justify-center text-sm">
-                                <span className="px-2 bg-white text-slate-500">Or continue with</span>
+                                <span className="px-2 bg-white text-slate-500">{t('orContinueWith')}</span>
                             </div>
                         </div>
 
@@ -162,7 +169,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                             <GoogleLogin
                                 onSuccess={handleGoogleSuccess}
                                 onError={() => {
-                                    setNotification({ show: true, type: 'error', message: 'Google Login Failed' });
+                                    setNotification({ show: true, type: 'error', message: t('googleLoginFailed') });
                                 }}
                                 useOneTap
                                 width="100%"

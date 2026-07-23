@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MoreHorizontal, MapPin, Video, Plus, X, ArrowUpRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { Role, Meeting, Incentive, TrainingRequest } from '../types';
 
@@ -32,6 +33,7 @@ interface LMSCalendarProps {
 }
 
 const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps) => {
+    const { t } = useTranslation('lmsCalendar');
     // --- State ---
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -82,28 +84,28 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
 
             // 2. Process External Training
             if (isHR) {
-                training.forEach((t: TrainingRequest) => {
-                    if (t.status === 'APPROVED') {
+                training.forEach((tr: TrainingRequest) => {
+                    if (tr.status === 'APPROVED') {
                         loadedEvents.push({
-                            id: t.id,
-                            title: `Training: ${t.title} (${t.employeeName})`,
+                            id: tr.id,
+                            title: t('eventContent.trainingTitleWithEmployee', { title: tr.title, employeeName: tr.employeeName }),
                             type: 'EXTERNAL',
-                            date: new Date(t.date),
-                            time: 'All Day',
-                            description: `Provider: ${t.vendor}. Justification: ${t.justification}`
+                            date: new Date(tr.date),
+                            time: t('allDay'),
+                            description: t('eventContent.providerJustification', { vendor: tr.vendor, justification: tr.justification })
                         });
                     }
                 });
             } else if (userEmail) {
-                training.forEach((t: TrainingRequest) => {
-                    if (t.employeeName.toLowerCase().includes(userEmail.split('@')[0].toLowerCase())) {
+                training.forEach((tr: TrainingRequest) => {
+                    if (tr.employeeName.toLowerCase().includes(userEmail.split('@')[0].toLowerCase())) {
                         loadedEvents.push({
-                            id: t.id,
-                            title: `Training: ${t.title}`,
+                            id: tr.id,
+                            title: t('eventContent.trainingTitle', { title: tr.title }),
                             type: 'EXTERNAL',
-                            date: new Date(t.date),
-                            time: 'All Day',
-                            description: `Status: ${t.status}`
+                            date: new Date(tr.date),
+                            time: t('allDay'),
+                            description: t('eventContent.statusLabel', { status: tr.status })
                         });
                     }
                 });
@@ -114,11 +116,11 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                 if (isHR && inc.status === 'Active') {
                     loadedEvents.push({
                         id: inc.id,
-                        title: `Incentive End: ${inc.courseName} - ${inc.employeeName}`,
+                        title: t('eventContent.incentiveEndTitle', { courseName: inc.courseName, employeeName: inc.employeeName }),
                         type: 'INCENTIVE',
                         date: new Date(inc.endDate),
                         time: '23:59',
-                        description: `Incentive period ends.`
+                        description: t('eventContent.incentivePeriodEnds')
                     });
                 }
             });
@@ -283,7 +285,7 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                 </div>
 
                 <div className="grid grid-cols-7 mb-3">
-                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+                    {(t('weekDaysShort', { returnObjects: true }) as string[]).map((day, i) => (
                         <div key={i} className="text-center text-[10px] font-black text-slate-300 uppercase">
                             {day}
                         </div>
@@ -300,13 +302,13 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                 <div className="mt-6 pt-5 border-t border-slate-50 flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-3">
                     <div className="flex justify-between items-center mb-1">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            Agenda • {selectedDate.getDate()} {selectedDate.toLocaleString('default', { month: 'short' })}
+                            {t('agenda')} • {selectedDate.getDate()} {selectedDate.toLocaleString('default', { month: 'short' })}
                         </p>
-                        {selectedDayEvents.length > 0 && <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{selectedDayEvents.length} Tasks</span>}
+                        {selectedDayEvents.length > 0 && <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{t('tasksCount', { count: selectedDayEvents.length })}</span>}
                     </div>
                     {selectedDayEvents.length === 0 ? (
                         <div className="py-8 text-center">
-                            <p className="text-xs text-slate-400 italic">No events scheduled.</p>
+                            <p className="text-xs text-slate-400 italic">{t('noEventsScheduled')}</p>
                         </div>
                     ) : (
                         selectedDayEvents.sort((a, b) => a.time.localeCompare(b.time)).map(ev => (
@@ -340,7 +342,7 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                             {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
                             <div className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse"></div>
                         </h2>
-                        <p className="text-slate-400 font-bold uppercase tracking-[0.2em] text-[10px] mt-2">Nusa Learning Management System • Schedule</p>
+                        <p className="text-slate-400 font-bold uppercase tracking-[0.2em] text-[10px] mt-2">{t('tagline')}</p>
                     </div>
 
                     <div className="flex items-center gap-3 bg-slate-100/80 p-2 rounded-[24px] border border-slate-200">
@@ -348,7 +350,7 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                             <ChevronLeft size={20} strokeWidth={3} />
                         </button>
                         <button onClick={() => setCurrentDate(new Date())} className="px-6 py-2 bg-white shadow-sm rounded-[18px] text-xs font-black text-slate-800 hover:bg-indigo-600 hover:text-white transition-all">
-                            Today
+                            {t('today')}
                         </button>
                         <button onClick={nextMonth} className="p-3 hover:bg-white hover:shadow-sm rounded-[18px] transition-all text-slate-500 hover:text-slate-900">
                             <ChevronRight size={20} strokeWidth={3} />
@@ -358,7 +360,7 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
 
                 {/* Days Header */}
                 <div className="grid grid-cols-7 mb-4">
-                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+                    {(t('weekDaysFull', { returnObjects: true }) as string[]).map(day => (
                         <div key={day} className="text-center text-[11px] font-black text-slate-300 uppercase tracking-widest">
                             {day.substring(0, 3)}
                         </div>
@@ -384,7 +386,7 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                         {/* Date Header */}
                         <div className="flex justify-between items-start mb-10">
                             <div>
-                                <h3 className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">Event Details</h3>
+                                <h3 className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">{t('eventDetails')}</h3>
                                 <div className="flex items-center gap-4">
                                     <div className="w-16 h-16 bg-slate-900 rounded-[22px] flex flex-col items-center justify-center text-white shadow-xl shadow-slate-900/20">
                                         <span className="text-2xl font-black">{selectedDate.getDate()}</span>
@@ -415,8 +417,8 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                                     <div className="w-20 h-20 rounded-[28px] bg-white shadow-sm flex items-center justify-center mb-6 text-slate-200">
                                         <CalendarIcon size={36} />
                                     </div>
-                                    <h5 className="text-slate-800 font-black text-lg">Clear Schedule</h5>
-                                    <p className="text-slate-400 text-sm mt-2 max-w-[200px]">No events or deadlines for this specific date.</p>
+                                    <h5 className="text-slate-800 font-black text-lg">{t('clearSchedule')}</h5>
+                                    <p className="text-slate-400 text-sm mt-2 max-w-[200px]">{t('noEventsForDate')}</p>
                                 </div>
                             ) : (
                                 selectedDayEvents.map(ev => (
@@ -426,7 +428,7 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                                     >
                                         <div className="flex justify-between items-start mb-4">
                                             <span className={`text-[9px] font-black px-3 py-1 rounded-full border tracking-widest ${getEventBadgeStyle(ev.type)}`}>
-                                                {ev.type === 'INTERNAL' ? 'MEETING' : ev.type}
+                                                {t(`eventTypes.${ev.type}`)}
                                             </span>
                                             <MoreHorizontal size={18} className="text-slate-300 cursor-pointer hover:text-slate-900 transition-colors" />
                                         </div>
@@ -459,7 +461,7 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                                                 rel="noreferrer" 
                                                 className="w-full py-3.5 bg-slate-900 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all hover:bg-indigo-600 hover:shadow-lg hover:shadow-indigo-200"
                                             >
-                                                <Video size={16} /> JOIN MEETING <ArrowUpRight size={14} />
+                                                <Video size={16} /> {t('joinMeeting')} <ArrowUpRight size={14} />
                                             </a>
                                         )}
                                     </div>
@@ -478,44 +480,44 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                         
                         <div className="relative z-10">
                             <div className="flex justify-between items-center mb-8">
-                                <h3 className="font-black text-2xl text-slate-800 tracking-tight">New Schedule</h3>
+                                <h3 className="font-black text-2xl text-slate-800 tracking-tight">{t('modal.title')}</h3>
                                 <button onClick={() => setIsScheduleOpen(false)} className="bg-slate-100 hover:bg-rose-50 hover:text-rose-500 p-2.5 rounded-2xl transition-all"><X size={20} /></button>
                             </div>
                             
                             <div className="space-y-6">
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Event Title</label>
-                                    <input className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" value={scheduleData.title} onChange={e => setScheduleData({ ...scheduleData, title: e.target.value })} placeholder="e.g. Project Sync Up" />
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('modal.eventTitleLabel')}</label>
+                                    <input className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" value={scheduleData.title} onChange={e => setScheduleData({ ...scheduleData, title: e.target.value })} placeholder={t('modal.eventTitlePlaceholder')} />
                                 </div>
                                 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Date</label>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('modal.dateLabel')}</label>
                                         <input type="date" className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold text-slate-800 outline-none focus:bg-white" value={scheduleData.date} onChange={e => setScheduleData({ ...scheduleData, date: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Platform</label>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('modal.platformLabel')}</label>
                                         <select className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold text-slate-800 outline-none focus:bg-white appearance-none" value={scheduleData.type} onChange={e => setScheduleData({ ...scheduleData, type: e.target.value as 'Online' | 'Offline' | 'Hybrid' })}>
-                                            <option value="Online">Online Link</option>
-                                            <option value="Offline">Offline / Room</option>
-                                            <option value="Hybrid">Hybrid Session</option>
+                                            <option value="Online">{t('modal.platformOnline')}</option>
+                                            <option value="Offline">{t('modal.platformOffline')}</option>
+                                            <option value="Hybrid">{t('modal.platformHybrid')}</option>
                                         </select>
                                     </div>
                                 </div>
                                 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Start Time</label>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('modal.startTimeLabel')}</label>
                                         <input type="time" className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold text-slate-800 outline-none focus:bg-white" value={scheduleData.startTime} onChange={e => setScheduleData({ ...scheduleData, startTime: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">End Time</label>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('modal.endTimeLabel')}</label>
                                         <input type="time" className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold text-slate-800 outline-none focus:bg-white" value={scheduleData.endTime} onChange={e => setScheduleData({ ...scheduleData, endTime: e.target.value })} />
                                     </div>
                                 </div>
-                                
+
                                 <button onClick={handleQuickSchedule} className="w-full py-5 bg-slate-900 hover:bg-indigo-600 text-white font-black rounded-3xl shadow-2xl shadow-slate-900/20 transition-all transform active:scale-95 mt-4 tracking-widest text-xs">
-                                    CONFIRM SCHEDULE
+                                    {t('modal.confirmButton')}
                                 </button>
                             </div>
                         </div>

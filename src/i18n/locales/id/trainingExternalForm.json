@@ -1,0 +1,69 @@
+{
+  "notifications": {
+    "submitSuccess": "Pengajuan berhasil dikirim! Mohon tunggu persetujuan.",
+    "submitError": "Gagal mengirim pengajuan."
+  },
+  "print": {
+    "documentTitle": "Persetujuan Pelatihan - {{id}}",
+    "certificateTitle": "Sertifikat Persetujuan Pelatihan Eksternal",
+    "referenceLabel": "Referensi: LTR-{{id}}",
+    "employeeNameLabel": "Nama Karyawan",
+    "approvalDateLabel": "Tanggal Persetujuan",
+    "trainingProgramLabel": "Program Pelatihan",
+    "vendorLabel": "Vendor / Penyedia",
+    "totalBudgetLabel": "Total Anggaran Disetujui",
+    "approvedByHrStamp": "Disetujui oleh HR",
+    "footer": "Sistem Manajemen Pembelajaran Nusa • Dokumen Resmi"
+  },
+  "header": {
+    "title": "Pelatihan Eksternal",
+    "subtitle": "Nusa LMS • Pengajuan Pembelajaran Lanjutan",
+    "teamRequests": "PENGAJUAN TIM"
+  },
+  "form": {
+    "section1Title": "Informasi Dasar Pelatihan",
+    "trainingNameLabel": "Nama Pelatihan / Sertifikasi",
+    "trainingNamePlaceholder": "misal. Masterclass Manajemen Strategis",
+    "vendorLabel": "Penyedia / Vendor",
+    "vendorPlaceholder": "Nama Institusi",
+    "locationLabel": "Lokasi / Tempat",
+    "locationPlaceholder": "Kota atau Online",
+    "dateLabel": "Tanggal yang Diusulkan",
+    "durationLabel": "Durasi Kursus",
+    "durationPlaceholder": "misal. 5 Hari Kerja",
+    "section2Title": "Investasi & Pencairan Dana",
+    "registrationFee": "Biaya Pendaftaran",
+    "travelFlight": "Perjalanan / Penerbangan",
+    "accommodation": "Akomodasi",
+    "miscellaneous": "Lain-lain",
+    "totalInvestmentLabel": "Total Investasi Pelatihan",
+    "settlementMethodLabel": "Metode Pembayaran Pilihan",
+    "reimbursementTitle": "Reimbursement",
+    "reimbursementDesc": "Bayar sendiri terlebih dahulu dan klaim kembali dengan bukti.",
+    "directPaymentTitle": "Pembayaran Langsung",
+    "directPaymentDesc": "Nusa Finance mentransfer langsung ke Vendor.",
+    "section3Title": "Tata Kelola Perusahaan",
+    "justificationLabel": "Justifikasi Pelatihan",
+    "justificationPlaceholder": "Jelaskan bagaimana program ini akan memengaruhi perkembangan profesional Anda dan tujuan perusahaan...",
+    "mandatoryPolicyTitle": "Kebijakan Wajib",
+    "policyItem1": "Staf harus mencapai standar kelulusan sertifikasi.",
+    "policyItem2": "Kegagalan lulus dikenakan tanggung jawab biaya pribadi sebesar 50%.",
+    "policyItem3": "Sertifikat asli harus diserahkan ke Departemen HR.",
+    "penaltyAgreement": "Saya memahami dan menerima penalti biaya 50% jika pelatihan gagal.",
+    "serviceBondTitle": "Ikatan Dinas Diperlukan",
+    "serviceBondDesc": "Total investasi melebihi ambang batas (Rp {{threshold}}). Pelatihan ini memerlukan perjanjian Ikatan Dinas resmi.",
+    "bondAgreement": "Saya bersedia mengikuti perjanjian Ikatan Dinas resmi untuk pelatihan ini.",
+    "processing": "MEMPROSES...",
+    "confirmSubmission": "KONFIRMASI PENGAJUAN"
+  },
+  "history": {
+    "title": "Linimasa",
+    "subtitle": "Riwayat Pengajuan & Persetujuan",
+    "noRecordsTitle": "Tidak Ada Catatan Ditemukan",
+    "noRecordsMessage": "Riwayat pelatihan Anda akan muncul di sini.",
+    "leaderOk": "OK ATASAN",
+    "hrFinalOk": "OK FINAL HR",
+    "rejectionNote": "Catatan Penolakan",
+    "downloadCertificate": "UNDUH SERTIFIKAT PERSETUJUAN"
+  }
+}

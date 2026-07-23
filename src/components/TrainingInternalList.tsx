@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, Fragment, type FormEvent } from 'react';
 import * as XLSX from 'xlsx';
+import { useTranslation } from 'react-i18next';
 import {
     Users,
     User as UserIcon,
@@ -66,6 +67,7 @@ const AvatarStack = ({ count }: { count: number }) => (
 );
 
 const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInternalListProps) => {
+    const { t } = useTranslation('trainingInternalList');
     const userEmail = user.email;
     // Determine effective role: in non-management mode, everyone is treated as STAFF
     const effectiveRole = isManagementMode ? userRole : 'STAFF';
@@ -423,7 +425,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     
                     if (res.ok) {
                         const result = await res.json();
-                        setNotification({ show: true, type: 'success', message: `Successfully imported ${result.count} meetings.` });
+                        setNotification({ show: true, type: 'success', message: t('notifications.importSuccess', { count: result.count }) });
                         // Refresh meetings
                         fetch(`${API_BASE_URL}/api/meetings`)
                             .then(res => res.json())
@@ -443,12 +445,12 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         }
                     } else {
                         const errData = await res.json().catch(() => ({}));
-                        throw new Error(errData.error || 'Failed to import data from backend');
+                        throw new Error(errData.error || t('notifications.importBackendFailed'));
                     }
                 }
             } catch (err: any) {
                 console.error("Import error:", err);
-                setNotification({ show: true, type: 'error', message: `Import Failed: ${err.message}` });
+                setNotification({ show: true, type: 'error', message: t('notifications.importFailed', { message: err.message }) });
             } finally {
                 if (fileInputRef.current) {
                     fileInputRef.current.value = '';
@@ -542,13 +544,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 const data = await res.json();
                 setSelectedMeeting(data);
                 setMeetings(prev => prev.map(m => m.id === data.id ? data : m));
-                setNotification({ show: true, type: 'success', message: `Status updated successfully.` });
+                setNotification({ show: true, type: 'success', message: t('notifications.statusUpdated') });
             } else {
                 throw new Error("Failed to update status.");
             }
         } catch (err) {
             console.error(err);
-            setNotification({ show: true, type: 'error', message: "An error occurred while updating status." });
+            setNotification({ show: true, type: 'error', message: t('notifications.statusUpdateError') });
         }
     };
 
@@ -627,11 +629,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         // reacting to the host's changes, not for the host themselves.
                         if (!isHostOrHR) {
                             if (!prev?.is_pre_test_active && data.is_pre_test_active) {
-                                setNotification({ show: true, type: 'success', message: 'Pre-Test is now available!' });
+                                setNotification({ show: true, type: 'success', message: t('notifications.preTestAvailable') });
                             } else if (!prev?.is_post_test_active && data.is_post_test_active) {
-                                setNotification({ show: true, type: 'success', message: 'Post-Test is now available!' });
+                                setNotification({ show: true, type: 'success', message: t('notifications.postTestAvailable') });
                             } else if (!prev?.is_feedback_active && data.is_feedback_active) {
-                                setNotification({ show: true, type: 'success', message: 'Feedback form is now open!' });
+                                setNotification({ show: true, type: 'success', message: t('notifications.feedbackNowOpen') });
                             }
                         }
 
@@ -1039,17 +1041,17 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             setNotification({
                 show: true,
                 type: 'error',
-                message: 'Cannot finalize report. Training session is still ACTIVE - wait until session is CLOSED.'
+                message: t('notifications.reportStillActive')
             });
             return false;
         }
 
         if ((reportData.participantsCount || 0) <= 0) {
-            setNotification({ show: true, type: 'error', message: 'Participants count must be at least 1.' });
+            setNotification({ show: true, type: 'error', message: t('notifications.participantsCountRequired') });
             return false;
         }
         if (!reportData.trainingPhotos || reportData.trainingPhotos.trim() === '') {
-            setNotification({ show: true, type: 'error', message: 'Training Photos are required for evidence.' });
+            setNotification({ show: true, type: 'error', message: t('notifications.trainingPhotosRequired') });
             return false;
         }
         return true;
@@ -1060,12 +1062,12 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
         // Validation
         if (!formData.title || !formData.date || !formData.startTime || !formData.endTime || !formData.host || !formData.type) {
-            setNotification({ show: true, type: 'error', message: 'Please fill in all required fields (Title, Date, Time, Host, Type).' });
+            setNotification({ show: true, type: 'error', message: t('notifications.fillRequiredFields') });
             return;
         }
 
         if (formData.type === 'Offline' && !formData.location) {
-            setNotification({ show: true, type: 'error', message: 'Please specify a Location for offline meetings.' });
+            setNotification({ show: true, type: 'error', message: t('notifications.locationRequired') });
             return;
         }
 
@@ -1073,10 +1075,10 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         const preQuestions = formData.pre_test_data?.questions || [];
         const postQuestions = formData.post_test_data?.questions || [];
         if (userRole !== 'HR' && userRole !== 'HR_ADMIN' && (preQuestions.length === 0 || postQuestions.length === 0)) {
-            setNotification({ 
-                show: true, 
-                type: 'error', 
-                message: 'Pre-Test and Post-Test data must be filled in the Exam Configuration tab before sending invitations.' 
+            setNotification({
+                show: true,
+                type: 'error',
+                message: t('notifications.assessmentDataRequired')
             });
             setActiveCreateTab('assessment');
             return;
@@ -1142,7 +1144,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     const savedMeeting = await res.json();
                     // Preserve is_closed status in local state after update
                     setMeetings(meetings.map(m => m.id === editId ? safeMeeting(savedMeeting) : m));
-                    setNotification({ show: true, type: 'success', message: 'Meeting updated successfully!' });
+                    setNotification({ show: true, type: 'success', message: t('notifications.meetingUpdated') });
                     // Do NOT reset editIsClosed - keep it locked until modal closes
                 }
             } catch (err) {
@@ -1159,7 +1161,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 if (res.ok) {
                     const savedMeeting = await res.json();
                     setMeetings([...meetings, safeMeeting(savedMeeting)]);
-                    setNotification({ show: true, type: 'success', message: 'Meeting scheduled & invitations sent!' });
+                    setNotification({ show: true, type: 'success', message: t('notifications.meetingScheduled') });
 
                     // Open Google Calendar
                     const fmtDate = formData.date.replace(/-/g, '');
@@ -1192,10 +1194,10 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             if (selectedMeeting?.id === meetingToDelete) {
                 setSelectedMeeting(null);
             }
-            setNotification({ show: true, type: 'success', message: 'Meeting cancelled successfully.' });
+            setNotification({ show: true, type: 'success', message: t('notifications.meetingCancelled') });
         } catch (err) {
             console.error(err);
-            setNotification({ show: true, type: 'error', message: 'Failed to cancel meeting.' });
+            setNotification({ show: true, type: 'error', message: t('notifications.meetingCancelError') });
         } finally {
             setMeetingToDelete(null);
         }
@@ -1802,13 +1804,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         if (!file) return;
 
         try {
-            setNotification({ show: true, type: 'success', message: "Uploading photo..." });
+            setNotification({ show: true, type: 'success', message: t('notifications.uploadingPhoto') });
             const url = await uploadFileToServer(file);
             setReportData(prev => ({ ...prev, trainingPhotos: url }));
-            setNotification({ show: true, type: 'success', message: "Photo uploaded successfully!" });
+            setNotification({ show: true, type: 'success', message: t('notifications.photoUploadSuccess') });
         } catch (err) {
             console.error(err);
-            setNotification({ show: true, type: 'error', message: "Failed to upload photo." });
+            setNotification({ show: true, type: 'error', message: t('notifications.photoUploadError') });
         }
     };
 
@@ -1828,9 +1830,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 isOpen={!!meetingToDelete}
                 onClose={() => setMeetingToDelete(null)}
                 onConfirm={handleDelete}
-                title="Cancel Meeting"
-                message="Are you sure you want to cancel this meeting? This action cannot be undone."
-                confirmText="Yes, Cancel it"
+                title={t('cancelMeetingModal.title')}
+                message={t('cancelMeetingModal.message')}
+                confirmText={t('cancelMeetingModal.confirmText')}
                 variant="danger"
             />
 
@@ -1841,9 +1843,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                             <div>
                                 <h3 className="text-xl font-black text-slate-800">
-                                    {showParticipantModal === 'sudah' ? 'Peserta Sudah Selesai' : 'Peserta Belum Selesai'}
+                                    {showParticipantModal === 'sudah' ? t('participantModal.titleDone') : t('participantModal.titlePending')}
                                 </h3>
-                                <p className="text-xs font-medium text-slate-500 mt-1">Detail status assessment peserta</p>
+                                <p className="text-xs font-medium text-slate-500 mt-1">{t('participantModal.subtitle')}</p>
                             </div>
                             <button onClick={() => setShowParticipantModal(null)} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-colors">
                                 <X size={20} />
@@ -1853,10 +1855,10 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200">
                                     <tr>
-                                        <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Participant Name</th>
-                                        <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest text-center">Pre-Test</th>
-                                        <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest text-center">Post-Test</th>
-                                        <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest text-center">Feedback</th>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">{t('participantModal.colParticipantName')}</th>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest text-center">{t('participantModal.colPreTest')}</th>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest text-center">{t('participantModal.colPostTest')}</th>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest text-center">{t('participantModal.colFeedback')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -2129,7 +2131,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             return (
                                                 <tr>
                                                     <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic">
-                                                        Tidak ada data peserta.
+                                                        {t('participantModal.noData')}
                                                     </td>
                                                 </tr>
                                             );
@@ -2153,22 +2155,22 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div className="space-y-1.5">
                         <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10 mb-2">
-                            <Zap size={12} className="text-yellow-400 fill-yellow-400" /> Professional Training
+                            <Zap size={12} className="text-yellow-400 fill-yellow-400" /> {t('hero.badge')}
                         </div>
                         <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
-                            Training Internal
+                            {t('hero.title')}
                         </h1>
                         <p className="text-blue-100/80 font-medium max-w-md">
-                            Manage sharing sessions, town halls, and internal training programs with professional standards.
+                            {t('hero.subtitle')}
                         </p>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto items-center">
                         {!isManagementMode && (
                             <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/10 md:min-w-[140px] text-center shadow-lg">
-                                <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-80">Internal Training Hours</div>
-                                <div className="text-2xl font-black tracking-tighter text-white">{learningStats.jamTraining} <span className="text-base font-bold opacity-80 tracking-normal">Hours</span></div>
-                                <div className="text-[9px] font-medium text-blue-200 mt-1">Total Hours</div>
+                                <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-80">{t('hero.internalTrainingHours')}</div>
+                                <div className="text-2xl font-black tracking-tighter text-white">{learningStats.jamTraining} <span className="text-base font-bold opacity-80 tracking-normal">{t('hero.hoursUnit')}</span></div>
+                                <div className="text-[9px] font-medium text-blue-200 mt-1">{t('hero.totalHours')}</div>
                             </div>
                         )}
 
@@ -2178,13 +2180,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     onClick={() => setListType('active')}
                                     className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${listType === 'active' ? 'bg-white text-indigo-600 shadow-xl' : 'text-blue-100 hover:text-white'}`}
                                 >
-                                    Active
+                                    {t('hero.active')}
                                 </button>
                                 <button
                                     onClick={() => setListType('history')}
                                     className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${listType === 'history' ? 'bg-white text-indigo-600 shadow-xl' : 'text-blue-100 hover:text-white'}`}
                                 >
-                                    History
+                                    {t('hero.history')}
                                 </button>
                             </div>
 
@@ -2194,13 +2196,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         onClick={() => toggleView('list')}
                                         className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-xl' : 'text-blue-100 hover:text-white'}`}
                                     >
-                                        List
+                                        {t('hero.list')}
                                     </button>
                                     <button
                                         onClick={() => toggleView('recap')}
                                         className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${viewMode === 'recap' ? 'bg-white text-indigo-600 shadow-xl' : 'text-blue-100 hover:text-white'}`}
                                     >
-                                        Recap
+                                        {t('hero.recap')}
                                     </button>
                                 </div>
                             )}
@@ -2210,7 +2212,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     onClick={() => { setIsEditing(false); resetForm(); setIsCreateOpen(true); }}
                                     className="px-6 py-3 bg-white text-indigo-600 rounded-2xl font-black uppercase tracking-wider text-sm hover:shadow-xl hover:shadow-white/20 transition-all hover:scale-105 active:scale-95 border border-white/20 flex items-center gap-2 self-start"
                                 >
-                                    <Plus size={18} /> Create Session
+                                    <Plus size={18} /> {t('hero.createSession')}
                                 </button>
                             )}
                         </div>
@@ -2232,7 +2234,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         onClick={() => fileInputRef.current?.click()}
                         className="bg-white border border-slate-200 text-slate-600 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:border-indigo-500 hover:text-indigo-600 transition-all flex items-center gap-2 group"
                     >
-                        <UploadCloud size={16} className="text-slate-400 group-hover:text-indigo-500" /> Import Data
+                        <UploadCloud size={16} className="text-slate-400 group-hover:text-indigo-500" /> {t('exportImportBar.importData')}
                     </button>
                     {viewMode === 'recap' && (
                         <>
@@ -2240,13 +2242,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 onClick={exportParticipantExcel}
                                 className="bg-white border border-slate-200 text-slate-600 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center gap-2 group"
                             >
-                                <FileText size={16} className="text-slate-400 group-hover:text-emerald-500" /> Export Participants (XLSX)
+                                <FileText size={16} className="text-slate-400 group-hover:text-emerald-500" /> {t('exportImportBar.exportParticipants')}
                             </button>
                             <button
                                 onClick={exportHostExcel}
                                 className="bg-white border border-slate-200 text-slate-600 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center gap-2 group"
                             >
-                                <Users size={16} className="text-slate-400 group-hover:text-emerald-500" /> Export Hosts (XLSX)
+                                <Users size={16} className="text-slate-400 group-hover:text-emerald-500" /> {t('exportImportBar.exportHosts')}
                             </button>
                         </>
                     )}
@@ -2261,7 +2263,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     </div>
                     <input
                         type="text"
-                        placeholder="Search Host or Title..."
+                        placeholder={t('filterBar.searchPlaceholder')}
                         className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-100 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-bold text-slate-600 text-sm transition-all shadow-sm"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -2275,7 +2277,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                             onChange={(e) => setSelectedBranch(e.target.value)}
                             className="w-full sm:w-auto pl-4 pr-10 py-3 rounded-2xl border border-slate-100 bg-white font-black text-slate-600 text-[11px] uppercase tracking-wider outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 shadow-sm appearance-none cursor-pointer"
                         >
-                            {branches.map(b => <option key={b} value={b}>{b === 'Online' ? 'Online Only' : b}</option>)}
+                            {branches.map(b => <option key={b} value={b}>{b === 'Online' ? t('filterBar.onlineOnly') : b}</option>)}
                         </select>
                         <ChevronDown size={14} className="absolute right-4 top-4 text-slate-400 pointer-events-none" />
                     </div>
@@ -2312,7 +2314,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         <div className="grid grid-cols-1 gap-4">
                             {(() => {
                                 const stats = getHostStats();
-                                if (stats.length === 0) return <div className="py-12 text-center text-slate-400 italic bg-white rounded-3xl border border-dashed border-slate-200">No data available for the selected period.</div>;
+                                if (stats.length === 0) return <div className="py-12 text-center text-slate-400 italic bg-white rounded-3xl border border-dashed border-slate-200">{t('recap.noData')}</div>;
 
                                 return stats.map((stat, idx) => (
                                     <div key={idx} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all">
@@ -2327,16 +2329,16 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 </div>
                                                 <div>
                                                     <h3 className="font-bold text-slate-800 text-lg leading-tight">{stat.host}</h3>
-                                                    <p className="text-xs text-slate-500 font-medium">{stat.sessions} Sessions • {stat.totalParticipants} Audience</p>
+                                                    <p className="text-xs text-slate-500 font-medium">{t('recap.sessionsAudience', { sessions: stat.sessions, participants: stat.totalParticipants })}</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-8">
                                                 <div className="text-right hidden md:block">
-                                                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Trainer Incentive</span>
+                                                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{t('recap.trainerIncentive')}</span>
                                                     <span className="text-lg font-black text-emerald-600 leading-none">{formatCurrency(stat.totalTrainerIncentive)}</span>
                                                 </div>
                                                 <div className="text-right">
-                                                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Cost</span>
+                                                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{t('recap.totalCost')}</span>
                                                     <span className="text-xl font-black text-slate-800 leading-none">{formatCurrency(stat.totalCost)}</span>
                                                 </div>
                                                 <ChevronDown className={`text-slate-400 transition-transform ${expandedHosts[stat.host] ? 'rotate-180' : ''}`} />
@@ -2350,13 +2352,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     <table className="w-full text-left text-sm">
                                                         <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
                                                             <tr>
-                                                                <th className="px-6 py-3">Date</th>
-                                                                <th className="px-6 py-3">Course / Session</th>
-                                                                <th className="px-6 py-3 text-center">Avg Pre-Test</th>
-                                                                <th className="px-6 py-3 text-center">Avg Post-Test</th>
-                                                                 <th className="px-6 py-3 text-center">Avg Feedback</th>
-                                                                 <th className="px-6 py-3 text-right">Cost</th>
-                                                                <th className="px-6 py-3 text-center">Status</th>
+                                                                <th className="px-6 py-3">{t('recap.colDate')}</th>
+                                                                <th className="px-6 py-3">{t('recap.colCourseSession')}</th>
+                                                                <th className="px-6 py-3 text-center">{t('recap.colAvgPreTest')}</th>
+                                                                <th className="px-6 py-3 text-center">{t('recap.colAvgPostTest')}</th>
+                                                                 <th className="px-6 py-3 text-center">{t('recap.colAvgFeedback')}</th>
+                                                                 <th className="px-6 py-3 text-right">{t('recap.colCost')}</th>
+                                                                <th className="px-6 py-3 text-center">{t('recap.colStatus')}</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-white">
@@ -2521,7 +2523,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                             <td className="px-6 py-4 text-center whitespace-nowrap">
                                                                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${m.costReport?.isPaid ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
                                                                                     {m.costReport?.isPaid ? <CheckCircle size={10} /> : null}
-                                                                                    {m.costReport?.isPaid ? 'Paid' : 'Pending'}
+                                                                                    {m.costReport?.isPaid ? t('recap.paid') : t('recap.pending')}
                                                                                 </span>
                                                                             </td>
                                                                         </tr>
@@ -2532,19 +2534,19 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                         <table className="w-full text-[10px]">
                                                                                             <thead className="bg-slate-50/50 text-slate-400 font-black uppercase tracking-widest border-b border-slate-50">
                                                                                                 <tr>
-                                                                                                    <th className="px-6 py-3 text-left">Participant Name</th>
-                                                                                                    <th className="px-4 py-2 text-center">Pre-Test</th>
-                                                                                                    <th className="px-4 py-2 text-center">Post-Test</th>
-                                                                                                    <th className="px-4 py-2 text-center">Feedback</th>
-                                                                                                    <th className="px-4 py-2 text-center">Attendance</th>
-                                                                                                    <th className="px-4 py-2 text-center">Participation Type</th>
-                                                                                                    <th className="px-4 py-2 text-right pr-6">Cost</th>
+                                                                                                    <th className="px-6 py-3 text-left">{t('recap.colParticipantName')}</th>
+                                                                                                    <th className="px-4 py-2 text-center">{t('recap.colPreTest')}</th>
+                                                                                                    <th className="px-4 py-2 text-center">{t('recap.colPostTest')}</th>
+                                                                                                    <th className="px-4 py-2 text-center">{t('recap.colFeedback')}</th>
+                                                                                                    <th className="px-4 py-2 text-center">{t('recap.colAttendance')}</th>
+                                                                                                    <th className="px-4 py-2 text-center">{t('recap.colParticipationType')}</th>
+                                                                                                    <th className="px-4 py-2 text-right pr-6">{t('recap.colCost')}</th>
                                                                                                 </tr>
                                                                                             </thead>
 <tbody className="divide-y divide-slate-50">
                                                                                                 {participantEmails.length === 0 ? (
                                                                                                     <tr>
-                                                                                                        <td colSpan={7} className="px-4 py-4 text-center italic text-slate-400">No participants recorded for this session.</td>
+                                                                                                        <td colSpan={7} className="px-4 py-4 text-center italic text-slate-400">{t('recap.noParticipants')}</td>
                                                                                                     </tr>
                                                                                                 ) : participantEmails.map(email => {
                                                                                                     const findById = (item: any, id: string) => {
@@ -2618,13 +2620,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                                                     const avg = Number(ratingVal);
                                                                                                                     feedbackDisplay = <span className="text-emerald-600 font-bold">{avg} / 4</span>;
                                                                                                                 } else {
-                                                                                                                    feedbackDisplay = <span className="text-emerald-500 font-bold">Sent</span>;
+                                                                                                                    feedbackDisplay = <span className="text-emerald-500 font-bold">{t('recap.feedbackSent')}</span>;
                                                                                                                 }
                                                                                                             } catch(e) {
-                                                                                                                feedbackDisplay = <span className="text-emerald-500 font-bold">Sent</span>;
+                                                                                                                feedbackDisplay = <span className="text-emerald-500 font-bold">{t('recap.feedbackSent')}</span>;
                                                                                                             }
                                                                                                         } else {
-                                                                                                            feedbackDisplay = <span className="text-emerald-500 font-bold">Sent</span>;
+                                                                                                            feedbackDisplay = <span className="text-emerald-500 font-bold">{t('recap.feedbackSent')}</span>;
                                                                                                         }
                                                                                                     }
 
@@ -2715,7 +2717,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {(filteredMeetings.length === 0) ? (
                             <div className="col-span-full py-12 text-center text-slate-400 italic bg-white rounded-3xl border border-dashed border-slate-200">
-                                No meetings scheduled.
+                                {t('listView.noMeetings')}
                             </div>
                         ) : (
                             filteredMeetings.map((meeting) => (
@@ -2739,11 +2741,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         <div className="flex flex-col items-end gap-2">
                                             {meeting.is_closed ? (
                                                 <span className="px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-600 border border-red-100/50 flex items-center gap-1.5 shadow-sm">
-                                                    <Lock size={10} /> CLOSED
+                                                    <Lock size={10} /> {t('listView.closed')}
                                                 </span>
                                             ) : (
                                                 <span className="px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 border border-emerald-100/50 flex items-center gap-1.5 shadow-sm">
-                                                    <Zap size={10} className="animate-pulse" /> ACTIVE
+                                                    <Zap size={10} className="animate-pulse" /> {t('listView.active')}
                                                 </span>
                                             )}
                                             <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm ${meeting.type === 'Online'
@@ -2766,19 +2768,19 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         </div>
                                         <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500 bg-slate-50/50 p-2 rounded-xl border border-transparent group-hover:border-slate-100 transition-all">
                                             <MapPin size={16} className="text-indigo-400" />
-                                            <span className="line-clamp-1">{meeting.location || 'Online'}</span>
+                                            <span className="line-clamp-1">{meeting.location || t('listView.onlineLocation')}</span>
                                         </div>
                                         <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500 bg-slate-50/50 p-2 rounded-xl border border-transparent group-hover:border-slate-100 transition-all">
                                             <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-black text-white shadow-lg shadow-indigo-200">
                                                 {meeting.host.charAt(0)}
                                             </div>
-                                            <span className="opacity-80">Host:</span> <span className="text-slate-700">{meeting.host}</span>
+                                            <span className="opacity-80">{t('listView.hostLabel')}</span> <span className="text-slate-700">{meeting.host}</span>
                                         </div>
                                     </div>
 
                                     <div className="flex items-center justify-between border-t border-slate-100 pt-6 mt-auto">
                                         <div className="space-y-1">
-                                            <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Audience</div>
+                                            <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('listView.audience')}</div>
                                             <AvatarStack count={meeting.guests?.count || 0} />
                                         </div>
 
@@ -2788,14 +2790,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); openReportModal(meeting); }}
                                                         className="w-10 h-10 flex items-center justify-center rounded-2xl bg-slate-50 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-transparent hover:border-emerald-100 shadow-sm"
-                                                        title="Financial Report"
+                                                        title={t('listView.financialReportTitle')}
                                                     >
                                                         <DollarSign size={18} />
                                                     </button>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); openEditModal(meeting); }}
                                                         className="w-10 h-10 flex items-center justify-center rounded-2xl bg-slate-50 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-all border border-transparent hover:border-blue-100 shadow-sm"
-                                                        title="Edit Meeting"
+                                                        title={t('listView.editMeetingTitle')}
                                                     >
                                                         <FileText size={18} />
                                                     </button>
@@ -2820,7 +2822,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
                             <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
                                 <h2 className="font-bold text-lg text-slate-800">
-                                    {isEditing ? 'Edit Session' : 'Schedule New Session'}
+                                    {isEditing ? t('createModal.editTitle') : t('createModal.createTitle')}
                                 </h2>
                                 <button onClick={() => { setIsCreateOpen(false); resetForm(); }} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={20} /></button>
                             </div>
@@ -2831,14 +2833,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     onClick={() => setActiveCreateTab('details')} 
                                     className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeCreateTab === 'details' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-white' : 'text-slate-400 hover:text-slate-600'}`}
                                 >
-                                    Session Details
+                                    {t('createModal.tabDetails')}
                                 </button>
-                                <button 
+                                <button
                                     type="button"
-                                    onClick={() => setActiveCreateTab('assessment')} 
+                                    onClick={() => setActiveCreateTab('assessment')}
                                     className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeCreateTab === 'assessment' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-white' : 'text-slate-400 hover:text-slate-600'}`}
                                 >
-                                    Exam Configuration
+                                    {t('createModal.tabAssessment')}
                                 </button>
                             </div>
 
@@ -2847,10 +2849,10 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     <>
                                 {/* Title */}
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Event Title</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.eventTitleLabel')}</label>
                                     <input
                                         required
-                                        placeholder="e.g. Q1 Design Review"
+                                        placeholder={t('createModal.eventTitlePlaceholder')}
                                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-slate-300 font-semibold text-slate-700"
                                         value={formData.title}
                                         onChange={e => setFormData({ ...formData, title: e.target.value })}
@@ -2860,7 +2862,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 {/* Date & Time */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Date</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.dateLabel')}</label>
                                         <input
                                             type="date"
                                             required
@@ -2872,7 +2874,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     </div>
                                     <div className="grid grid-cols-2 gap-2">
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Start</label>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.startLabel')}</label>
                                             <input
                                                 type="time"
                                                 required
@@ -2882,7 +2884,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">End</label>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.endLabel')}</label>
                                             <input
                                                 type="time"
                                                 required
@@ -2897,11 +2899,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 {/* Type & Host */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Host Name</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.hostNameLabel')}</label>
                                         <div className="relative" ref={hostDropdownRef}>
                                             <input
                                                 type="text"
-                                                placeholder={formData.host || "Search Host..."}
+                                                placeholder={formData.host || t('createModal.hostSearchPlaceholder')}
                                                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-semibold text-slate-700"
                                                 value={hostSearch}
                                                 onFocus={() => setShowHostDropdown(true)}
@@ -2921,7 +2923,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         ).slice(0, 50);
 
                                                         if (filtered.length === 0) {
-                                                            return <div className="p-4 text-center text-xs text-slate-400 italic">No matching hosts found.</div>;
+                                                            return <div className="p-4 text-center text-xs text-slate-400 italic">{t('createModal.noMatchingHosts')}</div>;
                                                         }
 
                                                         return filtered.map(emp => (
@@ -2945,15 +2947,15 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Event Type</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.eventTypeLabel')}</label>
                                         <select
                                             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-600"
                                             value={formData.type}
                                             onChange={e => setFormData({ ...formData, type: e.target.value as 'Online' | 'Offline' | 'Hybrid' })}
                                         >
-                                            <option value="Online">Online Video</option>
-                                            <option value="Offline">In-Person</option>
-                                            <option value="Hybrid">Hybrid (In-Person + Online)</option>
+                                            <option value="Online">{t('createModal.typeOnlineVideo')}</option>
+                                            <option value="Offline">{t('createModal.typeInPerson')}</option>
+                                            <option value="Hybrid">{t('createModal.typeHybrid')}</option>
                                         </select>
                                     </div>
                                 </div>
@@ -2961,24 +2963,24 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 {/* Competency Type & Name */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Competency Type</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.competencyTypeLabel')}</label>
                                         <select
                                             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-600"
                                             value={formData.competency_type}
                                             onChange={e => setFormData({ ...formData, competency_type: e.target.value })}
                                         >
-                                            <option value="">Select Type...</option>
-                                            <option value="Behavioral">Behavioral</option>
-                                            <option value="Core">Core</option>
-                                            <option value="Technical/Functional">Technical/Functional</option>
-                                            <option value="Managerial">Managerial</option>
+                                            <option value="">{t('createModal.selectTypePlaceholder')}</option>
+                                            <option value="Behavioral">{t('createModal.competencyBehavioral')}</option>
+                                            <option value="Core">{t('createModal.competencyCore')}</option>
+                                            <option value="Technical/Functional">{t('createModal.competencyTechnical')}</option>
+                                            <option value="Managerial">{t('createModal.competencyManagerial')}</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Competency Name</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.competencyNameLabel')}</label>
                                         <input
                                             type="text"
-                                            placeholder="e.g. Leadership"
+                                            placeholder={t('createModal.competencyNamePlaceholder')}
                                             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-semibold text-slate-700"
                                             value={formData.competency_name}
                                             onChange={e => setFormData({ ...formData, competency_name: e.target.value })}
@@ -2988,28 +2990,28 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                 {/* Training GRI Type */}
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Training GRI Type</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.griTypeLabel')}</label>
                                     <select
                                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-600"
                                         value={formData.training_gr_type}
                                         onChange={e => setFormData({ ...formData, training_gr_type: e.target.value })}
                                     >
-                                        <option value="">Select GRI Type...</option>
-                                        <option value="ESG">ESG (Environmental, Social, and Governance)</option>
-                                        <option value="HSE">HSE (Health, Safety, and Environment)</option>
-                                        <option value="Other">Other</option>
+                                        <option value="">{t('createModal.selectGriPlaceholder')}</option>
+                                        <option value="ESG">{t('createModal.griEsg')}</option>
+                                        <option value="HSE">{t('createModal.griHse')}</option>
+                                        <option value="Other">{t('createModal.griOther')}</option>
                                     </select>
                                 </div>
 
                                 {/* Location & Link - Conditional */}
                                 {(formData.type === 'Offline' || formData.type === 'Hybrid') && (
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Room / Location</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.locationLabel')}</label>
                                         <div className="relative">
                                             <MapPin size={18} className="absolute left-3.5 top-3 text-slate-400" />
                                             <input
                                                 required
-                                                placeholder="e.g. Meeting Room A, 2nd Floor"
+                                                placeholder={t('createModal.locationPlaceholder')}
                                                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600 mb-4"
                                                 value={formData.location}
                                                 onChange={e => setFormData({ ...formData, location: e.target.value })}
@@ -3020,12 +3022,12 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                 {(formData.type === 'Online' || formData.type === 'Hybrid') && (
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Online Meeting Link</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.meetLinkLabel')}</label>
                                         <div className="relative">
                                             <Video size={18} className="absolute left-3.5 top-3 text-slate-400" />
                                             <input
                                                 required
-                                                placeholder="Paste Google Meet / Zoom link here"
+                                                placeholder={t('createModal.meetLinkPlaceholder')}
                                                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600"
                                                 value={formData.meetLink}
                                                 onChange={e => setFormData({ ...formData, meetLink: e.target.value })}
@@ -3035,11 +3037,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 )}
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Presentation Link</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.materialLinkLabel')}</label>
                                     <div className="relative mb-4">
                                         <FileText size={18} className="absolute left-3.5 top-3 text-slate-400" />
                                         <input
-                                            placeholder="Paste Google Drive / Presentation link here"
+                                            placeholder={t('createModal.materialLinkPlaceholder')}
                                             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600"
                                             value={formData.material_link}
                                             onChange={e => setFormData({ ...formData, material_link: e.target.value })}
@@ -3049,12 +3051,12 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                 {/* Email Invites */}
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Invite Participants</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.inviteParticipantsLabel')}</label>
                                     <div className="flex flex-col gap-3">
                                         <div className="relative" ref={participantDropdownRef}>
                                             <input
                                                 type="text"
-                                                placeholder="Search & Add Employee..."
+                                                placeholder={t('createModal.participantSearchPlaceholder')}
                                                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-sm font-semibold text-slate-700"
                                                 value={participantSearch}
                                                 onFocus={() => setShowParticipantDropdown(true)}
@@ -3071,7 +3073,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         ).slice(0, 50);
 
                                                         if (filtered.length === 0) {
-                                                            return <div className="p-4 text-center text-xs text-slate-400 italic">No matching employees found.</div>;
+                                                            return <div className="p-4 text-center text-xs text-slate-400 italic">{t('createModal.noMatchingEmployees')}</div>;
                                                         }
 
                                                         return filtered.map(emp => (
@@ -3117,20 +3119,20 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 );
                                             })}
                                             {invitedEmails.length === 0 && invitedEmployeeIds.length === 0 && (
-                                                <span className="text-slate-400 text-xs py-1 px-1 italic">No participants added yet.</span>
+                                                <span className="text-slate-400 text-xs py-1 px-1 italic">{t('createModal.noParticipantsAdded')}</span>
                                             )}
                                         </div>
                                     </div>
-                                    <p className="text-[10px] text-slate-400 mt-1.5 pl-1">Select employees from the list to invite them to this session.</p>
+                                    <p className="text-[10px] text-slate-400 mt-1.5 pl-1">{t('createModal.inviteHelperText')}</p>
                                 </div>
 
                                 {/* Description */}
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Description</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.descriptionLabel')}</label>
                                     <textarea
                                         rows={3}
                                         required
-                                        placeholder="What is this session about?"
+                                        placeholder={t('createModal.descriptionPlaceholder')}
                                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600 resize-none"
                                         value={formData.description}
                                         onChange={e => setFormData({ ...formData, description: e.target.value })}
@@ -3160,14 +3162,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     onClick={() => { setIsCreateOpen(false); resetForm(); }}
                                     className="flex-1 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors"
                                 >
-                                    Cancel
+                                    {t('createModal.cancelButton')}
                                 </button>
                                 <button
                                     type="submit"
                                     onClick={(e) => handleSave(e)}
                                     className="flex-[2] py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
                                 >
-                                    <CalendarIcon size={18} /> {isEditing ? 'Update Event' : 'Send Invitations'}
+                                    <CalendarIcon size={18} /> {isEditing ? t('createModal.updateEventButton') : t('createModal.sendInvitationsButton')}
                                 </button>
                             </div>
                         </div>
@@ -3182,14 +3184,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
                             <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
                                 <div>
-                                    <h2 className="font-bold text-lg text-slate-800">Finalize Report</h2>
-                                    <p className="text-xs text-slate-500">Input post-training costs for HR Reporting.</p>
+                                    <h2 className="font-bold text-lg text-slate-800">{t('reportModal.title')}</h2>
+                                    <p className="text-xs text-slate-500">{t('reportModal.subtitle')}</p>
                                 </div>
                                 <button onClick={() => setIsReportOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={20} /></button>
                             </div>
                             <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Attendance Checklist</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t('reportModal.attendanceChecklistLabel')}</label>
                                     <div className={`bg-slate-50 rounded-xl border border-slate-200 p-3 max-h-[150px] overflow-y-auto space-y-2 ${reportData.isPaid ? 'opacity-60 pointer-events-none' : ''}`}>
                                         {(() => {
                                             const meeting = meetings.find(m => m.id === reportingId);
@@ -3197,7 +3199,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             const invitedEmployeeIdsList = (meeting?.guests as any)?.employee_ids || [];
 
                                             if (invitedEmailsList.length === 0 && invitedEmployeeIdsList.length === 0) {
-                                                return <p className="text-xs text-slate-400 italic text-center py-2">No invited guests found.</p>;
+                                                return <p className="text-xs text-slate-400 italic text-center py-2">{t('reportModal.noInvitedGuests')}</p>;
                                             }
 
                                             // Combined checklist
@@ -3236,7 +3238,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                         />
                                                                     </label>
                                                                     <span className="text-xs text-slate-600 font-semibold">
-                                                                        Self Registered
+                                                                        {t('reportModal.selfRegistered')}
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -3271,7 +3273,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                         />
                                                                     </label>
                                                                     <span className="text-xs text-slate-600 font-semibold">
-                                                                        Self Registered
+                                                                        {t('reportModal.selfRegistered')}
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -3282,7 +3284,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         })()}
                                     </div>
                                     <div className="flex justify-between items-center mt-2 px-1">
-                                        <span className="text-xs text-slate-400">Checked: {Math.max((reportData.attendees || []).length, (reportData.attendee_ids || []).length)} / {Math.max(meetings.find(m => m.id === reportingId)?.guests?.emails?.length || 0, (meetings.find(m => m.id === reportingId)?.guests as any)?.employee_ids?.length || 0)}</span>
+                                        <span className="text-xs text-slate-400">{t('reportModal.checkedCount', { checked: Math.max((reportData.attendees || []).length, (reportData.attendee_ids || []).length), total: Math.max(meetings.find(m => m.id === reportingId)?.guests?.emails?.length || 0, (meetings.find(m => m.id === reportingId)?.guests as any)?.employee_ids?.length || 0) })}</span>
                                         <button
                                             type="button"
                                             onClick={() => {
@@ -3312,13 +3314,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             }}
                                             className="text-[10px] font-bold text-blue-600 hover:underline"
                                         >
-                                            Select All (Excl. Internship/PKL)
+                                            {t('reportModal.selectAll')}
                                         </button>
                                     </div>
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Actual Participants (Excl. Internship/PKL)</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('reportModal.actualParticipantsLabel')}</label>
                                     <input
                                         type="number"
                                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed outline-none font-bold"
@@ -3328,7 +3330,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Training Photos</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t('reportModal.trainingPhotosLabel')}</label>
                                     <div 
                                         onClick={() => !reportData.isPaid && photoInputRef.current?.click()}
                                         className={`relative group h-40 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-3 overflow-hidden
@@ -3341,7 +3343,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     >
                                         {reportData.trainingPhotos ? (
                                             <>
-                                                <img src={getFullImageUrl(reportData.trainingPhotos)} alt="Training" className="absolute inset-0 w-full h-full object-cover" />
+                                                <img src={getFullImageUrl(reportData.trainingPhotos)} alt={t('reportModal.trainingPhotoAlt')} className="absolute inset-0 w-full h-full object-cover" />
                                                 {!reportData.isPaid && (
                                                     <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                         <div className="bg-white/20 backdrop-blur-md p-3 rounded-full text-white">
@@ -3356,8 +3358,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     <Camera size={28} className="text-slate-400" />
                                                 </div>
                                                 <div className="text-center">
-                                                    <p className="text-sm font-bold text-slate-600">Click to upload photo</p>
-                                                    <p className="text-[10px] text-slate-400">Documentation evidence (JPG/PNG)</p>
+                                                    <p className="text-sm font-bold text-slate-600">{t('reportModal.clickToUploadPhoto')}</p>
+                                                    <p className="text-[10px] text-slate-400">{t('reportModal.documentationEvidence')}</p>
                                                 </div>
                                             </>
                                         )}
@@ -3373,7 +3375,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Trainer Incentive</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('reportModal.trainerIncentiveLabel')}</label>
                                     <div className="relative">
                                         <span className="absolute left-4 top-2.5 text-slate-500 font-bold">Rp</span>
                                         <input
@@ -3390,7 +3392,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                 <div className="grid grid-cols-3 gap-3">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Snack Cost</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('reportModal.snackCostLabel')}</label>
                                         <div className="relative">
                                             <span className="absolute left-3 top-2.5 text-xs text-slate-500 font-bold">Rp</span>
                                             <input
@@ -3405,7 +3407,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Lunch Cost</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('reportModal.lunchCostLabel')}</label>
                                         <div className="relative">
                                             <span className="absolute left-3 top-2.5 text-xs text-slate-500 font-bold">Rp</span>
                                             <input
@@ -3420,7 +3422,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Other Cost</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('reportModal.otherCostLabel')}</label>
                                         <div className="relative">
                                             <span className="absolute left-3 top-2.5 text-xs text-slate-500 font-bold">Rp</span>
                                             <input
@@ -3438,7 +3440,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                             </div >
                             <div className="mt-4 p-4 bg-slate-100 rounded-xl border border-slate-200">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-sm font-bold text-slate-600 uppercase">Total Estimated Cost</span>
+                                    <span className="text-sm font-bold text-slate-600 uppercase">{t('reportModal.totalEstimatedCost')}</span>
                                     <span className="text-xl font-bold text-indigo-600">
                                         {formatCurrency(
                                             (reportData.trainerIncentive || 0) +
@@ -3454,12 +3456,12 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     onClick={() => setIsReportOpen(false)}
                                     className="flex-1 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors"
                                 >
-                                    Cancel
+                                    {t('reportModal.cancelButton')}
                                 </button>
 
                                 {reportData.isPaid ? (
                                     <div className="flex-[2] py-3 bg-slate-100 text-slate-400 font-bold rounded-xl flex items-center justify-center gap-2 border border-slate-200">
-                                        <CheckCircle size={18} /> Report Paid & Locked
+                                        <CheckCircle size={18} /> {t('reportModal.reportPaidLocked')}
                                     </div>
                                 ) : (
                                     (() => {
@@ -3484,10 +3486,10 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             >
                                                 {!isClosed ? (
                                                     <>
-                                                        <Lock size={18} /> Session Still Open
+                                                        <Lock size={18} /> {t('reportModal.sessionStillOpen')}
                                                     </>
                                                 ) : (
-                                                    <>Mark Paid</>
+                                                    <>{t('reportModal.markPaid')}</>
                                                 )}
                                             </button>
                                         );
@@ -3510,7 +3512,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     const updatedMeetings = meetings.map(m => m.id === reportingId ? { ...m, costReport: updatedData } : m);
                     setMeetings(updatedMeetings);
                     setIsReportOpen(false);
-                    setNotification({ show: true, type: 'success', message: 'Report marked as PAID and locked.' });
+                    setNotification({ show: true, type: 'success', message: t('notifications.reportMarkedPaid') });
 
                     // Persist
                     try {
@@ -3527,9 +3529,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         console.error(err);
                     }
                 }}
-                title="Confirm Payment"
-                message="Are you sure you want to mark this as PAID? This will lock the report and costs cannot be changed anymore."
-                confirmText="Yes, Mark Paid"
+                title={t('confirmPaidModal.title')}
+                message={t('confirmPaidModal.message')}
+                confirmText={t('confirmPaidModal.confirmText')}
                 variant="success"
             />
 
@@ -3542,7 +3544,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                             <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white">
                                 <div>
                                     <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                                        <Users className="text-indigo-600" size={20} /> {recapDetailHost} - Session Details
+                                        <Users className="text-indigo-600" size={20} /> {t('recapDetailModal.titleSuffix', { host: recapDetailHost })}
                                     </h2>
                                     <p className="text-xs text-slate-500 font-medium">{startDate} - {endDate} • {selectedBranch}</p>
                                 </div>
@@ -3553,14 +3555,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 <table className="w-full text-left text-sm">
                                     <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
                                         <tr>
-                                            <th className="px-4 py-3">Date</th>
-                                            <th className="px-4 py-3">Title</th>
-                                            <th className="px-4 py-3">Type</th>
-                                            <th className="px-4 py-3 text-center">Guests</th>
-                                            <th className="px-4 py-3 text-right">Trainer Inc.</th>
-                                            <th className="px-4 py-3 text-right">Total Cost</th>
-                                            <th className="px-4 py-3 text-center">Status</th>
-                                            <th className="px-4 py-3 text-center">Action</th>
+                                            <th className="px-4 py-3">{t('recapDetailModal.colDate')}</th>
+                                            <th className="px-4 py-3">{t('recapDetailModal.colTitle')}</th>
+                                            <th className="px-4 py-3">{t('recapDetailModal.colType')}</th>
+                                            <th className="px-4 py-3 text-center">{t('recapDetailModal.colGuests')}</th>
+                                            <th className="px-4 py-3 text-right">{t('recapDetailModal.colTrainerInc')}</th>
+                                            <th className="px-4 py-3 text-right">{t('recapDetailModal.colTotalCost')}</th>
+                                            <th className="px-4 py-3 text-center">{t('recapDetailModal.colStatus')}</th>
+                                            <th className="px-4 py-3 text-center">{t('recapDetailModal.colAction')}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -3594,14 +3596,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 <td className="px-4 py-3 text-center">
                                                     {m.costReport?.isPaid ? (
                                                         <div className="flex items-center justify-center gap-1 text-emerald-700 font-black text-xs uppercase bg-emerald-100 px-2 py-1 rounded-full">
-                                                            <CheckCircle size={14} /> PAID
+                                                            <CheckCircle size={14} /> {t('recapDetailModal.paid')}
                                                         </div>
                                                     ) : m.costReport?.isFinalized ? (
                                                         <div className="flex items-center justify-center gap-1 text-blue-600 font-bold text-xs uppercase">
-                                                            <CheckCircle size={14} /> Reported
+                                                            <CheckCircle size={14} /> {t('recapDetailModal.reported')}
                                                         </div>
                                                     ) : (
-                                                        <span className="text-orange-500 font-bold text-xs uppercase">Pending</span>
+                                                        <span className="text-orange-500 font-bold text-xs uppercase">{t('recapDetailModal.pending')}</span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
@@ -3609,7 +3611,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         onClick={() => openReportModal(m)}
                                                         className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline"
                                                     >
-                                                        View Details
+                                                        {t('recapDetailModal.viewDetails')}
                                                     </button>
                                                 </td>
                                             </tr>
@@ -3620,7 +3622,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                             <div className="p-4 border-t border-slate-100 bg-slate-50 text-right">
                                 <button onClick={() => setRecapDetailHost(null)} className="px-6 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-100 transition-colors shadow-sm">
-                                    Close
+                                    {t('recapDetailModal.close')}
                                 </button>
                             </div>
                         </div>
@@ -3678,11 +3680,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-600">{selectedMeeting.type}</span>
                                     {selectedMeeting.is_closed ? (
                                         <span className="bg-red-500 px-2 py-0.5 rounded text-white text-[10px] font-black flex items-center gap-1">
-                                            <Lock size={10} /> CLOSED
+                                            <Lock size={10} /> {t('detailModal.closed')}
                                         </span>
                                     ) : (
                                         <span className="bg-emerald-500 px-2 py-0.5 rounded text-white text-[10px] font-black flex items-center gap-1">
-                                            <Zap size={10} className="animate-pulse" /> ACTIVE
+                                            <Zap size={10} className="animate-pulse" /> {t('detailModal.active')}
                                         </span>
                                     )}
                                     <span>•</span>
@@ -3693,7 +3695,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     <div className="flex gap-4">
                                         <div className="w-8 flex justify-center pt-0.5"><UserIcon className="text-slate-400" size={20} /></div>
                                         <div>
-                                            <p className="font-semibold text-slate-700 text-sm">Host</p>
+                                            <p className="font-semibold text-slate-700 text-sm">{t('detailModal.hostLabel')}</p>
                                             <p className="text-sm text-slate-600">{selectedMeeting.host}</p>
                                         </div>
                                     </div>
@@ -3701,7 +3703,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     <div className="flex gap-4">
                                         <div className="w-8 flex justify-center pt-0.5"><Clock className="text-slate-400" size={20} /></div>
                                         <div>
-                                            <p className="font-semibold text-slate-700 text-sm">Time</p>
+                                            <p className="font-semibold text-slate-700 text-sm">{t('detailModal.timeLabel')}</p>
                                             <p className="text-sm text-slate-600">{selectedMeeting.time}</p>
                                         </div>
                                     </div>
@@ -3709,7 +3711,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     <div className="flex gap-4">
                                         <div className="w-8 flex justify-center pt-0.5"><MapPin className="text-slate-400" size={20} /></div>
                                         <div>
-                                            <p className="font-semibold text-slate-700 text-sm">Location</p>
+                                            <p className="font-semibold text-slate-700 text-sm">{t('detailModal.locationLabel')}</p>
                                             {(selectedMeeting.type === 'Offline' || selectedMeeting.type === 'Hybrid') && (
                                                 <p className="text-sm text-slate-600">{selectedMeeting.location}</p>
                                             )}
@@ -3725,14 +3727,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         <div className="flex gap-4">
                                             <div className="w-8 flex justify-center pt-0.5"><Link className="text-slate-400" size={20} /></div>
                                             <div className="flex-1">
-                                                <p className="font-semibold text-slate-700 text-sm mb-1">Presentation Link</p>
+                                                <p className="font-semibold text-slate-700 text-sm mb-1">{t('detailModal.materialLinkLabel')}</p>
                                                 <a
                                                     href={selectedMeeting.material_link}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors"
                                                 >
-                                                    Open Presentation ↗
+                                                    {t('detailModal.openPresentation')}
                                                 </a>
                                             </div>
                                         </div>
@@ -3742,7 +3744,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         <div className="w-8 flex justify-center pt-0.5"><Users className="text-slate-400" size={20} /></div>
                                         <div className="flex-1">
                                             <p className="font-semibold text-slate-700 text-sm mb-2">
-                                                {selectedMeeting.guests?.count || (selectedMeeting.guests as any)?.employee_ids?.length || 0} Invited Guests
+                                                {t('detailModal.invitedGuests', { count: selectedMeeting.guests?.count || (selectedMeeting.guests as any)?.employee_ids?.length || 0 })}
                                             </p>
                                             {(selectedMeeting.guests?.count > 0) ? (
                                                 <div className="flex flex-wrap gap-2">
@@ -3761,7 +3763,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     })}
                                                 </div>
                                             ) : (
-                                                <p className="text-xs text-slate-400 italic">No specific invites sent.</p>
+                                                <p className="text-xs text-slate-400 italic">{t('detailModal.noInvitesSent')}</p>
                                             )}
                                         </div>
                                     </div>
@@ -3834,7 +3836,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-purple-50 hover:bg-purple-100 rounded-lg transition-all"
                                                 >
                                                     <h4 className="text-[10px] font-black text-purple-600 uppercase tracking-widest flex items-center gap-2">
-                                                        <MessageSquare size={14} /> Feedback Peserta
+                                                        <MessageSquare size={14} /> {t('detailModal.participantFeedback')}
                                                     </h4>
                                                     <ChevronDown className={`text-purple-400 transition-transform ${showFeedbackList ? 'rotate-180' : ''}`} />
                                                 </button>
@@ -3846,13 +3848,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 <p className="text-xs font-bold text-slate-700 mb-2">{fb.name}</p>
                                                                 {fb.q11 && (
                                                                     <div className="mb-2">
-                                                                        <p className="text-[9px] font-bold text-purple-500 uppercase tracking-wider mb-1">Hal yang sudah baik:</p>
+                                                                        <p className="text-[9px] font-bold text-purple-500 uppercase tracking-wider mb-1">{t('detailModal.whatWentWell')}</p>
                                                                         <p className="text-xs text-slate-600">{fb.q11}</p>
                                                                     </div>
                                                                 )}
                                                                 {fb.q12 && (
                                                                     <div>
-                                                                        <p className="text-[9px] font-bold text-purple-500 uppercase tracking-wider mb-1">Yang perlu ditingkatkan:</p>
+                                                                        <p className="text-[9px] font-bold text-purple-500 uppercase tracking-wider mb-1">{t('detailModal.whatToImprove')}</p>
                                                                         <p className="text-xs text-slate-600">{fb.q12}</p>
                                                                     </div>
                                                                 )}
@@ -3867,7 +3869,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     {selectedMeeting.costReport?.trainingPhotos && (
                                         <div className="mt-6 pt-4 border-t border-slate-50">
                                             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                <ImageIcon size={12} /> Training Documentation
+                                                <ImageIcon size={12} /> {t('detailModal.trainingDocumentation')}
                                             </h4>
                                             <div 
                                                 className="relative h-40 rounded-2xl overflow-hidden border border-slate-100 group cursor-pointer shadow-sm hover:shadow-md transition-all"
@@ -3875,7 +3877,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             >
                                                 <img 
                                                     src={getFullImageUrl(selectedMeeting.costReport.trainingPhotos)} 
-                                                    alt="Training Evidence" 
+                                                    alt={t('detailModal.trainingEvidenceAlt')}
                                                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                                                 />
                                                 <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/20 transition-colors flex items-center justify-center">
@@ -3890,7 +3892,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                 <div className="mt-8 space-y-3">
                                     <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                                        <p className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1"><CalendarIcon size={12} /> Add to Calendar</p>
+                                        <p className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1"><CalendarIcon size={12} /> {t('detailModal.addToCalendar')}</p>
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => {
@@ -3919,12 +3921,12 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         a.click();
                                                     } catch (e) {
                                                         console.error(e);
-                                                        setNotification({ show: true, type: 'error', message: "Failed to create calendar file." });
+                                                        setNotification({ show: true, type: 'error', message: t('notifications.calendarFileError') });
                                                     }
                                                 }}
                                                 className="flex-1 py-2 bg-white border border-slate-200 hover:bg-white hover:border-slate-300 text-slate-600 font-bold rounded-lg text-xs transition-all shadow-sm"
                                             >
-                                                Outlook / Apple
+                                                {t('detailModal.outlookApple')}
                                             </button>
                                             <button
                                                 onClick={() => {
@@ -3948,12 +3950,12 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         window.open(url, '_blank');
                                                     } catch (e) {
                                                         console.error(e);
-                                                        setNotification({ show: true, type: 'error', message: "Failed to open Google Calendar." });
+                                                        setNotification({ show: true, type: 'error', message: t('notifications.googleCalendarError') });
                                                     }
                                                 }}
                                                 className="flex-1 py-2 bg-white border border-slate-200 hover:bg-white hover:border-slate-300 text-blue-600 font-bold rounded-lg text-xs transition-all shadow-sm text-center flex items-center justify-center"
                                             >
-                                                Google Calendar
+                                                {t('detailModal.googleCalendar')}
                                             </button>
                                         </div>
                                     </div>
@@ -3966,15 +3968,15 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                          <div className="mt-6 space-y-3 border-t border-slate-100 pt-6">
                                              <div className="flex items-center justify-between mb-1">
                                                  <div className="flex items-center gap-2">
-                                                     <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider">Assessment & Feedback</h4>
+                                                     <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider">{t('detailModal.assessmentFeedback')}</h4>
                                                      {isHostOrHR && !selectedMeeting.is_closed && (
                                                          <span className="flex items-center gap-1 text-[8px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-black border border-indigo-100">
-                                                             <Zap size={8} /> HOST CONTROL
+                                                             <Zap size={8} /> {t('detailModal.hostControl')}
                                                          </span>
                                                      )}
                                                  </div>
                                                  <div className="flex items-center gap-1 text-[10px] text-indigo-500 font-bold">
-                                                     <CheckCircle size={12} /> REQUIRED
+                                                     <CheckCircle size={12} /> {t('detailModal.required')}
                                                  </div>
                                              </div>
 
@@ -3985,11 +3987,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                             onClick={() => setIsCloseModalOpen(true)}
                                                             className="w-full mb-2 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-black rounded-xl border border-red-200 flex items-center justify-center gap-2 transition-all shadow-sm"
                                                         >
-                                                            <Lock size={14} /> CLOSE SESSION
+                                                            <Lock size={14} /> {t('detailModal.closeSession')}
                                                         </button>
                                                     ) : (
                                                         <div className="w-full mb-4 py-2 bg-slate-100 text-slate-500 text-xs font-black rounded-xl border border-slate-200 flex items-center justify-center gap-2 shadow-sm">
-                                                            <Lock size={14} /> SESSION CLOSED
+                                                            <Lock size={14} /> {t('detailModal.sessionClosed')}
                                                         </div>
                                                     )}
 
@@ -3999,7 +4001,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 className="flex justify-between items-center p-2 hover:bg-slate-100 rounded-xl cursor-pointer transition-colors"
                                                                 onClick={() => setShowParticipantModal('sudah')}
                                                             >
-                                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sudah Selesai</span>
+                                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('detailModal.done')}</span>
                                                                 <span className="text-sm font-black text-emerald-600 bg-emerald-50 px-3 py-0.5 rounded-full border border-emerald-100">
                                                                     {meetingSummary.feedback || 0}
                                                                 </span>
@@ -4008,7 +4010,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 className="flex justify-between items-center p-2 hover:bg-slate-100 rounded-xl cursor-pointer transition-colors"
                                                                 onClick={() => setShowParticipantModal('belum')}
                                                             >
-                                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Belum Selesai</span>
+                                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('detailModal.pendingCount')}</span>
                                                                 <span className="text-sm font-black text-orange-600 bg-orange-50 px-3 py-0.5 rounded-full border border-orange-100">
                                                                     {(() => {
                                                                         // Get total participants from multiple possible sources
@@ -4051,11 +4053,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         onClick={() => {
                                                             if (isHostOrHR) return; // Host doesn't take the test here
                                                             if (selectedMeeting.is_closed) {
-                                                                setNotification({ show: true, type: 'info', message: "Sesi ini sudah ditutup oleh Host." });
+                                                                setNotification({ show: true, type: 'info', message: t('notifications.sessionClosedByHost') });
                                                                 return;
                                                             }
                                                             if (!selectedMeeting.is_pre_test_active) {
-                                                                setNotification({ show: true, type: 'info', message: "Pre-Test belum dibuka oleh Host." });
+                                                                setNotification({ show: true, type: 'info', message: t('notifications.preTestNotOpen') });
                                                                 return;
                                                             }
                                                             if (meetingQuizResults.find(r => r.quizType === 'PRE')) return;
@@ -4077,8 +4079,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 {(selectedMeeting.is_pre_test_active && !selectedMeeting.is_closed) ? <FileText size={16} /> : <Lock size={16} />}
                                                             </div>
                                                             <div className="text-left">
-                                                                <p className="font-bold text-slate-800 text-xs">Pre-Test Assessment</p>
-                                                                <p className="text-[10px] text-slate-400">Evaluasi sebelum materi</p>
+                                                                <p className="font-bold text-slate-800 text-xs">{t('detailModal.preTestTitle')}</p>
+                                                                <p className="text-[10px] text-slate-400">{t('detailModal.preTestSubtitle')}</p>
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-3">
@@ -4088,7 +4090,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                     const midMatches = Number(r.meetingId || (r as any).meeting_id) === Number(selectedMeeting.id);
                                                                     return (type === 'PRE' || type === 'PRE-TEST') && midMatches;
                                                                 });
-                                                                return res && <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">Score: {res.score}</span>;
+                                                                return res && <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">{t('detailModal.score', { score: res.score })}</span>;
                                                             })()}
                                                             {!isHostOrHR && selectedMeeting.is_pre_test_active && !meetingQuizResults.find(r => r.quizType === 'PRE') && <ArrowRight size={14} className="text-slate-300 group-hover:text-indigo-500" />}
                                                         </div>
@@ -4097,7 +4099,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     {isHostOrHR && !selectedMeeting.is_closed && (
                                                         <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
                                                             <div className="flex flex-col">
-                                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Akses Pre-Test</span>
+                                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{t('detailModal.accessPreTest')}</span>
                                                             </div>
                                                             <button
                                                                 onClick={() => toggleMeetingStatus('is_pre_test_active', selectedMeeting.is_pre_test_active)}
@@ -4122,16 +4124,16 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         onClick={() => {
                                                             if (isHostOrHR) return;
                                                             if (selectedMeeting.is_closed) {
-                                                                setNotification({ show: true, type: 'info', message: "Sesi ini sudah ditutup oleh Host." });
+                                                                setNotification({ show: true, type: 'info', message: t('notifications.sessionClosedByHost') });
                                                                 return;
                                                             }
                                                             if (!selectedMeeting.is_post_test_active) {
-                                                                setNotification({ show: true, type: 'info', message: "Post-Test belum dibuka oleh Host." });
+                                                                setNotification({ show: true, type: 'info', message: t('notifications.postTestNotOpen') });
                                                                 return;
                                                             }
                                                             const preRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('PRE'));
                                                             if (!preRes) {
-                                                                setNotification({ show: true, type: 'info', message: "Silakan kerjakan Pre-Test terlebih dahulu." });
+                                                                setNotification({ show: true, type: 'info', message: t('notifications.completePreTestFirst') });
                                                                 return;
                                                             }
                                                             const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
@@ -4158,14 +4160,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 {(selectedMeeting.is_post_test_active && !selectedMeeting.is_closed) ? <CheckCircle size={16} /> : <Lock size={16} />}
                                                             </div>
                                                             <div className="text-left">
-                                                                <p className="font-bold text-slate-800 text-xs">Post-Test Assessment</p>
-                                                                <p className="text-[10px] text-slate-400">Syarat kelulusan (Min. 80)</p>
+                                                                <p className="font-bold text-slate-800 text-xs">{t('detailModal.postTestTitle')}</p>
+                                                                <p className="text-[10px] text-slate-400">{t('detailModal.postTestSubtitle')}</p>
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-3">
                                                             {(() => {
                                                                 const res = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
-                                                                return res && <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">Score: {res.score}</span>;
+                                                                return res && <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">{t('detailModal.score', { score: res.score })}</span>;
                                                             })()}
                                                             {!isHostOrHR && selectedMeeting.is_post_test_active && !meetingQuizResults.find(r => r.quizType === 'POST') && <ArrowRight size={14} className="text-slate-300 group-hover:text-indigo-500" />}
                                                         </div>
@@ -4174,7 +4176,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     {isHostOrHR && !selectedMeeting.is_closed && (
                                                         <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
                                                             <div className="flex flex-col">
-                                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Akses Post-Test</span>
+                                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{t('detailModal.accessPostTest')}</span>
                                                             </div>
                                                             <button
                                                                 onClick={() => toggleMeetingStatus('is_post_test_active', selectedMeeting.is_post_test_active)}
@@ -4194,11 +4196,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         onClick={() => {
                                                             if (isHostOrHR) return;
                                                             if (selectedMeeting.is_closed) {
-                                                                setNotification({ show: true, type: 'info', message: "Sesi ini sudah ditutup oleh Host." });
+                                                                setNotification({ show: true, type: 'info', message: t('notifications.sessionClosedByHost') });
                                                                 return;
                                                             }
                                                             if (!selectedMeeting.is_feedback_active) {
-                                                                setNotification({ show: true, type: 'info', message: "Form Feedback belum dibuka oleh Host." });
+                                                                setNotification({ show: true, type: 'info', message: t('notifications.feedbackNotOpen') });
                                                                 return;
                                                             }
                                                             const hasPostTest = (() => {
@@ -4210,7 +4212,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                             if (hasPostTest) {
                                                                 const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
                                                                 if (!postRes || (Number(postRes.score) || 0) < 80) {
-                                                                    setNotification({ show: true, type: 'info', message: "Anda harus lulus Post-Test (Skor >= 80) sebelum mengisi feedback." });
+                                                                    setNotification({ show: true, type: 'info', message: t('notifications.mustPassPostTest') });
                                                                     return;
                                                                 }
                                                             }
@@ -4259,12 +4261,12 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 })()}
                                                             </div>
                                                             <div className="text-left">
-                                                                <p className="font-bold text-slate-800 text-xs">Feedback Form</p>
-                                                                <p className="text-[10px] text-slate-400">Evaluasi penyelenggara (Bahasa Indonesia)</p>
+                                                                <p className="font-bold text-slate-800 text-xs">{t('detailModal.feedbackFormTitle')}</p>
+                                                                <p className="text-[10px] text-slate-400">{t('detailModal.feedbackFormSubtitle')}</p>
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-3">
-                                                            {userFeedback && <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">Submitted</span>}
+                                                            {userFeedback && <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">{t('detailModal.submitted')}</span>}
                                                             {!isHostOrHR && selectedMeeting.is_feedback_active && !userFeedback && <ArrowRight size={14} className="text-slate-300 group-hover:text-indigo-500" />}
                                                         </div>
                                                     </button>
@@ -4272,7 +4274,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     {isHostOrHR && !selectedMeeting.is_closed && (
                                                         <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
                                                             <div className="flex flex-col">
-                                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Akses Feedback</span>
+                                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{t('detailModal.accessFeedback')}</span>
                                                             </div>
                                                             <button
                                                                 onClick={() => toggleMeetingStatus('is_feedback_active', selectedMeeting.is_feedback_active)}
@@ -4293,7 +4295,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     onClick={() => setSelectedMeeting(null)}
                                     className="w-full mt-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all"
                                 >
-                                    Tutup Detail
+                                    {t('detailModal.closeDetail')}
                                 </button>
                             </div>
                         </div>
@@ -4349,17 +4351,17 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         setNotification({
                                             show: true,
                                             type: 'success',
-                                            message: `Nilai Anda: ${score}. Skor minimal untuk lulus adalah 80. Silakan coba lagi.`,
+                                            message: t('notifications.postTestRetry', { score }),
                                             onClose: () => {
                                                 // Reopen the quiz
                                                 setShowQuiz('POST');
                                             }
                                         });
                                     } else {
-                                        setNotification({ 
-                                            show: true, 
-                                            type: 'success', 
-                                            message: `${showQuiz} Test completed successfully! ${showQuiz === 'POST' ? `Nilai Anda: ${score}` : ''}` 
+                                        setNotification({
+                                            show: true,
+                                            type: 'success',
+                                            message: t('notifications.testCompleted', { type: showQuiz, scoreSuffix: showQuiz === 'POST' ? t('notifications.yourScore', { score }) : '' })
                                         });
                                     }
                                 }
@@ -4416,7 +4418,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         fetch(`${API_BASE_URL}/api/feedback/all`).then(r => r.json()).then(setAllFeedback);
                                     }
                                     setShowFeedback(false);
-                                    setNotification({ show: true, type: 'success', message: "Terima kasih atas feedback Anda!" });
+                                    setNotification({ show: true, type: 'success', message: t('notifications.feedbackThanks') });
                                 }
                             } catch (err) { console.error(err); }
                         }}
@@ -4433,11 +4435,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 <Lock size={32} />
                             </div>
 
-                            <h3 className="text-xl font-bold text-slate-800 mb-2">Tutup Sesi Training</h3>
-                            <p className="text-slate-500 mb-4 text-sm">Apakah Anda yakin ingin menutup sesi ini? Setelah ditutup, peserta tidak akan bisa lagi mengakses assessment dan feedback.</p>
-                            
+                            <h3 className="text-xl font-bold text-slate-800 mb-2">{t('closeSessionModal.title')}</h3>
+                            <p className="text-slate-500 mb-4 text-sm">{t('closeSessionModal.message')}</p>
+
                             <div className="w-full text-left mb-6 relative">
-                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Upload Training Photos <span className="text-red-500">*</span></label>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{t('closeSessionModal.uploadPhotosLabel')} <span className="text-red-500">*</span></label>
                                 <div className="relative">
                                     <ImageIcon size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
                                     <input 
@@ -4451,18 +4453,18 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 const url = await uploadFileToServer(file);
                                                 setCloseSessionPhotoUrl(url);
                                             } catch (err) {
-                                                setNotification({ show: true, type: 'error', message: 'Failed to upload photo.' });
+                                                setNotification({ show: true, type: 'error', message: t('notifications.photoUploadError') });
                                             } finally {
                                                 setIsUploadingPhoto(false);
                                             }
                                         }}
-                                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600 bg-slate-50 text-sm file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 cursor-pointer" 
+                                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-600 bg-slate-50 text-sm file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 cursor-pointer"
                                         disabled={isUploadingPhoto}
                                     />
                                 </div>
-                                {isUploadingPhoto && <p className="text-xs text-indigo-600 font-bold mt-2">Uploading...</p>}
+                                {isUploadingPhoto && <p className="text-xs text-indigo-600 font-bold mt-2">{t('closeSessionModal.uploading')}</p>}
                                 {closeSessionPhotoUrl && (
-                                    <p className="text-xs text-emerald-600 font-bold mt-2 flex items-center gap-1"><CheckCircle size={12}/> Photo uploaded successfully.</p>
+                                    <p className="text-xs text-emerald-600 font-bold mt-2 flex items-center gap-1"><CheckCircle size={12}/> {t('closeSessionModal.photoUploadedSuccess')}</p>
                                 )}
                             </div>
 
@@ -4471,7 +4473,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     onClick={() => { setIsCloseModalOpen(false); setCloseSessionPhotoUrl(''); }}
                                     className={`flex-1 py-2.5 rounded-xl border border-slate-200 font-bold transition-colors text-slate-600 hover:bg-slate-50`}
                                 >
-                                    Batal
+                                    {t('closeSessionModal.cancelButton')}
                                 </button>
                                 <button
                                     onClick={async () => { 
@@ -4498,22 +4500,22 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 const data = await res.json();
                                                 setSelectedMeeting(data);
                                                 setMeetings(prev => prev.map(m => m.id === data.id ? data : m));
-                                                setNotification({ show: true, type: 'success', message: `Sesi berhasil ditutup.` });
+                                                setNotification({ show: true, type: 'success', message: t('notifications.sessionClosed') });
                                             } else {
                                                 throw new Error("Failed to close session.");
                                             }
                                         } catch (e) {
                                             console.error(e);
-                                            setNotification({ show: true, type: 'error', message: "Gagal menutup sesi." });
+                                            setNotification({ show: true, type: 'error', message: t('notifications.sessionCloseError') });
                                         }
-                                        
-                                        setIsCloseModalOpen(false); 
-                                        setCloseSessionPhotoUrl(''); 
+
+                                        setIsCloseModalOpen(false);
+                                        setCloseSessionPhotoUrl('');
                                     }}
                                     className={`flex-1 py-2.5 rounded-xl text-white font-bold shadow-lg transition-colors bg-red-600 hover:bg-red-700 shadow-red-200 disabled:opacity-50 disabled:cursor-not-allowed`}
                                     disabled={!closeSessionPhotoUrl || isUploadingPhoto}
                                 >
-                                    Ya, Tutup Sesi
+                                    {t('closeSessionModal.confirmButton')}
                                 </button>
                             </div>
                         </div>
@@ -4527,6 +4529,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 // --- Sub-components for Interactive Training ---
 
 const TrainingQuiz = ({ type, questions, onClose, onSubmit, meetingTitle }: any) => {
+    const { t } = useTranslation('trainingInternalList');
     const [currentStep, setCurrentStep] = useState(0);
     const [answers, setAnswers] = useState<number[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -4552,8 +4555,8 @@ const TrainingQuiz = ({ type, questions, onClose, onSubmit, meetingTitle }: any)
 
     if (questions.length === 0) return (
         <div className="bg-white p-8 rounded-3xl text-center max-w-sm">
-            <p className="text-slate-500 mb-4 italic">Soal belum dikonfigurasi untuk sesi ini.</p>
-            <button onClick={onClose} className="px-6 py-2 bg-slate-100 rounded-xl font-bold">Tutup</button>
+            <p className="text-slate-500 mb-4 italic">{t('quiz.notConfigured')}</p>
+            <button onClick={onClose} className="px-6 py-2 bg-slate-100 rounded-xl font-bold">{t('quiz.close')}</button>
         </div>
     );
 
@@ -4563,7 +4566,7 @@ const TrainingQuiz = ({ type, questions, onClose, onSubmit, meetingTitle }: any)
         <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
                 <div>
-                    <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">{type} TEST ASSESSMENT</span>
+                    <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">{type} {t('quiz.testAssessment')}</span>
                     <h2 className="font-black text-xl text-slate-800 leading-tight">{meetingTitle}</h2>
                 </div>
                 <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400"><X size={20} /></button>
@@ -4577,8 +4580,8 @@ const TrainingQuiz = ({ type, questions, onClose, onSubmit, meetingTitle }: any)
                         return (
                             <>
                                 <div className="flex justify-between items-end mb-4">
-                                    <span className="text-sm font-black text-indigo-600 uppercase">Pertanyaan {currentStep + 1} dari {questions.length}</span>
-                                    <span className="text-xs font-bold text-slate-400">{progress}% Terisi</span>
+                                    <span className="text-sm font-black text-indigo-600 uppercase">{t('quiz.questionProgress', { current: currentStep + 1, total: questions.length })}</span>
+                                    <span className="text-xs font-bold text-slate-400">{t('quiz.percentFilled', { progress })}</span>
                                 </div>
                                 <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                                     <div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${progress}%` }} />
@@ -4617,7 +4620,7 @@ const TrainingQuiz = ({ type, questions, onClose, onSubmit, meetingTitle }: any)
                     onClick={handleNext}
                     className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-black rounded-2xl shadow-xl shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
                 >
-                    {isSubmitting ? 'Mengirim...' : (currentStep === questions.length - 1 ? 'SELESAIKAN TES' : 'PERTANYAAN BERIKUTNYA')}
+                    {isSubmitting ? t('quiz.sending') : (currentStep === questions.length - 1 ? t('quiz.finishTest') : t('quiz.nextQuestion'))}
                 </button>
             </div>
         </div>
@@ -4625,20 +4628,21 @@ const TrainingQuiz = ({ type, questions, onClose, onSubmit, meetingTitle }: any)
 };
 
 const TrainingFeedbackForm = ({ onClose, onSubmit, meetingTitle }: any) => {
+    const { t } = useTranslation('trainingInternalList');
     const [isLoading, setIsLoading] = useState(false);
     const questions = [
-        { id: 'q1', text: 'Materi training sesuai dengan kebutuhan pengembangan saya.', type: 'scale' },
-        { id: 'q2', text: 'Materi training dapat diterapkan dalam pekerjaan saya.', type: 'scale' },
-        { id: 'q3', text: 'Penyampaian materi training mudah dipahami.', type: 'scale' },
-        { id: 'q4', text: 'Secara keseluruhan, training ini memenuhi ekspektasi saya.', type: 'scale' },
-        { id: 'q5', text: 'Materi pendukung (handout/modul/ppt) membantu pemahaman saya.', type: 'scale' },
-        { id: 'q6', text: 'Trainer menyampaikan materi dengan efektif.', type: 'scale' },
-        { id: 'q7', text: 'Trainer menjawab pertanyaan dengan jelas.', type: 'scale' },
-        { id: 'q8', text: 'Studi kasus/contoh yang diberikan membantu pemahaman saya.', type: 'scale' },
-        { id: 'q9', text: 'Tempat training nyaman dan mendukung proses belajar.', type: 'scale' },
-        { id: 'q10', text: 'Konsumsi yang disediakan selama training memuaskan.', type: 'scale' },
-        { id: 'q11', text: 'Hal apa yang sudah baik dari training ini?', type: 'text' },
-        { id: 'q12', text: 'Hal apa yang perlu ditingkatkan untuk training selanjutnya?', type: 'text' }
+        { id: 'q1', text: t('feedbackForm.q1'), type: 'scale' },
+        { id: 'q2', text: t('feedbackForm.q2'), type: 'scale' },
+        { id: 'q3', text: t('feedbackForm.q3'), type: 'scale' },
+        { id: 'q4', text: t('feedbackForm.q4'), type: 'scale' },
+        { id: 'q5', text: t('feedbackForm.q5'), type: 'scale' },
+        { id: 'q6', text: t('feedbackForm.q6'), type: 'scale' },
+        { id: 'q7', text: t('feedbackForm.q7'), type: 'scale' },
+        { id: 'q8', text: t('feedbackForm.q8'), type: 'scale' },
+        { id: 'q9', text: t('feedbackForm.q9'), type: 'scale' },
+        { id: 'q10', text: t('feedbackForm.q10'), type: 'scale' },
+        { id: 'q11', text: t('feedbackForm.q11'), type: 'text' },
+        { id: 'q12', text: t('feedbackForm.q12'), type: 'text' }
     ];
 
     const [form, setForm] = useState<any>({});
@@ -4651,7 +4655,7 @@ const TrainingFeedbackForm = ({ onClose, onSubmit, meetingTitle }: any) => {
         <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
                 <div>
-                    <span className="text-[10px] font-black uppercase text-purple-500 tracking-widest">FEEDBACK PENYELENGGARA</span>
+                    <span className="text-[10px] font-black uppercase text-purple-500 tracking-widest">{t('feedbackForm.header')}</span>
                     <h2 className="font-black text-xl text-slate-800 leading-tight">{meetingTitle}</h2>
                 </div>
                 <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400"><X size={20} /></button>
@@ -4664,7 +4668,7 @@ const TrainingFeedbackForm = ({ onClose, onSubmit, meetingTitle }: any) => {
                         {q.type === 'scale' ? (
                             <div className="flex justify-between gap-2">
                                 {[1, 2, 3, 4].map(v => {
-                                    const labels = ["", "Strongly Disagree", "Disagree", "Agree", "Strongly Agree"];
+                                    const labels = ["", t('feedbackForm.scaleStronglyDisagree'), t('feedbackForm.scaleDisagree'), t('feedbackForm.scaleAgree'), t('feedbackForm.scaleStronglyAgree')];
                                     return (
                                         <button
                                             key={v}
@@ -4688,7 +4692,7 @@ const TrainingFeedbackForm = ({ onClose, onSubmit, meetingTitle }: any) => {
                                 onChange={e => setForm({ ...form, [q.id]: e.target.value })}
                                 className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 focus:border-purple-500 outline-none transition-all font-semibold text-slate-700"
                                 rows={4}
-                                placeholder="Tuliskan masukan Anda di sini..."
+                                placeholder={t('feedbackForm.textPlaceholder')}
                             />
                         )}
                     </div>
@@ -4704,7 +4708,7 @@ const TrainingFeedbackForm = ({ onClose, onSubmit, meetingTitle }: any) => {
                     }}
                     className="w-full py-4 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white font-black rounded-2xl shadow-xl shadow-purple-500/20 transition-all"
                 >
-                    {isLoading ? 'Sending...' : 'SUBMIT FEEDBACK'}
+                    {isLoading ? t('feedbackForm.sending') : t('feedbackForm.submitButton')}
                 </button>
             </div>
         </div>
@@ -4712,6 +4716,7 @@ const TrainingFeedbackForm = ({ onClose, onSubmit, meetingTitle }: any) => {
 };
 
 const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChange: (data: any) => void }) => {
+    const { t } = useTranslation('trainingInternalList');
     const questions = data?.questions || [];
     const lastQuestionRef = useRef<HTMLDivElement>(null);
     const lastInputRef = useRef<HTMLTextAreaElement>(null);
@@ -4742,14 +4747,14 @@ const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChang
             if (result.questions && result.questions.length > 0) {
                 const newQs = [...questions, ...result.questions];
                 onChange({ ...data, questions: newQs });
-                alert(`Berhasil mengimpor ${result.questions.length} soal.`);
+                alert(t('quizEditor.importSuccessAlert', { count: result.questions.length }));
                 setShowImportModal(false);
                 setImportUrl('');
             } else {
-                alert('Tidak ada soal pilihan ganda ditemukan di form tersebut.');
+                alert(t('quizEditor.importNoQuestionsAlert'));
             }
         } catch (e: any) {
-            alert('Gagal mengimpor form: ' + e.message);
+            alert(t('quizEditor.importFailedAlert', { message: e.message }));
         } finally {
             setIsImporting(false);
         }
@@ -4800,20 +4805,20 @@ const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChang
              <div className="flex items-center justify-between">
                  <h4 className="text-sm font-black text-slate-700 uppercase tracking-tight flex items-center gap-2">
                      <div className={`w-2 h-2 rounded-full ${type === 'Pre-Test' ? 'bg-blue-500' : 'bg-indigo-500'}`} />
-                     {type} Assessment
+                     {type} {t('quizEditor.assessmentSuffix')}
                  </h4>
                  <div className="flex items-center gap-2">
-                     <button type="button" onClick={() => setShowImportModal(true)} className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-black hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-1" title="Import soal dari Google Form">
-                         <Link size={14} /> IMPORT GOOGLE FORM
+                     <button type="button" onClick={() => setShowImportModal(true)} className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-black hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-1" title={t('quizEditor.importTooltip')}>
+                         <Link size={14} /> {t('quizEditor.importGoogleForm')}
                      </button>
                      <button type="button" onClick={addQuestion} className="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-black hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-1">
-                         <Plus size={14} /> ADD QUESTION
+                         <Plus size={14} /> {t('quizEditor.addQuestion')}
                      </button>
                  </div>
              </div>
              {questions.length === 0 && (
                  <div className="py-8 px-4 border-2 border-dashed border-slate-100 rounded-2xl text-center">
-                     <p className="text-xs text-slate-400 font-medium">Belum ada soal untuk {type}.</p>
+                     <p className="text-xs text-slate-400 font-medium">{t('quizEditor.noQuestionsFor', { type })}</p>
                  </div>
              )}
              <div className="space-y-6">
@@ -4828,18 +4833,18 @@ const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChang
                              <Trash2 size={16} />
                          </button>
                          <div className="mb-4 pr-8">
-                             <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5">Pertanyaan {i + 1}</label>
-                             <textarea 
+                             <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5">{t('quizEditor.questionLabel', { number: i + 1 })}</label>
+                             <textarea
                                  ref={i === questions.length - 1 ? lastInputRef : null}
                                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
                                  value={q.question}
                                  onChange={e => updateQuestion(i, 'question', e.target.value)}
-                                 placeholder="Tuliskan pertanyaan di sini..."
+                                 placeholder={t('quizEditor.questionPlaceholder')}
                                  rows={2}
                              />
                          </div>
                          <div className="grid grid-cols-1 gap-2.5">
-                             <label className="block text-[9px] font-black text-slate-400 uppercase">Opsi Jawaban (Pilih satu yang benar)</label>
+                             <label className="block text-[9px] font-black text-slate-400 uppercase">{t('quizEditor.answerOptionsLabel')}</label>
                              {q.options.map((opt: string, oi: number) => (
                                  <div 
                                     key={oi} 
@@ -4858,7 +4863,7 @@ const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChang
                                          value={opt}
                                          onClick={(e) => e.stopPropagation()}
                                          onChange={e => updateOption(i, oi, e.target.value)}
-                                         placeholder={`Opsi ${oi + 1}`}
+                                         placeholder={t('quizEditor.optionPlaceholder', { number: oi + 1 })}
                                      />
                                      {q.options.length > 2 && (
                                          <button 
@@ -4876,7 +4881,7 @@ const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChang
                                 onClick={() => addOption(i)}
                                 className="mt-1 w-fit text-[10px] font-black text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 bg-indigo-50/50 hover:bg-indigo-100/50 px-4 py-2 rounded-xl transition-all"
                              >
-                                <Plus size={12} strokeWidth={3} /> ADD OPTION
+                                <Plus size={12} strokeWidth={3} /> {t('quizEditor.addOption')}
                              </button>
                          </div>
                      </div>
@@ -4888,13 +4893,13 @@ const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChang
                     <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95 duration-200">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                                <Link size={18} className="text-emerald-500" /> Import Google Form
+                                <Link size={18} className="text-emerald-500" /> {t('quizEditor.importModalTitle')}
                             </h3>
                             <button type="button" onClick={() => setShowImportModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
-                        <p className="text-sm text-slate-500 mb-4">Masukkan URL Google Form yang dapat diakses publik untuk mengimpor daftar pertanyaannya.</p>
+                        <p className="text-sm text-slate-500 mb-4">{t('quizEditor.importModalMessage')}</p>
                         <input 
                             type="url"
                             autoFocus
@@ -4910,15 +4915,15 @@ const QuizEditor = ({ type, data, onChange }: { type: string, data: any, onChang
                                 onClick={() => setShowImportModal(false)}
                                 className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-colors text-sm"
                             >
-                                Cancel
+                                {t('quizEditor.cancelButton')}
                             </button>
-                            <button 
-                                type="button" 
+                            <button
+                                type="button"
                                 disabled={isImporting || !importUrl}
                                 onClick={importGForm}
                                 className="px-5 py-2.5 rounded-xl font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {isImporting ? 'Importing...' : 'Import Soal'}
+                                {isImporting ? t('quizEditor.importing') : t('quizEditor.importSubmit')}
                             </button>
                         </div>
                     </div>

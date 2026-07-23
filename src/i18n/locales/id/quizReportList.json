@@ -1,0 +1,42 @@
+{
+  "header": {
+    "title": "Rekapitulasi Kuis & Penilaian",
+    "subtitle": "Pantau performa karyawan (dikelompokkan per pengguna)."
+  },
+  "exportButton": "Ekspor XLSX",
+  "searchPlaceholder": "Cari karyawan atau pelatihan...",
+  "allBranches": "Semua Cabang",
+  "noReportsFound": "Tidak ada laporan untuk filter ini.",
+  "activitiesCount": "{{count}} Aktivitas",
+  "coursesCompleted": "Pelatihan Selesai",
+  "table": {
+    "date": "Tanggal",
+    "course": "Pelatihan",
+    "preTest": "Pre-Tes",
+    "postTest": "Post-Tes",
+    "status": "Status"
+  },
+  "status": {
+    "valid": "Valid",
+    "fail": "Gagal"
+  },
+  "pagination": "Halaman {{current}} dari {{total}}",
+  "unknownStudent": "Karyawan Tidak Diketahui",
+  "unknownCourse": "Pelatihan Tidak Diketahui",
+  "unknownBranch": "Tidak Diketahui",
+  "exportFailedAlert": "Gagal mengekspor file Excel. Silakan coba lagi.",
+  "export": {
+    "sheetName": "Rekap Kuis",
+    "no": "No.",
+    "date": "Tanggal",
+    "branch": "Cabang",
+    "student": "Karyawan",
+    "course": "Pelatihan",
+    "module": "Modul",
+    "score": "Nilai",
+    "status": "Status",
+    "finalAssessment": "Penilaian Akhir",
+    "pass": "LULUS",
+    "fail": "GAGAL"
+  }
+}

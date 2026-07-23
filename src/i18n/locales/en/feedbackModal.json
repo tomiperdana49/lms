@@ -1,0 +1,40 @@
+{
+  "header": {
+    "reportIssue": "Report an Issue",
+    "feedbackHistory": "Feedback History",
+    "reportSubtitle": "Please provide detailed information about the issue.",
+    "historySubtitle": "View your previously submitted issues and suggestions"
+  },
+  "categories": {
+    "Issue": "Issue",
+    "Suggestion": "Suggestion",
+    "Compliment": "Compliment"
+  },
+  "history": {
+    "loading": "Loading history...",
+    "empty": "No feedback history found.",
+    "pageLabel": "Page:"
+  },
+  "form": {
+    "descriptionPlaceholder": "Please describe your problem...",
+    "screenshotLabel": "Screenshot ({{count}})",
+    "addMore": "Add more",
+    "capturing": "Capturing...",
+    "uploading": "Uploading screenshots..."
+  },
+  "footerTagline": "- Feedback is a gift -",
+  "buttons": {
+    "history": "History",
+    "backToForm": "Back to Form",
+    "cancel": "Cancel",
+    "send": "Send",
+    "sending": "Sending..."
+  },
+  "toast": {
+    "uploadFailed": "Failed to upload screenshot.",
+    "descriptionRequired": "Please describe your problem or suggestion.",
+    "submitSuccess": "Feedback submitted successfully! Thank you.",
+    "submitFailed": "Failed to send feedback.",
+    "connectionFailed": "Failed to connect to server."
+  }
+}

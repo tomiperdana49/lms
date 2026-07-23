@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, Filter, Download, ChevronLeft, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import * as XLSX from 'xlsx';
@@ -22,6 +23,7 @@ interface QuizReportListProps {
 }
 
 const QuizReportList = ({ onBack }: QuizReportListProps) => {
+    const { t } = useTranslation('quizReportList');
     const [reports, setReports] = useState<QuizReport[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedBranch, setSelectedBranch] = useState('All');
@@ -82,7 +84,7 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
             (e.id_employee === r.student_id)
         );
 
-        let branch = r.branch || 'Unknown';
+        let branch = r.branch || t('unknownBranch');
         if (emp) {
             branch = emp.branch_name;
         } else {
@@ -99,8 +101,8 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
 
     // 1. Filter raw reports
     const filteredRawReports = mappedReports.filter(r => {
-        const studentName = r.student_name || 'Unknown';
-        const courseTitle = r.course_title || 'Unknown';
+        const studentName = r.student_name || t('unknownBranch');
+        const courseTitle = r.course_title || t('unknownBranch');
         const matchesSearch = studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             courseTitle.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesBranch = selectedBranch === 'All' || r.branch === selectedBranch;
@@ -125,13 +127,13 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
 
     const { groupedData } = (function() {
         const rawGrouped = filteredRawReports.reduce((acc, curr) => {
-            const sName = curr.student_name || 'Unknown Student';
-            const cTitle = curr.course_title || 'Unknown Course';
+            const sName = curr.student_name || t('unknownStudent');
+            const cTitle = curr.course_title || t('unknownCourse');
 
             if (!acc[sName]) {
                 acc[sName] = {
                     student_name: sName,
-                    branch: curr.branch || 'Unknown',
+                    branch: curr.branch || t('unknownBranch'),
                     courseSummariesMap: {},
                     reports: []
                 };
@@ -207,17 +209,17 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
     const handleExport = () => {
         try {
             const dataToExport = filteredRawReports.map((r, idx) => {
-                const status = r.score >= 80 ? "PASS" : "FAIL";
-                const modTitle = r.module_id ? r.module_title : "Final Assessment";
+                const status = r.score >= 80 ? t('export.pass') : t('export.fail');
+                const modTitle = r.module_id ? r.module_title : t('export.finalAssessment');
                 return {
-                    'No.': idx + 1,
-                    'Date': new Date(r.date).toLocaleDateString(),
-                    'Branch': r.branch,
-                    'Student': r.student_name,
-                    'Course': r.course_title,
-                    'Module': modTitle,
-                    'Score': r.score,
-                    'Status': status
+                    [t('export.no')]: idx + 1,
+                    [t('export.date')]: new Date(r.date).toLocaleDateString(),
+                    [t('export.branch')]: r.branch,
+                    [t('export.student')]: r.student_name,
+                    [t('export.course')]: r.course_title,
+                    [t('export.module')]: modTitle,
+                    [t('export.score')]: r.score,
+                    [t('export.status')]: status
                 };
             });
 
@@ -236,11 +238,11 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
             ws['!cols'] = colsWidths;
 
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Quiz Recap');
+            XLSX.utils.book_append_sheet(wb, ws, t('export.sheetName'));
             XLSX.writeFile(wb, `Quiz_Assessment_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
         } catch (error) {
             console.error('Failed to export XLSX', error);
-            alert('Failed to export Excel file. Please try again.');
+            alert(t('exportFailedAlert'));
         }
     };
 
@@ -253,8 +255,8 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
                         <ChevronLeft size={24} className="text-slate-600" />
                     </button>
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Quiz & Assessment Recapitulation</h2>
-                        <p className="text-slate-500">Monitor staff performance (Grouped by User).</p>
+                        <h2 className="text-2xl font-bold text-slate-800">{t('header.title')}</h2>
+                        <p className="text-slate-500">{t('header.subtitle')}</p>
                     </div>
                 </div>
                 <div className="flex gap-2">
@@ -262,7 +264,7 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
                         onClick={handleExport}
                         className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl hover:bg-green-700 transition"
                     >
-                        <Download size={18} /> Export XLSX
+                        <Download size={18} /> {t('exportButton')}
                     </button>
                 </div>
             </div>
@@ -273,7 +275,7 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                     <input
                         type="text"
-                        placeholder="Search student or course..."
+                        placeholder={t('searchPlaceholder')}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -288,7 +290,7 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
                     >
                         {branches.map(b => (
                             <option key={b} value={b}>
-                                {b === 'All' ? 'All Branches' : b}
+                                {b === 'All' ? t('allBranches') : b}
                             </option>
                         ))}
                     </select>
@@ -299,7 +301,7 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
             <div className="space-y-4">
                 {paginatedUsers.length === 0 ? (
                     <div className="p-12 text-center text-slate-400 bg-white rounded-xl border border-slate-100 italic">
-                        No reports found for this filter.
+                        {t('noReportsFound')}
                     </div>
                 ) : (
                     paginatedUsers.map((user) => (
@@ -316,14 +318,14 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
                                     <div>
                                         <h3 className="font-bold text-slate-800 text-lg">{user.student_name}</h3>
                                         <p className="text-sm text-slate-500">
-                                            {user.branch} • {user.reports.length} Activities
+                                            {user.branch} • {t('activitiesCount', { count: user.reports.length })}
                                         </p>
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-3">
                                     <div className="text-right mr-2 hidden md:block">
                                         <div className="text-2xl font-bold text-slate-700">{user.completedCoursesCount}</div>
-                                        <div className="text-xs text-slate-400 uppercase tracking-wide">Courses Completed</div>
+                                        <div className="text-xs text-slate-400 uppercase tracking-wide">{t('coursesCompleted')}</div>
                                     </div>
                                     {expandedUser === user.student_name ? <ChevronLeft className="-rotate-90 text-slate-400" /> : <ChevronLeft className="rotate-180 text-slate-400" />}
                                 </div>
@@ -336,11 +338,11 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
                                         <table className="w-full text-left">
                                             <thead className="bg-slate-50 border-b border-slate-200">
                                                 <tr>
-                                                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">Date</th>
-                                                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">Course</th>
-                                                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-center">Pre-Tes</th>
-                                                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-center">Post-Tes</th>
-                                                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">Status</th>
+                                                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">{t('table.date')}</th>
+                                                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">{t('table.course')}</th>
+                                                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-center">{t('table.preTest')}</th>
+                                                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase text-center">{t('table.postTest')}</th>
+                                                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase">{t('table.status')}</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
@@ -357,11 +359,11 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
                                                         <td className="px-4 py-3">
                                                             {summary.status === 'Valid' ? (
                                                                 <span className="inline-flex items-center gap-1 text-green-700 bg-green-50 px-3 py-1 rounded-full text-xs font-bold border border-green-200">
-                                                                    <CheckCircle size={12} /> Valid
+                                                                    <CheckCircle size={12} /> {t('status.valid')}
                                                                 </span>
                                                             ) : (
                                                                 <span className="inline-flex items-center gap-1 text-red-700 bg-red-50 px-3 py-1 rounded-full text-xs font-bold border border-red-200">
-                                                                    <XCircle size={12} /> Fail
+                                                                    <XCircle size={12} /> {t('status.fail')}
                                                                 </span>
                                                             )}
                                                         </td>
@@ -388,7 +390,7 @@ const QuizReportList = ({ onBack }: QuizReportListProps) => {
                         <ChevronLeft size={20} />
                     </button>
                     <span className="px-4 py-2 bg-white border rounded-lg text-sm font-medium">
-                        Page {currentPage} of {totalPages}
+                        {t('pagination', { current: currentPage, total: totalPages })}
                     </span>
                     <button
                         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}

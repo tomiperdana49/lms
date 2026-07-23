@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BookOpen, Users, Calendar as CalendarIcon, Video, GraduationCap, Star, Briefcase, Award } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { Page, Role } from '../types';
 import LMSCalendar from './LMSCalendar';
 import { API_BASE_URL } from '../config';
@@ -15,6 +16,7 @@ interface DashboardHomeProps {
 import NotificationPanel from './NotificationPanel';
 
 const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: DashboardHomeProps) => {
+    const { t } = useTranslation('dashboardHome');
     const [learningStats, setLearningStats] = useState({ totalJam: 0, totalBiaya: 0 });
 
     useEffect(() => {
@@ -32,48 +34,48 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
 
     const baseMenuItems = [
         {
-            title: 'Reading Log',
-            subtitle: 'Book reading logs',
+            title: t('menu.readingLogTitle'),
+            subtitle: t('menu.readingLogSubtitle'),
             icon: <BookOpen size={24} />,
             page: 'reading-log' as Page,
             color: 'text-orange-600',
             bg: 'bg-orange-50'
         },
         {
-            title: 'Online Courses',
-            subtitle: 'Modules & Quizzes',
+            title: t('menu.onlineCoursesTitle'),
+            subtitle: t('menu.onlineCoursesSubtitle'),
             icon: <Video size={24} />,
             page: 'courses' as Page,
             color: 'text-blue-600',
             bg: 'bg-blue-50'
         },
         ...(config?.moduleInternal ? [{
-            title: 'Internal Training',
-            subtitle: 'Internal sessions',
+            title: t('menu.internalTrainingTitle'),
+            subtitle: t('menu.internalTrainingSubtitle'),
             icon: <Users size={24} />,
             page: 'internal' as Page,
             color: 'text-purple-600',
             bg: 'bg-purple-50'
         }] : []),
         ...(config?.moduleExternal ? [{
-            title: 'External Training',
-            subtitle: 'External workshops',
+            title: t('menu.externalTrainingTitle'),
+            subtitle: t('menu.externalTrainingSubtitle'),
             icon: <Briefcase size={24} />,
             page: 'external' as Page,
             color: 'text-teal-600',
             bg: 'bg-teal-50'
         }] : []),
         ...(config?.moduleIncentive ? [{
-            title: 'Incentives',
-            subtitle: 'Claim rewards',
+            title: t('menu.incentivesTitle'),
+            subtitle: t('menu.incentivesSubtitle'),
             icon: <Award size={24} />,
             page: 'incentives' as Page,
             color: 'text-amber-500',
             bg: 'bg-amber-50'
         }] : []),
         {
-            title: 'Training Calendar',
-            subtitle: 'Learning schedule',
+            title: t('menu.calendarTitle'),
+            subtitle: t('menu.calendarSubtitle'),
             icon: <CalendarIcon size={24} />,
             page: 'calendar' as Page,
             color: 'text-red-500',
@@ -86,10 +88,10 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
 
     const getGreeting = () => {
         const hour = new Date().getHours();
-        if (hour < 11) return 'Good Morning';
-        if (hour < 15) return 'Good Afternoon';
-        if (hour < 18) return 'Good Evening';
-        return 'Good Night';
+        if (hour < 11) return t('goodMorning');
+        if (hour < 15) return t('goodAfternoon');
+        if (hour < 18) return t('goodEvening');
+        return t('goodNight');
     };
 
     return (
@@ -103,29 +105,29 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div className="space-y-1">
                         <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10 mb-2">
-                            <Star size={12} className="text-yellow-400 fill-yellow-400" /> Dashboard Overview
+                            <Star size={12} className="text-yellow-400 fill-yellow-400" /> {t('dashboardOverview')}
                         </div>
                         <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
-                            {getGreeting()}, <span className="text-blue-200">{userName || 'User'}</span>!
+                            {getGreeting()}, <span className="text-blue-200">{userName || t('defaultUser')}</span>!
                         </h1>
                         <p className="text-blue-100/80 font-medium max-w-md text-sm sm:text-base">
-                            Ready to level up your skills today? You have several activities waiting to be completed.
+                            {t('heroSubtitle')}
                         </p>
                     </div>
 
                     {/* Quick Stats Bar */}
                     <div className="flex gap-4 w-full md:w-auto md:mr-12 lg:mr-24">
                         <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-white/10 flex-1 md:flex-none md:min-w-[140px] group hover:bg-white/15 transition-all text-center">
-                            <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-70">Learning Hours</div>
-                            <div className="text-xl sm:text-2xl font-black tracking-tighter">{learningStats.totalJam} Hours</div>
-                            <div className="text-[9px] font-medium text-blue-200 mt-1">Total Hours</div>
+                            <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-70">{t('learningHours')}</div>
+                            <div className="text-xl sm:text-2xl font-black tracking-tighter">{learningStats.totalJam} {t('hours')}</div>
+                            <div className="text-[9px] font-medium text-blue-200 mt-1">{t('totalHours')}</div>
                         </div>
                         <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-white/10 flex-1 md:flex-none md:min-w-[140px] group hover:bg-white/15 transition-all text-center">
-                            <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-70">Learning Cost</div>
+                            <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-70">{t('learningCost')}</div>
                             <div className="text-xl sm:text-2xl font-black tracking-tighter">
                                 Rp {learningStats.totalBiaya.toLocaleString('id-ID')}
                             </div>
-                            <div className="text-[9px] font-medium text-blue-200 mt-1">Total Cost</div>
+                            <div className="text-[9px] font-medium text-blue-200 mt-1">{t('totalCost')}</div>
                         </div>
                     </div>
                 </div>
@@ -183,7 +185,7 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
 
                     <div className="mt-12 mb-8 flex items-center justify-center gap-4 text-slate-300">
                         <div className="h-px w-12 bg-slate-100"></div>
-                        <div className="text-[10px] font-black uppercase tracking-widest">© 2026 PT Media Antar Nusa</div>
+                        <div className="text-[10px] font-black uppercase tracking-widest">{t('footer')}</div>
                         <div className="h-px w-12 bg-slate-100"></div>
                     </div>
                 </div>

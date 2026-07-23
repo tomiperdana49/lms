@@ -1,0 +1,40 @@
+{
+  "header": {
+    "reportIssue": "Laporkan Masalah",
+    "feedbackHistory": "Riwayat Masukan",
+    "reportSubtitle": "Mohon berikan informasi rinci mengenai masalah ini.",
+    "historySubtitle": "Lihat masalah dan saran yang pernah Anda kirimkan"
+  },
+  "categories": {
+    "Issue": "Masalah",
+    "Suggestion": "Saran",
+    "Compliment": "Pujian"
+  },
+  "history": {
+    "loading": "Memuat riwayat...",
+    "empty": "Riwayat masukan tidak ditemukan.",
+    "pageLabel": "Halaman:"
+  },
+  "form": {
+    "descriptionPlaceholder": "Mohon jelaskan masalah Anda...",
+    "screenshotLabel": "Tangkapan Layar ({{count}})",
+    "addMore": "Tambah lagi",
+    "capturing": "Mengambil gambar...",
+    "uploading": "Mengunggah tangkapan layar..."
+  },
+  "footerTagline": "- Masukan adalah sebuah hadiah -",
+  "buttons": {
+    "history": "Riwayat",
+    "backToForm": "Kembali ke Formulir",
+    "cancel": "Batal",
+    "send": "Kirim",
+    "sending": "Mengirim..."
+  },
+  "toast": {
+    "uploadFailed": "Gagal mengunggah tangkapan layar.",
+    "descriptionRequired": "Mohon jelaskan masalah atau saran Anda.",
+    "submitSuccess": "Masukan berhasil dikirim! Terima kasih.",
+    "submitFailed": "Gagal mengirim masukan.",
+    "connectionFailed": "Gagal terhubung ke server."
+  }
+}

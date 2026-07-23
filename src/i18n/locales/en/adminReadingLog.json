@@ -1,0 +1,202 @@
+{
+  "header": {
+    "backToDashboard": "Back to Dashboard",
+    "title": "Reading Log Management",
+    "subtitle": "Manage validations and view reading statistics."
+  },
+  "actions": {
+    "exportXLSX": "Export XLSX",
+    "exportXLSXTitle": "Export recapitulation table to Excel (XLSX) matching active filters and sorting",
+    "syncSIMAS": "Sync SIMAS Data",
+    "syncing": "Syncing...",
+    "syncSIMASTitle": "Fetch latest book loan data from SIMAS for all employees",
+    "verification": "Verification",
+    "recapitulation": "Recapitulation"
+  },
+  "filters": {
+    "dateTo": "to",
+    "searchPlaceholder": "Search Name, Title...",
+    "status": {
+      "all": "All Status",
+      "reading": "Reading",
+      "read": "Read",
+      "approved": "Approved",
+      "underReview": "Under Review",
+      "rejectedHRD": "Rejected HRD",
+      "removed": "Removed"
+    }
+  },
+  "common": {
+    "staffRoleFallback": "STAFF",
+    "cancel": "Cancel"
+  },
+  "status": {
+    "reading": "Reading",
+    "removed": "Removed",
+    "underReview": "Under Review",
+    "review": "Review",
+    "read": "Read",
+    "approved": "Approved",
+    "rejected": "Rejected"
+  },
+  "source": {
+    "personal": "Personal",
+    "private": "Private",
+    "simas": "SIMAS",
+    "office": "Office"
+  },
+  "duration": {
+    "format": "{{days}}D {{hours}}H {{minutes}}M"
+  },
+  "recapTable": {
+    "nameEmail": "Name / Email",
+    "role": "Role",
+    "booksRead": "Books Read",
+    "bonusStatus": "Bonus Status",
+    "totalIncentive": "Total Incentive {{month}}",
+    "books": "Books",
+    "verifiedMonth": "{{count}} Verified {{month}}",
+    "milestonePassed": "Milestone Passed!",
+    "moreToBonus": "{{count}} more to bonus",
+    "pendingReview": "Pending Review",
+    "booksReadByModalTitle": "Books Read by {{name}} in {{year}}",
+    "verifiedBooksModalTitle": "Verified Books for {{name}} (Selected Range)"
+  },
+  "verificationTable": {
+    "sectionTitle": "Pending Verifications & History",
+    "employee": "Employee",
+    "bookTitleSource": "Book Title / Source",
+    "finishDate": "Finish Date",
+    "claimedDate": "Claimed Date",
+    "status": "Status",
+    "action": "Action",
+    "unknown": "Unknown",
+    "idLabel": "ID: {{id}}",
+    "staff": "Staff",
+    "milestoneBonus": "Milestone Bonus!",
+    "limitExceeded": "Limit Exceeded ({{seq}}/5)",
+    "rejectOverLimit": "Reject Over Limit",
+    "verify": "Verify",
+    "edit": "Edit",
+    "reject": "Reject",
+    "remove": "Remove",
+    "verifyTitle": "Verify & Reward",
+    "editTitle": "Edit Details",
+    "rejectTitle": "Reject Report",
+    "removeTitle": "Remove Log",
+    "removeReportTitle": "Remove Report"
+  },
+  "verifyModal": {
+    "title": "Verify Reading Log",
+    "milestoneDetected": "Milestone #5 Detected!",
+    "milestoneBonusNote": "This user will receive an additional Rp 500,000 bonus.",
+    "verifiedBookYear": "Verified Book #{{seq}} Year {{year}}",
+    "bookDetails": "Book Details",
+    "snLabel": "SN: {{sn}}",
+    "previouslyApproved": "Previously Approved in {{year}} ({{count}})",
+    "startBorrow": "Start / Borrow",
+    "finishReturn": "Finish / Return",
+    "reviewLinkGoodreads": "Review Link / Goodreads",
+    "openReviewLink": "Open Review Link",
+    "borrowEvidence": "Borrow Evidence",
+    "returnEvidence": "Return Evidence",
+    "bookCategory": "Book Category",
+    "categoryTextOption": "Non-Fiction Text (Rp 100.000)",
+    "categoryComicOption": "Non-Fiction Comic/Manga (Rp 50.000)",
+    "categoryNoneOption": "No Incentive (Rp 0 - Fiction/Novel/Magazine)",
+    "incentiveAmount": "Incentive Amount (Rp)",
+    "cancel": "Cancel",
+    "approveAndSendReward": "Approve & Send Reward"
+  },
+  "rejectModal": {
+    "title": "Reject Incentive Claim",
+    "reasonLabel": "Reason for Rejection",
+    "reasonPlaceholder": "State why this log is rejected...",
+    "cancel": "Cancel",
+    "submit": "Reject Incentive Claim"
+  },
+  "cancelModal": {
+    "title": "Remove Reading Log",
+    "description": "Removing this log will remove it from the employee's reading statistics.",
+    "reasonLabel": "Removal Reason",
+    "reasonPlaceholder": "Enter reason why this report is being removed...",
+    "discard": "Discard",
+    "confirm": "Yes, Remove Report"
+  },
+  "editModal": {
+    "title": "Edit Reading Log",
+    "titleLabel": "Title",
+    "categoryLabel": "Category",
+    "selectCategoryPlaceholder": "Select Category...",
+    "startDateLabel": "Start Date",
+    "finishDateLabel": "Finish Date",
+    "evidenceUrlLabel": "Evidence URL / Image",
+    "reviewLinkLabel": "Goodreads / Review Link",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "saveChanges": "Save Changes"
+  },
+  "detailModal": {
+    "status": "Status",
+    "hrApproval": "HR Approval",
+    "read": "Read",
+    "removed": "Removed",
+    "draft": "Draft",
+    "rejectionRemovalNote": "REJECTION/REMOVAL NOTE",
+    "byLabel": "• BY: {{name}}",
+    "readerName": "Reader Name",
+    "employeeId": "Employee ID",
+    "startDate": "Start Date",
+    "finishDate": "Finish Date",
+    "claimedDate": "Claimed Date",
+    "approvedBy": "Approved By",
+    "hrAdministrator": "HR Administrator",
+    "approvedTime": "Approved Time",
+    "incentiveReward": "Incentive Reward",
+    "milestoneBonus": "Milestone #5 Bonus!",
+    "editReviewDetails": "Edit Review Details",
+    "reviewLinkPlaceholder": "https://goodreads.com/...",
+    "reviewNotesLabel": "Review Notes",
+    "reviewNotesPlaceholder": "Write review notes...",
+    "discard": "Discard",
+    "save": "Save",
+    "reviewLink": "Review Link",
+    "noReviewLink": "No review link provided",
+    "noReviewNotes": "No review notes provided",
+    "edit": "Edit",
+    "evidencePhoto": "Evidence Photo",
+    "returnEvidencePhoto": "Return Evidence Photo"
+  },
+  "photoModal": {
+    "evidencePhotosFor": "Evidence Photos for {{title}}",
+    "borrowingEvidencePhoto": "Borrowing Evidence Photo",
+    "evidencePhoto": "Evidence Photo",
+    "returnEvidencePhoto": "Return Evidence Photo"
+  },
+  "recapModal": {
+    "noBooksToDisplay": "No books to display.",
+    "numberHeader": "#",
+    "bookTitleCategory": "Book Title / Category",
+    "finished": "Finished",
+    "claimed": "Claimed",
+    "verified": "Verified",
+    "incentive": "Incentive",
+    "status": "Status",
+    "milestoneBonus": "MILESTONE BONUS!"
+  },
+  "zoomImage": {
+    "zoomOut": "Zoom Out",
+    "zoomIn": "Zoom In",
+    "resetZoom": "Reset Zoom",
+    "panHint": "Double-click or drag to pan"
+  },
+  "alerts": {
+    "confirmCancelReport": "Are you sure you want to cancel this report? The data will remain stored but will not be counted in reports.",
+    "failedToCancelReport": "Failed to cancel report",
+    "errorWhileCancellingReport": "Error while cancelling report",
+    "simasSyncSuccess": "SIMAS data synchronization successful!",
+    "simasSyncFailed": "Failed to synchronize SIMAS data.",
+    "simasSyncError": "Error during data synchronization.",
+    "failedToExportExcel": "Failed to export Excel file. Please try again."
+  }
+}

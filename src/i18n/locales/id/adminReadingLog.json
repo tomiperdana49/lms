@@ -1,0 +1,202 @@
+{
+  "header": {
+    "backToDashboard": "Kembali ke Dashboard",
+    "title": "Manajemen Log Membaca",
+    "subtitle": "Kelola validasi dan lihat statistik membaca."
+  },
+  "actions": {
+    "exportXLSX": "Ekspor XLSX",
+    "exportXLSXTitle": "Ekspor tabel rekapitulasi ke Excel (XLSX) sesuai filter dan pengurutan aktif",
+    "syncSIMAS": "Sinkronkan Data SIMAS",
+    "syncing": "Menyinkronkan...",
+    "syncSIMASTitle": "Ambil data peminjaman buku terbaru dari SIMAS untuk semua karyawan",
+    "verification": "Verifikasi",
+    "recapitulation": "Rekapitulasi"
+  },
+  "filters": {
+    "dateTo": "sampai",
+    "searchPlaceholder": "Cari Nama, Judul...",
+    "status": {
+      "all": "Semua Status",
+      "reading": "Sedang Dibaca",
+      "read": "Selesai Dibaca",
+      "approved": "Disetujui",
+      "underReview": "Sedang Ditinjau",
+      "rejectedHRD": "Ditolak HRD",
+      "removed": "Dihapus"
+    }
+  },
+  "common": {
+    "staffRoleFallback": "STAF",
+    "cancel": "Batal"
+  },
+  "status": {
+    "reading": "Sedang Dibaca",
+    "removed": "Dihapus",
+    "underReview": "Sedang Ditinjau",
+    "review": "Ditinjau",
+    "read": "Selesai Dibaca",
+    "approved": "Disetujui",
+    "rejected": "Ditolak"
+  },
+  "source": {
+    "personal": "Pribadi",
+    "private": "Pribadi",
+    "simas": "SIMAS",
+    "office": "Kantor"
+  },
+  "duration": {
+    "format": "{{days}}H {{hours}}J {{minutes}}M"
+  },
+  "recapTable": {
+    "nameEmail": "Nama / Email",
+    "role": "Jabatan",
+    "booksRead": "Buku Dibaca",
+    "bonusStatus": "Status Bonus",
+    "totalIncentive": "Total Insentif {{month}}",
+    "books": "Buku",
+    "verifiedMonth": "{{count}} Terverifikasi {{month}}",
+    "milestonePassed": "Milestone Tercapai!",
+    "moreToBonus": "{{count}} lagi menuju bonus",
+    "pendingReview": "Menunggu Peninjauan",
+    "booksReadByModalTitle": "Buku Dibaca oleh {{name}} pada {{year}}",
+    "verifiedBooksModalTitle": "Buku Terverifikasi untuk {{name}} (Rentang Terpilih)"
+  },
+  "verificationTable": {
+    "sectionTitle": "Verifikasi Tertunda & Riwayat",
+    "employee": "Karyawan",
+    "bookTitleSource": "Judul Buku / Sumber",
+    "finishDate": "Tanggal Selesai",
+    "claimedDate": "Tanggal Klaim",
+    "status": "Status",
+    "action": "Aksi",
+    "unknown": "Tidak Diketahui",
+    "idLabel": "ID: {{id}}",
+    "staff": "Staf",
+    "milestoneBonus": "Bonus Milestone!",
+    "limitExceeded": "Batas Terlampaui ({{seq}}/5)",
+    "rejectOverLimit": "Tolak Melebihi Batas",
+    "verify": "Verifikasi",
+    "edit": "Ubah",
+    "reject": "Tolak",
+    "remove": "Hapus",
+    "verifyTitle": "Verifikasi & Beri Reward",
+    "editTitle": "Ubah Detail",
+    "rejectTitle": "Tolak Laporan",
+    "removeTitle": "Hapus Log",
+    "removeReportTitle": "Hapus Laporan"
+  },
+  "verifyModal": {
+    "title": "Verifikasi Log Membaca",
+    "milestoneDetected": "Milestone #5 Terdeteksi!",
+    "milestoneBonusNote": "Pengguna ini akan menerima bonus tambahan sebesar Rp 500.000.",
+    "verifiedBookYear": "Buku Terverifikasi #{{seq}} Tahun {{year}}",
+    "bookDetails": "Detail Buku",
+    "snLabel": "SN: {{sn}}",
+    "previouslyApproved": "Sebelumnya Disetujui pada {{year}} ({{count}})",
+    "startBorrow": "Mulai / Pinjam",
+    "finishReturn": "Selesai / Kembali",
+    "reviewLinkGoodreads": "Tautan Ulasan / Goodreads",
+    "openReviewLink": "Buka Tautan Ulasan",
+    "borrowEvidence": "Bukti Peminjaman",
+    "returnEvidence": "Bukti Pengembalian",
+    "bookCategory": "Kategori Buku",
+    "categoryTextOption": "Teks Non-Fiksi (Rp 100.000)",
+    "categoryComicOption": "Komik/Manga Non-Fiksi (Rp 50.000)",
+    "categoryNoneOption": "Tanpa Insentif (Rp 0 - Fiksi/Novel/Majalah)",
+    "incentiveAmount": "Jumlah Insentif (Rp)",
+    "cancel": "Batal",
+    "approveAndSendReward": "Setujui & Kirim Reward"
+  },
+  "rejectModal": {
+    "title": "Tolak Klaim Insentif",
+    "reasonLabel": "Alasan Penolakan",
+    "reasonPlaceholder": "Jelaskan alasan penolakan log ini...",
+    "cancel": "Batal",
+    "submit": "Tolak Klaim Insentif"
+  },
+  "cancelModal": {
+    "title": "Hapus Log Membaca",
+    "description": "Menghapus log ini akan menghilangkannya dari statistik membaca karyawan.",
+    "reasonLabel": "Alasan Penghapusan",
+    "reasonPlaceholder": "Masukkan alasan penghapusan laporan ini...",
+    "discard": "Batalkan",
+    "confirm": "Ya, Hapus Laporan"
+  },
+  "editModal": {
+    "title": "Ubah Log Membaca",
+    "titleLabel": "Judul",
+    "categoryLabel": "Kategori",
+    "selectCategoryPlaceholder": "Pilih Kategori...",
+    "startDateLabel": "Tanggal Mulai",
+    "finishDateLabel": "Tanggal Selesai",
+    "evidenceUrlLabel": "URL Bukti / Gambar",
+    "reviewLinkLabel": "Tautan Goodreads / Ulasan",
+    "delete": "Hapus",
+    "cancel": "Batal",
+    "saveChanges": "Simpan Perubahan"
+  },
+  "detailModal": {
+    "status": "Status",
+    "hrApproval": "Persetujuan HR",
+    "read": "Selesai Dibaca",
+    "removed": "Dihapus",
+    "draft": "Draf",
+    "rejectionRemovalNote": "CATATAN PENOLAKAN/PENGHAPUSAN",
+    "byLabel": "• OLEH: {{name}}",
+    "readerName": "Nama Pembaca",
+    "employeeId": "ID Karyawan",
+    "startDate": "Tanggal Mulai",
+    "finishDate": "Tanggal Selesai",
+    "claimedDate": "Tanggal Klaim",
+    "approvedBy": "Disetujui Oleh",
+    "hrAdministrator": "Administrator HR",
+    "approvedTime": "Waktu Persetujuan",
+    "incentiveReward": "Reward Insentif",
+    "milestoneBonus": "Bonus Milestone #5!",
+    "editReviewDetails": "Ubah Detail Ulasan",
+    "reviewLinkPlaceholder": "https://goodreads.com/...",
+    "reviewNotesLabel": "Catatan Ulasan",
+    "reviewNotesPlaceholder": "Tulis catatan ulasan...",
+    "discard": "Batalkan",
+    "save": "Simpan",
+    "reviewLink": "Tautan Ulasan",
+    "noReviewLink": "Tautan ulasan tidak tersedia",
+    "noReviewNotes": "Catatan ulasan tidak tersedia",
+    "edit": "Ubah",
+    "evidencePhoto": "Foto Bukti",
+    "returnEvidencePhoto": "Foto Bukti Pengembalian"
+  },
+  "photoModal": {
+    "evidencePhotosFor": "Foto Bukti untuk {{title}}",
+    "borrowingEvidencePhoto": "Foto Bukti Peminjaman",
+    "evidencePhoto": "Foto Bukti",
+    "returnEvidencePhoto": "Foto Bukti Pengembalian"
+  },
+  "recapModal": {
+    "noBooksToDisplay": "Tidak ada buku untuk ditampilkan.",
+    "numberHeader": "#",
+    "bookTitleCategory": "Judul Buku / Kategori",
+    "finished": "Selesai",
+    "claimed": "Diklaim",
+    "verified": "Terverifikasi",
+    "incentive": "Insentif",
+    "status": "Status",
+    "milestoneBonus": "BONUS MILESTONE!"
+  },
+  "zoomImage": {
+    "zoomOut": "Perkecil",
+    "zoomIn": "Perbesar",
+    "resetZoom": "Atur Ulang Zoom",
+    "panHint": "Klik dua kali atau seret untuk menggeser"
+  },
+  "alerts": {
+    "confirmCancelReport": "Apakah Anda yakin ingin membatalkan laporan ini? Data akan tetap tersimpan tetapi tidak akan dihitung dalam laporan.",
+    "failedToCancelReport": "Gagal membatalkan laporan",
+    "errorWhileCancellingReport": "Terjadi kesalahan saat membatalkan laporan",
+    "simasSyncSuccess": "Sinkronisasi data SIMAS berhasil!",
+    "simasSyncFailed": "Gagal menyinkronkan data SIMAS.",
+    "simasSyncError": "Terjadi kesalahan saat sinkronisasi data.",
+    "failedToExportExcel": "Gagal mengekspor file Excel. Silakan coba lagi."
+  }
+}

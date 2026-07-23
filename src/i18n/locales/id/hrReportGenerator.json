@@ -1,0 +1,95 @@
+{
+  "months": {
+    "january": "Januari",
+    "february": "Februari",
+    "march": "Maret",
+    "april": "April",
+    "may": "Mei",
+    "june": "Juni",
+    "july": "Juli",
+    "august": "Agustus",
+    "september": "September",
+    "october": "Oktober",
+    "november": "November",
+    "december": "Desember"
+  },
+  "export": {
+    "sheetName": "Laporan HR",
+    "noColumn": "No.",
+    "monthColumn": "Bulan",
+    "internalTrainingColumn": "Pelatihan Internal",
+    "readingIncentivesColumn": "Insentif Membaca",
+    "externalTrainingColumn": "Pelatihan Eksternal",
+    "certIncentivesColumn": "Insentif Sertifikasi",
+    "grandTotalColumn": "Total Keseluruhan",
+    "ytdTotalRow": "TOTAL SEPANJANG TAHUN",
+    "failedAlert": "Gagal mengekspor file Excel. Silakan coba lagi."
+  },
+  "transactions": {
+    "internalTraining": "Pelatihan Internal",
+    "readingIncentive": "Insentif Membaca",
+    "externalTraining": "Pelatihan Eksternal",
+    "certIncentiveOneTime": "Insentif Sertifikasi (Satu Kali)",
+    "certIncentiveRecurring": "Insentif Sertifikasi (Berulang)",
+    "unknown": "Tidak Diketahui",
+    "snackDetail": "Snack: {{amount}}",
+    "lunchDetail": "Makan Siang: {{amount}}",
+    "trainerDetail": "Trainer: {{amount}}",
+    "audienceDetail": "Peserta: {{amount}}/orang",
+    "otherDetail": "Lainnya: {{amount}}",
+    "categoryDetail": "Kategori: {{category}}",
+    "mainCostDetail": "Biaya Utama: {{amount}}",
+    "additionalDetail": "Tambahan: {{amount}}",
+    "registrationDetail": "Registrasi: {{amount}}",
+    "travelDetail": "Perjalanan: {{amount}}",
+    "accommodationDetail": "Akomodasi: {{amount}}",
+    "miscDetail": "Lain-lain: {{amount}}",
+    "statusRewardDetail": "Status: {{status}} • Imbalan: {{amount}}"
+  },
+  "header": {
+    "title": "Generator Laporan HR",
+    "subtitle": "Nusa LMS • Intelijen Pengeluaran Perusahaan",
+    "refresh": "MUAT ULANG",
+    "exportXlsx": "EKSPOR XLSX"
+  },
+  "stats": {
+    "ytdTotalInvestment": "Total Investasi Sepanjang Tahun",
+    "avgMonthlySpend": "Rata-rata Pengeluaran Bulanan",
+    "topAllocation": "Alokasi Tertinggi",
+    "yearAnalysis": "Analisis Tahun",
+    "calendarPeriod": "Periode Kalender"
+  },
+  "categories": {
+    "internal": "Internal",
+    "external": "Eksternal",
+    "reading": "Membaca",
+    "cert": "Sertifikasi"
+  },
+  "filters": {
+    "allBranches": "SEMUA CABANG",
+    "filtersActive": "FILTER AKTIF"
+  },
+  "table": {
+    "month": "Bulan",
+    "internal": "Internal",
+    "reading": "Membaca",
+    "external": "Eksternal",
+    "certInc": "Ins. Sertifikasi",
+    "grandTotal": "Total Keseluruhan",
+    "audit": "Audit",
+    "ytdTotal": "TOTAL SEPANJANG TAHUN"
+  },
+  "modal": {
+    "header": "Pusat Audit Bulanan • {{month}} {{year}}",
+    "subtitle": "Ringkasan Buku Besar Konsolidasi • {{branch}}",
+    "noTransactions": "Tidak ada transaksi ditemukan untuk periode ini",
+    "timestamp": "Waktu",
+    "categorization": "Kategori",
+    "transactionItem": "Item Transaksi",
+    "professionalPic": "Penanggung Jawab",
+    "netAmount": "Jumlah Bersih",
+    "system": "SISTEM",
+    "monthlyAggregate": "AGREGAT BULANAN",
+    "closeAuditHub": "TUTUP PUSAT AUDIT"
+  }
+}

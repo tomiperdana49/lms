@@ -1,0 +1,42 @@
+{
+  "weekDaysShort": ["S", "M", "T", "W", "T", "F", "S"],
+  "weekDaysFull": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+  "today": "Today",
+  "tagline": "Nusa Learning Management System • Schedule",
+  "eventDetails": "Event Details",
+  "clearSchedule": "Clear Schedule",
+  "noEventsForDate": "No events or deadlines for this specific date.",
+  "joinMeeting": "JOIN MEETING",
+  "agenda": "Agenda",
+  "tasksCount_one": "{{count}} Task",
+  "tasksCount_other": "{{count}} Tasks",
+  "noEventsScheduled": "No events scheduled.",
+  "allDay": "All Day",
+  "eventTypes": {
+    "INTERNAL": "MEETING",
+    "EXTERNAL": "EXTERNAL",
+    "DEADLINE": "DEADLINE",
+    "INCENTIVE": "INCENTIVE"
+  },
+  "modal": {
+    "title": "New Schedule",
+    "eventTitleLabel": "Event Title",
+    "eventTitlePlaceholder": "e.g. Project Sync Up",
+    "dateLabel": "Date",
+    "platformLabel": "Platform",
+    "platformOnline": "Online Link",
+    "platformOffline": "Offline / Room",
+    "platformHybrid": "Hybrid Session",
+    "startTimeLabel": "Start Time",
+    "endTimeLabel": "End Time",
+    "confirmButton": "CONFIRM SCHEDULE"
+  },
+  "eventContent": {
+    "trainingTitleWithEmployee": "Training: {{title}} ({{employeeName}})",
+    "trainingTitle": "Training: {{title}}",
+    "providerJustification": "Provider: {{vendor}}. Justification: {{justification}}",
+    "statusLabel": "Status: {{status}}",
+    "incentiveEndTitle": "Incentive End: {{courseName}} - {{employeeName}}",
+    "incentivePeriodEnds": "Incentive period ends."
+  }
+}

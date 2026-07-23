@@ -1,0 +1,116 @@
+{
+  "statusBadge": {
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "reviewHr": "Review (HR)",
+    "reviewSupervisor": "Review (Spv)"
+  },
+  "header": {
+    "title": "External Training Manager",
+    "subtitle": "Nusa LMS • Enterprise Request Governance"
+  },
+  "viewSwitcher": {
+    "list": "LIST VIEW",
+    "recap": "RECAPITULATION"
+  },
+  "stats": {
+    "totalInvestment": "Total Investment",
+    "pendingApproval": "Pending Approval",
+    "successfulEnrollments": "Successful Enrollments",
+    "averagePerHead": "Average Per Head"
+  },
+  "filters": {
+    "searchPlaceholder": "Search employee, title, or vendor...",
+    "allYears": "ALL YEARS"
+  },
+  "list": {
+    "empty": "No matching requests found",
+    "certificateAlt": "Certificate",
+    "supervisor": "Supervisor",
+    "hrDept": "HR DEPT",
+    "pending": "PENDING",
+    "viewDocument": "View Document",
+    "openDocument": "Open Document",
+    "viewCertificateAttachment": "View Certificate/Attachment",
+    "viewDossier": "View Dossier"
+  },
+  "recapTable": {
+    "professionalEntity": "Professional Entity",
+    "requests": "Requests",
+    "approved": "Approved",
+    "totalInvestment": "Total Investment",
+    "actionHub": "Action Hub",
+    "enrollments": "{{count}} Enrollments",
+    "viewDossier": "VIEW DOSSIER"
+  },
+  "requestModal": {
+    "dateRange": "Dates: {{start}} to {{end}}",
+    "processTitle": "Process Training Request",
+    "ltrId": "LTR-ID: {{id}} • {{name}}",
+    "trainingTitle": "Training Title",
+    "vendorLocation": "Vendor & Location",
+    "strategicJustification": "Strategic Justification",
+    "financeAllocation": "Finance Allocation",
+    "trainingFee": "Training Fee",
+    "travelCost": "Travel Cost",
+    "accommodation": "Accommodation",
+    "miscellaneous": "Miscellaneous",
+    "uploadCertificateEvidence": "Upload Certificate Evidence",
+    "rejectionReason": "Rejection Reason",
+    "rejectionReasonPlaceholder": "Enter reason...",
+    "cancel": "Cancel",
+    "confirmReject": "Confirm Reject",
+    "evidence": "Evidence",
+    "print": "Print",
+    "reject": "Reject",
+    "approveRequest": "Approve Request",
+    "updateSettlement": "Update Settlement"
+  },
+  "recapDetailModal": {
+    "archiveTitle": "{{name}} • Training Archive",
+    "date": "Date",
+    "trainingTitle": "Training Title",
+    "vendor": "Vendor",
+    "investment": "Investment",
+    "adjustment": "Adjustment",
+    "netTotal": "Net Total",
+    "status": "Status",
+    "closeArchive": "CLOSE ARCHIVE"
+  },
+  "settlementModal": {
+    "title": "Finance Settlement",
+    "subtitle": "Final Actual Expenditure Review",
+    "trainingCost": "Training Cost",
+    "transport": "Transport",
+    "accommodation": "Accommodation",
+    "others": "Others",
+    "totalActualExpenditure": "Total Actual Expenditure",
+    "uploadCertificateEvidenceOptional": "Upload Certificate Evidence (Optional to Update)",
+    "settlementNotes": "Settlement Notes",
+    "settlementNotesPlaceholder": "Add notes for finance department...",
+    "cancel": "CANCEL",
+    "confirmSettlement": "CONFIRM SETTLEMENT"
+  },
+  "alerts": {
+    "rejectionReasonRequired": "Please provide a rejection reason.",
+    "certificateEvidenceRequired": "Please upload the certificate evidence before processing this request.",
+    "confirmDeleteRequest": "Are you sure you want to permanently delete this training request?"
+  },
+  "printDocument": {
+    "windowTitle": "Training Approval - {{id}}",
+    "heading": "External Training Certificate of Approval",
+    "reference": "Reference: LTR-{{id}}",
+    "employeeName": "Employee Name",
+    "approvalDate": "Approval Date",
+    "trainingProgram": "Training Program",
+    "vendorProvider": "Vendor / Provider",
+    "totalApprovedBudget": "Total Approved Budget",
+    "approvedByHr": "Approved by HR",
+    "footer": "Nusa Learning Management System • Official Document"
+  },
+  "common": {
+    "notAvailable": "N/A",
+    "hrProcessed": "HR Processed",
+    "others": "Others"
+  }
+}

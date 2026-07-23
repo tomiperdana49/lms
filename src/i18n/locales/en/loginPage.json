@@ -1,0 +1,14 @@
+{
+  "title": "LMS NUSA",
+  "subtitle": "Learning Management System",
+  "emailLabel": "Email",
+  "emailPlaceholder": "Email",
+  "passwordLabel": "Password",
+  "signIn": "Sign In",
+  "signingIn": "Signing in...",
+  "orContinueWith": "Or continue with",
+  "loginFailed": "Login Failed: {{message}} (Status: {{status}})",
+  "connectionError": "Connection Error: {{message}}",
+  "googleLoginFailed": "Google Login Failed",
+  "googleLoginError": "Google Login Error"
+}

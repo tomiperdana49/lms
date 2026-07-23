@@ -1,0 +1,116 @@
+{
+  "statusBadge": {
+    "approved": "Disetujui",
+    "rejected": "Ditolak",
+    "reviewHr": "Tinjauan (HR)",
+    "reviewSupervisor": "Tinjauan (Atasan)"
+  },
+  "header": {
+    "title": "Manajer Pelatihan Eksternal",
+    "subtitle": "Nusa LMS • Tata Kelola Permintaan Enterprise"
+  },
+  "viewSwitcher": {
+    "list": "TAMPILAN DAFTAR",
+    "recap": "REKAPITULASI"
+  },
+  "stats": {
+    "totalInvestment": "Total Investasi",
+    "pendingApproval": "Menunggu Persetujuan",
+    "successfulEnrollments": "Pendaftaran Berhasil",
+    "averagePerHead": "Rata-rata Per Orang"
+  },
+  "filters": {
+    "searchPlaceholder": "Cari karyawan, judul, atau vendor...",
+    "allYears": "SEMUA TAHUN"
+  },
+  "list": {
+    "empty": "Tidak ada permintaan yang cocok ditemukan",
+    "certificateAlt": "Sertifikat",
+    "supervisor": "Atasan",
+    "hrDept": "DEPT HR",
+    "pending": "MENUNGGU",
+    "viewDocument": "Lihat Dokumen",
+    "openDocument": "Buka Dokumen",
+    "viewCertificateAttachment": "Lihat Sertifikat/Lampiran",
+    "viewDossier": "Lihat Berkas"
+  },
+  "recapTable": {
+    "professionalEntity": "Entitas Profesional",
+    "requests": "Permintaan",
+    "approved": "Disetujui",
+    "totalInvestment": "Total Investasi",
+    "actionHub": "Pusat Aksi",
+    "enrollments": "{{count}} Pendaftaran",
+    "viewDossier": "LIHAT BERKAS"
+  },
+  "requestModal": {
+    "dateRange": "Tanggal: {{start}} sampai {{end}}",
+    "processTitle": "Proses Permintaan Pelatihan",
+    "ltrId": "LTR-ID: {{id}} • {{name}}",
+    "trainingTitle": "Judul Pelatihan",
+    "vendorLocation": "Vendor & Lokasi",
+    "strategicJustification": "Justifikasi Strategis",
+    "financeAllocation": "Alokasi Keuangan",
+    "trainingFee": "Biaya Pelatihan",
+    "travelCost": "Biaya Perjalanan",
+    "accommodation": "Akomodasi",
+    "miscellaneous": "Lain-lain",
+    "uploadCertificateEvidence": "Unggah Bukti Sertifikat",
+    "rejectionReason": "Alasan Penolakan",
+    "rejectionReasonPlaceholder": "Masukkan alasan...",
+    "cancel": "Batal",
+    "confirmReject": "Konfirmasi Tolak",
+    "evidence": "Bukti",
+    "print": "Cetak",
+    "reject": "Tolak",
+    "approveRequest": "Setujui Permintaan",
+    "updateSettlement": "Perbarui Penyelesaian"
+  },
+  "recapDetailModal": {
+    "archiveTitle": "{{name}} • Arsip Pelatihan",
+    "date": "Tanggal",
+    "trainingTitle": "Judul Pelatihan",
+    "vendor": "Vendor",
+    "investment": "Investasi",
+    "adjustment": "Penyesuaian",
+    "netTotal": "Total Bersih",
+    "status": "Status",
+    "closeArchive": "TUTUP ARSIP"
+  },
+  "settlementModal": {
+    "title": "Penyelesaian Keuangan",
+    "subtitle": "Tinjauan Pengeluaran Aktual Akhir",
+    "trainingCost": "Biaya Pelatihan",
+    "transport": "Transportasi",
+    "accommodation": "Akomodasi",
+    "others": "Lainnya",
+    "totalActualExpenditure": "Total Pengeluaran Aktual",
+    "uploadCertificateEvidenceOptional": "Unggah Bukti Sertifikat (Opsional untuk Diperbarui)",
+    "settlementNotes": "Catatan Penyelesaian",
+    "settlementNotesPlaceholder": "Tambahkan catatan untuk departemen keuangan...",
+    "cancel": "BATAL",
+    "confirmSettlement": "KONFIRMASI PENYELESAIAN"
+  },
+  "alerts": {
+    "rejectionReasonRequired": "Silakan berikan alasan penolakan.",
+    "certificateEvidenceRequired": "Silakan unggah bukti sertifikat sebelum memproses permintaan ini.",
+    "confirmDeleteRequest": "Apakah Anda yakin ingin menghapus permanen permintaan pelatihan ini?"
+  },
+  "printDocument": {
+    "windowTitle": "Persetujuan Pelatihan - {{id}}",
+    "heading": "Sertifikat Persetujuan Pelatihan Eksternal",
+    "reference": "Referensi: LTR-{{id}}",
+    "employeeName": "Nama Karyawan",
+    "approvalDate": "Tanggal Persetujuan",
+    "trainingProgram": "Program Pelatihan",
+    "vendorProvider": "Vendor / Penyedia",
+    "totalApprovedBudget": "Total Anggaran Disetujui",
+    "approvedByHr": "Disetujui oleh HR",
+    "footer": "Nusa Learning Management System • Dokumen Resmi"
+  },
+  "common": {
+    "notAvailable": "N/A",
+    "hrProcessed": "Diproses HR",
+    "others": "Lainnya"
+  }
+}

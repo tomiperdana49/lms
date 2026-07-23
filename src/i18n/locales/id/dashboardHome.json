@@ -1,0 +1,29 @@
+{
+  "dashboardOverview": "Ringkasan Dasbor",
+  "goodMorning": "Selamat Pagi",
+  "goodAfternoon": "Selamat Siang",
+  "goodEvening": "Selamat Sore",
+  "goodNight": "Selamat Malam",
+  "defaultUser": "Pengguna",
+  "heroSubtitle": "Siap tingkatkan kemampuanmu hari ini? Ada beberapa aktivitas yang menunggu untuk diselesaikan.",
+  "learningHours": "Jam Belajar",
+  "hours": "Jam",
+  "totalHours": "Total Jam",
+  "learningCost": "Biaya Belajar",
+  "totalCost": "Total Biaya",
+  "menu": {
+    "readingLogTitle": "Log Bacaan",
+    "readingLogSubtitle": "Log bacaan buku",
+    "onlineCoursesTitle": "Kursus Online",
+    "onlineCoursesSubtitle": "Modul & Kuis",
+    "internalTrainingTitle": "Training Internal",
+    "internalTrainingSubtitle": "Sesi internal",
+    "externalTrainingTitle": "Training Eksternal",
+    "externalTrainingSubtitle": "Workshop eksternal",
+    "incentivesTitle": "Insentif",
+    "incentivesSubtitle": "Klaim reward",
+    "calendarTitle": "Kalender Training",
+    "calendarSubtitle": "Jadwal belajar"
+  },
+  "footer": "© 2026 PT Media Antar Nusa"
+}

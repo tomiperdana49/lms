@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { ElementType } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Users,
     BookOpen,
@@ -36,27 +37,31 @@ interface StatCardProps {
     trend?: string;
 }
 
-const StatCard = ({ label, value, icon: Icon, color, trend }: StatCardProps) => (
-    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <div className="flex justify-between items-start">
-            <div>
-                <p className="text-slate-500 text-sm font-medium mb-1">{label}</p>
-                <h3 className="text-3xl font-bold text-slate-800">{value}</h3>
+const StatCard = ({ label, value, icon: Icon, color, trend }: StatCardProps) => {
+    const { t } = useTranslation('adminDashboard');
+    return (
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <div className="flex justify-between items-start">
+                <div>
+                    <p className="text-slate-500 text-sm font-medium mb-1">{label}</p>
+                    <h3 className="text-3xl font-bold text-slate-800">{value}</h3>
+                </div>
+                <div className={`p-3 rounded-xl ${color} text-white`}>
+                    <Icon size={24} />
+                </div>
             </div>
-            <div className={`p-3 rounded-xl ${color} text-white`}>
-                <Icon size={24} />
-            </div>
+            {trend && (
+                <div className="flex items-center gap-1 mt-4 text-xs font-medium text-green-600">
+                    <TrendingUp size={14} />
+                    <span>{t('stats.trendVsLastMonth', { trend })}</span>
+                </div>
+            )}
         </div>
-        {trend && (
-            <div className="flex items-center gap-1 mt-4 text-xs font-medium text-green-600">
-                <TrendingUp size={14} />
-                <span>{trend} vs last month</span>
-            </div>
-        )}
-    </div>
-);
+    );
+};
 
 const AdminDashboard = ({ user, initialView }: AdminDashboardProps) => {
+    const { t } = useTranslation('adminDashboard');
     const [currentView, setCurrentView] = useState<AdminView>((initialView as AdminView) || 'overview');
     
     // Sinkronkan view jika prop berubah dari sidebar utama
@@ -146,18 +151,18 @@ const AdminDashboard = ({ user, initialView }: AdminDashboardProps) => {
                     <div className="space-y-6">
                         {/* Stats Row */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <StatCard label="Total Staff" value={stats.totalUsers} icon={Users} color="bg-blue-500" trend="+12%" />
-                            <StatCard label="Books Read" value={stats.booksRead} icon={BookOpen} color="bg-orange-500" trend="+8%" />
-                            <StatCard label="Training Internal" value={stats.activeMeetings} icon={Calendar} color="bg-purple-500" />
-                            <StatCard label="Pending Requests" value={stats.pendingTraining} icon={AlertCircle} color="bg-rose-500" />
+                            <StatCard label={t('stats.totalStaff')} value={stats.totalUsers} icon={Users} color="bg-blue-500" trend="+12%" />
+                            <StatCard label={t('stats.booksRead')} value={stats.booksRead} icon={BookOpen} color="bg-orange-500" trend="+8%" />
+                            <StatCard label={t('stats.trainingInternal')} value={stats.activeMeetings} icon={Calendar} color="bg-purple-500" />
+                            <StatCard label={t('stats.pendingRequests')} value={stats.pendingTraining} icon={AlertCircle} color="bg-rose-500" />
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             {/* Recent Activity Feed */}
                             <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
                                 <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-lg font-bold text-slate-800">Recent User Activity</h3>
-                                    <button onClick={() => setCurrentView('logs')} className="text-sm text-blue-600 hover:text-blue-700 font-medium">View All</button>
+                                    <h3 className="text-lg font-bold text-slate-800">{t('recentActivity.title')}</h3>
+                                    <button onClick={() => setCurrentView('logs')} className="text-sm text-blue-600 hover:text-blue-700 font-medium">{t('recentActivity.viewAll')}</button>
                                 </div>
                                 <div className="space-y-4">
                                     {recentLogs.map((log) => (
@@ -167,16 +172,16 @@ const AdminDashboard = ({ user, initialView }: AdminDashboardProps) => {
                                             </div>
                                             <div className="flex-1">
                                                 <p className="text-sm font-semibold text-slate-800">
-                                                    {log.userName || 'Unknown User'} <span className="font-normal text-slate-500">read</span> {log.title}
+                                                    {log.userName || t('recentActivity.unknownUser')} <span className="font-normal text-slate-500">{t('recentActivity.read')}</span> {log.title}
                                                 </p>
                                                 <p className="text-xs text-slate-400 mt-0.5">{new Date(log.date).toLocaleDateString()} • {log.category}</p>
                                             </div>
                                             <span className={`text-xs font-bold px-2 py-1 rounded-lg ${log.status === 'Finished' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                                                {log.status === 'Finished' ? 'Completed' : 'Reading'}
+                                                {log.status === 'Finished' ? t('recentActivity.completed') : t('recentActivity.reading')}
                                             </span>
                                         </div>
                                     ))}
-                                    {recentLogs.length === 0 && <p className="text-slate-400 italic text-center py-4">No recent activity.</p>}
+                                    {recentLogs.length === 0 && <p className="text-slate-400 italic text-center py-4">{t('recentActivity.noRecentActivity')}</p>}
                                 </div>
                             </div>
 
@@ -184,18 +189,18 @@ const AdminDashboard = ({ user, initialView }: AdminDashboardProps) => {
                             <div className="space-y-6">
                                 {/* Notifications / Quick Actions */}
                                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-                                    <h3 className="text-lg font-bold text-slate-800 mb-4">Quick Actions</h3>
+                                    <h3 className="text-lg font-bold text-slate-800 mb-4">{t('quickActions.title')}</h3>
                                     <div className="space-y-3">
                                         <button
                                             onClick={() => setCurrentView('meetings')}
                                             className="w-full text-left p-3 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors font-medium flex justify-between items-center group">
-                                            Schedule Meeting
+                                            {t('quickActions.scheduleMeeting')}
                                             <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                                         </button>
                                         <button
                                             onClick={() => setCurrentView('users')}
                                             className="w-full text-left p-3 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-medium flex justify-between items-center group">
-                                            Add New Staff
+                                            {t('quickActions.addNewStaff')}
                                             <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                                         </button>
                                         {/* <button
@@ -209,7 +214,7 @@ const AdminDashboard = ({ user, initialView }: AdminDashboardProps) => {
 
                                 {/* Calendar Widget */}
                                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 overflow-hidden">
-                                    <h3 className="text-lg font-bold text-slate-800 mb-4">Training Calendar</h3>
+                                    <h3 className="text-lg font-bold text-slate-800 mb-4">{t('calendar.title')}</h3>
                                     <div className="h-[300px]">
                                         <LMSCalendar compact={true} userEmail={user.email} userRole={user.role} />
                                     </div>
@@ -225,7 +230,7 @@ const AdminDashboard = ({ user, initialView }: AdminDashboardProps) => {
             {/* Mobile Header (Simplified) */}
             <div className="md:hidden flex justify-between items-center mb-6">
                 <div className="flex items-center gap-3">
-                    <h1 className="text-xl font-bold text-slate-800">Admin Panel</h1>
+                    <h1 className="text-xl font-bold text-slate-800">{t('mobileHeader')}</h1>
                 </div>
             </div>
 

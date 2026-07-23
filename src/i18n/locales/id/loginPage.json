@@ -1,0 +1,14 @@
+{
+  "title": "LMS NUSA",
+  "subtitle": "Sistem Manajemen Pembelajaran",
+  "emailLabel": "Email",
+  "emailPlaceholder": "Email",
+  "passwordLabel": "Kata Sandi",
+  "signIn": "Masuk",
+  "signingIn": "Sedang masuk...",
+  "orContinueWith": "Atau lanjutkan dengan",
+  "loginFailed": "Login Gagal: {{message}} (Status: {{status}})",
+  "connectionError": "Kesalahan Koneksi: {{message}}",
+  "googleLoginFailed": "Login Google Gagal",
+  "googleLoginError": "Kesalahan Login Google"
+}

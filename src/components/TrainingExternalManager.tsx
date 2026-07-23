@@ -15,6 +15,7 @@ import {
     Briefcase,
     Link
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { TrainingRequest } from '../types';
 
@@ -28,11 +29,12 @@ const getStatusColor = (status: string) => {
 };
 
 const StatusBadge = ({ status }: { status: string }) => {
+    const { t } = useTranslation('trainingExternalManager');
     const labels: Record<string, string> = {
-        'APPROVED': 'Approved',
-        'REJECTED': 'Rejected',
-        'PENDING_HR': 'Review (HR)',
-        'PENDING_SUPERVISOR': 'Review (Spv)'
+        'APPROVED': t('statusBadge.approved'),
+        'REJECTED': t('statusBadge.rejected'),
+        'PENDING_HR': t('statusBadge.reviewHr'),
+        'PENDING_SUPERVISOR': t('statusBadge.reviewSupervisor')
     };
     return (
         <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${getStatusColor(status)}`}>
@@ -42,6 +44,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 const TrainingExternalManager = ({ userRole, userName, user }: { userRole: string; userName?: string; user?: any }) => {
+    const { t } = useTranslation('trainingExternalManager');
     // --- Data State ---
     const [requests, setRequests] = useState<TrainingRequest[]>([]);
     const [employees, setEmployees] = useState<any[]>([]);
@@ -64,18 +67,21 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     employeeName: req.employee_name,
                     employeeRole: req.category,
                     title: req.title,
-                    vendor: req.vendor || 'N/A',
-                    location: req.location || 'N/A',
+                    vendor: req.vendor || t('common.notAvailable'),
+                    location: req.location || t('common.notAvailable'),
                     cost: Number(req.registration_fee || 0) + Number(req.travel_flight_cost || 0) + Number(req.accommodation_cost || 0) + Number(req.miscellaneous_cost || 0),
                     date: req.created_at || req.start_date || new Date().toISOString(),
                     status: req.status === 'Processed' ? 'APPROVED' : (req.status === 'Approved' ? 'PENDING_HR' : (req.status === 'Pending' ? 'PENDING_SUPERVISOR' : 'REJECTED')),
-                    justification: `Dates: ${req.start_date ? new Date(req.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''} to ${req.end_date ? new Date(req.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}`,
+                    justification: t('requestModal.dateRange', {
+                        start: req.start_date ? new Date(req.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+                        end: req.end_date ? new Date(req.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+                    }),
                     costTraining: req.registration_fee || 0,
                     costTransport: req.travel_flight_cost || 0,
                     costAccommodation: req.accommodation_cost || 0,
                     costOthers: req.miscellaneous_cost || 0,
                     evidenceUrl: (req.certificate_link || req.attachment_link) ? ((req.certificate_link || req.attachment_link).startsWith('/') ? `${API_BASE_URL}${req.certificate_link || req.attachment_link}` : (req.certificate_link || req.attachment_link)) : undefined,
-                    hrName: req.status === 'Processed' ? 'HR Processed' : '',
+                    hrName: req.status === 'Processed' ? t('common.hrProcessed') : '',
                     supervisorName: req.approved_by,
                     employee_id: req.employee_id,
                     _original: req
@@ -101,18 +107,21 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     employeeName: req.employee_name,
                     employeeRole: req.category,
                     title: req.title,
-                    vendor: req.vendor || 'N/A',
-                    location: req.location || 'N/A',
+                    vendor: req.vendor || t('common.notAvailable'),
+                    location: req.location || t('common.notAvailable'),
                     cost: Number(req.registration_fee || 0) + Number(req.travel_flight_cost || 0) + Number(req.accommodation_cost || 0) + Number(req.miscellaneous_cost || 0),
                     date: req.created_at || req.start_date || new Date().toISOString(),
                     status: req.status === 'Processed' ? 'APPROVED' : (req.status === 'Approved' ? 'PENDING_HR' : (req.status === 'Pending' ? 'PENDING_SUPERVISOR' : 'REJECTED')),
-                    justification: `Dates: ${req.start_date ? new Date(req.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''} to ${req.end_date ? new Date(req.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}`,
+                    justification: t('requestModal.dateRange', {
+                        start: req.start_date ? new Date(req.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+                        end: req.end_date ? new Date(req.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+                    }),
                     costTraining: req.registration_fee || 0,
                     costTransport: req.travel_flight_cost || 0,
                     costAccommodation: req.accommodation_cost || 0,
                     costOthers: req.miscellaneous_cost || 0,
                     evidenceUrl: (req.certificate_link || req.attachment_link) ? ((req.certificate_link || req.attachment_link).startsWith('/') ? `${API_BASE_URL}${req.certificate_link || req.attachment_link}` : (req.certificate_link || req.attachment_link)) : undefined,
-                    hrName: req.status === 'Processed' ? 'HR Processed' : '',
+                    hrName: req.status === 'Processed' ? t('common.hrProcessed') : '',
                     supervisorName: req.approved_by,
                     employee_id: req.employee_id,
                     _original: req
@@ -250,7 +259,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     const handleAction = async (_id: number, action: 'approve' | 'reject', reason?: string) => {
         if (!selectedRequest) return;
         if (action === 'reject' && !reason) {
-            alert("Please provide a rejection reason.");
+            alert(t('alerts.rejectionReasonRequired'));
             return;
         }
 
@@ -259,7 +268,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             if (action === 'approve') {
                 let certLink = selectedRequest?._original?.certificate_link;
                 if (selectedRequest?._original?.category === 'Sertifikat' && !certLink && !hrCertificateFile) {
-                    alert("Please upload the certificate evidence before processing this request.");
+                    alert(t('alerts.certificateEvidenceRequired'));
                     return;
                 }
                 if (hrCertificateFile) {
@@ -310,7 +319,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     };
 
     const handleDeleteRequest = async (id: number) => {
-        if (!window.confirm("Are you sure you want to permanently delete this training request?")) return;
+        if (!window.confirm(t('alerts.confirmDeleteRequest'))) return;
         try {
             const res = await fetch(`${API_BASE_URL}/api/training/${id}`, { method: 'DELETE' });
             if (res.ok) {
@@ -325,7 +334,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             printWindow.document.write(`
                 <html>
                 <head>
-                    <title>Training Approval - ${req.id}</title>
+                    <title>${t('printDocument.windowTitle', { id: req.id })}</title>
                     <style>
                         body { font-family: 'Inter', sans-serif; padding: 50px; color: #1e293b; line-height: 1.6; }
                         .header { text-align: center; margin-bottom: 50px; border-bottom: 2px solid #f1f5f9; padding-bottom: 30px; }
@@ -341,18 +350,18 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                 </head>
                 <body>
                     <div class="header">
-                        <div class="title">External Training Certificate of Approval</div>
-                        <div class="doc-id">Reference: LTR-${req.id}</div>
+                        <div class="title">${t('printDocument.heading')}</div>
+                        <div class="doc-id">${t('printDocument.reference', { id: req.id })}</div>
                     </div>
-                    
+
                     <div class="grid">
                         <div>
-                            <div class="label">Employee Name</div>
+                            <div class="label">${t('printDocument.employeeName')}</div>
                             <div class="value">${req.employeeName}</div>
                             <div style="font-size: 13px; color: #64748b; font-weight: 500;">${req.employeeRole}</div>
                         </div>
                         <div>
-                            <div class="label">Approval Date</div>
+                            <div class="label">${t('printDocument.approvalDate')}</div>
                             <div class="value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
                         </div>
                     </div>
@@ -360,11 +369,11 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     <div class="box">
                         <div class="grid" style="margin-bottom: 0;">
                             <div>
-                                <div class="label">Training Program</div>
+                                <div class="label">${t('printDocument.trainingProgram')}</div>
                                 <div class="value">${req.title}</div>
                             </div>
                             <div>
-                                <div class="label">Vendor / Provider</div>
+                                <div class="label">${t('printDocument.vendorProvider')}</div>
                                 <div class="value">${req.vendor}</div>
                             </div>
                         </div>
@@ -372,16 +381,16 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
 
                     <div class="grid">
                         <div>
-                            <div class="label">Total Approved Budget</div>
+                            <div class="label">${t('printDocument.totalApprovedBudget')}</div>
                             <div class="value" style="font-size: 20px; color: #0f172a;">${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(req.cost)}</div>
                         </div>
                         <div style="text-align: right;">
-                             <div class="stamp">Approved by HR</div>
+                             <div class="stamp">${t('printDocument.approvedByHr')}</div>
                         </div>
                     </div>
 
                     <div class="footer">
-                        Nusa Learning Management System • Official Document
+                        ${t('printDocument.footer')}
                     </div>
                 </body>
                 </html>
@@ -524,8 +533,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             {/* Header & View Switcher */}
             <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
                 <div>
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tight">External Training Manager</h1>
-                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1">Nusa LMS • Enterprise Request Governance</p>
+                    <h1 className="text-4xl font-black text-slate-900 tracking-tight">{t('header.title')}</h1>
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1">{t('header.subtitle')}</p>
                 </div>
 
                 <div className="flex items-center gap-4 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
@@ -533,13 +542,13 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                         onClick={() => setViewMode('list')}
                         className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all ${viewMode === 'list' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600'}`}
                     >
-                        <Clock size={16} /> LIST VIEW
+                        <Clock size={16} /> {t('viewSwitcher.list')}
                     </button>
                     <button
                         onClick={() => setViewMode('recap')}
                         className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all ${viewMode === 'recap' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600'}`}
                     >
-                        <TrendingUp size={16} /> RECAPITULATION
+                        <TrendingUp size={16} /> {t('viewSwitcher.recap')}
                     </button>
                 </div>
             </div>
@@ -547,10 +556,10 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             {/* Insight Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
-                    { label: 'Total Investment', value: formatCurrency(stats.totalBudget), icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                    { label: 'Pending Approval', value: stats.pendingCount, icon: Clock, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                    { label: 'Successful Enrollments', value: stats.approvedCount, icon: CheckCircle2, color: 'text-blue-600', bg: 'bg-blue-50' },
-                    { label: 'Average Per Head', value: formatCurrency(stats.averageCost), icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' }
+                    { label: t('stats.totalInvestment'), value: formatCurrency(stats.totalBudget), icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                    { label: t('stats.pendingApproval'), value: stats.pendingCount, icon: Clock, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                    { label: t('stats.successfulEnrollments'), value: stats.approvedCount, icon: CheckCircle2, color: 'text-blue-600', bg: 'bg-blue-50' },
+                    { label: t('stats.averagePerHead'), value: formatCurrency(stats.averageCost), icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' }
                 ].map((stat, i) => (
                     <div key={i} className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-5 group hover:border-indigo-100 transition-all duration-300">
                         <div className={`p-4 ${stat.bg} ${stat.color} rounded-2xl group-hover:scale-110 transition-transform duration-500`}>
@@ -570,7 +579,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     <Search className="absolute left-5 top-4.5 text-slate-300" size={18} />
                     <input
                         type="text"
-                        placeholder="Search employee, title, or vendor..."
+                        placeholder={t('filters.searchPlaceholder')}
                         className="w-full pl-14 pr-6 py-4 rounded-2xl bg-slate-50 border border-transparent focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-slate-700 transition-all placeholder:text-slate-300"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -602,7 +611,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                             onChange={(e) => setSelectedYear(e.target.value === 'All' ? 'All' : parseInt(e.target.value))}
                             className="bg-transparent px-3 py-2 rounded-xl font-black text-slate-600 text-[10px] outline-none tracking-widest cursor-pointer min-w-[100px]"
                         >
-                            <option value="All">ALL YEARS</option>
+                            <option value="All">{t('filters.allYears')}</option>
                             {Array.from({ length: Math.max(1, new Date().getFullYear() - 2026 + 1) }, (_, i) => 2026 + i).map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
                     </div>
@@ -631,7 +640,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                             <div className="w-16 h-16 rounded-3xl bg-slate-50 flex items-center justify-center text-slate-200">
                                 <FileText size={32} />
                             </div>
-                            <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No matching requests found</p>
+                            <p className="text-sm font-black text-slate-400 uppercase tracking-widest">{t('list.empty')}</p>
                         </div>
                     ) : (
                         filteredRequests.map(req => (
@@ -667,8 +676,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                                     <CheckCircle2 size={10} />
                                                 </div>
                                                 <div>
-                                                    <p className="opacity-60 leading-none mb-0.5">Supervisor</p>
-                                                    <p className="leading-none">{req.supervisorName || 'PENDING'}</p>
+                                                    <p className="opacity-60 leading-none mb-0.5">{t('list.supervisor')}</p>
+                                                    <p className="leading-none">{req.supervisorName || t('list.pending')}</p>
                                                 </div>
                                             </div>
                                             <div className="w-8 h-px bg-slate-100" />
@@ -677,8 +686,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                                     <CheckCircle2 size={10} />
                                                 </div>
                                                 <div>
-                                                    <p className="opacity-60 leading-none mb-0.5">HR DEPT</p>
-                                                    <p className="leading-none">{req.hrName || 'PENDING'}</p>
+                                                    <p className="opacity-60 leading-none mb-0.5">{t('list.hrDept')}</p>
+                                                    <p className="leading-none">{req.hrName || t('list.pending')}</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -688,15 +697,15 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                         <div className="hidden lg:flex items-center justify-center mr-4">
                                             {req.evidenceUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
                                                 <a href={req.evidenceUrl} target="_blank" rel="noreferrer" className="group/img relative block overflow-hidden rounded-xl border border-slate-100 shadow-sm w-40 h-28 shrink-0">
-                                                    <img src={req.evidenceUrl} alt="Certificate" className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-500" />
+                                                    <img src={req.evidenceUrl} alt={t('list.certificateAlt')} className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-500" />
                                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
-                                                        <span className="text-white text-[10px] font-black uppercase tracking-widest">View Document</span>
+                                                        <span className="text-white text-[10px] font-black uppercase tracking-widest">{t('list.viewDocument')}</span>
                                                     </div>
                                                 </a>
                                             ) : (
                                                 <a href={req.evidenceUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center w-40 h-28 bg-slate-50 border border-slate-100 rounded-xl hover:bg-slate-100 hover:border-slate-300 transition-colors group/doc text-slate-400 hover:text-indigo-600 shrink-0">
                                                     <FileText size={24} className="mb-2" />
-                                                    <span className="text-[9px] font-black uppercase tracking-widest text-center px-2">Open Document</span>
+                                                    <span className="text-[9px] font-black uppercase tracking-widest text-center px-2">{t('list.openDocument')}</span>
                                                 </a>
                                             )}
                                         </div>
@@ -704,11 +713,11 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
 
                                     <div className="flex items-center gap-2">
                                         {req.evidenceUrl && (
-                                            <a href={req.evidenceUrl} target="_blank" rel="noreferrer" className="p-3 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all lg:hidden" title="View Certificate/Attachment">
+                                            <a href={req.evidenceUrl} target="_blank" rel="noreferrer" className="p-3 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all lg:hidden" title={t('list.viewCertificateAttachment')}>
                                                 <Link size={20} />
                                             </a>
                                         )}
-                                        <button onClick={() => setSelectedRequest(req)} className="p-3 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="View Dossier">
+                                        <button onClick={() => setSelectedRequest(req)} className="p-3 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title={t('list.viewDossier')}>
                                             <FileText size={20} />
                                         </button>
                                         {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
@@ -727,11 +736,11 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     <table className="w-full text-left">
                         <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
                             <tr>
-                                <th className="px-10 py-6">Professional Entity</th>
-                                <th className="px-10 py-6 text-center">Requests</th>
-                                <th className="px-10 py-6 text-center">Approved</th>
-                                <th className="px-10 py-6 text-right">Total Investment</th>
-                                <th className="px-10 py-6 text-center">Action Hub</th>
+                                <th className="px-10 py-6">{t('recapTable.professionalEntity')}</th>
+                                <th className="px-10 py-6 text-center">{t('recapTable.requests')}</th>
+                                <th className="px-10 py-6 text-center">{t('recapTable.approved')}</th>
+                                <th className="px-10 py-6 text-right">{t('recapTable.totalInvestment')}</th>
+                                <th className="px-10 py-6 text-center">{t('recapTable.actionHub')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -748,7 +757,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                     <td className="px-10 py-6 text-center font-black text-slate-600">{stat.totalRequests}</td>
                                     <td className="px-10 py-6 text-center">
                                         <span className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest">
-                                            {stat.approvedRequests} Enrollments
+                                            {t('recapTable.enrollments', { count: stat.approvedRequests })}
                                         </span>
                                     </td>
                                     <td className="px-10 py-6 text-right font-mono text-slate-900 font-black text-base">
@@ -759,7 +768,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                             onClick={() => setRecapDetailUser(stat.name)}
                                             className="px-6 py-2.5 bg-white border border-slate-200 text-slate-600 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 rounded-2xl text-[10px] font-black tracking-widest transition-all shadow-sm"
                                         >
-                                            VIEW DOSSIER
+                                            {t('recapTable.viewDossier')}
                                         </button>
                                     </td>
                                 </tr>
@@ -776,36 +785,36 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
                             <div>
                                 <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                                    <Briefcase size={20} className="text-indigo-600" /> Process Training Request
+                                    <Briefcase size={20} className="text-indigo-600" /> {t('requestModal.processTitle')}
                                 </h3>
-                                <p className="text-sm text-slate-500">LTR-ID: {selectedRequest.id} • {selectedRequest.employeeName}</p>
+                                <p className="text-sm text-slate-500">{t('requestModal.ltrId', { id: selectedRequest.id, name: selectedRequest.employeeName })}</p>
                             </div>
                             <button onClick={() => setSelectedRequest(null)} className="text-slate-400 hover:text-slate-600"><XCircle size={24} /></button>
                         </div>
                         <div className="p-6 space-y-4 overflow-y-auto">
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Training Title</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.trainingTitle')}</label>
                                 <input readOnly value={selectedRequest.title} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-700 cursor-not-allowed" />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Vendor & Location</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.vendorLocation')}</label>
                                 <input readOnly value={`${selectedRequest.vendor} - ${selectedRequest.location}`} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-700 cursor-not-allowed" />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Strategic Justification</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.strategicJustification')}</label>
                                 <textarea readOnly value={selectedRequest.justification} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-700 cursor-not-allowed resize-none" rows={2} />
                             </div>
 
                             {(userRole === 'HR' || userRole === 'HR_ADMIN') && selectedRequest.status === 'PENDING_HR' && (
                                 <>
                                     <div className="pt-4 border-t border-slate-100">
-                                        <h4 className="font-bold text-slate-800 mb-3">Finance Allocation</h4>
+                                        <h4 className="font-bold text-slate-800 mb-3">{t('requestModal.financeAllocation')}</h4>
                                         <div className="grid grid-cols-2 gap-3">
                                             {[
-                                                { label: 'Training Fee', field: 'training' },
-                                                { label: 'Travel Cost', field: 'transport' },
-                                                { label: 'Accommodation', field: 'accommodation' },
-                                                { label: 'Miscellaneous', field: 'others' }
+                                                { label: t('requestModal.trainingFee'), field: 'training' },
+                                                { label: t('requestModal.travelCost'), field: 'transport' },
+                                                { label: t('requestModal.accommodation'), field: 'accommodation' },
+                                                { label: t('requestModal.miscellaneous'), field: 'others' }
                                             ].map((item) => (
                                                 <div key={item.field}>
                                                     <label className="block text-xs font-semibold text-slate-700 mb-1">{item.label}</label>
@@ -827,7 +836,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                     </div>
                                     {selectedRequest._original?.category === 'Sertifikat' && (
                                         <div className="mt-4">
-                                            <label className="block text-sm font-semibold text-slate-700 mb-1">Upload Certificate Evidence</label>
+                                            <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.uploadCertificateEvidence')}</label>
                                             <input
                                                 type="file"
                                                 accept="image/*,.pdf"
@@ -838,20 +847,20 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                     )}
                                 </>
                             )}
-                            
+
                             {isRejectMode && (
                                 <div className="mt-4 p-4 bg-red-50 rounded-xl border border-red-100">
-                                    <label className="block text-sm font-semibold text-red-700 mb-1">Rejection Reason</label>
+                                    <label className="block text-sm font-semibold text-red-700 mb-1">{t('requestModal.rejectionReason')}</label>
                                     <input
                                         autoFocus
-                                        placeholder="Enter reason..."
+                                        placeholder={t('requestModal.rejectionReasonPlaceholder')}
                                         className="w-full px-4 py-2 border border-red-200 rounded-xl outline-none text-sm mb-3"
                                         value={rejectReason}
                                         onChange={(e) => setRejectReason(e.target.value)}
                                     />
                                     <div className="flex gap-2">
-                                        <button onClick={() => setIsRejectMode(false)} className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl text-sm">Cancel</button>
-                                        <button onClick={() => handleAction(selectedRequest.id, 'reject', rejectReason)} className="flex-1 py-2 bg-red-600 text-white font-bold rounded-xl text-sm">Confirm Reject</button>
+                                        <button onClick={() => setIsRejectMode(false)} className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl text-sm">{t('requestModal.cancel')}</button>
+                                        <button onClick={() => handleAction(selectedRequest.id, 'reject', rejectReason)} className="flex-1 py-2 bg-red-600 text-white font-bold rounded-xl text-sm">{t('requestModal.confirmReject')}</button>
                                     </div>
                                 </div>
                             )}
@@ -862,22 +871,22 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                             <div className="p-6 border-t border-slate-100 bg-slate-50 flex flex-wrap gap-3 rounded-b-2xl">
                                 {selectedRequest.evidenceUrl && (
                                     <a href={selectedRequest.evidenceUrl} target="_blank" rel="noopener noreferrer" className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl text-sm text-center">
-                                        Evidence
+                                        {t('requestModal.evidence')}
                                     </a>
                                 )}
                                 <button onClick={() => handlePrint(selectedRequest)} className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl text-sm flex items-center justify-center gap-2">
-                                    <Printer size={16} /> Print
+                                    <Printer size={16} /> {t('requestModal.print')}
                                 </button>
-                                
+
                                 {((userRole === 'SUPERVISOR' && selectedRequest.status === 'PENDING_SUPERVISOR') || (userRole === 'HR' && selectedRequest.status === 'PENDING_HR')) && (
                                     <>
-                                        <button onClick={() => setIsRejectMode(true)} className="flex-1 py-2 bg-red-50 text-red-600 font-bold rounded-xl text-sm">Reject</button>
-                                        <button onClick={() => handleAction(selectedRequest.id, 'approve')} className="flex-[2] py-2 bg-indigo-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-indigo-700 transition-colors">Approve Request</button>
+                                        <button onClick={() => setIsRejectMode(true)} className="flex-1 py-2 bg-red-50 text-red-600 font-bold rounded-xl text-sm">{t('requestModal.reject')}</button>
+                                        <button onClick={() => handleAction(selectedRequest.id, 'approve')} className="flex-[2] py-2 bg-indigo-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-indigo-700 transition-colors">{t('requestModal.approveRequest')}</button>
                                     </>
                                 )}
-                                
+
                                 {selectedRequest.status === 'APPROVED' && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
-                                    <button onClick={() => handleOpenSettlement(selectedRequest)} className="flex-[2] py-2 bg-emerald-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-emerald-700 transition-colors">Update Settlement</button>
+                                    <button onClick={() => handleOpenSettlement(selectedRequest)} className="flex-[2] py-2 bg-emerald-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-emerald-700 transition-colors">{t('requestModal.updateSettlement')}</button>
                                 )}
                             </div>
                         )}
@@ -893,7 +902,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                             <div>
                                 <h2 className="font-black text-2xl text-slate-900 tracking-tight flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center"><FileText size={20} /></div>
-                                    {recapDetailUser} • Training Archive
+                                    {t('recapDetailModal.archiveTitle', { name: recapDetailUser })}
                                 </h2>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 ml-14">{selectedPeriod} • {selectedYear}</p>
                             </div>
@@ -904,13 +913,13 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
                                     <tr>
-                                        <th className="px-6 py-4">Date</th>
-                                        <th className="px-6 py-4">Training Title</th>
-                                        <th className="px-6 py-4">Vendor</th>
-                                        <th className="px-6 py-4 text-right">Investment</th>
-                                        <th className="px-6 py-4 text-right">Adjustment</th>
-                                        <th className="px-6 py-4 text-right">Net Total</th>
-                                        <th className="px-6 py-4 text-center">Status</th>
+                                        <th className="px-6 py-4">{t('recapDetailModal.date')}</th>
+                                        <th className="px-6 py-4">{t('recapDetailModal.trainingTitle')}</th>
+                                        <th className="px-6 py-4">{t('recapDetailModal.vendor')}</th>
+                                        <th className="px-6 py-4 text-right">{t('recapDetailModal.investment')}</th>
+                                        <th className="px-6 py-4 text-right">{t('recapDetailModal.adjustment')}</th>
+                                        <th className="px-6 py-4 text-right">{t('recapDetailModal.netTotal')}</th>
+                                        <th className="px-6 py-4 text-center">{t('recapDetailModal.status')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
@@ -939,7 +948,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
 
                         <div className="p-6 border-t border-slate-50 bg-slate-50/50 text-right">
                             <button onClick={() => setRecapDetailUser(null)} className="px-10 py-4 bg-white border border-slate-200 text-slate-600 font-black rounded-lg hover:bg-slate-100 transition-all text-xs tracking-widest shadow-sm">
-                                CLOSE ARCHIVE
+                                {t('recapDetailModal.closeArchive')}
                             </button>
                         </div>
                     </div>
@@ -952,8 +961,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
                         <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 shrink-0">
                             <div>
-                                <h2 className="font-black text-2xl text-slate-900 tracking-tight">Finance Settlement</h2>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Final Actual Expenditure Review</p>
+                                <h2 className="font-black text-2xl text-slate-900 tracking-tight">{t('settlementModal.title')}</h2>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{t('settlementModal.subtitle')}</p>
                             </div>
                             <button onClick={() => setIsSettlementOpen(false)} className="p-3 hover:bg-slate-100 rounded-2xl text-slate-300 transition-colors"><XCircle size={24} /></button>
                         </div>
@@ -961,10 +970,10 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                         <div className="p-6 space-y-6 overflow-y-auto">
                             <div className="grid grid-cols-2 gap-4">
                                 {[
-                                    { label: 'Training Cost', field: 'training' },
-                                    { label: 'Transport', field: 'transport' },
-                                    { label: 'Accommodation', field: 'accommodation' },
-                                    { label: 'Others', field: 'others' }
+                                    { label: t('settlementModal.trainingCost'), field: 'training' },
+                                    { label: t('settlementModal.transport'), field: 'transport' },
+                                    { label: t('settlementModal.accommodation'), field: 'accommodation' },
+                                    { label: t('settlementModal.others'), field: 'others' }
                                 ].map((item) => (
                                     <div key={item.field}>
                                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{item.label}</label>
@@ -986,7 +995,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
 
                             <div className="bg-emerald-900 p-5 rounded-xl text-white shadow-xl shadow-emerald-100">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Total Actual Expenditure</span>
+                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">{t('settlementModal.totalActualExpenditure')}</span>
                                     <span className="text-2xl font-black">
                                         {formatCurrency(settleData.training + settleData.transport + settleData.accommodation + settleData.others)}
                                     </span>
@@ -995,7 +1004,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
 
                             {selectedRequest?._original?.category === 'Sertifikat' && (
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Upload Certificate Evidence (Optional to Update)</label>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{t('settlementModal.uploadCertificateEvidenceOptional')}</label>
                                     <input
                                         type="file"
                                         accept="image/*,.pdf"
@@ -1006,11 +1015,11 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                             )}
 
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Settlement Notes</label>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{t('settlementModal.settlementNotes')}</label>
                                 <textarea
                                     className="w-full px-6 py-4 rounded-lg bg-slate-50 border border-slate-100 focus:bg-white outline-none font-bold text-slate-700 text-sm resize-none"
                                     rows={3}
-                                    placeholder="Add notes for finance department..."
+                                    placeholder={t('settlementModal.settlementNotesPlaceholder')}
                                     value={settleData.settlementNotes}
                                     onChange={(e) => setSettleData(prev => ({ ...prev, settlementNotes: e.target.value }))}
                                 />
@@ -1018,8 +1027,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                         </div>
 
                         <div className="p-5 bg-slate-50 border-t border-slate-100 flex justify-end gap-4 shrink-0">
-                            <button onClick={() => setIsSettlementOpen(false)} className="px-8 py-3 bg-white text-slate-400 rounded-2xl font-black text-xs tracking-widest border border-slate-200">CANCEL</button>
-                            <button onClick={handleSaveSettlement} className="px-8 py-3 bg-emerald-600 text-white rounded-2xl font-black text-xs tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all">CONFIRM SETTLEMENT</button>
+                            <button onClick={() => setIsSettlementOpen(false)} className="px-8 py-3 bg-white text-slate-400 rounded-2xl font-black text-xs tracking-widest border border-slate-200">{t('settlementModal.cancel')}</button>
+                            <button onClick={handleSaveSettlement} className="px-8 py-3 bg-emerald-600 text-white rounded-2xl font-black text-xs tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all">{t('settlementModal.confirmSettlement')}</button>
                         </div>
                     </div>
                 </div>

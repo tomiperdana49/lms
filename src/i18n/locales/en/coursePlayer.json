@@ -1,0 +1,90 @@
+{
+  "hero": {
+    "badge": "Learning Hub",
+    "title": "Online Learning Modules",
+    "subtitle": "Access premium modules to enhance your professional skills.",
+    "studentsBadge": "Students"
+  },
+  "card": {
+    "completed": "Completed",
+    "progressLabel": "Progress",
+    "review": "Review",
+    "continue": "Continue",
+    "start": "Start",
+    "cancelProgressTooltip": "Cancel Progress"
+  },
+  "cancelModal": {
+    "title": "Cancel Progress",
+    "message": "Are you sure you want to cancel progress for module \"{{title}}\"? All quiz scores and learning history will be deleted.",
+    "confirmText": "Yes, Cancel Progress"
+  },
+  "overview": {
+    "backToModules": "Back to Modules",
+    "modulesCount": "{{count}} Modules",
+    "moduleDescription": "Module Description",
+    "process": "Process"
+  },
+  "player": {
+    "videoUnavailable": "Video source not available",
+    "materialTitleFallback": "Material Title",
+    "durationFallback": "00:00",
+    "moduleHint": "Master this module to advance your skills. Watch the video completely to unlock the next steps.",
+    "passed": "Passed",
+    "passedWithScore": "Passed: {{score}}%",
+    "finishAndContinue": "Finish & Continue",
+    "checkingStatus": "Checking Status...",
+    "takeQuiz": "Take Quiz",
+    "takeQuizWithQuestions": "Take Quiz ({{count}} Questions)",
+    "watchToUnlockQuiz": "Watch video until the end to unlock the Quiz",
+    "watchUntilFinished": "Watch until finished",
+    "replay": "Replay",
+    "startModuleQuiz": "Start Module Quiz"
+  },
+  "sidebar": {
+    "materialList": "Material List",
+    "materialsCompleted": "{{completed}} / {{total}} Materials Completed",
+    "preTestScore": "Pre-Test Score",
+    "modulePreTest": "Module Pre-Test",
+    "mandatory": "MANDATORY",
+    "moduleQuiz": "Module Quiz",
+    "moduleQuizWithScore": "Module Quiz: {{score}}",
+    "finalAssessmentTitle": "Final Assessment (Final Exam)",
+    "finalAssessmentRetry": "Last Score: {{score}} (Min. 80). Please retry.",
+    "finalAssessmentStart": "Click to Start Evaluation",
+    "finalAssessmentLocked": "Complete all materials to unlock",
+    "finalAssessmentCompleted": "Final Assessment Completed",
+    "finalScore": "Final Score: {{score}} / 100. You have passed this course.",
+    "downloadCertificate": "Download Certificate (PDF)"
+  },
+  "quiz": {
+    "preTest": "Pre-Test",
+    "moduleQuiz": "Module Quiz",
+    "finalAssessment": "Final Assessment",
+    "passingStandard": "Passing Standard:",
+    "minScore": "Min. Score {{score}}",
+    "lastScore": "Last Score:",
+    "answerCarefully": "Please answer carefully.",
+    "score": "Score: {{score}} / 100",
+    "retryWarning": "⚠️ Passing standard is {{score}}. Please answer correctly again.",
+    "retry": "Retry",
+    "continue": "Continue",
+    "submitAnswers": "Submit Answers"
+  },
+  "notifications": {
+    "moduleInProgress": "You have a module currently in progress: \"{{title}}\". Please finish or cancel that module before starting a new one.",
+    "noMaterials": "This course does not have any materials or modules yet.",
+    "progressCancelled": "Module progress successfully cancelled.",
+    "cancelProgressFailed": "Failed to cancel progress.",
+    "saveProgressFailed": "Failed to save progress.",
+    "allModulesFinished": "All video materials are finished! Please proceed to the Final Assessment.",
+    "allMaterialsCompleted": "All materials are completed!",
+    "moduleCompleted": "Module Completed!",
+    "savingProgressError": "Error saving progress",
+    "answerAllQuestions": "Please answer all questions!",
+    "passedCourse": "Congratulations! You have passed this course.",
+    "submitScoreFailed": "Failed to submit score.",
+    "certificateDownloaded": "Certificate downloaded successfully!",
+    "certificateGenerationFailed": "Failed to generate certificate.",
+    "finalAssessmentRequired": "You must complete all video materials & quizzes before taking the Final Assessment."
+  }
+}

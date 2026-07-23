@@ -1,0 +1,85 @@
+{
+  "quizEditor": {
+    "quizQuestions": "Pertanyaan Kuis",
+    "deleteQuiz": "Hapus Kuis",
+    "question": "Pertanyaan {{number}}",
+    "questionPlaceholder": "Masukkan pertanyaan di sini...",
+    "answerOptions": "Pilihan Jawaban",
+    "optionPlaceholder": "Pilihan {{number}}",
+    "removeOption": "Hapus Pilihan",
+    "minOptionsError": "Minimal 2 pilihan diperlukan",
+    "addOption": "+ Tambah Pilihan",
+    "addQuestion": "+ Tambah Pertanyaan"
+  },
+  "errors": {
+    "loadCoursesFailed": "Gagal memuat kursus: {{message}}",
+    "deleteCourseFailed": "Gagal menghapus kursus.",
+    "saveCourseFailed": "Gagal menyimpan kursus: {{message}}",
+    "checkConnection": "Silakan periksa koneksi Anda."
+  },
+  "confirm": {
+    "deleteCourseTitle": "Hapus Kursus",
+    "deleteCourseMessage": "Apakah Anda yakin ingin menghapus kursus ini? Tindakan ini tidak dapat dibatalkan.",
+    "deletePreTestTitle": "Hapus Pre-Test",
+    "deletePreTestMessage": "Hapus kuis persyaratan masuk ini?",
+    "deleteQuizTitle": "Hapus Kuis",
+    "deleteQuizMessage": "Hapus kuis modul ini? Semua pertanyaan akan hilang.",
+    "deletePostTestTitle": "Hapus Post-Test",
+    "deletePostTestMessage": "Hapus kuis evaluasi akhir ini?",
+    "yesProceed": "Ya, Lanjutkan"
+  },
+  "notifications": {
+    "courseDeleted": "Kursus berhasil dihapus.",
+    "courseSaved": "Kursus Berhasil Disimpan! (ID: {{id}})"
+  },
+  "editor": {
+    "managingModule": "Mengelola Modul",
+    "creatingModule": "Membuat Modul",
+    "section1Title": "Informasi Dasar",
+    "moduleNameLabel": "Nama Modul",
+    "moduleNamePlaceholder": "Kursus Baru Tanpa Judul",
+    "descriptionLabel": "Deskripsi",
+    "descriptionPlaceholder": "Deskripsi di sini...",
+    "totalDurationLabel": "Label Total Durasi",
+    "totalDurationPlaceholder": "misal. 60 Jam Pembelajaran",
+    "section2Title": "Pre-Test Masuk Kursus",
+    "requirementLevel1": "Tingkat Persyaratan 1",
+    "createPreTestButton": "Buat Kuis Pre-Test (Wajib sebelum memulai materi)",
+    "preTestDefaultTitle": "Pre-Test: {{courseTitle}}",
+    "entryRequirementActive": "✓ Persyaratan Masuk Kursus Aktif",
+    "deleteRequirement": "Hapus Persyaratan",
+    "section3Title": "Daftar Materi (Video & Kuis Modul)",
+    "addCourse": "Tambah Kursus",
+    "coursePlaceholder": "Kursus Baru",
+    "durationPlaceholder": "Durasi (misal. 10:00)",
+    "videoIdPlaceholder": "ID atau Tautan Video YouTube",
+    "moduleQuizTitle": "Kuis Modul (Setelah Video)",
+    "moduleQuizDefaultTitle": "Kuis Modul: {{moduleTitle}}",
+    "addModuleQuiz": "+ Tambah Kuis Modul",
+    "section4Title": "Penutup Kursus (Evaluasi Akhir)",
+    "finalPostTest": "Post-Test Akhir",
+    "finalPostTestDefaultTitle": "Post-Test Akhir",
+    "delete": "Hapus",
+    "createFinalEvalButton": "Buat Kuis Evaluasi Akhir (Post-Test)",
+    "close": "Tutup",
+    "saveChanges": "Simpan Perubahan"
+  },
+  "header": {
+    "badge": "Arsitektur Modul",
+    "title": "Manajemen Modul Online",
+    "subtitle": "Arsitektur Pembelajaran Digital: Rancang, ubah, dan kelola modul kurikulum berstandar tinggi.",
+    "newModule": "Modul Baru"
+  },
+  "card": {
+    "badge": "Modul",
+    "editCourse": "Ubah Kursus",
+    "deleteCourse": "Hapus Kursus",
+    "coursesCount": "{{count}} Kursus",
+    "reorder": "Atur Ulang"
+  },
+  "empty": {
+    "title": "Tidak Ada Kursus Ditemukan",
+    "message": "Mulai dengan membuat kursus pelatihan pertama Anda.",
+    "createNewCourse": "Buat Kursus Baru"
+  }
+}

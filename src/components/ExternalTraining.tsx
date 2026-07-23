@@ -1,4 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { ExternalTrainingRequest, User } from '../types';
 import { API_BASE_URL } from '../config';
 import {
@@ -22,6 +23,7 @@ interface ExternalTrainingProps {
 }
 
 export default function ExternalTraining({ currentUser, isManagementMode, defaultTab }: ExternalTrainingProps) {
+ const { t } = useTranslation('externalTraining');
  const [activeTab, setActiveTab] = useState<TabType>(defaultTab || 'my_requests');
 
  useEffect(() => {
@@ -96,11 +98,11 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  })
  });
  if (res.ok) {
- showNotif('success', 'Request submitted successfully!');
+ showNotif('success', t('notifications.submitSuccess'));
  setTitle(''); setVendor(''); setLocation(''); setRegFee(''); setAttachment(''); setStartDate(''); setEndDate('');
  fetchMyRequests();
  } else {
- throw new Error('Failed to submit request');
+ throw new Error(t('notifications.submitFailed'));
  }
  } catch (err: any) {
  showNotif('error', err.message);
@@ -126,8 +128,8 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  body: JSON.stringify(bodyData)
  });
 
- if (!res.ok) throw new Error('Failed to update request');
- setNotification({ show: true, type: 'success', message: `Request successfully ${status.toLowerCase()}` });
+ if (!res.ok) throw new Error(t('notifications.updateFailed'));
+ setNotification({ show: true, type: 'success', message: t('notifications.statusUpdated', { status: status === 'Approved' ? t('notifications.statusApproved') : t('notifications.statusRejected') }) });
  fetchTeamRequests();
  if (status === 'Rejected') {
  setRejectModalOpen(false);
@@ -136,7 +138,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  }
  } catch (error) {
  console.error(error);
- setNotification({ show: true, type: 'error', message: 'An error occurred while updating the request' });
+ setNotification({ show: true, type: 'error', message: t('notifications.updateError') });
  }
  };
 
@@ -157,7 +159,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <div className="flex flex-wrap items-center justify-between gap-4">
  <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
  <Briefcase className="w-8 h-8 text-blue-600 " />
- External Training
+ {t('title')}
  </h1>
  </div>
 
@@ -167,13 +169,13 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  className={`px-4 py-2 border-b-2 font-medium text-sm transition-colors ${activeTab === 'my_requests' ? 'border-blue-600 text-blue-600 ' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
  onClick={() => setActiveTab('my_requests')}
  >
- My Requests
+ {t('tabs.myRequests')}
  </button>
  <button
  className={`px-4 py-2 border-b-2 font-medium text-sm transition-colors ${activeTab === 'team_approvals' ? 'border-blue-600 text-blue-600 ' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
  onClick={() => setActiveTab('team_approvals')}
  >
- Team Approvals
+ {t('tabs.teamApprovals')}
  </button>
 
  </div>
@@ -182,61 +184,61 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  {activeTab === 'my_requests' && (
  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
  <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
- <h2 className="text-lg font-semibold text-gray-800 mb-4">New Request</h2>
+ <h2 className="text-lg font-semibold text-gray-800 mb-4">{t('form.newRequest')}</h2>
  <form onSubmit={handleRequestSubmit} className="space-y-4">
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.category')}</label>
  <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg">
- <option>Training</option>
- <option>Sertifikat</option>
- <option>Modul</option>
+ <option value="Training">{t('form.categoryTraining')}</option>
+ <option value="Sertifikat">{t('form.categoryCertificate')}</option>
+ <option value="Modul">{t('form.categoryModule')}</option>
  </select>
  </div>
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1">Title / Course Name</label>
- <input required type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" placeholder="e.g. Advanced Leadership" />
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.titleLabel')}</label>
+ <input required type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" placeholder={t('form.titlePlaceholder')} />
  </div>
  <div className="grid grid-cols-2 gap-4">
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1">Vendor</label>
- <input required type="text" value={vendor} onChange={e => setVendor(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" placeholder="e.g. Coursera" />
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.vendor')}</label>
+ <input required type="text" value={vendor} onChange={e => setVendor(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" placeholder={t('form.vendorPlaceholder')} />
  </div>
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
- <input type="text" value={location} onChange={e => setLocation(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" placeholder="e.g. Jakarta (Online)" />
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.location')}</label>
+ <input type="text" value={location} onChange={e => setLocation(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" placeholder={t('form.locationPlaceholder')} />
  </div>
  </div>
  <div className="grid grid-cols-2 gap-4">
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.startDate')}</label>
  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" />
  </div>
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.endDate')}</label>
  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" />
  </div>
  </div>
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1">Registration Fee (Rp)</label>
- <input 
- required 
- type="text" 
- value={regFee} 
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.registrationFee')}</label>
+ <input
+ required
+ type="text"
+ value={regFee}
  onChange={e => {
  const rawValue = e.target.value.replace(/\D/g, '');
  if (rawValue === '') setRegFee('');
  else setRegFee(new Intl.NumberFormat('id-ID').format(Number(rawValue)));
- }} 
- className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" 
- placeholder="0" 
+ }}
+ className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg"
+ placeholder="0"
  />
  </div>
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1">Attachment Link (Optional)</label>
- <input type="url" value={attachment} onChange={e => setAttachment(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" placeholder="Google Drive link, etc." />
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.attachmentLink')}</label>
+ <input type="url" value={attachment} onChange={e => setAttachment(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" placeholder={t('form.attachmentPlaceholder')} />
  </div>
  <button disabled={isLoading} type="submit" className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
- {isLoading ? 'Submitting...' : 'Submit Request'}
+ {isLoading ? t('form.submitting') : t('form.submitRequest')}
  </button>
  </form>
  </div>
@@ -244,7 +246,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  {requests.length === 0 ? (
  <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300 ">
  <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-3" />
- <p className="text-gray-500">No external training requests yet.</p>
+ <p className="text-gray-500">{t('empty.noRequests')}</p>
  </div>
  ) : (
  requests.map(req => (
@@ -253,7 +255,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <div>
  <div className="flex items-center gap-2 mb-1">
  <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 ">
- {req.category}
+ {t(`categoryLabels.${req.category}`, { defaultValue: req.category })}
  </span>
  <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
  req.status === 'Processed' ? 'bg-green-100 text-green-800' :
@@ -261,26 +263,26 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  req.status === 'Rejected' ? 'bg-red-100 text-red-800' :
  'bg-amber-100 text-amber-800'
  }`}>
- {req.status === 'Pending' ? `Pending (${req.leader_name || 'Supervisor'})` : req.status === 'Approved' ? 'Pending (HR)' : req.status === 'Processed' ? 'Approved' : req.status}
+ {req.status === 'Pending' ? t('status.pendingWithApprover', { name: req.leader_name || t('status.defaultSupervisor') }) : req.status === 'Approved' ? t('status.pendingHr') : req.status === 'Processed' ? t('status.approved') : req.status === 'Rejected' ? t('status.rejected') : req.status}
  </span>
  </div>
  <h3 className="font-semibold text-gray-800 text-lg">{req.title}</h3>
  <div className="flex items-center gap-4 text-sm text-gray-500 mt-2">
  <span className="flex items-center gap-1"><Calendar className="w-4 h-4"/> {req.start_date ? new Date(req.start_date).toLocaleDateString() : '-'}</span>
- <span className="flex items-center gap-1"><DollarSign className="w-4 h-4"/> Reg: {formatRp(req.registration_fee || 0)}</span>
+ <span className="flex items-center gap-1"><DollarSign className="w-4 h-4"/> {t('request.registrationLabel', { amount: formatRp(req.registration_fee || 0) })}</span>
  </div>
  </div>
  {req.status === 'Processed' && req.payment_method && (
  <div className="text-right">
- <p className="text-sm text-gray-500">Payment via</p>
+ <p className="text-sm text-gray-500">{t('request.paymentVia')}</p>
  <p className="font-medium text-gray-800 ">{req.payment_method}</p>
  </div>
  )}
  </div>
- 
+
  {req.status === 'Rejected' && req.rejection_reason && (
  <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-700 w-full">
- <span className="font-semibold block mb-1">Rejection Reason:</span>
+ <span className="font-semibold block mb-1">{t('request.rejectionReasonLabel')}</span>
  <p>{req.rejection_reason}</p>
  </div>
  )}
@@ -299,8 +301,8 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <div className="bg-white w-16 h-16 rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-4 border border-slate-100">
  <CheckCircle className="w-8 h-8 text-emerald-500" />
  </div>
- <h3 className="text-lg font-semibold text-slate-800 mb-1">All Caught Up!</h3>
- <p className="text-slate-500 max-w-sm mx-auto">There are no pending external training requests from your team at the moment.</p>
+ <h3 className="text-lg font-semibold text-slate-800 mb-1">{t('empty.allCaughtUpTitle')}</h3>
+ <p className="text-slate-500 max-w-sm mx-auto">{t('empty.allCaughtUpMessage')}</p>
  </div>
  ) : (
  <div className="grid gap-6">
@@ -316,18 +318,18 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  </div>
  <div>
  <p className="text-sm font-semibold text-slate-800">{req.employee_name}</p>
- <p className="text-xs text-slate-500 font-medium">ID: {req.employee_id}</p>
+ <p className="text-xs text-slate-500 font-medium">{t('team.idLabel', { id: req.employee_id })}</p>
  </div>
  <div className="ml-auto flex gap-2">
  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
- {req.category}
+ {t(`categoryLabels.${req.category}`, { defaultValue: req.category })}
  </span>
  <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
- req.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]' : 
- req.status === 'Rejected' ? 'bg-rose-50 text-rose-700 border-rose-200' : 
+ req.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]' :
+ req.status === 'Rejected' ? 'bg-rose-50 text-rose-700 border-rose-200' :
  'bg-emerald-50 text-emerald-700 border-emerald-200'
  }`}>
- {req.status}
+ {t(`statusLabels.${req.status}`, { defaultValue: req.status })}
  </span>
  </div>
  </div>
@@ -336,16 +338,16 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/50">
- <p className="text-xs text-slate-500 mb-1 font-medium flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5"/> Schedule</p>
+ <p className="text-xs text-slate-500 mb-1 font-medium flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5"/> {t('team.schedule')}</p>
  <p className="text-sm font-semibold text-slate-700">{req.start_date ? new Date(req.start_date).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}) : '-'} &mdash; {req.end_date ? new Date(req.end_date).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}) : '-'}</p>
  </div>
  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/50">
- <p className="text-xs text-slate-500 mb-1 font-medium flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5"/> Registration Fee</p>
+ <p className="text-xs text-slate-500 mb-1 font-medium flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5"/> {t('team.registrationFee')}</p>
  <p className="text-sm font-bold text-slate-800">{formatRp(req.registration_fee || 0)}</p>
  </div>
  {req.vendor && (
  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/50">
- <p className="text-xs text-slate-500 mb-1 font-medium flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5"/> Vendor</p>
+ <p className="text-xs text-slate-500 mb-1 font-medium flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5"/> {t('team.vendor')}</p>
  <p className="text-sm font-semibold text-slate-700">{req.vendor}</p>
  </div>
  )}
@@ -355,7 +357,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center group-hover/link:bg-blue-200 transition-colors">
  <Link className="w-4 h-4"/>
  </div>
- View Attachment
+ {t('team.viewAttachment')}
  </a>
  </div>
  )}
@@ -366,16 +368,16 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  {req.status === 'Pending' ? (
  <>
  <button onClick={() => handleApproveReject(req.id, 'Approved')} className="flex-1 md:flex-none px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-0.5">
- <CheckCircle className="w-5 h-5"/> Approve
+ <CheckCircle className="w-5 h-5"/> {t('team.approve')}
  </button>
  <button onClick={() => { setSelectedRequestId(req.id); setRejectModalOpen(true); }} className="flex-1 md:flex-none px-6 py-3 bg-white text-rose-600 hover:bg-rose-50 hover:text-rose-700 border border-rose-200 rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 shadow-sm">
- <XCircle className="w-5 h-5"/> Reject
+ <XCircle className="w-5 h-5"/> {t('team.reject')}
  </button>
  </>
  ) : (
  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100 w-full md:w-32">
- <p className="text-xs text-slate-500 font-medium mb-1">Status</p>
- <p className={`font-bold ${req.status === 'Rejected' ? 'text-rose-600' : 'text-emerald-600'}`}>{req.status}</p>
+ <p className="text-xs text-slate-500 font-medium mb-1">{t('team.statusLabel')}</p>
+ <p className={`font-bold ${req.status === 'Rejected' ? 'text-rose-600' : 'text-emerald-600'}`}>{t(`statusLabels.${req.status}`, { defaultValue: req.status })}</p>
  </div>
  )}
  </div>
@@ -393,12 +395,12 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
             {rejectModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-                        <h3 className="text-xl font-bold text-slate-800 mb-2">Reject Training Request</h3>
-                        <p className="text-slate-500 text-sm mb-4">Please provide a reason for rejecting this request.</p>
+                        <h3 className="text-xl font-bold text-slate-800 mb-2">{t('rejectModal.title')}</h3>
+                        <p className="text-slate-500 text-sm mb-4">{t('rejectModal.subtitle')}</p>
                         <textarea
                             className="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none resize-none"
                             rows={4}
-                            placeholder="Type reason here..."
+                            placeholder={t('rejectModal.placeholder')}
                             value={rejectionReason}
                             onChange={(e) => setRejectionReason(e.target.value)}
                         />
@@ -407,14 +409,14 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
                                 onClick={() => { setRejectModalOpen(false); setRejectionReason(''); setSelectedRequestId(null); }}
                                 className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-colors"
                             >
-                                Cancel
+                                {t('rejectModal.cancel')}
                             </button>
                             <button
                                 onClick={confirmReject}
                                 disabled={!rejectionReason.trim()}
                                 className="flex-1 px-4 py-2.5 rounded-xl bg-rose-600 text-white font-medium hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
-                                Confirm Reject
+                                {t('rejectModal.confirmReject')}
                             </button>
                         </div>
                     </div>

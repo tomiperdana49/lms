@@ -1,0 +1,69 @@
+{
+  "notifications": {
+    "submitSuccess": "Request submitted successfully! Please wait for approval.",
+    "submitError": "Failed to submit request."
+  },
+  "print": {
+    "documentTitle": "Training Approval - {{id}}",
+    "certificateTitle": "External Training Certificate of Approval",
+    "referenceLabel": "Reference: LTR-{{id}}",
+    "employeeNameLabel": "Employee Name",
+    "approvalDateLabel": "Approval Date",
+    "trainingProgramLabel": "Training Program",
+    "vendorLabel": "Vendor / Provider",
+    "totalBudgetLabel": "Total Approved Budget",
+    "approvedByHrStamp": "Approved by HR",
+    "footer": "Nusa Learning Management System • Official Document"
+  },
+  "header": {
+    "title": "External Training",
+    "subtitle": "Nusa LMS • Advanced Learning Requests",
+    "teamRequests": "TEAM REQUESTS"
+  },
+  "form": {
+    "section1Title": "Training Fundamentals",
+    "trainingNameLabel": "Training / Certification Name",
+    "trainingNamePlaceholder": "e.g. Strategic Management Masterclass",
+    "vendorLabel": "Provider / Vendor",
+    "vendorPlaceholder": "Institution Name",
+    "locationLabel": "Location / Venue",
+    "locationPlaceholder": "City or Online",
+    "dateLabel": "Proposed Date",
+    "durationLabel": "Course Duration",
+    "durationPlaceholder": "e.g. 5 Working Days",
+    "section2Title": "Investment & Disbursement",
+    "registrationFee": "Registration Fee",
+    "travelFlight": "Travel / Flight",
+    "accommodation": "Accommodation",
+    "miscellaneous": "Miscellaneous",
+    "totalInvestmentLabel": "Total Training Investment",
+    "settlementMethodLabel": "Preferred Settlement Method",
+    "reimbursementTitle": "Reimbursement",
+    "reimbursementDesc": "Pay personally first and claim later with evidence.",
+    "directPaymentTitle": "Direct Payment",
+    "directPaymentDesc": "Nusa Finance transfers directly to the Vendor.",
+    "section3Title": "Corporate Governance",
+    "justificationLabel": "Justification for Training",
+    "justificationPlaceholder": "Describe how this program will impact your professional growth and company goals...",
+    "mandatoryPolicyTitle": "Mandatory Policy",
+    "policyItem1": "Staff must achieve passing certification standard.",
+    "policyItem2": "Failure to pass incurs 50% personal cost liability.",
+    "policyItem3": "Original certificates must be deposited to HR Dept.",
+    "penaltyAgreement": "I acknowledge and accept the 50% cost penalty in event of training failure.",
+    "serviceBondTitle": "Service Bond Required",
+    "serviceBondDesc": "Total investment exceeds the threshold (Rp {{threshold}}). This training requires a formal Service Bond agreement.",
+    "bondAgreement": "I am willing to enter a formal Service Bond agreement for this training.",
+    "processing": "PROCESSING...",
+    "confirmSubmission": "CONFIRM SUBMISSION"
+  },
+  "history": {
+    "title": "Timeline",
+    "subtitle": "Submission & Approval History",
+    "noRecordsTitle": "No Records Found",
+    "noRecordsMessage": "Your training history will appear here.",
+    "leaderOk": "LEADER OK",
+    "hrFinalOk": "HR FINAL OK",
+    "rejectionNote": "Rejection Note",
+    "downloadCertificate": "DOWNLOAD APPROVAL CERTIFICATE"
+  }
+}

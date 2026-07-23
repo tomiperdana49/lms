@@ -21,8 +21,10 @@ import {
     FileText,
     Globe
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { Page, Role, User } from '../types';
 import FeedbackModal from './FeedbackModal';
+import LanguageSwitcher from './LanguageSwitcher';
 import { API_BASE_URL } from '../config';
 
 interface DashboardLayoutProps {
@@ -38,6 +40,7 @@ interface DashboardLayoutProps {
 }
 
 const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onLogout, adminView, config }: DashboardLayoutProps) => {
+    const { t, i18n } = useTranslation('dashboardLayout');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
     const [isTrainingOpen, setIsTrainingOpen] = useState(() => {
@@ -89,6 +92,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     if (saved) readIds = JSON.parse(saved);
                 } catch (e) { console.error(e); }
 
+                const dateLocale = i18n.language?.startsWith('id') ? 'id-ID' : 'en-US';
+
                 // 1. Meetings
                 const meetingNotifs = meetings
                     .filter((m: any) => m.guests?.emails?.includes(user.email))
@@ -96,9 +101,9 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                         const notifId = m.id;
                         return {
                             id: notifId,
-                            title: 'Upcoming Meeting',
-                            message: `${m.title} at ${m.time} (${m.type})`,
-                            time: new Date(m.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                            title: t('notifications.upcomingMeeting'),
+                            message: t('notifications.meetingMessage', { title: m.title, time: m.time, type: m.type }),
+                            time: new Date(m.date).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
                             type: 'INFO',
                             isRead: readIds.includes(notifId)
                         };
@@ -106,15 +111,15 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
 
                 // 2. Training Requests
                 const trainingNotifs = training
-                    .filter((t: any) => t.userName === user.name || (user.employee_id && t.employee_id === user.employee_id))
-                    .map((t: any) => {
-                        const notifId = t.id + 50000;
+                    .filter((tr: any) => tr.userName === user.name || (user.employee_id && tr.employee_id === user.employee_id))
+                    .map((tr: any) => {
+                        const notifId = tr.id + 50000;
                         return {
                             id: notifId,
-                            title: `Training: ${t.status?.replace('_', ' ')}`,
-                            message: `Request for "${t.title}" is ${t.status?.toLowerCase().replace('_', ' ')}.`,
-                            time: new Date(t.submittedAt || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                            type: t.status === 'APPROVED' ? 'SUCCESS' : t.status === 'REJECTED' ? 'WARNING' : 'INFO',
+                            title: t('notifications.trainingStatus', { status: tr.status?.replace('_', ' ') }),
+                            message: t('notifications.trainingMessage', { title: tr.title, status: tr.status?.toLowerCase().replace('_', ' ') }),
+                            time: new Date(tr.submittedAt || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            type: tr.status === 'APPROVED' ? 'SUCCESS' : tr.status === 'REJECTED' ? 'WARNING' : 'INFO',
                             isRead: readIds.includes(notifId)
                         };
                     });
@@ -122,32 +127,36 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                 // 3. Reading Logs
                 const readingNotifs = logs
                     .filter((l: any) => {
-                        const isOwnLog = (l.userName && l.userName.trim().toLowerCase() === user.name.trim().toLowerCase()) || 
+                        const isOwnLog = (l.userName && l.userName.trim().toLowerCase() === user.name.trim().toLowerCase()) ||
                                          (user.employee_id && l.employee_id === user.employee_id);
                         const hasUpdate = ['Approved', 'Rejected', 'Cancelled'].includes(l.hrApprovalStatus) || l.status === 'Cancelled';
                         return isOwnLog && hasUpdate;
                     })
                     .map((l: any) => {
                         const notifId = l.id + 100000;
-                        let statusLabel = 'diperbarui';
+                        let statusLabel = t('notifications.statusUpdated');
                         let type = 'INFO';
-                        
+
                         if (l.hrApprovalStatus === 'Approved') {
-                            statusLabel = 'disetujui oleh HRD';
+                            statusLabel = t('notifications.statusApproved');
                             type = 'SUCCESS';
                         } else if (l.hrApprovalStatus === 'Rejected') {
-                            statusLabel = `ditolak oleh HRD${l.rejectionReason ? ` dengan alasan: "${l.rejectionReason}"` : ''}`;
+                            statusLabel = l.rejectionReason
+                                ? t('notifications.statusRejectedWithReason', { reason: l.rejectionReason })
+                                : t('notifications.statusRejected');
                             type = 'WARNING';
                         } else if (l.hrApprovalStatus === 'Cancelled' || l.status === 'Cancelled') {
-                            statusLabel = `dibatalkan/dihapus${l.rejectionReason ? ` dengan alasan: "${l.rejectionReason}"` : ''}`;
+                            statusLabel = l.rejectionReason
+                                ? t('notifications.statusCancelledWithReason', { reason: l.rejectionReason })
+                                : t('notifications.statusCancelled');
                             type = 'WARNING';
                         }
 
                         return {
                             id: notifId,
-                            title: `Status Buku: ${l.hrApprovalStatus || l.status}`,
-                            message: `Buku "${l.title}" Anda telah ${statusLabel}.`,
-                            time: new Date(l.approvedAt || l.finishDate || l.date || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                            title: t('notifications.readingStatusTitle', { status: l.hrApprovalStatus || l.status }),
+                            message: t('notifications.readingMessage', { title: l.title, statusLabel }),
+                            time: new Date(l.approvedAt || l.finishDate || l.date || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
                             type,
                             isRead: readIds.includes(notifId)
                         };
@@ -209,32 +218,32 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
     
     // List sub-menu admin agar sama dengan gambar
     const adminSubItems = [
-        { icon: LayoutDashboard, label: 'Overview', id: 'admin-dashboard', view: 'overview' },
-        { icon: Calendar, label: 'Calendar', id: 'admin-dashboard', view: 'calendar' },
-        { header: 'MANAGEMENT' },
-        { icon: Users, label: 'User Management', id: 'admin-dashboard', view: 'users' },
-        { icon: BookOpen, label: 'Online Modules Management', id: 'admin-dashboard', view: 'courses' },
-        ...((config?.moduleInternal || config?.moduleExternal) ? [{ header: 'TRAINING' }] : []),
-        ...(config?.moduleInternal ? [{ icon: Users, label: 'Internal', id: 'admin-dashboard', view: 'meetings' }] : []),
-        ...(config?.moduleExternal ? [{ icon: FileText, label: 'External', id: 'admin-dashboard', view: 'training' }] : []),
-        { header: 'REPORT' },
-        { icon: Library, label: 'Reading Log', id: 'admin-dashboard', view: 'logs' },
-        { icon: Award, label: 'Quiz Report', id: 'admin-dashboard', view: 'quiz-reports' },
-        { icon: TrendingUp, label: 'HR Report', id: 'admin-dashboard', view: 'reports' },
-        ...(config?.moduleIncentive ? [{ icon: Award, label: 'Incentives', id: 'admin-dashboard', view: 'incentives' }] : []),
+        { icon: LayoutDashboard, label: t('admin.overview'), id: 'admin-dashboard', view: 'overview' },
+        { icon: Calendar, label: t('admin.calendar'), id: 'admin-dashboard', view: 'calendar' },
+        { header: t('admin.managementHeader') },
+        { icon: Users, label: t('admin.userManagement'), id: 'admin-dashboard', view: 'users' },
+        { icon: BookOpen, label: t('admin.onlineModulesManagement'), id: 'admin-dashboard', view: 'courses' },
+        ...((config?.moduleInternal || config?.moduleExternal) ? [{ header: t('admin.trainingHeader') }] : []),
+        ...(config?.moduleInternal ? [{ icon: Users, label: t('admin.internal'), id: 'admin-dashboard', view: 'meetings' }] : []),
+        ...(config?.moduleExternal ? [{ icon: FileText, label: t('admin.external'), id: 'admin-dashboard', view: 'training' }] : []),
+        { header: t('admin.reportHeader') },
+        { icon: Library, label: t('admin.readingLog'), id: 'admin-dashboard', view: 'logs' },
+        { icon: Award, label: t('admin.quizReport'), id: 'admin-dashboard', view: 'quiz-reports' },
+        { icon: TrendingUp, label: t('admin.hrReport'), id: 'admin-dashboard', view: 'reports' },
+        ...(config?.moduleIncentive ? [{ icon: Award, label: t('admin.incentives'), id: 'admin-dashboard', view: 'incentives' }] : []),
     ];
 
     const menuItems = [
-        { icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard' },
-        { icon: Library, label: 'Reading Log', id: 'reading-log' },
-        { icon: BookOpen, label: 'Online Modules', id: 'courses' },
-        { icon: Calendar, label: 'Calendar', id: 'calendar' },
-        ...(config?.moduleIncentive ? [{ icon: Award, label: 'Incentives', id: 'incentives' }] : []),
+        { icon: LayoutDashboard, label: t('menu.dashboard'), id: 'dashboard' },
+        { icon: Library, label: t('menu.readingLog'), id: 'reading-log' },
+        { icon: BookOpen, label: t('menu.onlineModules'), id: 'courses' },
+        { icon: Calendar, label: t('menu.calendar'), id: 'calendar' },
+        ...(config?.moduleIncentive ? [{ icon: Award, label: t('menu.incentives'), id: 'incentives' }] : []),
     ];
 
     const trainingSubItems = [
-        ...(config?.moduleInternal ? [{ icon: Users, label: 'Internal', id: 'internal' }] : []),
-        ...(config?.moduleExternal ? [{ icon: Globe, label: 'External', id: 'external' }] : []),
+        ...(config?.moduleInternal ? [{ icon: Users, label: t('menu.internal'), id: 'internal' }] : []),
+        ...(config?.moduleExternal ? [{ icon: Globe, label: t('menu.external'), id: 'external' }] : []),
     ];
 
     const getInitials = (name: string) => {
@@ -319,7 +328,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                 >
                                     <div className="flex items-center gap-3">
                                         <GraduationCap size={20} />
-                                        <span className="font-medium">Training</span>
+                                        <span className="font-medium">{t('menu.training')}</span>
                                     </div>
                                     {isTrainingOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                 </button>
@@ -363,7 +372,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                 >
                                     <div className="flex items-center gap-3">
                                         <Shield size={20} />
-                                        <span className="font-medium">Admin Panel</span>
+                                        <span className="font-medium">{t('menu.adminPanel')}</span>
                                     </div>
                                     {isAdminOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                 </button>
@@ -404,7 +413,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-emerald-400 hover:bg-slate-800 hover:text-emerald-300 transition-all text-left cursor-pointer"
                         >
                             <MessageSquarePlus size={20} />
-                            <span className="font-medium">Feedback</span>
+                            <span className="font-medium">{t('menu.feedback')}</span>
                         </button>
                     </div>
 
@@ -415,7 +424,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-slate-800 hover:text-red-300 transition-colors"
                         >
                             <LogOut size={20} />
-                            <span className="font-medium">Sign Out</span>
+                            <span className="font-medium">{t('menu.signOut')}</span>
                         </button>
                     </div>
 
@@ -440,6 +449,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     </div>
 
                     <div className="flex items-center gap-6">
+                        <LanguageSwitcher />
+
                         <div className="relative notification-btn-container">
                             <button 
                                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
@@ -457,16 +468,16 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                     <div className="p-4 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
                                         <h4 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
                                             <Bell size={16} className="text-blue-600" />
-                                            Notifications
+                                            {t('notifications.title')}
                                         </h4>
                                         <span className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded-full">
-                                            {notifications.filter(n => !n.isRead).length} New
+                                            {notifications.filter(n => !n.isRead).length} {t('notifications.new')}
                                         </span>
                                     </div>
                                     <div className="max-h-[320px] overflow-y-auto divide-y divide-slate-50 p-2 space-y-1">
                                         {notifications.length === 0 ? (
                                             <div className="text-center py-8 text-slate-400 text-xs font-bold uppercase tracking-wider">
-                                                No notifications found
+                                                {t('notifications.noNotifications')}
                                             </div>
                                         ) : (
                                             notifications.map(notif => (
@@ -501,7 +512,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                             }}
                                             className="text-[10px] font-black text-blue-600 hover:text-blue-700 tracking-wider uppercase bg-transparent border-none cursor-pointer outline-none"
                                         >
-                                            Mark all as read
+                                            {t('notifications.markAllAsRead')}
                                         </button>
                                     </div>
                                 </div>
@@ -510,9 +521,9 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
 
                         <div className="flex items-center gap-3 pl-6 border-l border-gray-200">
                             <div className="text-right hidden sm:block">
-                                <p className="text-sm font-semibold text-slate-800 leading-tight">{user?.name || 'User'}</p>
+                                <p className="text-sm font-semibold text-slate-800 leading-tight">{user?.name || t('userFallback')}</p>
                                 {user?.employee_id && <p className="text-[10px] text-slate-500 font-medium leading-tight">{user.employee_id}</p>}
-                                <p className="text-xs text-blue-600 font-bold leading-tight mt-0.5">{user?.branch || 'Nusanet'}</p>
+                                <p className="text-xs text-blue-600 font-bold leading-tight mt-0.5">{user?.branch || t('branchFallback')}</p>
                             </div>
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white
                                 ${userRole === 'HR' || userRole === 'HR_ADMIN' ? 'bg-gradient-to-tr from-purple-500 to-pink-600' :

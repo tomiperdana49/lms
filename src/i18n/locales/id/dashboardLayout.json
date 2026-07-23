@@ -1,0 +1,51 @@
+{
+  "menu": {
+    "dashboard": "Dashboard",
+    "readingLog": "Log Bacaan",
+    "onlineModules": "Modul Online",
+    "calendar": "Kalender",
+    "incentives": "Insentif",
+    "training": "Training",
+    "internal": "Internal",
+    "external": "Eksternal",
+    "adminPanel": "Panel Admin",
+    "feedback": "Feedback",
+    "signOut": "Keluar"
+  },
+  "admin": {
+    "overview": "Ringkasan",
+    "calendar": "Kalender",
+    "managementHeader": "MANAJEMEN",
+    "userManagement": "Manajemen Pengguna",
+    "onlineModulesManagement": "Manajemen Modul Online",
+    "trainingHeader": "TRAINING",
+    "internal": "Internal",
+    "external": "Eksternal",
+    "reportHeader": "LAPORAN",
+    "readingLog": "Log Bacaan",
+    "quizReport": "Laporan Kuis",
+    "hrReport": "Laporan HR",
+    "incentives": "Insentif"
+  },
+  "notifications": {
+    "title": "Notifikasi",
+    "new": "Baru",
+    "noNotifications": "Tidak ada notifikasi",
+    "markAllAsRead": "Tandai semua dibaca",
+    "upcomingMeeting": "Meeting Mendatang",
+    "meetingMessage": "{{title}} pukul {{time}} ({{type}})",
+    "trainingStatus": "Training: {{status}}",
+    "trainingMessage": "Pengajuan untuk \"{{title}}\" {{status}}.",
+    "readingStatusTitle": "Status Buku: {{status}}",
+    "readingMessage": "Buku \"{{title}}\" Anda telah {{statusLabel}}.",
+    "statusUpdated": "diperbarui",
+    "statusApproved": "disetujui oleh HRD",
+    "statusRejectedWithReason": "ditolak oleh HRD dengan alasan: \"{{reason}}\"",
+    "statusRejected": "ditolak oleh HRD",
+    "statusCancelledWithReason": "dibatalkan/dihapus dengan alasan: \"{{reason}}\"",
+    "statusCancelled": "dibatalkan/dihapus"
+  },
+  "footer": "© 2026 PT Media Antar Nusa",
+  "userFallback": "Pengguna",
+  "branchFallback": "Nusanet"
+}

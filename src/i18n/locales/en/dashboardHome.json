@@ -1,0 +1,29 @@
+{
+  "dashboardOverview": "Dashboard Overview",
+  "goodMorning": "Good Morning",
+  "goodAfternoon": "Good Afternoon",
+  "goodEvening": "Good Evening",
+  "goodNight": "Good Night",
+  "defaultUser": "User",
+  "heroSubtitle": "Ready to level up your skills today? You have several activities waiting to be completed.",
+  "learningHours": "Learning Hours",
+  "hours": "Hours",
+  "totalHours": "Total Hours",
+  "learningCost": "Learning Cost",
+  "totalCost": "Total Cost",
+  "menu": {
+    "readingLogTitle": "Reading Log",
+    "readingLogSubtitle": "Book reading logs",
+    "onlineCoursesTitle": "Online Courses",
+    "onlineCoursesSubtitle": "Modules & Quizzes",
+    "internalTrainingTitle": "Internal Training",
+    "internalTrainingSubtitle": "Internal sessions",
+    "externalTrainingTitle": "External Training",
+    "externalTrainingSubtitle": "External workshops",
+    "incentivesTitle": "Incentives",
+    "incentivesSubtitle": "Claim rewards",
+    "calendarTitle": "Training Calendar",
+    "calendarSubtitle": "Learning schedule"
+  },
+  "footer": "© 2026 PT Media Antar Nusa"
+}

@@ -1,0 +1,81 @@
+{
+  "title": "External Training",
+  "tabs": {
+    "myRequests": "My Requests",
+    "teamApprovals": "Team Approvals"
+  },
+  "form": {
+    "newRequest": "New Request",
+    "category": "Category",
+    "categoryTraining": "Training",
+    "categoryCertificate": "Certificate",
+    "categoryModule": "Module",
+    "titleLabel": "Title / Course Name",
+    "titlePlaceholder": "e.g. Advanced Leadership",
+    "vendor": "Vendor",
+    "vendorPlaceholder": "e.g. Coursera",
+    "location": "Location",
+    "locationPlaceholder": "e.g. Jakarta (Online)",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "registrationFee": "Registration Fee (Rp)",
+    "attachmentLink": "Attachment Link (Optional)",
+    "attachmentPlaceholder": "Google Drive link, etc.",
+    "submitting": "Submitting...",
+    "submitRequest": "Submit Request"
+  },
+  "status": {
+    "pendingWithApprover": "Pending ({{name}})",
+    "defaultSupervisor": "Supervisor",
+    "pendingHr": "Pending (HR)",
+    "approved": "Approved",
+    "rejected": "Rejected"
+  },
+  "categoryLabels": {
+    "Training": "Training",
+    "Sertifikat": "Certificate",
+    "Modul": "Module"
+  },
+  "statusLabels": {
+    "Pending": "Pending",
+    "Approved": "Approved",
+    "Rejected": "Rejected",
+    "Processed": "Processed"
+  },
+  "empty": {
+    "noRequests": "No external training requests yet.",
+    "allCaughtUpTitle": "All Caught Up!",
+    "allCaughtUpMessage": "There are no pending external training requests from your team at the moment."
+  },
+  "request": {
+    "registrationLabel": "Reg: {{amount}}",
+    "paymentVia": "Payment via",
+    "rejectionReasonLabel": "Rejection Reason:"
+  },
+  "team": {
+    "idLabel": "ID: {{id}}",
+    "schedule": "Schedule",
+    "registrationFee": "Registration Fee",
+    "vendor": "Vendor",
+    "viewAttachment": "View Attachment",
+    "approve": "Approve",
+    "reject": "Reject",
+    "statusLabel": "Status"
+  },
+  "rejectModal": {
+    "title": "Reject Training Request",
+    "subtitle": "Please provide a reason for rejecting this request.",
+    "placeholder": "Type reason here...",
+    "cancel": "Cancel",
+    "confirmReject": "Confirm Reject"
+  },
+  "notifications": {
+    "submitSuccess": "Request submitted successfully!",
+    "submitFailed": "Failed to submit request",
+    "statusUpdated": "Request successfully {{status}}",
+    "statusApproved": "approved",
+    "statusRejected": "rejected",
+    "updateFailed": "Failed to update request",
+    "updateError": "An error occurred while updating the request"
+  }
+}

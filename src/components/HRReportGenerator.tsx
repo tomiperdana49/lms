@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Download, Layers, Eye, XCircle, RefreshCw, Filter, Calendar, Building2, TrendingUp, DollarSign, PieChart } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { TrainingRequest, Meeting, Incentive, ReadingLogEntry } from '../types';
 import * as XLSX from 'xlsx';
 
 const HRReportGenerator = () => {
+    const { t } = useTranslation('hrReportGenerator');
     // Data State
     const [requests, setRequests] = useState<TrainingRequest[]>([]);
     const [externalRequests, setExternalRequests] = useState<any[]>([]);
@@ -22,6 +24,9 @@ const HRReportGenerator = () => {
     const [detailMonth, setDetailMonth] = useState<string | null>(null);
 
     const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    // Positional keys mapping to translation entries (months array order never changes)
+    const monthKeys = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    const monthLabel = (idx: number) => t(`months.${monthKeys[idx]}`);
 
     const [refreshing, setRefreshing] = useState(false);
 
@@ -180,10 +185,10 @@ const HRReportGenerator = () => {
     const totalYTD = monthlyData.reduce((sum, m) => sum + m.total, 0);
     const avgMonthly = totalYTD / monthlyData.filter(m => m.total > 0).length || 0;
     const topCategory = [
-        { label: 'Internal', val: monthlyData.reduce((s, m) => s + m.internalTraining, 0) },
-        { label: 'External', val: monthlyData.reduce((s, m) => s + m.externalTraining, 0) },
-        { label: 'Reading', val: monthlyData.reduce((s, m) => s + m.readingIncentive, 0) },
-        { label: 'Cert.', val: monthlyData.reduce((s, m) => s + m.certIncentive, 0) }
+        { label: t('categories.internal'), val: monthlyData.reduce((s, m) => s + m.internalTraining, 0) },
+        { label: t('categories.external'), val: monthlyData.reduce((s, m) => s + m.externalTraining, 0) },
+        { label: t('categories.reading'), val: monthlyData.reduce((s, m) => s + m.readingIncentive, 0) },
+        { label: t('categories.cert'), val: monthlyData.reduce((s, m) => s + m.certIncentive, 0) }
     ].sort((a, b) => b.val - a.val)[0];
 
     // Detail Data Generator
@@ -213,11 +218,11 @@ const HRReportGenerator = () => {
                 const total = trainerInc + snackC + lunchC + otherC + (audFee * safeNum(m.costReport.participantsCount));
 
                 const details = [];
-                if (snackC) details.push(`Snack: ${formatCurrency(snackC)}`);
-                if (lunchC) details.push(`Lunch: ${formatCurrency(lunchC)}`);
-                if (trainerInc) details.push(`Trainer: ${formatCurrency(trainerInc)}`);
-                if (audFee) details.push(`Audience: ${formatCurrency(audFee)}/pax`);
-                if (otherC) details.push(`Other: ${formatCurrency(otherC)}`);
+                if (snackC) details.push(t('transactions.snackDetail', { amount: formatCurrency(snackC) }));
+                if (lunchC) details.push(t('transactions.lunchDetail', { amount: formatCurrency(lunchC) }));
+                if (trainerInc) details.push(t('transactions.trainerDetail', { amount: formatCurrency(trainerInc) }));
+                if (audFee) details.push(t('transactions.audienceDetail', { amount: formatCurrency(audFee) }));
+                if (otherC) details.push(t('transactions.otherDetail', { amount: formatCurrency(otherC) }));
 
                 txs.push({
                     date: m.date,
@@ -238,8 +243,8 @@ const HRReportGenerator = () => {
                     date: dateToCheck,
                     category: 'Reading Incentive',
                     item: l.title,
-                    pic: l.userName || 'Unknown',
-                    details: `Category: ${l.category}`,
+                    pic: l.userName || t('transactions.unknown'),
+                    details: t('transactions.categoryDetail', { category: l.category }),
                     amount: safeNum(l.incentiveAmount)
                 });
             }
@@ -248,20 +253,20 @@ const HRReportGenerator = () => {
         requests.filter(r => r.status === 'APPROVED').forEach(r => {
             if (selectedBranch !== 'All' && r.location !== selectedBranch) return;
             if (isInPeriod(r.date, range)) {
-                const details = [`Main Cost: ${formatCurrency(r.cost || 0)}`];
-                if (r.additionalCost) details.push(`Addtl: ${formatCurrency(r.additionalCost)}`);
+                const details = [t('transactions.mainCostDetail', { amount: formatCurrency(r.cost || 0) })];
+                if (r.additionalCost) details.push(t('transactions.additionalDetail', { amount: formatCurrency(r.additionalCost) }));
 
                 txs.push({
                     date: r.date,
                     category: 'External Training',
                     item: r.title,
-                    pic: r.employeeName || 'Unknown',
+                    pic: r.employeeName || t('transactions.unknown'),
                     details: details.join(', '),
                     amount: safeNum(r.cost) + safeNum(r.additionalCost)
                 });
             }
         });
-        
+
         externalRequests.filter(r => r.status === 'Processed').forEach(r => {
             if (selectedBranch !== 'All') {
                 const emp = employees.find(e => e.id_employee === r.employee_id);
@@ -269,16 +274,16 @@ const HRReportGenerator = () => {
             }
             const dateToCheck = r.updated_at || r.created_at || r.start_date;
             if (isInPeriod(dateToCheck, range)) {
-                const details = [`Reg: ${formatCurrency(safeNum(r.registration_fee))}`];
-                if (safeNum(r.travel_flight_cost)) details.push(`Travel: ${formatCurrency(safeNum(r.travel_flight_cost))}`);
-                if (safeNum(r.accommodation_cost)) details.push(`Accomm: ${formatCurrency(safeNum(r.accommodation_cost))}`);
-                if (safeNum(r.miscellaneous_cost)) details.push(`Misc: ${formatCurrency(safeNum(r.miscellaneous_cost))}`);
+                const details = [t('transactions.registrationDetail', { amount: formatCurrency(safeNum(r.registration_fee)) })];
+                if (safeNum(r.travel_flight_cost)) details.push(t('transactions.travelDetail', { amount: formatCurrency(safeNum(r.travel_flight_cost)) }));
+                if (safeNum(r.accommodation_cost)) details.push(t('transactions.accommodationDetail', { amount: formatCurrency(safeNum(r.accommodation_cost)) }));
+                if (safeNum(r.miscellaneous_cost)) details.push(t('transactions.miscDetail', { amount: formatCurrency(safeNum(r.miscellaneous_cost)) }));
 
                 txs.push({
                     date: dateToCheck,
                     category: 'External Training',
                     item: r.title,
-                    pic: r.employee_name || 'Unknown',
+                    pic: r.employee_name || t('transactions.unknown'),
                     details: details.join(', '),
                     amount: safeNum(r.registration_fee) + safeNum(r.travel_flight_cost) + safeNum(r.accommodation_cost) + safeNum(r.miscellaneous_cost)
                 });
@@ -308,13 +313,25 @@ const HRReportGenerator = () => {
                     category: `Cert. Incentive (${isOneTime ? 'One-Time' : 'Recurring'})`,
                     item: i.courseName,
                     pic: i.employeeName,
-                    details: `Status: ${i.status} • Reward: ${formatCurrency(safeNum(i.reward))}`,
+                    details: t('transactions.statusRewardDetail', { status: i.status, amount: formatCurrency(safeNum(i.reward)) }),
                     amount: safeNum(i.reward)
                 });
             }
         });
 
         return txs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    };
+
+    // Maps the internal (English, logic-bearing) category identifier to a translated display label.
+    // The identifier itself must stay untranslated because it drives the color-coding below.
+    const categoryLabel = (category: string) => {
+        if (category === 'Internal Training') return t('transactions.internalTraining');
+        if (category === 'Reading Incentive') return t('transactions.readingIncentive');
+        if (category === 'External Training') return t('transactions.externalTraining');
+        if (category.startsWith('Cert. Incentive')) {
+            return category.includes('One-Time') ? t('transactions.certIncentiveOneTime') : t('transactions.certIncentiveRecurring');
+        }
+        return category;
     };
 
     const handleExport = () => {
@@ -325,29 +342,37 @@ const HRReportGenerator = () => {
             const totalCert = monthlyData.reduce((a, b) => a + b.certIncentive, 0);
             const totalGrand = monthlyData.reduce((a, b) => a + b.total, 0);
 
+            const noCol = t('export.noColumn');
+            const monthCol = t('export.monthColumn');
+            const internalCol = t('export.internalTrainingColumn');
+            const readingCol = t('export.readingIncentivesColumn');
+            const externalCol = t('export.externalTrainingColumn');
+            const certCol = t('export.certIncentivesColumn');
+            const grandTotalCol = t('export.grandTotalColumn');
+
             const dataToExport = [
                 ...monthlyData.map((row, idx) => ({
-                    'No.': idx + 1,
-                    'Month': row.month.toUpperCase(),
-                    'Internal Training': row.internalTraining,
-                    'Reading Incentives': row.readingIncentive,
-                    'External Training': row.externalTraining,
-                    'Cert. Incentives': row.certIncentive,
-                    'Grand Total': row.total
+                    [noCol]: idx + 1,
+                    [monthCol]: monthLabel(idx).toUpperCase(),
+                    [internalCol]: row.internalTraining,
+                    [readingCol]: row.readingIncentive,
+                    [externalCol]: row.externalTraining,
+                    [certCol]: row.certIncentive,
+                    [grandTotalCol]: row.total
                 })),
                 {
-                    'No.': null as any,
-                    'Month': 'YTD TOTAL',
-                    'Internal Training': totalInternal,
-                    'Reading Incentives': totalReading,
-                    'External Training': totalExternal,
-                    'Cert. Incentives': totalCert,
-                    'Grand Total': totalGrand
+                    [noCol]: null as any,
+                    [monthCol]: t('export.ytdTotalRow'),
+                    [internalCol]: totalInternal,
+                    [readingCol]: totalReading,
+                    [externalCol]: totalExternal,
+                    [certCol]: totalCert,
+                    [grandTotalCol]: totalGrand
                 }
             ];
 
             const ws = XLSX.utils.json_to_sheet(dataToExport);
-            
+
             const colsWidths = [
                 { wch: 6 },   // No.
                 { wch: 15 },  // Month
@@ -360,15 +385,16 @@ const HRReportGenerator = () => {
             ws['!cols'] = colsWidths;
 
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'HR Report');
+            XLSX.utils.book_append_sheet(wb, ws, t('export.sheetName'));
             XLSX.writeFile(wb, `L&D_Report_${year}_${selectedBranch.replace(/\s+/g, '_')}.xlsx`);
         } catch (error) {
             console.error('Failed to export XLSX', error);
-            alert('Failed to export Excel file. Please try again.');
+            alert(t('export.failedAlert'));
         }
     };
 
     const details = detailMonth !== null ? getDetailTransactions(months.indexOf(detailMonth)) : [];
+    const detailMonthLabel = detailMonth !== null ? monthLabel(months.indexOf(detailMonth)) : '';
 
     return (
         <div className="space-y-10 animate-fade-in max-w-[1600px] mx-auto py-6">
@@ -377,9 +403,9 @@ const HRReportGenerator = () => {
                 <div>
                     <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4">
                         <Layers className="text-indigo-600" size={32} />
-                        HR Report Generator
+                        {t('header.title')}
                     </h1>
-                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1 ml-12">Nusa LMS • Enterprise Expenditure Intelligence</p>
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1 ml-12">{t('header.subtitle')}</p>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -389,13 +415,13 @@ const HRReportGenerator = () => {
                         className="flex items-center gap-2 px-6 py-2.5 bg-white text-slate-600 border border-slate-200 rounded-2xl hover:bg-slate-50 font-black text-[10px] tracking-widest transition-all disabled:opacity-50 shadow-sm"
                     >
                         <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
-                        REFRESH
+                        {t('header.refresh')}
                     </button>
                     <button
                         onClick={handleExport}
                         className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-2xl font-black text-[10px] tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
                     >
-                        <Download size={14} /> EXPORT XLSX
+                        <Download size={14} /> {t('header.exportXlsx')}
                     </button>
                 </div>
             </div>
@@ -403,10 +429,10 @@ const HRReportGenerator = () => {
             {/* Insight Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
-                    { label: 'YTD Total Investment', value: formatCurrency(totalYTD), icon: DollarSign, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                    { label: 'Avg Monthly Spend', value: formatCurrency(avgMonthly), icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                    { label: 'Top Allocation', value: topCategory?.label || '-', sub: formatCurrency(topCategory?.val || 0), icon: PieChart, color: 'text-amber-600', bg: 'bg-amber-50' },
-                    { label: 'Year Analysis', value: year, sub: 'Calendar Period', icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50' }
+                    { label: t('stats.ytdTotalInvestment'), value: formatCurrency(totalYTD), icon: DollarSign, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                    { label: t('stats.avgMonthlySpend'), value: formatCurrency(avgMonthly), icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                    { label: t('stats.topAllocation'), value: topCategory?.label || '-', sub: formatCurrency(topCategory?.val || 0), icon: PieChart, color: 'text-amber-600', bg: 'bg-amber-50' },
+                    { label: t('stats.yearAnalysis'), value: year, sub: t('stats.calendarPeriod'), icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50' }
                 ].map((stat, i) => (
                     <div key={i} className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-5 group hover:border-indigo-100 transition-all duration-300">
                         <div className={`p-4 ${stat.bg} ${stat.color} rounded-2xl group-hover:scale-110 transition-transform duration-500`}>
@@ -446,13 +472,13 @@ const HRReportGenerator = () => {
                             onChange={(e) => setSelectedBranch(e.target.value)}
                             className="bg-transparent px-3 py-2 rounded-xl font-black text-slate-600 text-[10px] outline-none tracking-widest cursor-pointer min-w-[180px]"
                         >
-                            <option value="All">ALL BRANCHES</option>
+                            <option value="All">{t('filters.allBranches')}</option>
                             {branchesList.map(b => <option key={b} value={b}>{b.toUpperCase()}</option>)}
                         </select>
                     </div>
                 </div>
                 <div className="ml-auto flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
-                    <Filter size={14} /> FILTERS ACTIVE
+                    <Filter size={14} /> {t('filters.filtersActive')}
                 </div>
             </div>
 
@@ -461,20 +487,20 @@ const HRReportGenerator = () => {
                 <table className="w-full text-left border-collapse table-fixed">
                     <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest">
                         <tr>
-                            <th className="px-5 py-5 w-[140px]">Month</th>
-                            <th className="px-5 py-5 text-right">Internal</th>
-                            <th className="px-5 py-5 text-right">Reading</th>
-                            <th className="px-5 py-5 text-right">External</th>
-                            <th className="px-5 py-5 text-right">Cert. Inc</th>
-                            <th className="px-5 py-5 text-right bg-indigo-50/50 text-indigo-700 w-[160px]">Grand Total</th>
-                            <th className="px-5 py-5 text-center w-[80px]">Audit</th>
+                            <th className="px-5 py-5 w-[140px]">{t('table.month')}</th>
+                            <th className="px-5 py-5 text-right">{t('table.internal')}</th>
+                            <th className="px-5 py-5 text-right">{t('table.reading')}</th>
+                            <th className="px-5 py-5 text-right">{t('table.external')}</th>
+                            <th className="px-5 py-5 text-right">{t('table.certInc')}</th>
+                            <th className="px-5 py-5 text-right bg-indigo-50/50 text-indigo-700 w-[160px]">{t('table.grandTotal')}</th>
+                            <th className="px-5 py-5 text-center w-[80px]">{t('table.audit')}</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                        {monthlyData.map((row) => (
+                        {monthlyData.map((row, idx) => (
                             <tr key={row.month} className="hover:bg-slate-50 transition-colors group">
                                 <td className="px-5 py-4">
-                                    <p className="font-black text-slate-800 text-xs">{row.month.toUpperCase()}</p>
+                                    <p className="font-black text-slate-800 text-xs">{monthLabel(idx).toUpperCase()}</p>
                                 </td>
                                 <td className="px-5 py-4 text-right font-mono text-slate-500 font-bold text-[11px]">
                                     {row.internalTraining > 0 ? formatCurrency(row.internalTraining) : <span className="opacity-20">-</span>}
@@ -504,7 +530,7 @@ const HRReportGenerator = () => {
                     </tbody>
                     <tfoot className="bg-slate-900 text-white font-black uppercase tracking-widest text-[9px]">
                         <tr>
-                            <td className="px-5 py-6">YTD TOTAL</td>
+                            <td className="px-5 py-6">{t('table.ytdTotal')}</td>
                             <td className="px-5 py-6 text-right text-[10px]">{formatCurrency(monthlyData.reduce((a, b) => a + b.internalTraining, 0))}</td>
                             <td className="px-5 py-6 text-right text-[10px]">{formatCurrency(monthlyData.reduce((a, b) => a + b.readingIncentive, 0))}</td>
                             <td className="px-5 py-6 text-right text-[10px]">{formatCurrency(monthlyData.reduce((a, b) => a + b.externalTraining, 0))}</td>
@@ -524,9 +550,9 @@ const HRReportGenerator = () => {
                             <div>
                                 <h2 className="font-black text-2xl text-slate-900 tracking-tight flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center"><PieChart size={20} /></div>
-                                    Monthly Audit Hub • {detailMonth.toUpperCase()} {year}
+                                    {t('modal.header', { month: detailMonthLabel.toUpperCase(), year })}
                                 </h2>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 ml-14">Consolidated Ledger Overview • {selectedBranch.toUpperCase()}</p>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 ml-14">{t('modal.subtitle', { branch: selectedBranch.toUpperCase() })}</p>
                             </div>
                             <button onClick={() => setDetailMonth(null)} className="p-4 hover:bg-slate-100 rounded-3xl text-slate-300 transition-colors"><XCircle size={32} /></button>
                         </div>
@@ -535,18 +561,18 @@ const HRReportGenerator = () => {
                             {details.length === 0 ? (
                                 <div className="text-center py-32 bg-white rounded-[40px] border-2 border-dashed border-slate-100">
                                     <Layers className="mx-auto text-slate-200 mb-4" size={48} />
-                                    <p className="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">Zero transactions found for this period</p>
+                                    <p className="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">{t('modal.noTransactions')}</p>
                                 </div>
                             ) : (
                                 <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden">
                                     <table className="w-full text-left">
                                         <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
                                             <tr>
-                                                <th className="px-8 py-6">Timestamp</th>
-                                                <th className="px-8 py-6">Categorization</th>
-                                                <th className="px-8 py-6">Transaction Item</th>
-                                                <th className="px-8 py-6">Professional PIC</th>
-                                                <th className="px-8 py-6 text-right">Net Amount</th>
+                                                <th className="px-8 py-6">{t('modal.timestamp')}</th>
+                                                <th className="px-8 py-6">{t('modal.categorization')}</th>
+                                                <th className="px-8 py-6">{t('modal.transactionItem')}</th>
+                                                <th className="px-8 py-6">{t('modal.professionalPic')}</th>
+                                                <th className="px-8 py-6 text-right">{t('modal.netAmount')}</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
@@ -562,21 +588,21 @@ const HRReportGenerator = () => {
                                                             ${tx.category.includes('Internal') ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
                                                                 tx.category.includes('External') ? 'bg-amber-50 text-amber-700 border-amber-100' :
                                                                     'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
-                                                            {tx.category}
+                                                            {categoryLabel(tx.category)}
                                                         </span>
                                                     </td>
                                                     <td className="px-8 py-6">
                                                         <p className="font-black text-slate-800 text-sm leading-tight">{tx.item}</p>
                                                         <p className="text-[9px] font-bold text-slate-400 mt-1 italic leading-tight">{tx.details}</p>
                                                     </td>
-                                                    <td className="px-8 py-6 font-bold text-slate-600 text-xs uppercase">{tx.pic || 'SYSTEM'}</td>
+                                                    <td className="px-8 py-6 font-bold text-slate-600 text-xs uppercase">{tx.pic || t('modal.system')}</td>
                                                     <td className="px-8 py-6 text-right font-mono font-black text-slate-900 text-base">{formatCurrency(tx.amount)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                         <tfoot className="bg-slate-50 font-black border-t border-slate-100 text-right">
                                             <tr>
-                                                <td colSpan={4} className="px-8 py-6 text-slate-400 text-[10px] tracking-widest">MONTHLY AGGREGATE</td>
+                                                <td colSpan={4} className="px-8 py-6 text-slate-400 text-[10px] tracking-widest">{t('modal.monthlyAggregate')}</td>
                                                 <td className="px-8 py-6 text-indigo-600 text-xl">{formatCurrency(details.reduce((a, b) => a + b.amount, 0))}</td>
                                             </tr>
                                         </tfoot>
@@ -587,7 +613,7 @@ const HRReportGenerator = () => {
 
                         <div className="p-10 border-t border-slate-50 bg-white text-right">
                             <button onClick={() => setDetailMonth(null)} className="px-10 py-4 bg-slate-900 text-white rounded-[24px] font-black text-xs tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200">
-                                CLOSE AUDIT HUB
+                                {t('modal.closeAuditHub')}
                             </button>
                         </div>
                     </div>

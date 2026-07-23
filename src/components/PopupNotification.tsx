@@ -1,4 +1,5 @@
 import { CheckCircle, XCircle, X, Info } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export interface PopupNotificationProps {
     type: 'success' | 'error' | 'info';
@@ -8,6 +9,7 @@ export interface PopupNotificationProps {
 }
 
 const PopupNotification = ({ type, message, isOpen, onClose }: PopupNotificationProps) => {
+    const { t } = useTranslation('popupNotification');
     const isSuccess = type === 'success';
     const isError = type === 'error';
 
@@ -33,7 +35,7 @@ const PopupNotification = ({ type, message, isOpen, onClose }: PopupNotification
 
                         <div>
                             <h3 className={`text-xl font-bold mb-1 ${isSuccess ? 'text-slate-800' : isError ? 'text-red-600' : 'text-slate-800'}`}>
-                                {isSuccess ? 'Success!' : isError ? 'Error' : 'Information'}
+                                {isSuccess ? t('success') : isError ? t('error') : t('information')}
                             </h3>
                             <p className="text-slate-500 text-sm leading-relaxed">
                                 {message}
@@ -49,7 +51,7 @@ const PopupNotification = ({ type, message, isOpen, onClose }: PopupNotification
                                     : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
                                 }`}
                         >
-                            {isSuccess ? 'Continue' : isError ? 'Try Again' : 'Tutup'}
+                            {isSuccess ? t('continue') : isError ? t('tryAgain') : t('close')}
                         </button>
                     </div>
                 </div>

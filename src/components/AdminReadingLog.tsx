@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2, RefreshCw, BookOpen, Trophy, ArrowUp, ArrowDown, Save, Download, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry, User, Employee } from '../types';
 import * as XLSX from 'xlsx';
@@ -57,6 +58,7 @@ interface ZoomableImageProps {
 }
 
 const ZoomableImage = ({ src, alt }: ZoomableImageProps) => {
+    const { t } = useTranslation('adminReadingLog');
     const [scale, setScale] = useState(1);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
@@ -157,38 +159,38 @@ const ZoomableImage = ({ src, alt }: ZoomableImageProps) => {
                     onClick={handleZoomOut}
                     disabled={scale <= 1}
                     className="p-1.5 rounded-full hover:bg-white/10 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
-                    title="Zoom Out"
+                    title={t('zoomImage.zoomOut')}
                 >
                     <ZoomOut size={16} />
                 </button>
                 <span className="text-xs font-mono font-bold w-12 text-center text-slate-300">
                     {Math.round(scale * 100)}%
                 </span>
-                <button 
+                <button
                     type="button"
                     onClick={handleZoomIn}
                     disabled={scale >= 4}
                     className="p-1.5 rounded-full hover:bg-white/10 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
-                    title="Zoom In"
+                    title={t('zoomImage.zoomIn')}
                 >
                     <ZoomIn size={16} />
                 </button>
                 <div className="w-[1px] h-4 bg-white/20 mx-1"></div>
-                <button 
+                <button
                     type="button"
                     onClick={handleReset}
                     disabled={scale === 1 && position.x === 0 && position.y === 0}
                     className="p-1.5 rounded-full hover:bg-white/10 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
-                    title="Reset Zoom"
+                    title={t('zoomImage.resetZoom')}
                 >
                     <RotateCcw size={15} />
                 </button>
             </div>
-            
+
             {/* Zoom Help Prompt (only visible when not zoomed) */}
             {scale === 1 && (
                 <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-sm px-2.5 py-1 rounded-md text-[10px] font-medium text-slate-300 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
-                    Double-click or drag to pan
+                    {t('zoomImage.panHint')}
                 </div>
             )}
         </div>
@@ -196,6 +198,7 @@ const ZoomableImage = ({ src, alt }: ZoomableImageProps) => {
 };
 
 const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
+    const { t } = useTranslation('adminReadingLog');
     const [allLogs, setAllLogs] = useState<ReadingLogEntry[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -559,7 +562,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             XLSX.writeFile(wb, `L&D_Reading_Recap_${selectedBranch.replace(/\s+/g, '_')}_${periodStr}.xlsx`);
         } catch (error) {
             console.error('Failed to export XLSX', error);
-            alert('Failed to export Excel file. Please try again.');
+            alert(t('alerts.failedToExportExcel'));
         }
     };
 
@@ -573,14 +576,14 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 body: JSON.stringify({ employee_id: 'all' })
             });
             if (res.ok) {
-                alert('SIMAS data synchronization successful!');
+                alert(t('alerts.simasSyncSuccess'));
                 fetchLogs(); // Refresh the list
             } else {
-                alert('Failed to synchronize SIMAS data.');
+                alert(t('alerts.simasSyncFailed'));
             }
         } catch (error) {
             console.error(error);
-            alert('Error during data synchronization.');
+            alert(t('alerts.simasSyncError'));
         } finally {
             setIsSyncing(false);
         }
@@ -800,7 +803,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
     };
 
     const handleDeleteLog = async (id: number | string) => {
-        if (!window.confirm('Are you sure you want to cancel this report? The data will remain stored but will not be counted in reports.')) return;
+        if (!window.confirm(t('alerts.confirmCancelReport'))) return;
         try {
             const res = await fetch(`${API_BASE_URL}/api/logs/${id}`, { method: 'DELETE' });
             if (res.ok) {
@@ -809,11 +812,11 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                     window.location.reload();
                 }, 1000);
             } else {
-                alert('Failed to cancel report');
+                alert(t('alerts.failedToCancelReport'));
             }
         } catch (error) {
             console.error(error);
-            alert('Error while cancelling report');
+            alert(t('alerts.errorWhileCancellingReport'));
         }
     };
 
@@ -1041,65 +1044,65 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         <div className="space-y-6 animate-fade-in relative min-h-screen pb-20">
             <div className="flex flex-col gap-4">
                 <button onClick={onBack} className="flex items-center text-slate-500 hover:text-slate-800 transition-colors w-fit group">
-                    <ArrowLeft size={20} className="mr-2 group-hover:-translate-x-1 transition-transform" /> Back to Dashboard
+                    <ArrowLeft size={20} className="mr-2 group-hover:-translate-x-1 transition-transform" /> {t('header.backToDashboard')}
                 </button>
 
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-800">Reading Log Management</h1>
-                        <p className="text-slate-500">Manage validations and view reading statistics.</p>
+                        <h1 className="text-2xl font-bold text-slate-800">{t('header.title')}</h1>
+                        <p className="text-slate-500">{t('header.subtitle')}</p>
                     </div>
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                         {viewMode === 'recap' && (
                             <button
                                 onClick={handleExportXLSX}
                                 className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-md w-full sm:w-auto cursor-pointer"
-                                title="Export recapitulation table to Excel (XLSX) matching active filters and sorting"
+                                title={t('actions.exportXLSXTitle')}
                             >
                                 <Download size={18} />
-                                Export XLSX
+                                {t('actions.exportXLSX')}
                             </button>
                         )}
                         <button
                             onClick={handleSyncSIMAS}
                             disabled={isSyncing}
                             className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm border ${isSyncing ? 'bg-slate-50 text-slate-400 border-slate-200' : 'bg-white text-emerald-600 border-emerald-100 hover:bg-emerald-50 hover:border-emerald-200'} w-full sm:w-auto`}
-                            title="Fetch latest book loan data from SIMAS for all employees"
+                            title={t('actions.syncSIMASTitle')}
                         >
                             <RefreshCw size={18} className={isSyncing ? 'animate-spin' : ''} />
-                            {isSyncing ? 'Syncing...' : 'Sync SIMAS Data'}
+                            {isSyncing ? t('actions.syncing') : t('actions.syncSIMAS')}
                         </button>
                         <div className="bg-slate-100 p-1 rounded-xl flex shadow-inner w-full sm:w-auto justify-center">
-                            <button 
+                            <button
                                 onClick={() => {
                                     setViewMode('verification');
                                     // Reset to Full Year for Verification
                                     const y = new Date().getFullYear();
                                     setStartDate(`${y - 1}-12-26`);
                                     setEndDate(`${y}-12-25`);
-                                }} 
+                                }}
                                 className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-all text-center ${viewMode === 'verification' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             >
-                                Verification
+                                {t('actions.verification')}
                             </button>
-                            <button 
+                            <button
                                 onClick={() => {
                                     setViewMode('recap');
                                     // Reset to Rolling Cycle for Recap (Periode bulan berjalan)
                                     const now = new Date();
                                     const m = now.getMonth();
                                     const y = now.getFullYear();
-                                    
+
                                     // Selalu ambil 26 bulan lalu s/d 25 bulan ini
                                     const d = new Date(y, m - 1, 26);
                                     const ed = new Date(y, m, 25);
-                                    
+
                                     setStartDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
                                     setEndDate(`${ed.getFullYear()}-${String(ed.getMonth() + 1).padStart(2, '0')}-${String(ed.getDate()).padStart(2, '0')}`);
-                                }} 
+                                }}
                                 className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-all text-center ${viewMode === 'recap' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             >
-                                Recapitulation
+                                {t('actions.recapitulation')}
                             </button>
                         </div>
                     </div>
@@ -1113,24 +1116,24 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                     </select>
                     <div className="flex items-center justify-between sm:justify-start gap-2 bg-slate-50 px-3 py-2.5 rounded-xl border border-slate-100 w-full sm:w-auto">
                         <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} onClick={(e) => e.currentTarget.showPicker()} className="bg-transparent border-none font-bold text-slate-600 text-xs outline-none focus:ring-0 cursor-pointer w-[110px]" />
-                        <span className="text-slate-400 font-medium text-xs">to</span>
+                        <span className="text-slate-400 font-medium text-xs">{t('filters.dateTo')}</span>
                         <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} onClick={(e) => e.currentTarget.showPicker()} className="bg-transparent border-none font-bold text-slate-600 text-xs outline-none focus:ring-0 cursor-pointer w-[110px]" />
                     </div>
                     {viewMode === 'verification' && (
                         <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white w-full sm:w-auto">
-                            <option value="all">All Status</option>
-                            <option value="Reading">Reading</option>
-                            <option value="Read">Read</option>
-                            <option value="Approved">Approved</option>
-                            <option value="Under Review">Under Review</option>
-                            <option value="Rejected HRD">Rejected HRD</option>
-                            <option value="Cancel">Removed</option>
+                            <option value="all">{t('filters.status.all')}</option>
+                            <option value="Reading">{t('filters.status.reading')}</option>
+                            <option value="Read">{t('filters.status.read')}</option>
+                            <option value="Approved">{t('filters.status.approved')}</option>
+                            <option value="Under Review">{t('filters.status.underReview')}</option>
+                            <option value="Rejected HRD">{t('filters.status.rejectedHRD')}</option>
+                            <option value="Cancel">{t('filters.status.removed')}</option>
                         </select>
                     )}
                 </div>
                 <div className="relative w-full lg:w-72">
                     <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
-                    <input type="text" placeholder="Search Name, Title..." className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-600 text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                    <input type="text" placeholder={t('filters.searchPlaceholder')} className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-600 text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
             </div>
 
@@ -1142,23 +1145,23 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 <tr>
                                     <th className="px-6 py-4 w-[30%] cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setRecapSort({ key: 'name', direction: recapSort.key === 'name' && recapSort.direction === 'asc' ? 'desc' : 'asc' })}>
                                         <div className="flex items-center gap-1.5">
-                                            Name / Email {recapSort.key === 'name' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                                            {t('recapTable.nameEmail')} {recapSort.key === 'name' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
                                         </div>
                                     </th>
-                                    <th className="px-6 py-4 w-[15%]">Role</th>
+                                    <th className="px-6 py-4 w-[15%]">{t('recapTable.role')}</th>
                                     <th className="px-6 py-4 w-[25%] cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setRecapSort({ key: 'totalBooks', direction: recapSort.key === 'totalBooks' && recapSort.direction === 'asc' ? 'desc' : 'asc' })}>
                                         <div className="flex items-center gap-1.5">
-                                            Books Read {recapSort.key === 'totalBooks' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                                            {t('recapTable.booksRead')} {recapSort.key === 'totalBooks' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
                                         </div>
                                     </th>
                                     <th className="px-6 py-4 w-[20%] cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setRecapSort({ key: 'milestone', direction: recapSort.key === 'milestone' && recapSort.direction === 'asc' ? 'desc' : 'asc' })}>
                                         <div className="flex items-center gap-1.5">
-                                            Bonus Status {recapSort.key === 'milestone' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                                            {t('recapTable.bonusStatus')} {recapSort.key === 'milestone' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
                                         </div>
                                     </th>
                                     <th className="px-6 py-4 w-[20%] cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setRecapSort({ key: 'incentive', direction: recapSort.key === 'incentive' && recapSort.direction === 'asc' ? 'desc' : 'asc' })}>
                                         <div className="flex items-center gap-1.5 justify-end">
-                                            Total Incentive {new Date(endDate).toLocaleString('en-US', { month: 'short' })} {recapSort.key === 'incentive' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                                            {t('recapTable.totalIncentive', { month: new Date(endDate).toLocaleString('en-US', { month: 'short' }) })} {recapSort.key === 'incentive' && (recapSort.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
                                         </div>
                                     </th>
                                 </tr>
@@ -1203,24 +1206,24 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                     <div><p className="font-bold text-slate-800">{user.name}</p><p className="text-xs text-slate-400">{user.email}</p></div>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${user.role === 'HR' || user.role === 'HR_ADMIN' ? 'bg-purple-100 text-purple-700' : user.role === 'SUPERVISOR' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>{user.role?.replace('_', ' ') || 'STAFF'}</span>
+                                                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${user.role === 'HR' || user.role === 'HR_ADMIN' ? 'bg-purple-100 text-purple-700' : user.role === 'SUPERVISOR' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>{user.role?.replace('_', ' ') || t('common.staffRoleFallback')}</span>
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-2">
                                                         <button
                                                             className="group flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg px-3 py-1.5 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:shadow-sm transition-all active:scale-95"
-                                                            onClick={() => setRecapModal({ open: true, title: `Books Read by ${user.name} in ${new Date(endDate).getFullYear()}`, logs: stats.logsYear })}
+                                                            onClick={() => setRecapModal({ open: true, title: t('recapTable.booksReadByModalTitle', { name: user.name, year: new Date(endDate).getFullYear() }), logs: stats.logsYear })}
                                                         >
                                                             <span className="text-slate-800 font-bold text-lg group-hover:text-blue-700 transition-colors">{stats.totalBooksYear}</span>
-                                                            <span className="text-slate-500 text-sm group-hover:text-blue-600 transition-colors">Books</span>
+                                                            <span className="text-slate-500 text-sm group-hover:text-blue-600 transition-colors">{t('recapTable.books')}</span>
                                                         </button>
                                                         {stats.verifiedCountRange > 0 && (
                                                             <button
                                                                 className="group flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-green-500 rounded-lg px-2.5 py-1.5 bg-green-50 border border-green-200 hover:border-green-400 hover:bg-green-100 hover:shadow-sm transition-all active:scale-95 text-green-700 text-xs font-bold whitespace-nowrap"
-                                                                onClick={() => setRecapModal({ open: true, title: `Verified Books for ${user.name} (Selected Range)`, logs: stats.logsRange.filter(l => l.hrApprovalStatus === 'Approved') })}
+                                                                onClick={() => setRecapModal({ open: true, title: t('recapTable.verifiedBooksModalTitle', { name: user.name }), logs: stats.logsRange.filter(l => l.hrApprovalStatus === 'Approved') })}
                                                             >
                                                                 <CheckCircle size={14} className="text-green-500 group-hover:text-green-600 transition-colors" />
-                                                                {stats.verifiedCountRange} Verified {new Date(endDate).toLocaleString('en-US', { month: 'short' })}
+                                                                {t('recapTable.verifiedMonth', { count: stats.verifiedCountRange, month: new Date(endDate).toLocaleString('en-US', { month: 'short' }) })}
                                                             </button>
                                                         )}
                                                     </div>
@@ -1229,12 +1232,12 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                     <div className="flex flex-col gap-1 items-start">
                                                         {isEligible ? (
                                                             <span className="flex items-center gap-1.5 text-white bg-green-600 font-black text-[10px] px-2.5 py-1 rounded-full uppercase shadow-sm border border-green-500 animate-pulse">
-                                                                <Trophy size={12} /> Milestone Passed!
+                                                                <Trophy size={12} /> {t('recapTable.milestonePassed')}
                                                             </span>
                                                         ) : (
                                                             <div className="flex flex-col">
                                                                 <span className="flex items-center gap-1 text-slate-500 text-[11px] font-bold italic">
-                                                                    <Clock size={12} /> {remaining > 0 ? `${remaining} more to bonus` : 'Pending Review'}
+                                                                    <Clock size={12} /> {remaining > 0 ? t('recapTable.moreToBonus', { count: remaining }) : t('recapTable.pendingReview')}
                                                                 </span>
                                                                 <div className="w-24 h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
                                                                     <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(stats.verifiedCountYear / 5) * 100}%` }}></div>
@@ -1267,17 +1270,17 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             {viewMode === 'verification' && (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-in slide-in-from-bottom-4 fade-in">
                     <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                        <h3 className="font-bold text-slate-700 flex items-center gap-2"><CheckCircle size={18} className="text-orange-500" /> Pending Verifications & History</h3>
+                        <h3 className="font-bold text-slate-700 flex items-center gap-2"><CheckCircle size={18} className="text-orange-500" /> {t('verificationTable.sectionTitle')}</h3>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
                             <thead className="bg-slate-50 text-slate-500 font-semibold uppercase text-xs select-none">
                                 <tr>
-                                    <th className="px-6 py-4">Employee</th>
-                                    <th className="px-6 py-4">Book Title / Source</th>
+                                    <th className="px-6 py-4">{t('verificationTable.employee')}</th>
+                                    <th className="px-6 py-4">{t('verificationTable.bookTitleSource')}</th>
                                     <th className="px-6 py-4 cursor-pointer hover:bg-slate-100/80 transition-colors" onClick={() => handleVerificationSortClick('finishDate')}>
                                         <div className="flex items-center gap-1">
-                                            <span>Finish Date</span>
+                                            <span>{t('verificationTable.finishDate')}</span>
                                             {verificationSort.key === 'finishDate' && (
                                                 verificationSort.direction === 'asc' ? <ArrowUp size={14} className="text-slate-400" /> : <ArrowDown size={14} className="text-slate-400" />
                                             )}
@@ -1285,14 +1288,14 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     </th>
                                     <th className="px-6 py-4 text-purple-600 cursor-pointer hover:bg-slate-100/80 transition-colors" onClick={() => handleVerificationSortClick('claimedDate')}>
                                         <div className="flex items-center gap-1">
-                                            <span>Claimed Date</span>
+                                            <span>{t('verificationTable.claimedDate')}</span>
                                             {verificationSort.key === 'claimedDate' && (
                                                 verificationSort.direction === 'asc' ? <ArrowUp size={14} className="text-purple-500 animate-in fade-in zoom-in-75" /> : <ArrowDown size={14} className="text-purple-500 animate-in fade-in zoom-in-75" />
                                             )}
                                         </div>
                                     </th>
-                                    <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4 text-center">Action</th>
+                                    <th className="px-6 py-4">{t('verificationTable.status')}</th>
+                                    <th className="px-6 py-4 text-center">{t('verificationTable.action')}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -1304,15 +1307,15 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                 if (!emp) emp = users.find(u => log.userName && u.name && log.userName.trim().toLowerCase() === u.name.trim().toLowerCase());
                                                 return (
                                                     <div className="flex flex-col">
-                                                        <p className="font-bold text-slate-700 text-sm">{emp?.name || log.userName || 'Unknown'}</p>
-                                                        {emp?.employee_id && <p className="text-[11px] text-slate-500 font-medium mt-0.5">ID: {emp.employee_id}</p>}
+                                                        <p className="font-bold text-slate-700 text-sm">{emp?.name || log.userName || t('verificationTable.unknown')}</p>
+                                                        {emp?.employee_id && <p className="text-[11px] text-slate-500 font-medium mt-0.5">{t('verificationTable.idLabel', { id: emp.employee_id })}</p>}
                                                         {emp?.email && <p className="text-[11px] text-slate-400">{emp.email}</p>}
-                                                        {!emp?.employee_id && !emp?.email && <p className="text-[11px] text-slate-400">Staff</p>}
+                                                        {!emp?.employee_id && !emp?.email && <p className="text-[11px] text-slate-400">{t('verificationTable.staff')}</p>}
                                                     </div>
                                                 );
                                             })()}
                                         </td>
-                                        <td className="px-6 py-4"><div className="flex flex-col gap-1"><span onClick={() => handleOpenDetailModal(log)} className="font-semibold text-slate-800 text-sm cursor-pointer hover:text-blue-600 transition-colors">{log.title}</span><span className="text-xs text-slate-500">{log.category}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit ${log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>{log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'Personal' : (log.source === 'SIMAS' ? 'SIMAS' : 'Office')}</span></div></td>
+                                        <td className="px-6 py-4"><div className="flex flex-col gap-1"><span onClick={() => handleOpenDetailModal(log)} className="font-semibold text-slate-800 text-sm cursor-pointer hover:text-blue-600 transition-colors">{log.title}</span><span className="text-xs text-slate-500">{log.category}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit ${log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>{log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? t('source.personal') : (log.source === 'SIMAS' ? t('source.simas') : t('source.office'))}</span></div></td>
                                         <td className="px-6 py-4 text-sm text-slate-600">
                                             <div className="flex flex-col gap-1">
                                                 <span>{log.finishDate ? new Date(log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}</span>
@@ -1330,7 +1333,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                 log.hrApprovalStatus === 'Pending' ? 'bg-orange-100 text-orange-700 border-orange-200' : 
                                                 'bg-slate-100 text-slate-500 border-slate-200'
                                             }`}>
-                                                {log.status === 'Reading' ? 'Reading' : (log.status === 'Cancelled' || log.hrApprovalStatus === 'Cancelled' ? 'Removed' : (log.hrApprovalStatus === 'Pending' ? 'Under Review' : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus)))}
+                                                {log.status === 'Reading' ? t('status.reading') : (log.status === 'Cancelled' || log.hrApprovalStatus === 'Cancelled' ? t('status.removed') : (log.hrApprovalStatus === 'Pending' ? t('status.underReview') : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? t('status.read') : (log.hrApprovalStatus === 'Approved' ? t('status.approved') : (log.hrApprovalStatus === 'Rejected' ? t('status.rejected') : log.hrApprovalStatus)))))}
                                             </span>
                                                     {Number(log.incentiveAmount) > 0 && (
                                                         <div className="mt-1">
@@ -1342,7 +1345,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                                     const baseAmount = hasBonus ? amount - 500000 : amount;
                                                                     return (
                                                                         <div className="flex flex-col items-center bg-orange-50 p-1 rounded border border-orange-100 shadow-sm animate-pulse">
-                                                                            <span className="text-[9px] text-orange-600 font-black tracking-tighter uppercase">Milestone Bonus!</span>
+                                                                            <span className="text-[9px] text-orange-600 font-black tracking-tighter uppercase">{t('verificationTable.milestoneBonus')}</span>
                                                                             <div className="flex flex-col items-center">
                                                                                 <span className="text-[11px] font-bold text-green-700">{formatCurrency(baseAmount)} + Rp 500.000</span>
                                                                                 <span className="text-[9px] text-slate-500 font-black">= {formatCurrency(baseAmount + 500000)}</span>
@@ -1366,43 +1369,43 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                             if (currentSeq <= 5) {
                                                                 return (
                                                                     <div className="grid grid-cols-2 gap-2 min-w-[180px]">
-                                                                        <button 
-                                                                            onClick={() => handleVerifyClick(log)} 
-                                                                            className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow-sm font-bold text-[11px]" 
-                                                                            title="Verify & Reward"
+                                                                        <button
+                                                                            onClick={() => handleVerifyClick(log)}
+                                                                            className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow-sm font-bold text-[11px]"
+                                                                            title={t('verificationTable.verifyTitle')}
                                                                         >
-                                                                            <CheckCircle size={13} /> Verify
+                                                                            <CheckCircle size={13} /> {t('verificationTable.verify')}
                                                                         </button>
-                                                                        <button 
-                                                                            onClick={() => handleEditLogClick(log)} 
-                                                                            className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors font-bold text-[11px] border border-slate-200" 
-                                                                            title="Edit Details"
+                                                                        <button
+                                                                            onClick={() => handleEditLogClick(log)}
+                                                                            className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 transition-colors font-bold text-[11px] border border-slate-200"
+                                                                            title={t('verificationTable.editTitle')}
                                                                         >
-                                                                            <Edit size={13} /> Edit
+                                                                            <Edit size={13} /> {t('verificationTable.edit')}
                                                                         </button>
-                                                                        <button 
-                                                                            onClick={() => handleRejectClick(log)} 
-                                                                            className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-rose-50 text-rose-700 rounded-lg hover:bg-rose-100 transition-colors font-bold text-[11px] border border-rose-100" 
-                                                                            title="Reject Report"
+                                                                        <button
+                                                                            onClick={() => handleRejectClick(log)}
+                                                                            className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-rose-50 text-rose-700 rounded-lg hover:bg-rose-100 transition-colors font-bold text-[11px] border border-rose-100"
+                                                                            title={t('verificationTable.rejectTitle')}
                                                                         >
-                                                                            <XCircle size={13} /> Reject
+                                                                            <XCircle size={13} /> {t('verificationTable.reject')}
                                                                         </button>
-                                                                        <button 
-                                                                            onClick={() => handleCancelClick(log)} 
-                                                                            className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-white text-slate-400 rounded-lg hover:bg-slate-50 transition-colors font-bold text-[11px] border border-slate-100" 
-                                                                            title="Remove Log"
+                                                                        <button
+                                                                            onClick={() => handleCancelClick(log)}
+                                                                            className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-white text-slate-400 rounded-lg hover:bg-slate-50 transition-colors font-bold text-[11px] border border-slate-100"
+                                                                            title={t('verificationTable.removeTitle')}
                                                                         >
-                                                                            <Trash2 size={13} /> Remove
+                                                                            <Trash2 size={13} /> {t('verificationTable.remove')}
                                                                         </button>
                                                                     </div>
                                                                 );
                                                             } else {
                                                                 return (
                                                                     <div className="flex flex-col items-center">
-                                                                        <span className="text-xs text-red-500 font-bold italic">Limit Exceeded ({currentSeq}/5)</span>
+                                                                        <span className="text-xs text-red-500 font-bold italic">{t('verificationTable.limitExceeded', { seq: currentSeq })}</span>
                                                                         <div className="flex items-center gap-2 mt-1">
-                                                                            <button onClick={() => handleCancelClick(log)} className="p-1.5 bg-slate-100 text-slate-500 rounded hover:bg-slate-200" title="Remove Log"><Trash2 size={12} /></button>
-                                                                            <button onClick={() => handleRejectClick(log)} className="text-[10px] text-red-600 hover:underline flex items-center gap-1"><XCircle size={10} /> Reject Over Limit</button>
+                                                                            <button onClick={() => handleCancelClick(log)} className="p-1.5 bg-slate-100 text-slate-500 rounded hover:bg-slate-200" title={t('verificationTable.removeTitle')}><Trash2 size={12} /></button>
+                                                                            <button onClick={() => handleRejectClick(log)} className="text-[10px] text-red-600 hover:underline flex items-center gap-1"><XCircle size={10} /> {t('verificationTable.rejectOverLimit')}</button>
                                                                         </div>
                                                                     </div>
                                                                 );
@@ -1411,17 +1414,17 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                     ) : (
                                                          /* For Approved, Rejected, Draft or finished logs not in Pending mode */
                                                          <div className="flex justify-center gap-1.5">
-                                                             <button 
-                                                                 onClick={() => handleEditLogClick(log)} 
-                                                                 className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-all border border-slate-200 hover:border-blue-200" 
-                                                                 title="Edit Details"
+                                                             <button
+                                                                 onClick={() => handleEditLogClick(log)}
+                                                                 className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-all border border-slate-200 hover:border-blue-200"
+                                                                 title={t('verificationTable.editTitle')}
                                                              >
                                                                  <Edit size={16} />
                                                              </button>
-                                                             <button 
-                                                                 onClick={() => handleCancelClick(log)} 
-                                                                 className="p-2 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-all border border-slate-100 hover:border-red-200" 
-                                                                 title="Remove Report"
+                                                             <button
+                                                                 onClick={() => handleCancelClick(log)}
+                                                                 className="p-2 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-all border border-slate-100 hover:border-red-200"
+                                                                 title={t('verificationTable.removeReportTitle')}
                                                              >
                                                                  <Trash2 size={16} />
                                                              </button>
@@ -1429,7 +1432,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                     )}
                                                 </div>
                                             ) : (
-                                                <span className="text-xs text-slate-300 font-bold uppercase tracking-wider italic">Removed</span>
+                                                <span className="text-xs text-slate-300 font-bold uppercase tracking-wider italic">{t('status.removed')}</span>
                                             )}
                                         </td>
                                     </tr>
@@ -1444,7 +1447,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto pr-2">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><CheckCircle className="text-green-500" /> Verify Reading Log</h3>
+                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><CheckCircle className="text-green-500" /> {t('verifyModal.title')}</h3>
                             <button onClick={() => setVerifyModal({ open: false, log: null, category: 'text', reward: 0 })} className="text-slate-400 hover:text-slate-600"><XCircle /></button>
                         </div>
                         <div className="space-y-4">
@@ -1457,8 +1460,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                         <div className="bg-orange-50 border border-orange-200 p-3 rounded-xl flex items-start gap-3 animate-pulse">
                                             <Trophy size={20} className="text-orange-500 mt-1" />
                                             <div>
-                                                <p className="text-sm font-bold text-orange-800">Milestone #5 Detected!</p>
-                                                <p className="text-xs text-orange-600">This user will receive an additional Rp 500,000 bonus.</p>
+                                                <p className="text-sm font-bold text-orange-800">{t('verifyModal.milestoneDetected')}</p>
+                                                <p className="text-xs text-orange-600">{t('verifyModal.milestoneBonusNote')}</p>
                                             </div>
                                         </div>
                                     );
@@ -1466,14 +1469,14 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 return (
                                     <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center gap-2">
                                         <BookOpen size={16} className="text-blue-500" />
-                                        <p className="text-xs font-bold text-blue-700">Verified Book #{currentSeq} Year {y}</p>
+                                        <p className="text-xs font-bold text-blue-700">{t('verifyModal.verifiedBookYear', { seq: currentSeq, year: y })}</p>
                                     </div>
                                 );
                             })()}
 
                             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col gap-3">
                                  <div className="flex flex-col gap-1">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Book Details</p>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('verifyModal.bookDetails')}</p>
                                     <p className="font-bold text-slate-800 text-sm leading-tight">{verifyModal.log.title}</p>
                                     <div className="flex items-center gap-2 mt-1">
                                         <span className="text-xs text-slate-500 font-medium">{verifyModal.log.category}</span>
@@ -1485,12 +1488,12 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                     ? 'bg-blue-100 text-blue-700 border-blue-200'
                                                     : 'bg-indigo-100 text-indigo-700 border-indigo-200'
                                             }`}>
-                                            {verifyModal.log.source === 'Personal Book' || verifyModal.log.source === 'Buku Pribadi' ? 'Private' : (verifyModal.log.source === 'SIMAS' ? 'SIMAS' : 'Office')}
+                                            {verifyModal.log.source === 'Personal Book' || verifyModal.log.source === 'Buku Pribadi' ? t('source.private') : (verifyModal.log.source === 'SIMAS' ? t('source.simas') : t('source.office'))}
                                         </span>
                                         {verifyModal.log.sn && (
                                             <>
                                                 <span className="text-slate-300">•</span>
-                                                <span className="text-[10px] font-bold text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded">SN: {verifyModal.log.sn}</span>
+                                                <span className="text-[10px] font-bold text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded">{t('verifyModal.snLabel', { sn: verifyModal.log.sn })}</span>
                                             </>
                                         )}
                                     </div>
@@ -1509,7 +1512,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
 
                                     return (
                                         <div className="pt-2 border-t border-slate-200/60">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Previously Approved in {y} ({approvedLogs.length})</p>
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('verifyModal.previouslyApproved', { year: y, count: approvedLogs.length })}</p>
                                             <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1 custom-scrollbar">
                                                 {approvedLogs.map((appLog, idx) => (
                                                     <div key={appLog.id} className="flex items-start gap-2 p-2 rounded-lg bg-emerald-50/50 border border-emerald-100/50">
@@ -1534,11 +1537,11 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 {/* Dates Grid */}
                                 <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200/60">
                                     <div>
-                                        <p className="text-[9px] font-bold text-slate-400 uppercase">Start / Borrow</p>
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase">{t('verifyModal.startBorrow')}</p>
                                         <p className="text-xs font-bold text-slate-700">{verifyModal.log.startDate ? new Date(verifyModal.log.startDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-[9px] font-bold text-slate-400 uppercase">Finish / Return</p>
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase">{t('verifyModal.finishReturn')}</p>
                                         <div className="flex items-center gap-2">
                                             <p className="text-xs font-bold text-slate-700">{verifyModal.log.finishDate ? new Date(verifyModal.log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</p>
                                             {verifyModal.log.startDate && verifyModal.log.finishDate && (
@@ -1552,7 +1555,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                         const days = Math.floor(totalMinutes / (24 * 60));
                                                         const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
                                                         const minutes = totalMinutes % 60;
-                                                        return `${days}D ${hours}H ${minutes}M`;
+                                                        return t('duration.format', { days, hours, minutes });
                                                     })()}
                                                 </span>
                                             )}
@@ -1563,14 +1566,14 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 {/* Review Link */}
                                 {(verifyModal.log.link || verifyModal.log.review) && (
                                     <div className="pt-2 border-t border-slate-200/60">
-                                        <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Review Link / Goodreads</p>
-                                        <a 
-                                            href={verifyModal.log.link || verifyModal.log.review} 
-                                            target="_blank" 
-                                            rel="noreferrer" 
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">{t('verifyModal.reviewLinkGoodreads')}</p>
+                                        <a
+                                            href={verifyModal.log.link || verifyModal.log.review}
+                                            target="_blank"
+                                            rel="noreferrer"
                                             className="text-blue-600 text-[11px] font-bold hover:underline flex items-center gap-1 w-fit"
                                         >
-                                            <ExternalLink size={12} /> Open Review Link
+                                            <ExternalLink size={12} /> {t('verifyModal.openReviewLink')}
                                         </a>
                                     </div>
                                 )}
@@ -1580,11 +1583,11 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     <div className="pt-2 border-t border-slate-200/60 flex gap-3">
                                         {verifyModal.log.evidenceUrl && (
                                             <div className="flex-1">
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Borrow Evidence</p>
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">{t('verifyModal.borrowEvidence')}</p>
                                                 <div className="relative group cursor-zoom-in" onClick={() => setPhotoModal({ open: true, log: verifyModal.log })}>
-                                                    <img 
-                                                        src={verifyModal.log.evidenceUrl.startsWith('http') ? verifyModal.log.evidenceUrl : `${API_BASE_URL}${verifyModal.log.evidenceUrl}`} 
-                                                        alt="Borrow Evidence" 
+                                                    <img
+                                                        src={verifyModal.log.evidenceUrl.startsWith('http') ? verifyModal.log.evidenceUrl : `${API_BASE_URL}${verifyModal.log.evidenceUrl}`}
+                                                        alt={t('verifyModal.borrowEvidence')}
                                                         className="w-full h-14 object-cover rounded-lg border border-slate-200 shadow-sm transition-transform group-hover:scale-[1.02]"
                                                     />
                                                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
@@ -1595,11 +1598,11 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                         )}
                                         {verifyModal.log.returnEvidenceUrl && (
                                             <div className="flex-1">
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Return Evidence</p>
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">{t('verifyModal.returnEvidence')}</p>
                                                 <div className="relative group cursor-zoom-in" onClick={() => setPhotoModal({ open: true, log: verifyModal.log })}>
-                                                    <img 
-                                                        src={verifyModal.log.returnEvidenceUrl.startsWith('http') ? verifyModal.log.returnEvidenceUrl : `${API_BASE_URL}${verifyModal.log.returnEvidenceUrl}`} 
-                                                        alt="Return Evidence" 
+                                                    <img
+                                                        src={verifyModal.log.returnEvidenceUrl.startsWith('http') ? verifyModal.log.returnEvidenceUrl : `${API_BASE_URL}${verifyModal.log.returnEvidenceUrl}`}
+                                                        alt={t('verifyModal.returnEvidence')}
                                                         className="w-full h-14 object-cover rounded-lg border border-slate-200 shadow-sm transition-transform group-hover:scale-[1.02]"
                                                     />
                                                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
@@ -1612,7 +1615,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 )}
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">Book Category</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">{t('verifyModal.bookCategory')}</label>
                                 <select
                                     className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                                     value={verifyModal.category}
@@ -1643,13 +1646,13 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                         }));
                                     }}
                                 >
-                                    <option value="text">Non-Fiction Text (Rp 100.000)</option>
-                                    <option value="comic">Non-Fiction Comic/Manga (Rp 50.000)</option>
-                                    <option value="none">No Incentive (Rp 0 - Fiksi/Novel/Majalah)</option>
+                                    <option value="text">{t('verifyModal.categoryTextOption')}</option>
+                                    <option value="comic">{t('verifyModal.categoryComicOption')}</option>
+                                    <option value="none">{t('verifyModal.categoryNoneOption')}</option>
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">Incentive Amount (Rp)</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">{t('verifyModal.incentiveAmount')}</label>
                                 <input
                                     type="text"
                                     className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-green-700 bg-green-50/30"
@@ -1663,8 +1666,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                             </div>
                         </div>
                         <div className="mt-6 flex justify-end gap-3">
-                            <button onClick={() => setVerifyModal({ open: false, log: null, category: 'text', reward: 0 })} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Cancel</button>
-                            <button onClick={handleVerifySubmit} className="px-4 py-2 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700">Approve & Send Reward</button>
+                            <button onClick={() => setVerifyModal({ open: false, log: null, category: 'text', reward: 0 })} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">{t('verifyModal.cancel')}</button>
+                            <button onClick={handleVerifySubmit} className="px-4 py-2 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700">{t('verifyModal.approveAndSendReward')}</button>
                         </div>
                     </div>
                 </div>
@@ -1675,21 +1678,21 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-red-600 flex items-center gap-2"><XCircle /> Reject Incentive Claim</h3>
+                            <h3 className="text-xl font-bold text-red-600 flex items-center gap-2"><XCircle /> {t('rejectModal.title')}</h3>
                             <button onClick={() => setRejectModal({ open: false, log: null, reason: '' })} className="text-slate-400 hover:text-slate-600"><XCircle /></button>
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">Reason for Rejection</label>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">{t('rejectModal.reasonLabel')}</label>
                             <textarea
                                 className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none min-h-[100px]"
-                                placeholder="State why this log is rejected..."
+                                placeholder={t('rejectModal.reasonPlaceholder')}
                                 value={rejectModal.reason}
                                 onChange={(e) => setRejectModal(prev => ({ ...prev, reason: e.target.value }))}
                             />
                         </div>
                         <div className="mt-6 flex justify-end gap-3">
-                            <button onClick={() => setRejectModal({ open: false, log: null, reason: '' })} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Cancel</button>
-                            <button onClick={handleRejectSubmit} className="px-4 py-2 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700">Reject Incentive Claim</button>
+                            <button onClick={() => setRejectModal({ open: false, log: null, reason: '' })} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">{t('rejectModal.cancel')}</button>
+                            <button onClick={handleRejectSubmit} className="px-4 py-2 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700">{t('rejectModal.submit')}</button>
                         </div>
                     </div>
                 </div>
@@ -1700,24 +1703,24 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-slate-700 flex items-center gap-2"><Trash2 className="text-slate-400" /> Remove Reading Log</h3>
+                            <h3 className="text-xl font-bold text-slate-700 flex items-center gap-2"><Trash2 className="text-slate-400" /> {t('cancelModal.title')}</h3>
                             <button onClick={() => setCancelModal({ open: false, log: null, reason: '' })} className="text-slate-400 hover:text-slate-600"><XCircle /></button>
                         </div>
                         <p className="text-sm text-slate-500 mb-4">
-                            Removing this log will remove it from the employee's reading statistics.
+                            {t('cancelModal.description')}
                         </p>
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">Removal Reason</label>
+                            <label className="block text-sm font-bold text-slate-700 mb-1">{t('cancelModal.reasonLabel')}</label>
                             <textarea
                                 className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none min-h-[100px]"
-                                placeholder="Enter reason why this report is being removed..."
+                                placeholder={t('cancelModal.reasonPlaceholder')}
                                 value={cancelModal.reason}
                                 onChange={(e) => setCancelModal(prev => ({ ...prev, reason: e.target.value }))}
                             />
                         </div>
                         <div className="mt-6 flex justify-end gap-3">
-                            <button onClick={() => setCancelModal({ open: false, log: null, reason: '' })} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Discard</button>
-                            <button onClick={handleCancelSubmit} className="px-4 py-2 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 shadow-lg">Yes, Remove Report</button>
+                            <button onClick={() => setCancelModal({ open: false, log: null, reason: '' })} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">{t('cancelModal.discard')}</button>
+                            <button onClick={handleCancelSubmit} className="px-4 py-2 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 shadow-lg">{t('cancelModal.confirm')}</button>
                         </div>
                     </div>
                 </div>
@@ -1728,49 +1731,49 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Edit className="text-blue-500" /> Edit Reading Log</h3>
+                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Edit className="text-blue-500" /> {t('editModal.title')}</h3>
                             <button onClick={() => setEditLogModal({ open: false, log: null, formData: {} })} className="text-slate-400 hover:text-slate-600"><XCircle /></button>
                         </div>
                         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">Title</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">{t('editModal.titleLabel')}</label>
                                 <input type="text" className="w-full px-4 py-2 border border-slate-200 rounded-xl" value={editLogModal.formData.title || ''} onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, title: e.target.value } }))} />
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">Category</label>
-                                <select 
+                                <label className="block text-sm font-bold text-slate-700 mb-1">{t('editModal.categoryLabel')}</label>
+                                <select
                                     className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                    value={editLogModal.formData.category || ''} 
+                                    value={editLogModal.formData.category || ''}
                                     onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, category: e.target.value } }))}
                                 >
-                                    <option value="" disabled>Select Category...</option>
+                                    <option value="" disabled>{t('editModal.selectCategoryPlaceholder')}</option>
                                     {categories.map((cat, idx) => (
                                         <option key={idx} value={cat}>{cat}</option>
                                     ))}
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">Start Date</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">{t('editModal.startDateLabel')}</label>
                                 <input type="datetime-local" className="w-full px-4 py-2 border border-slate-200 rounded-xl" value={formatToDatetimeLocal(editLogModal.formData.startDate || editLogModal.formData.date)} onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, startDate: e.target.value } }))} />
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">Finish Date</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">{t('editModal.finishDateLabel')}</label>
                                 <input type="datetime-local" className="w-full px-4 py-2 border border-slate-200 rounded-xl" value={formatToDatetimeLocal(editLogModal.formData.finishDate)} onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, finishDate: e.target.value } }))} />
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">Evidence URL / Image</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">{t('editModal.evidenceUrlLabel')}</label>
                                 <input type="text" className="w-full px-4 py-2 border border-slate-200 rounded-xl" value={editLogModal.formData.evidenceUrl || ''} onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, evidenceUrl: e.target.value } }))} />
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">Goodreads / Review Link</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">{t('editModal.reviewLinkLabel')}</label>
                                 <input type="text" className="w-full px-4 py-2 border border-slate-200 rounded-xl" value={editLogModal.formData.link || ''} onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, link: e.target.value } }))} />
                             </div>
                         </div>
                         <div className="mt-6 flex justify-between gap-3">
-                            <button onClick={() => handleDeleteLog(editLogModal.log!.id)} className="px-4 py-2 text-red-600 font-bold hover:bg-red-50 rounded-xl border border-red-200 flex items-center"><Trash2 size={16} className="mr-2" /> Delete</button>
+                            <button onClick={() => handleDeleteLog(editLogModal.log!.id)} className="px-4 py-2 text-red-600 font-bold hover:bg-red-50 rounded-xl border border-red-200 flex items-center"><Trash2 size={16} className="mr-2" /> {t('editModal.delete')}</button>
                             <div className="flex gap-2">
-                                <button onClick={() => setEditLogModal({ open: false, log: null, formData: {} })} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Cancel</button>
-                                <button onClick={handleEditLogSubmit} className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700">Save Changes</button>
+                                <button onClick={() => setEditLogModal({ open: false, log: null, formData: {} })} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">{t('editModal.cancel')}</button>
+                                <button onClick={handleEditLogSubmit} className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700">{t('editModal.saveChanges')}</button>
                             </div>
                         </div>
                     </div>
@@ -1792,7 +1795,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                             ? 'bg-purple-50 text-purple-700 border border-purple-100'
                                             : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
                                     }`}>
-                                        {detailModal.log.source === 'Personal Book' || detailModal.log.source === 'Buku Pribadi' ? 'Private' : (detailModal.log.source === 'SIMAS' ? 'SIMAS' : 'Office')}
+                                        {detailModal.log.source === 'Personal Book' || detailModal.log.source === 'Buku Pribadi' ? t('source.private') : (detailModal.log.source === 'SIMAS' ? t('source.simas') : t('source.office'))}
                                     </span>
                                 </div>
                             </div>
@@ -1803,19 +1806,19 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         <div className="p-6 overflow-y-auto space-y-5">
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                    <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Status</div>
-                                    <div className={`font-black text-xs uppercase ${detailModal.log.status === 'Finished' ? 'text-green-600' : detailModal.log.status === 'Cancelled' ? 'text-red-500' : 'text-blue-600'}`}>{detailModal.log.status === 'Finished' ? 'Read' : (detailModal.log.status === 'Cancelled' ? 'Removed' : detailModal.log.status)}</div>
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">{t('detailModal.status')}</div>
+                                    <div className={`font-black text-xs uppercase ${detailModal.log.status === 'Finished' ? 'text-green-600' : detailModal.log.status === 'Cancelled' ? 'text-red-500' : 'text-blue-600'}`}>{detailModal.log.status === 'Finished' ? t('detailModal.read') : (detailModal.log.status === 'Cancelled' ? t('detailModal.removed') : detailModal.log.status)}</div>
                                 </div>
                                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                    <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">HR Approval</div>
-                                    <div className="font-black text-xs uppercase text-indigo-600">{detailModal.log.hrApprovalStatus === 'Cancelled' ? 'Removed' : (detailModal.log.hrApprovalStatus || 'Draft')}</div>
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">{t('detailModal.hrApproval')}</div>
+                                    <div className="font-black text-xs uppercase text-indigo-600">{detailModal.log.hrApprovalStatus === 'Cancelled' ? t('detailModal.removed') : (detailModal.log.hrApprovalStatus || t('detailModal.draft'))}</div>
                                 </div>
                             </div>
 
                             {detailModal.log.rejectionReason && (
                                 <div className="bg-red-50 p-3.5 rounded-xl border border-red-100">
                                     <div className="text-[10px] font-black text-red-600 uppercase mb-1.5 flex justify-between items-center">
-                                        <span>REJECTION/REMOVAL NOTE</span>
+                                        <span>{t('detailModal.rejectionRemovalNote')}</span>
                                         {detailModal.log.cancelledAt && (
                                             <span className="text-[9px] opacity-60 normal-case flex items-center gap-1 font-bold">
                                                 <Clock size={10} /> {new Date(detailModal.log.cancelledAt).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
@@ -1825,7 +1828,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     <p className="text-xs text-red-800 font-semibold italic">"{detailModal.log.rejectionReason}"</p>
                                     {detailModal.log.cancelledBy && (
                                         <div className="mt-2 text-[9px] text-red-600/70 font-black">
-                                            • BY: {detailModal.log.cancelledBy}
+                                            {t('detailModal.byLabel', { name: detailModal.log.cancelledBy })}
                                         </div>
                                     )}
                                 </div>
@@ -1833,28 +1836,28 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
 
                             <div className="space-y-3 text-xs font-semibold text-slate-700">
                                 <div className="flex justify-between py-1.5 border-b border-slate-50">
-                                    <span className="text-slate-400">Reader Name</span>
+                                    <span className="text-slate-400">{t('detailModal.readerName')}</span>
                                     <span className="font-bold text-slate-800">
                                         {(() => {
                                             let emp = users.find(u => detailModal.log?.employee_id && u.employee_id === detailModal.log.employee_id);
                                             if (!emp) emp = users.find(u => detailModal.log?.userName && u.name && detailModal.log.userName.trim().toLowerCase() === u.name.trim().toLowerCase());
-                                            return emp?.name || detailModal.log?.userName || 'Unknown';
+                                            return emp?.name || detailModal.log?.userName || t('verificationTable.unknown');
                                         })()}
                                     </span>
                                 </div>
                                 {detailModal.log.employee_id && (
                                     <div className="flex justify-between py-1.5 border-b border-slate-50">
-                                        <span className="text-slate-400">Employee ID</span>
+                                        <span className="text-slate-400">{t('detailModal.employeeId')}</span>
                                         <span className="font-mono text-slate-800">{detailModal.log.employee_id}</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between py-1.5 border-b border-slate-50">
-                                    <span className="text-slate-400">Start Date</span>
+                                    <span className="text-slate-400">{t('detailModal.startDate')}</span>
                                     <span className="font-bold text-slate-800">{new Date(detailModal.log.startDate || detailModal.log.date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                                 </div>
                                 {detailModal.log.finishDate && (
                                     <div className="flex justify-between py-1.5 border-b border-slate-50 items-center">
-                                        <span className="text-slate-400">Finish Date</span>
+                                        <span className="text-slate-400">{t('detailModal.finishDate')}</span>
                                         <div className="flex items-center gap-2">
                                             <span className="font-bold text-slate-800">{new Date(detailModal.log.finishDate).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                                             {detailModal.log.startDate && (
@@ -1868,7 +1871,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                         const days = Math.floor(totalMinutes / (24 * 60));
                                                         const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
                                                         const minutes = totalMinutes % 60;
-                                                        return `${days}D ${hours}H ${minutes}M`;
+                                                        return t('duration.format', { days, hours, minutes });
                                                     })()}
                                                 </span>
                                             )}
@@ -1877,7 +1880,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 )}
                                 {detailModal.log.claimedAt && (
                                     <div className="flex justify-between py-1.5 border-b border-slate-50 items-center">
-                                        <span className="text-slate-400">Claimed Date</span>
+                                        <span className="text-slate-400">{t('detailModal.claimedDate')}</span>
                                         <span className="font-bold text-purple-600">
                                             {new Date(detailModal.log.claimedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                         </span>
@@ -1886,12 +1889,12 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 {detailModal.log.hrApprovalStatus === 'Approved' && (
                                     <>
                                         <div className="flex justify-between py-1.5 border-b border-slate-50">
-                                            <span className="text-slate-400">Approved By</span>
-                                            <span className="font-bold text-blue-600">{detailModal.log.approvedBy || 'HR Administrator'}</span>
+                                            <span className="text-slate-400">{t('detailModal.approvedBy')}</span>
+                                            <span className="font-bold text-blue-600">{detailModal.log.approvedBy || t('detailModal.hrAdministrator')}</span>
                                         </div>
                                         {detailModal.log.approvedAt && (
                                             <div className="flex justify-between py-1.5 border-b border-slate-50">
-                                                <span className="text-slate-400">Approved Time</span>
+                                                <span className="text-slate-400">{t('detailModal.approvedTime')}</span>
                                                 <span className="font-bold text-slate-800">{new Date(detailModal.log.approvedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                                             </div>
                                         )}
@@ -1899,7 +1902,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 )}
                                 {Number(detailModal.log.incentiveAmount) > 0 && (
                                     <div className="flex justify-between py-1.5 border-b border-slate-50 items-center">
-                                        <span className="text-slate-400">Incentive Reward</span>
+                                        <span className="text-slate-400">{t('detailModal.incentiveReward')}</span>
                                         {(() => {
                                             const seq = getLogSequence(detailModal.log);
                                             const amount = Number(detailModal.log.incentiveAmount) || 0;
@@ -1908,7 +1911,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                 const baseAmount = hasBonus ? amount - 500000 : amount;
                                                 return (
                                                     <div className="flex flex-col items-end bg-orange-50 px-2.5 py-1 rounded-xl border border-orange-100 shadow-sm">
-                                                        <span className="text-[8px] text-orange-600 font-black tracking-tighter uppercase leading-none mb-0.5">Milestone #5 Bonus!</span>
+                                                        <span className="text-[8px] text-orange-600 font-black tracking-tighter uppercase leading-none mb-0.5">{t('detailModal.milestoneBonus')}</span>
                                                         <span className="font-bold text-green-700 text-xs">{formatCurrency(baseAmount)} + Rp 500.000</span>
                                                     </div>
                                                 );
@@ -1925,42 +1928,42 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 {isEditingReviewInfo ? (
                                     <div className="space-y-4 pt-3 bg-slate-50 p-4 rounded-xl border border-slate-100 animate-in fade-in slide-in-from-top-2 duration-200">
                                         <div className="text-[10px] font-black text-blue-600 uppercase tracking-wider mb-2 flex items-center gap-1">
-                                            <Edit size={12} /> Edit Review Details
+                                            <Edit size={12} /> {t('detailModal.editReviewDetails')}
                                         </div>
-                                        
+
                                         <div>
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Goodreads / Review Link</label>
-                                            <input 
-                                                type="text" 
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t('editModal.reviewLinkLabel')}</label>
+                                            <input
+                                                type="text"
                                                 className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-semibold text-slate-800"
-                                                placeholder="https://goodreads.com/..."
+                                                placeholder={t('detailModal.reviewLinkPlaceholder')}
                                                 value={editReviewLink}
                                                 onChange={e => setEditReviewLink(e.target.value)}
                                             />
                                         </div>
-                                        
+
                                         <div>
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Review Notes</label>
-                                            <textarea 
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t('detailModal.reviewNotesLabel')}</label>
+                                            <textarea
                                                 className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none min-h-[70px] font-semibold text-slate-700 leading-relaxed"
-                                                placeholder="Write review notes..."
+                                                placeholder={t('detailModal.reviewNotesPlaceholder')}
                                                 value={editReviewNotes}
                                                 onChange={e => setEditReviewNotes(e.target.value)}
                                             />
                                         </div>
 
                                         <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
-                                            <button 
-                                                onClick={() => setIsEditingReviewInfo(false)} 
+                                            <button
+                                                onClick={() => setIsEditingReviewInfo(false)}
                                                 className="px-2.5 py-1.5 text-[11px] font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
                                             >
-                                                Discard
+                                                {t('detailModal.discard')}
                                             </button>
-                                            <button 
-                                                onClick={handleUpdateReviewInfo} 
+                                            <button
+                                                onClick={handleUpdateReviewInfo}
                                                 className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-sm"
                                             >
-                                                <Save size={12} /> Save
+                                                <Save size={12} /> {t('detailModal.save')}
                                             </button>
                                         </div>
                                     </div>
@@ -1968,59 +1971,59 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     <div className="space-y-4">
                                         <div className="flex justify-between items-start group/section">
                                             <div className="flex-1">
-                                                <div className="text-[10px] font-black text-slate-400 uppercase mb-1">Review Link</div>
+                                                <div className="text-[10px] font-black text-slate-400 uppercase mb-1">{t('detailModal.reviewLink')}</div>
                                                 {detailModal.log.link ? (
                                                     <a href={detailModal.log.link} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all flex items-center gap-1 font-bold">
                                                         {detailModal.log.link}
                                                         <ExternalLink size={12} className="inline shrink-0 text-blue-500" />
                                                     </a>
                                                 ) : (
-                                                    <span className="text-slate-400 italic text-[11px]">No review link provided</span>
+                                                    <span className="text-slate-400 italic text-[11px]">{t('detailModal.noReviewLink')}</span>
                                                 )}
                                             </div>
                                             {detailModal.log.status !== 'Cancelled' && (
-                                                <button 
+                                                <button
                                                     onClick={() => {
                                                         setEditReviewLink(detailModal.log?.link || '');
                                                         setEditReviewNotes(detailModal.log?.review || '');
                                                         setIsEditingReviewInfo(true);
                                                     }}
                                                     className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors ml-2 flex items-center gap-1 font-bold text-[10px]"
-                                                    title="Edit Review Details"
+                                                    title={t('detailModal.editReviewDetails')}
                                                 >
-                                                    <Edit size={12} /> Edit
+                                                    <Edit size={12} /> {t('detailModal.edit')}
                                                 </button>
                                             )}
                                         </div>
 
                                         <div>
-                                            <div className="text-[10px] font-black text-slate-400 uppercase mb-1">Review Notes</div>
+                                            <div className="text-[10px] font-black text-slate-400 uppercase mb-1">{t('detailModal.reviewNotesLabel')}</div>
                                             {detailModal.log.review && detailModal.log.review !== '-' ? (
                                                 <p className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-slate-600 leading-relaxed italic">"{detailModal.log.review}"</p>
                                             ) : (
-                                                <span className="text-slate-400 italic text-[11px] block bg-slate-50/50 p-2.5 rounded-xl border border-dashed border-slate-200">No review notes provided</span>
+                                                <span className="text-slate-400 italic text-[11px] block bg-slate-50/50 p-2.5 rounded-xl border border-dashed border-slate-200">{t('detailModal.noReviewNotes')}</span>
                                             )}
                                         </div>
                                     </div>
                                 )}
                                 {detailModal.log.evidenceUrl && (
                                     <div className="pt-2">
-                                        <div className="text-[10px] font-black text-slate-400 uppercase mb-2">Evidence Photo</div>
-                                        <img 
-                                            src={detailModal.log.evidenceUrl.startsWith('http') ? detailModal.log.evidenceUrl : `${API_BASE_URL}${detailModal.log.evidenceUrl}`} 
-                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 max-h-[220px] object-cover hover:scale-[1.02] transition-transform duration-300 cursor-zoom-in" 
-                                            alt="Evidence" 
+                                        <div className="text-[10px] font-black text-slate-400 uppercase mb-2">{t('detailModal.evidencePhoto')}</div>
+                                        <img
+                                            src={detailModal.log.evidenceUrl.startsWith('http') ? detailModal.log.evidenceUrl : `${API_BASE_URL}${detailModal.log.evidenceUrl}`}
+                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 max-h-[220px] object-cover hover:scale-[1.02] transition-transform duration-300 cursor-zoom-in"
+                                            alt={t('detailModal.evidencePhoto')}
                                             onClick={() => setPhotoModal({ open: true, log: detailModal.log })}
                                         />
                                     </div>
                                 )}
                                 {detailModal.log.returnEvidenceUrl && (
                                     <div className="pt-2">
-                                        <div className="text-[10px] font-black text-slate-400 uppercase mb-2">Return Evidence Photo</div>
-                                        <img 
-                                            src={detailModal.log.returnEvidenceUrl.startsWith('http') ? detailModal.log.returnEvidenceUrl : `${API_BASE_URL}${detailModal.log.returnEvidenceUrl}`} 
-                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 max-h-[220px] object-cover hover:scale-[1.02] transition-transform duration-300 cursor-zoom-in" 
-                                            alt="Return Evidence" 
+                                        <div className="text-[10px] font-black text-slate-400 uppercase mb-2">{t('detailModal.returnEvidencePhoto')}</div>
+                                        <img
+                                            src={detailModal.log.returnEvidenceUrl.startsWith('http') ? detailModal.log.returnEvidenceUrl : `${API_BASE_URL}${detailModal.log.returnEvidenceUrl}`}
+                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 max-h-[220px] object-cover hover:scale-[1.02] transition-transform duration-300 cursor-zoom-in"
+                                            alt={t('detailModal.returnEvidencePhoto')}
                                             onClick={() => setPhotoModal({ open: true, log: detailModal.log })}
                                         />
                                     </div>
@@ -2037,16 +2040,16 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         <button onClick={() => setPhotoModal({ open: false, log: null })} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-white rounded-full p-1 shadow-sm">
                             <XCircle size={24} />
                         </button>
-                        <h3 className="text-xl font-bold text-slate-800 mb-6 pr-8">Evidence Photos for {photoModal.log.title}</h3>
+                        <h3 className="text-xl font-bold text-slate-800 mb-6 pr-8">{t('photoModal.evidencePhotosFor', { title: photoModal.log.title })}</h3>
 
                         <div className="flex flex-col gap-6">
                              {photoModal.log.evidenceUrl && (
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                                     <p className="font-bold text-slate-700 mb-3 flex items-center gap-2">
                                         <ImageIcon className="text-blue-500" size={18} />
-                                        {photoModal.log.source === 'SIMAS' ? 'Borrowing Evidence Photo' : 'Evidence Photo'}
+                                        {photoModal.log.source === 'SIMAS' ? t('photoModal.borrowingEvidencePhoto') : t('photoModal.evidencePhoto')}
                                     </p>
-                                    <ZoomableImage src={photoModal.log.evidenceUrl.startsWith('http') ? photoModal.log.evidenceUrl : `${API_BASE_URL}${photoModal.log.evidenceUrl}`} alt="Borrowing" />
+                                    <ZoomableImage src={photoModal.log.evidenceUrl.startsWith('http') ? photoModal.log.evidenceUrl : `${API_BASE_URL}${photoModal.log.evidenceUrl}`} alt={t('photoModal.borrowingEvidencePhoto')} />
                                 </div>
                             )}
 
@@ -2054,9 +2057,9 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                                     <p className="font-bold text-slate-700 mb-3 flex items-center gap-2">
                                         <ImageIcon className="text-green-500" size={18} />
-                                        Return Evidence Photo
+                                        {t('photoModal.returnEvidencePhoto')}
                                     </p>
-                                    <ZoomableImage src={photoModal.log.returnEvidenceUrl.startsWith('http') ? photoModal.log.returnEvidenceUrl : `${API_BASE_URL}${photoModal.log.returnEvidenceUrl}`} alt="Return" />
+                                    <ZoomableImage src={photoModal.log.returnEvidenceUrl.startsWith('http') ? photoModal.log.returnEvidenceUrl : `${API_BASE_URL}${photoModal.log.returnEvidenceUrl}`} alt={t('photoModal.returnEvidencePhoto')} />
                                 </div>
                             )}
                         </div>
@@ -2078,18 +2081,18 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         </div>
                         <div className="p-0 overflow-y-auto w-full">
                             {recapModal.logs.length === 0 ? (
-                                <div className="p-8 text-center text-slate-500 italic">No books to display.</div>
+                                <div className="p-8 text-center text-slate-500 italic">{t('recapModal.noBooksToDisplay')}</div>
                             ) : (
                                 <table className="w-full text-left">
                                     <thead className="bg-white text-[10px] uppercase text-slate-500 font-black border-b border-slate-100 sticky top-0 shadow-sm">
                                         <tr>
-                                            <th className="px-3 py-3 text-center w-[8%]">#</th>
-                                            <th className="px-3 py-3 w-[28%]">Book Title / Category</th>
-                                            <th className="px-3 py-3 text-center w-[12%]">Finished</th>
-                                            <th className="px-3 py-3 text-center text-purple-600 w-[12%]">Claimed</th>
-                                            <th className="px-3 py-3 text-center w-[12%]">Verified</th>
-                                            <th className="px-3 py-3 text-center w-[18%]">Incentive</th>
-                                            <th className="px-3 py-3 w-[10%]">Status</th>
+                                            <th className="px-3 py-3 text-center w-[8%]">{t('recapModal.numberHeader')}</th>
+                                            <th className="px-3 py-3 w-[28%]">{t('recapModal.bookTitleCategory')}</th>
+                                            <th className="px-3 py-3 text-center w-[12%]">{t('recapModal.finished')}</th>
+                                            <th className="px-3 py-3 text-center text-purple-600 w-[12%]">{t('recapModal.claimed')}</th>
+                                            <th className="px-3 py-3 text-center w-[12%]">{t('recapModal.verified')}</th>
+                                            <th className="px-3 py-3 text-center w-[18%]">{t('recapModal.incentive')}</th>
+                                            <th className="px-3 py-3 w-[10%]">{t('recapModal.status')}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
@@ -2129,7 +2132,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                                         ? 'bg-blue-100 text-blue-700 border-blue-200'
                                                                         : 'bg-indigo-100 text-indigo-700 border-indigo-200'
                                                                 }`}>
-                                                                {log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? 'Private' : (log.source === 'SIMAS' ? 'SIMAS' : 'Office')}
+                                                                {log.source === 'Personal Book' || log.source === 'Buku Pribadi' ? t('source.private') : (log.source === 'SIMAS' ? t('source.simas') : t('source.office'))}
                                                             </span>
                                                         </div>
                                                     </td>
@@ -2174,7 +2177,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                                             const baseAmount = hasBonus ? amount - 500000 : amount;
                                                                             return (
                                                                                 <div className="flex flex-col items-center bg-orange-50 px-2 py-1 rounded border border-orange-100 min-w-[100px]">
-                                                                                    <span className="text-[8px] text-orange-600 font-black leading-none mb-1">MILESTONE BONUS!</span>
+                                                                                    <span className="text-[8px] text-orange-600 font-black leading-none mb-1">{t('recapModal.milestoneBonus')}</span>
                                                                                     <span className="text-[10px] font-bold text-green-700">{formatCurrency(baseAmount)} + Rp 500.000</span>
                                                                                     <span className="text-[9px] text-slate-500 font-black">= {formatCurrency(baseAmount + 500000)}</span>
                                                                                 </div>
@@ -2200,7 +2203,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                              'bg-slate-100 text-slate-500 border-slate-200'
                                                          }`}>
                                                               <div className="flex flex-col">
-                                                                 <span>{log.status === 'Reading' ? 'Reading' : (log.status === 'Cancelled' || log.hrApprovalStatus === 'Cancelled' ? 'Removed' : (log.hrApprovalStatus === 'Pending' ? 'Review' : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? 'Read' : log.hrApprovalStatus)))}</span>
+                                                                 <span>{log.status === 'Reading' ? t('status.reading') : (log.status === 'Cancelled' || log.hrApprovalStatus === 'Cancelled' ? t('status.removed') : (log.hrApprovalStatus === 'Pending' ? t('status.review') : ((log.hrApprovalStatus as any) === 'Draft' || !log.hrApprovalStatus ? t('status.read') : (log.hrApprovalStatus === 'Approved' ? t('status.approved') : (log.hrApprovalStatus === 'Rejected' ? t('status.rejected') : log.hrApprovalStatus)))))}</span>
                                                               </div>
                                                          </div>
                                                      </td>

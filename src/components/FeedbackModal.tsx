@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type ChangeEvent } from 'react';
 import { X, Clock, Plus, CheckCircle2, MessageSquare, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { User } from '../types';
 
@@ -19,6 +20,7 @@ interface FeedbackHistoryEntry {
 }
 
 export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalProps) {
+    const { t } = useTranslation('feedbackModal');
     const [category, setCategory] = useState<'Issue' | 'Suggestion' | 'Compliment'>('Issue');
     const [description, setDescription] = useState('');
     const [screenshots, setScreenshots] = useState<string[]>([]);
@@ -162,7 +164,7 @@ export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalPr
                 setScreenshots(prev => [...prev, ...uploadedUrls]);
             } catch (err) {
                 console.error('Upload error:', err);
-                showToast('error', 'Failed to upload screenshot.');
+                showToast('error', t('toast.uploadFailed'));
             } finally {
                 setIsUploading(false);
                 if (fileInputRef.current) fileInputRef.current.value = '';
@@ -183,7 +185,7 @@ export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalPr
 
     const handleSubmit = async () => {
         if (!description.trim()) {
-            showToast('error', 'Please describe your problem or suggestion.');
+            showToast('error', t('toast.descriptionRequired'));
             return;
         }
 
@@ -205,7 +207,7 @@ export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalPr
             });
 
             if (res.ok) {
-                showToast('success', 'Feedback submitted successfully! Thank you.');
+                showToast('success', t('toast.submitSuccess'));
                 // Save locally to localStorage as immediate offline history
                 const localFeedback = {
                     id: Date.now(),
@@ -222,11 +224,11 @@ export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalPr
                     onClose();
                 }, 1500);
             } else {
-                showToast('error', 'Failed to send feedback.');
+                showToast('error', t('toast.submitFailed'));
             }
         } catch (err) {
             console.error('Submit error:', err);
-            showToast('error', 'Failed to connect to server.');
+            showToast('error', t('toast.connectionFailed'));
         } finally {
             setIsSubmitting(false);
         }
@@ -254,10 +256,10 @@ export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalPr
                     <div>
                         <h3 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                             {showHistory ? <Clock size={20} className="text-emerald-400" /> : <MessageSquare size={20} className="text-emerald-400" />}
-                            {showHistory ? 'Feedback History' : 'Report an Issue'}
+                            {showHistory ? t('header.feedbackHistory') : t('header.reportIssue')}
                         </h3>
                         <p className="text-xs text-slate-400 mt-1">
-                            {showHistory ? 'View your previously submitted issues and suggestions' : 'Please provide detailed information about the issue.'}
+                            {showHistory ? t('header.historySubtitle') : t('header.reportSubtitle')}
                         </p>
                     </div>
                     <button onClick={onClose} className="text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg p-1.5 transition-colors cursor-pointer">
@@ -271,12 +273,12 @@ export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalPr
                         {isLoadingHistory ? (
                             <div className="flex flex-col items-center justify-center py-12 text-slate-500 gap-2">
                                 <Clock className="animate-spin text-emerald-400" size={32} />
-                                <p className="text-xs font-semibold">Loading history...</p>
+                                <p className="text-xs font-semibold">{t('history.loading')}</p>
                             </div>
                         ) : history.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-12 text-slate-500 gap-3">
                                 <Clock size={40} className="opacity-20" />
-                                <p className="text-sm font-medium">No feedback history found.</p>
+                                <p className="text-sm font-medium">{t('history.empty')}</p>
                             </div>
                         ) : (
                             <div className="space-y-4">
@@ -288,7 +290,7 @@ export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalPr
                                                 item.category === 'Suggestion' ? 'bg-blue-950 border-blue-800 text-blue-400' :
                                                 'bg-emerald-950 border-emerald-800 text-emerald-400'
                                             }`}>
-                                                {item.category}
+                                                {t(`categories.${item.category}`)}
                                             </span>
                                             <span className="text-[10px] text-slate-500 font-medium">
                                                 {new Date(item.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -298,7 +300,7 @@ export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalPr
                                         
                                         {item.url && (
                                             <p className="text-[10px] text-slate-500 truncate font-semibold">
-                                                Page: <span className="text-blue-500 select-all">{item.url}</span>
+                                                {t('history.pageLabel')} <span className="text-blue-500 select-all">{item.url}</span>
                                             </p>
                                         )}
 
@@ -338,7 +340,7 @@ export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalPr
                                                 : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
                                         }`}
                                     >
-                                        <span>{type}</span>
+                                        <span>{t(`categories.${type}`)}</span>
                                         <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
                                             isSelected 
                                                 ? 'border-emerald-500 bg-emerald-500' 
@@ -355,7 +357,7 @@ export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalPr
                         <textarea
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            placeholder="Please describe your problem..."
+                            placeholder={t('form.descriptionPlaceholder')}
                             className="w-full bg-slate-950/60 border border-slate-800 text-slate-200 placeholder-slate-600 rounded-xl p-4 min-h-[120px] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm resize-none leading-relaxed transition-all"
                             required
                         />
@@ -364,14 +366,14 @@ export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalPr
                         <div className="border border-dashed border-slate-800 rounded-2xl p-4 bg-slate-950/30 flex flex-col gap-3">
                             <div className="flex items-center justify-between">
                                 <span className="text-sm font-bold text-slate-300">
-                                    Screenshot ({screenshots.length})
+                                    {t('form.screenshotLabel', { count: screenshots.length })}
                                 </span>
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
                                     className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-lg text-xs font-bold border border-slate-800 shadow-sm transition-all active:scale-95 cursor-pointer"
                                 >
-                                    <Plus size={14} /> Add more
+                                    <Plus size={14} /> {t('form.addMore')}
                                 </button>
                                 <input
                                     type="file"
@@ -402,14 +404,14 @@ export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalPr
                                     {isCapturing && (
                                         <div className="relative w-24 h-24 rounded-xl border border-slate-800 bg-slate-950/50 flex flex-col items-center justify-center gap-1.5 animate-pulse text-slate-500">
                                             <div className="w-4 h-4 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
-                                            <span className="text-[10px] font-bold text-slate-400">Capturing...</span>
+                                            <span className="text-[10px] font-bold text-slate-400">{t('form.capturing')}</span>
                                         </div>
                                     )}
                                 </div>
                             )}
 
                             {isUploading && (
-                                <div className="text-xs text-slate-500 italic animate-pulse">Uploading screenshots...</div>
+                                <div className="text-xs text-slate-500 italic animate-pulse">{t('form.uploading')}</div>
                             )}
                         </div>
                     </div>
@@ -418,7 +420,7 @@ export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalPr
                 {/* Feedback is a gift */}
                 {!showHistory && (
                     <div className="text-slate-500 text-xs text-center font-semibold italic select-none my-1">
-                        - Feedback is a gift -
+                        {t('footerTagline')}
                     </div>
                 )}
 
@@ -430,7 +432,7 @@ export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalPr
                         className="flex items-center gap-2 text-emerald-400 hover:text-emerald-300 text-sm font-bold transition-colors cursor-pointer hover:underline"
                     >
                         <Clock size={16} />
-                        {showHistory ? 'Back to Form' : 'History'}
+                        {showHistory ? t('buttons.backToForm') : t('buttons.history')}
                     </button>
 
                     <div className="flex gap-3">
@@ -439,7 +441,7 @@ export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalPr
                             onClick={onClose}
                             className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-300 rounded-xl text-sm font-bold transition-all active:scale-95 cursor-pointer"
                         >
-                            Cancel
+                            {t('buttons.cancel')}
                         </button>
                         {!showHistory && (
                             <button
@@ -448,7 +450,7 @@ export default function FeedbackModal({ isOpen, onClose, user }: FeedbackModalPr
                                 disabled={isSubmitting || isUploading}
                                 className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 text-white font-bold rounded-xl text-sm transition-all shadow-md shadow-emerald-950/20 cursor-pointer"
                             >
-                                {isSubmitting ? 'Sending...' : 'Send'}
+                                {isSubmitting ? t('buttons.sending') : t('buttons.send')}
                             </button>
                         )}
                     </div>

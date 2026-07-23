@@ -1,25 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
 import { Edit, Trash2, Plus, GripVertical, Save, X, BookOpen, Clock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { Course, Module, Quiz } from '../types';
 import PopupNotification from './PopupNotification';
 import ConfirmationModal from './ConfirmationModal';
 
 const QuizEditor = ({ quiz, onUpdate, onDelete, onNotify }: { quiz: Quiz | undefined, onUpdate: (q: Quiz) => void, onDelete?: () => void, onNotify?: (msg: string, type: 'success' | 'error') => void }) => {
+    const { t } = useTranslation('onlineModulesManager');
     if (!quiz) return null;
     return (
         <div className="mt-4 space-y-4 border-l-2 border-slate-200 pl-4">
             <div className="flex justify-between items-center mb-2">
-                <h4 className="font-bold text-slate-700 text-sm uppercase">Quiz Questions</h4>
+                <h4 className="font-bold text-slate-700 text-sm uppercase">{t('quizEditor.quizQuestions')}</h4>
                 {onDelete && (
-                    <button onClick={onDelete} className="text-red-500 text-xs hover:underline">Delete Quiz</button>
+                    <button onClick={onDelete} className="text-red-500 text-xs hover:underline">{t('quizEditor.deleteQuiz')}</button>
                 )}
             </div>
             {quiz.questions.map((q, qIdx) => (
                 <div key={q.id} className="bg-slate-100 p-4 rounded-xl space-y-3">
                     <div className="flex justify-between items-start gap-2">
                         <div className="flex-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase">Question {qIdx + 1}</label>
+                            <label className="text-xs font-bold text-slate-500 uppercase">{t('quizEditor.question', { number: qIdx + 1 })}</label>
                             <textarea
                                 value={q.question}
                                 onChange={(e) => {
@@ -28,7 +30,7 @@ const QuizEditor = ({ quiz, onUpdate, onDelete, onNotify }: { quiz: Quiz | undef
                                     onUpdate({ ...quiz, questions: newQuestions });
                                 }}
                                 className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-200 text-sm font-medium resize-none"
-                                placeholder="Enter question here..."
+                                placeholder={t('quizEditor.questionPlaceholder')}
                                 rows={2}
                             />
                         </div>
@@ -44,7 +46,7 @@ const QuizEditor = ({ quiz, onUpdate, onDelete, onNotify }: { quiz: Quiz | undef
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Answer Options</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase">{t('quizEditor.answerOptions')}</label>
                         {q.options.map((opt, optIdx) => (
                             <div key={optIdx} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${q.correctAnswer === optIdx ? 'bg-green-50 border-green-200 ring-1 ring-green-200' : 'bg-white border-slate-200'}`}>
                                 <input
@@ -66,14 +68,14 @@ const QuizEditor = ({ quiz, onUpdate, onDelete, onNotify }: { quiz: Quiz | undef
                                         onUpdate({ ...quiz, questions: newQuestions });
                                     }}
                                     className="flex-1 px-3 py-1.5 rounded-md border border-slate-200 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all bg-white"
-                                    placeholder={`Option ${optIdx + 1}`}
+                                    placeholder={t('quizEditor.optionPlaceholder', { number: optIdx + 1 })}
                                 />
                                 <button
                                     onClick={() => {
                                         const newQuestions = [...quiz.questions];
                                         if (newQuestions[qIdx].options.length <= 2) {
-                                            if (onNotify) onNotify("Minimum 2 options required", 'error');
-                                            else alert("Minimum 2 options required");
+                                            if (onNotify) onNotify(t('quizEditor.minOptionsError'), 'error');
+                                            else alert(t('quizEditor.minOptionsError'));
                                             return;
                                         }
                                         newQuestions[qIdx].options.splice(optIdx, 1);
@@ -85,7 +87,7 @@ const QuizEditor = ({ quiz, onUpdate, onDelete, onNotify }: { quiz: Quiz | undef
                                         onUpdate({ ...quiz, questions: newQuestions });
                                     }}
                                     className="text-slate-400 hover:text-red-500 p-1"
-                                    title="Remove Option"
+                                    title={t('quizEditor.removeOption')}
                                 >
                                     <X size={14} />
                                 </button>
@@ -99,7 +101,7 @@ const QuizEditor = ({ quiz, onUpdate, onDelete, onNotify }: { quiz: Quiz | undef
                             }}
                             className="text-xs text-blue-600 font-bold hover:text-blue-800 flex items-center gap-1 mt-2 pl-1"
                         >
-                            <Plus size={14} /> Add Option
+                            <Plus size={14} /> {t('quizEditor.addOption')}
                         </button>
                     </div>
                 </div>
@@ -121,13 +123,14 @@ const QuizEditor = ({ quiz, onUpdate, onDelete, onNotify }: { quiz: Quiz | undef
                 }}
                 className="w-full py-2 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 font-bold hover:border-blue-400 hover:text-blue-500 transition-colors"
             >
-                + Add Question
+                {t('quizEditor.addQuestion')}
             </button>
         </div>
     );
 };
 
 const OnlineModulesManager = () => {
+    const { t } = useTranslation('onlineModulesManager');
     const [courses, setCourses] = useState<Course[]>([]);
     const [editingCourse, setEditingCourse] = useState<Course | null>(null);
     const editorScrollRef = useRef<HTMLDivElement>(null);
@@ -159,21 +162,21 @@ const OnlineModulesManager = () => {
                 }
             } catch (e) {
                 console.error("Courses fetch error", e);
-                setPopup({ type: 'error', message: `Failed to load courses: ${e instanceof Error ? e.message : String(e)}`, isOpen: true });
+                setPopup({ type: 'error', message: t('errors.loadCoursesFailed', { message: e instanceof Error ? e.message : String(e) }), isOpen: true });
             }
         };
         fetchData();
     }, []);
 
     const handleDeleteCourse = (id: number) => {
-        openConfirm('Delete Course', 'Are you sure you want to delete this course? This action cannot be undone.', async () => {
+        openConfirm(t('confirm.deleteCourseTitle'), t('confirm.deleteCourseMessage'), async () => {
             try {
                 await fetch(`${API_BASE_URL}/api/courses/${id}`, { method: 'DELETE' });
                 setCourses(courses.filter(c => c.id !== id));
-                setPopup({ type: 'success', message: 'Course deleted successfully.', isOpen: true });
+                setPopup({ type: 'success', message: t('notifications.courseDeleted'), isOpen: true });
             } catch (err) {
                 console.error("Failed to delete course", err);
-                setPopup({ type: 'error', message: 'Failed to delete course.', isOpen: true });
+                setPopup({ type: 'error', message: t('errors.deleteCourseFailed'), isOpen: true });
             }
         });
     };
@@ -239,11 +242,11 @@ const OnlineModulesManager = () => {
                 setCourses(courses.map(c => c.id === savedCourse.id ? savedCourse : c));
             }
             setEditingCourse(null);
-            setPopup({ type: 'success', message: `Course Saved Successfully! (ID: ${savedCourse.id})`, isOpen: true });
+            setPopup({ type: 'success', message: t('notifications.courseSaved', { id: savedCourse.id }), isOpen: true });
         } catch (err) {
             console.error('Failed to save course', err);
-            const msg = err instanceof Error ? err.message : 'Please check the connection.';
-            setPopup({ type: 'error', message: `Failed to save course: ${msg}`, isOpen: true });
+            const msg = err instanceof Error ? err.message : t('errors.checkConnection');
+            setPopup({ type: 'error', message: t('errors.saveCourseFailed', { message: msg }), isOpen: true });
         }
     };
 
@@ -255,7 +258,7 @@ const OnlineModulesManager = () => {
                     <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                         <div className="flex flex-col">
                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                {courses.find(c => c.id === editingCourse.id) ? 'Managing Module' : 'Creating Module'}
+                                {courses.find(c => c.id === editingCourse.id) ? t('editor.managingModule') : t('editor.creatingModule')}
                             </span>
                             <h2 className="font-bold text-xl text-slate-800">{editingCourse.title}</h2>
                         </div>
@@ -269,35 +272,35 @@ const OnlineModulesManager = () => {
                             <section className="space-y-4">
                                 <h3 className="font-bold text-slate-700 flex items-center gap-2">
                                     <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">1</span>
-                                    Basic Information
+                                    {t('editor.section1Title')}
                                 </h3>
                                 <div className="grid grid-cols-1 gap-4">
                                     <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-1">Module Name</label>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('editor.moduleNameLabel')}</label>
                                         <input
                                             value={editingCourse.title}
                                             onChange={e => setEditingCourse({ ...editingCourse, title: e.target.value })}
-                                            placeholder="New Untitled Course"
+                                            placeholder={t('editor.moduleNamePlaceholder')}
                                             className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-1">Description</label>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('editor.descriptionLabel')}</label>
                                         <textarea
                                             value={editingCourse.description}
                                             onChange={e => setEditingCourse({ ...editingCourse, description: e.target.value })}
                                             rows={3}
-                                            placeholder="Description here..."
+                                            placeholder={t('editor.descriptionPlaceholder')}
                                             className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-1">Total Duration Label</label>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('editor.totalDurationLabel')}</label>
                                         <div className="relative">
                                             <input
                                                 value={editingCourse.duration}
                                                 onChange={e => setEditingCourse({ ...editingCourse, duration: e.target.value })}
-                                                placeholder="e.g. 60 Hours of Learning"
+                                                placeholder={t('editor.totalDurationPlaceholder')}
                                                 className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
                                             />
                                             <Clock size={16} className="absolute left-3.5 top-3 text-slate-400" />
@@ -310,28 +313,28 @@ const OnlineModulesManager = () => {
                             <section className="space-y-4 pt-6 border-t border-slate-100">
                                 <h3 className="font-bold text-slate-700 flex items-center gap-2">
                                     <span className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-xs">2</span>
-                                    Course Entry Pre-Test
-                                    <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full ml-2 font-bold uppercase tracking-tight">Requirement Level 1</span>
+                                    {t('editor.section2Title')}
+                                    <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full ml-2 font-bold uppercase tracking-tight">{t('editor.requirementLevel1')}</span>
                                 </h3>
                                 <div className="bg-amber-50/20 border border-amber-100 rounded-2xl p-6">
                                     {!editingCourse.preAssessment ? (
                                         <button
                                             onClick={() => setEditingCourse({
                                                 ...editingCourse,
-                                                preAssessment: { id: Date.now(), title: 'Pre-Test: ' + editingCourse.title, questions: [] }
+                                                preAssessment: { id: Date.now(), title: t('editor.preTestDefaultTitle', { courseTitle: editingCourse.title }), questions: [] }
                                             })}
                                             className="w-full py-6 border-2 border-dashed border-amber-200 rounded-2xl text-amber-500 font-bold hover:border-amber-400 hover:bg-amber-50 transition-all flex flex-col items-center justify-center gap-2"
                                         >
                                             <Plus size={24} />
-                                            <span>Create Pre-Test Quiz (Mandatory before starting material)</span>
+                                            <span>{t('editor.createPreTestButton')}</span>
                                         </button>
                                     ) : (
                                         <div className="bg-white rounded-2xl shadow-sm border border-amber-200 overflow-hidden">
                                             <div className="px-6 py-4 bg-amber-50 border-b border-amber-100 flex justify-between items-center">
-                                                <span className="font-bold text-amber-900 text-sm italic">✓ Course Entry Requirement Active</span>
+                                                <span className="font-bold text-amber-900 text-sm italic">{t('editor.entryRequirementActive')}</span>
                                                 <button
                                                     onClick={() => {
-                                                        openConfirm('Delete Pre-Test', 'Delete this entry requirement quiz?', () => {
+                                                        openConfirm(t('confirm.deletePreTestTitle'), t('confirm.deletePreTestMessage'), () => {
                                                             const upd = { ...editingCourse };
                                                             delete upd.preAssessment;
                                                             setEditingCourse(upd);
@@ -339,7 +342,7 @@ const OnlineModulesManager = () => {
                                                     }}
                                                     className="text-red-500 hover:text-red-700 text-xs font-bold"
                                                 >
-                                                    Delete Requirement
+                                                    {t('editor.deleteRequirement')}
                                                 </button>
                                             </div>
                                             <div className="p-4">
@@ -361,7 +364,7 @@ const OnlineModulesManager = () => {
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-bold text-slate-700 flex items-center gap-2">
                                         <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">3</span>
-                                        Material List (Video & Module Quizzes)
+                                        {t('editor.section3Title')}
                                     </h3>
                                     <button
                                         onClick={() => {
@@ -392,7 +395,7 @@ const OnlineModulesManager = () => {
                                         }}
                                         className="text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
                                     >
-                                        <Plus size={16} /> Add Course
+                                        <Plus size={16} /> {t('editor.addCourse')}
                                     </button>
                                 </div>
 
@@ -415,7 +418,7 @@ const OnlineModulesManager = () => {
                                                             newMods[idx] = { ...mod, title: e.target.value };
                                                             setEditingCourse({ ...editingCourse, modules: newMods });
                                                         }}
-                                                        placeholder="New Course"
+                                                        placeholder={t('editor.coursePlaceholder')}
                                                         className="px-3 py-2 rounded-lg border border-slate-200 text-sm"
                                                     />
                                                     <div className="flex gap-2">
@@ -427,7 +430,7 @@ const OnlineModulesManager = () => {
                                                                     newMods[idx] = { ...mod, duration: e.target.value };
                                                                     setEditingCourse({ ...editingCourse, modules: newMods });
                                                                 }}
-                                                                placeholder="Duration (e.g. 10:00)"
+                                                                placeholder={t('editor.durationPlaceholder')}
                                                                 className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-200 text-sm"
                                                             />
                                                             <Clock size={14} className="absolute left-2.5 top-3 text-slate-400" />
@@ -454,7 +457,7 @@ const OnlineModulesManager = () => {
                                                                     newMods[idx] = { ...mod, videoId: videoId };
                                                                     setEditingCourse({ ...editingCourse, modules: newMods });
                                                                 }}
-                                                                placeholder="YouTube Video ID or Link"
+                                                                placeholder={t('editor.videoIdPlaceholder')}
                                                                 className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"
                                                             />
                                                         </div>
@@ -476,7 +479,7 @@ const OnlineModulesManager = () => {
 
 
                                                 <div className="space-y-2">
-                                                    <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-[#5d5dff]">Module Quiz (After Video)</h5>
+                                                    <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-[#5d5dff]">{t('editor.moduleQuizTitle')}</h5>
                                                     {mod.quiz ? (
                                                         <QuizEditor
                                                             quiz={mod.quiz}
@@ -487,7 +490,7 @@ const OnlineModulesManager = () => {
                                                             }}
                                                             onNotify={(msg, type) => setPopup({ isOpen: true, message: msg, type })}
                                                             onDelete={() => {
-                                                                openConfirm('Delete Quiz', 'Delete this module quiz? All questions will be lost.', () => {
+                                                                openConfirm(t('confirm.deleteQuizTitle'), t('confirm.deleteQuizMessage'), () => {
                                                                     const newMods = [...editingCourse.modules];
                                                                     delete newMods[idx].quiz;
                                                                     setEditingCourse({ ...editingCourse, modules: newMods });
@@ -500,14 +503,14 @@ const OnlineModulesManager = () => {
                                                                 const newMods = [...editingCourse.modules];
                                                                 newMods[idx].quiz = {
                                                                     id: Date.now(),
-                                                                    title: 'Module Quiz: ' + mod.title,
+                                                                    title: t('editor.moduleQuizDefaultTitle', { moduleTitle: mod.title }),
                                                                     questions: []
                                                                 };
                                                                 setEditingCourse({ ...editingCourse, modules: newMods });
                                                             }}
                                                             className="text-[10px] bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg text-indigo-700 font-bold transition-colors border border-indigo-100 flex items-center gap-1"
                                                         >
-                                                            + Add Module Quiz
+                                                            {t('editor.addModuleQuiz')}
                                                         </button>
                                                     )}
                                                 </div>
@@ -521,7 +524,7 @@ const OnlineModulesManager = () => {
                             <section className="space-y-4 pt-8 border-t-2 border-slate-100 bg-slate-50/50 -mx-6 px-6 pb-6">
                                 <h3 className="font-bold text-slate-700 flex items-center gap-2 pt-4">
                                     <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">4</span>
-                                    Course Conclusion (Final Evaluation)
+                                    {t('editor.section4Title')}
                                 </h3>
 
                                 <div className="grid grid-cols-1 gap-6">
@@ -532,12 +535,12 @@ const OnlineModulesManager = () => {
                                                 <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
                                                     <BookOpen size={20} />
                                                 </div>
-                                                <h4 className="font-bold text-lg text-slate-800">Final Post-Test</h4>
+                                                <h4 className="font-bold text-lg text-slate-800">{t('editor.finalPostTest')}</h4>
                                             </div>
                                             {editingCourse.assessment && (
                                                 <button
                                                     onClick={() => {
-                                                        openConfirm('Delete Post-Test', 'Delete this final evaluation quiz?', () => {
+                                                        openConfirm(t('confirm.deletePostTestTitle'), t('confirm.deletePostTestMessage'), () => {
                                                             const upd = { ...editingCourse };
                                                             delete upd.assessment;
                                                             setEditingCourse(upd);
@@ -545,7 +548,7 @@ const OnlineModulesManager = () => {
                                                     }}
                                                     className="text-red-500 hover:text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-red-100"
                                                 >
-                                                    Delete
+                                                    {t('editor.delete')}
                                                 </button>
                                             )}
                                         </div>
@@ -553,12 +556,12 @@ const OnlineModulesManager = () => {
                                             <button
                                                 onClick={() => setEditingCourse({
                                                     ...editingCourse,
-                                                    assessment: { id: Date.now(), title: 'Final Post-Test', questions: [] }
+                                                    assessment: { id: Date.now(), title: t('editor.finalPostTestDefaultTitle'), questions: [] }
                                                 })}
                                                 className="w-full py-6 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold hover:border-blue-400 hover:text-blue-500 hover:bg-white transition-all flex flex-col items-center justify-center gap-2"
                                             >
                                                 <Plus size={24} />
-                                                <span>Create Final Evaluation Quiz (Post-Test)</span>
+                                                <span>{t('editor.createFinalEvalButton')}</span>
                                             </button>
                                         ) : (
                                             <QuizEditor
@@ -581,13 +584,13 @@ const OnlineModulesManager = () => {
                             onClick={() => setEditingCourse(null)}
                             className="px-6 py-2 rounded-xl text-slate-600 font-bold hover:bg-slate-200 transition-colors"
                         >
-                            Close
+                            {t('editor.close')}
                         </button>
                         <button
                             onClick={handleSaveCourse}
                             className="px-6 py-2 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all flex items-center gap-2"
                         >
-                            <Save size={18} /> Save Changes
+                            <Save size={18} /> {t('editor.saveChanges')}
                         </button>
                     </div>
                 </div>
@@ -604,16 +607,16 @@ const OnlineModulesManager = () => {
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
                     <div>
                         <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/20 mb-4">
-                            Module Architecture
+                            {t('header.badge')}
                         </div>
-                        <h1 className="text-3xl md:text-4xl font-black tracking-tighter mb-2">Online Module Management</h1>
-                        <p className="text-purple-100 font-medium max-w-xl opacity-90">Digital Learning Architecture: Design, edit, and manage high-standard curriculum modules.</p>
+                        <h1 className="text-3xl md:text-4xl font-black tracking-tighter mb-2">{t('header.title')}</h1>
+                        <p className="text-purple-100 font-medium max-w-xl opacity-90">{t('header.subtitle')}</p>
                     </div>
                     <button
                         onClick={handleAddNewCourse}
                         className="bg-white text-purple-600 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-2xl hover:bg-purple-50 transition-all active:scale-95"
                     >
-                        <Plus size={20} /> New Module
+                        <Plus size={20} /> {t('header.newModule')}
                     </button>
                 </div>
             </div>
@@ -624,20 +627,20 @@ const OnlineModulesManager = () => {
                         <div className="absolute top-0 left-0 w-1.5 h-full bg-purple-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         <div className="flex justify-between items-start mb-6">
                             <span className="bg-purple-50 text-purple-600 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border border-purple-100/50 shadow-sm">
-                                Module
+                                {t('card.badge')}
                             </span>
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => handleEditCourse(course)}
                                     className="w-10 h-10 flex items-center justify-center rounded-2xl bg-slate-50 text-slate-400 hover:bg-purple-50 hover:text-purple-600 transition-all border border-transparent hover:border-purple-100 shadow-sm"
-                                    title="Edit Course"
+                                    title={t('card.editCourse')}
                                 >
                                     <Edit size={18} />
                                 </button>
                                 <button
                                     onClick={() => handleDeleteCourse(course.id)}
                                     className="w-10 h-10 flex items-center justify-center rounded-2xl bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-all border border-transparent hover:border-red-100 shadow-sm"
-                                    title="Delete Course"
+                                    title={t('card.deleteCourse')}
                                 >
                                     <Trash2 size={18} />
                                 </button>
@@ -648,10 +651,10 @@ const OnlineModulesManager = () => {
                         <div className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest border-t border-slate-50 pt-6 mt-auto">
                             <div className="flex items-center gap-2">
                                 <BookOpen size={14} className="text-purple-400" />
-                                <span>{course.modules?.length || 0} Courses</span>
+                                <span>{t('card.coursesCount', { count: course.modules?.length || 0 })}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <GripVertical size={14} /> Reorder
+                                <GripVertical size={14} /> {t('card.reorder')}
                             </div>
                         </div>
                     </div>
@@ -662,13 +665,13 @@ const OnlineModulesManager = () => {
                         <div className="mb-4 text-slate-300 flex justify-center">
                             <BookOpen size={64} />
                         </div>
-                        <h3 className="text-lg font-bold text-slate-600 mb-2">No Courses Found</h3>
-                        <p className="text-slate-400 mb-6">Get started by creating your first training course.</p>
+                        <h3 className="text-lg font-bold text-slate-600 mb-2">{t('empty.title')}</h3>
+                        <p className="text-slate-400 mb-6">{t('empty.message')}</p>
                         <button
                             onClick={handleAddNewCourse}
                             className="text-blue-600 font-bold hover:underline"
                         >
-                            Create New Course
+                            {t('empty.createNewCourse')}
                         </button>
                     </div>
                 )}
@@ -689,7 +692,7 @@ const OnlineModulesManager = () => {
                 onConfirm={confirmConfig.onConfirm}
                 title={confirmConfig.title}
                 message={confirmConfig.message}
-                confirmText="Yes, Proceed"
+                confirmText={t('confirm.yesProceed')}
                 variant="danger"
             />
         </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Bell, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Meeting, TrainingRequest } from '../types';
@@ -19,6 +20,7 @@ interface NotificationPanelProps {
 }
 
 const NotificationPanel = ({ userEmail, userName, userRole }: NotificationPanelProps) => {
+    const { t } = useTranslation('notificationPanel');
     const [notifications, setNotifications] = useState<Notification[]>([]);
 
     useEffect(() => {
@@ -42,8 +44,8 @@ const NotificationPanel = ({ userEmail, userName, userRole }: NotificationPanelP
                     .filter((m: Meeting) => m.guests?.emails?.includes(userEmail))
                     .map((m: Meeting) => ({
                         id: m.id,
-                        title: 'Upcoming Meeting',
-                        message: `${m.title} at ${m.time} (${m.type})`,
+                        title: t('meeting.title'),
+                        message: t('meeting.message', { title: m.title, time: m.time, type: m.type }),
                         time: new Date(m.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
                         type: 'INFO',
                         isRead: false
@@ -53,13 +55,13 @@ const NotificationPanel = ({ userEmail, userName, userRole }: NotificationPanelP
                 // Filter: Only include requests submitted by the current user
                 const trainingNotifs: Notification[] = training
                     .filter((t: TrainingRequest) => t.userName === userName)
-                    .map((t: TrainingRequest) => ({
-                        id: t.id,
-                        title: `Training: ${t.status?.replace('_', ' ')}`,
-                        message: `Request for "${t.title}" is ${t.status?.toLowerCase().replace('_', ' ')}.`,
-                        time: new Date(t.submittedAt || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                        type: t.status === 'APPROVED' ? 'SUCCESS' : t.status === 'REJECTED' ? 'WARNING' : 'INFO',
-                        isRead: t.status !== 'PENDING_SUPERVISOR'
+                    .map((req: TrainingRequest) => ({
+                        id: req.id,
+                        title: t('training.title', { status: req.status?.replace('_', ' ') }),
+                        message: t('training.message', { title: req.title, status: req.status?.toLowerCase().replace('_', ' ') }),
+                        time: new Date(req.submittedAt || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                        type: req.status === 'APPROVED' ? 'SUCCESS' : req.status === 'REJECTED' ? 'WARNING' : 'INFO',
+                        isRead: req.status !== 'PENDING_SUPERVISOR'
                     }));
 
                 // 3. Transform Reading Logs to Notifications for HR
@@ -69,8 +71,8 @@ const NotificationPanel = ({ userEmail, userName, userRole }: NotificationPanelP
                         .filter((l: any) => l.status === 'Finished' && l.hrApprovalStatus === 'Pending')
                         .map((l: any) => ({
                             id: l.id + 100000,
-                            title: `Klaim Baca Buku`,
-                            message: `${l.userName || 'Karyawan'} menyelesaikan buku "${l.title}". Menunggu verifikasi HR.`,
+                            title: t('readingClaim.title'),
+                            message: t('readingClaim.message', { userName: l.userName || t('readingClaim.defaultUserName'), title: l.title }),
                             time: new Date(l.date || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
                             type: 'INFO',
                             isRead: false
@@ -101,10 +103,10 @@ const NotificationPanel = ({ userEmail, userName, userRole }: NotificationPanelP
             <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                     <Bell size={20} className="text-blue-600" />
-                    Notifications
+                    {t('title')}
                 </h3>
                 <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">
-                    {notifications.filter(n => !n.isRead).length} New
+                    {t('newCount', { count: notifications.filter(n => !n.isRead).length })}
                 </span>
             </div>
 
@@ -135,7 +137,7 @@ const NotificationPanel = ({ userEmail, userName, userRole }: NotificationPanelP
             </div>
 
             <button className="mt-4 w-full py-2 text-xs font-bold text-slate-500 hover:text-blue-600 border border-transparent hover:border-blue-100 rounded-xl transition-all">
-                View All Notifications
+                {t('viewAll')}
             </button>
         </div>
     );

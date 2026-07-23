@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { Users, UserPlus, Mail, Lock, Shield, ArrowLeft, Edit, Briefcase, MapPin, Trash2, RefreshCw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { Role, User, Employee } from '../types';
 import PopupNotification from './PopupNotification';
@@ -10,6 +11,7 @@ interface UserManagementProps {
 }
 
 const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
+    const { t } = useTranslation('userManagement');
     const [users, setUsers] = useState<User[]>([]);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -47,7 +49,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
 
             } catch (err) {
                 console.error(err);
-                setNotification({ show: true, type: 'error', message: 'Failed to load data.' });
+                setNotification({ show: true, type: 'error', message: t('notifications.loadFailed') });
             } finally {
                 setIsLoading(false);
             }
@@ -71,9 +73,9 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                     setIsFormOpen(false);
                     setEditingUser(null);
                     setFormData({ name: '', email: '', password: '', role: 'STAFF', employee_id: '' });
-                    setNotification({ show: true, type: 'success', message: 'User updated successfully!' });
+                    setNotification({ show: true, type: 'success', message: t('notifications.userUpdated') });
                 } else {
-                    setNotification({ show: true, type: 'error', message: 'Failed to update user' });
+                    setNotification({ show: true, type: 'error', message: t('notifications.updateFailed') });
                 }
             } else {
                 // CREATE
@@ -87,10 +89,10 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                     setUsers([...users, newUser]);
                     setIsFormOpen(false);
                     setFormData({ name: '', email: '', password: '', role: 'STAFF', employee_id: '' });
-                    setNotification({ show: true, type: 'success', message: 'User created successfully!' });
+                    setNotification({ show: true, type: 'success', message: t('notifications.userCreated') });
                 } else {
                     const err = await res.json();
-                    setNotification({ show: true, type: 'error', message: err.message || 'Failed to create user' });
+                    setNotification({ show: true, type: 'error', message: err.message || t('notifications.createFailed') });
                 }
             }
         } catch (error) {
@@ -111,23 +113,23 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
     };
 
     const handleDelete = async (id: string) => {
-        if (!window.confirm('Are you sure you want to delete this user? This will revoke their access to the LMS.')) return;
+        if (!window.confirm(t('confirm.deleteUser'))) return;
         try {
             const res = await fetch(`${API_BASE_URL}/api/users/${id}`, { method: 'DELETE' });
             if (res.ok) {
                 setUsers(users.filter(u => u.id !== id));
-                setNotification({ show: true, type: 'success', message: 'User deleted successfully!' });
+                setNotification({ show: true, type: 'success', message: t('notifications.userDeleted') });
             } else {
-                setNotification({ show: true, type: 'error', message: 'Failed to delete user' });
+                setNotification({ show: true, type: 'error', message: t('notifications.deleteFailed') });
             }
         } catch (error) {
             console.error(error);
-            setNotification({ show: true, type: 'error', message: 'Error deleting user' });
+            setNotification({ show: true, type: 'error', message: t('notifications.deleteError') });
         }
     };
 
     const handleSyncNusawork = async () => {
-        if (!window.confirm('Sync all users with Nusawork? This will update local profile details (position, branch, department, avatar, role etc.) based on active Nusawork data.')) return;
+        if (!window.confirm(t('confirm.syncNusawork'))) return;
         setIsSyncing(true);
         try {
             const res = await fetch(`${API_BASE_URL}/api/admin/sync-all-nusawork`, {
@@ -139,7 +141,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                 setNotification({
                     show: true,
                     type: 'success',
-                    message: data.message || 'Synchronization completed successfully!'
+                    message: data.message || t('notifications.syncSuccess')
                 });
                 
                 // Reload users and employees to show updated data
@@ -161,7 +163,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                 setNotification({
                     show: true,
                     type: 'error',
-                    message: data.message || 'Synchronization failed.'
+                    message: data.message || t('notifications.syncFailed')
                 });
             }
         } catch (err) {
@@ -169,7 +171,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
             setNotification({
                 show: true,
                 type: 'error',
-                message: 'Error connecting to the synchronization service.'
+                message: t('notifications.syncError')
             });
         } finally {
             setIsSyncing(false);
@@ -177,7 +179,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
     };
 
     if (userRole !== 'HR' && userRole !== 'HR_ADMIN') {
-        return <div className="p-8 text-center text-red-500">Access Denied. HR Only.</div>;
+        return <div className="p-8 text-center text-red-500">{t('accessDenied')}</div>;
     }
 
     const filteredEmployees = employees.filter(emp =>
@@ -186,7 +188,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
         emp.id_employee.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    if (isLoading) return <div className="p-8 text-center">Loading...</div>;
+    if (isLoading) return <div className="p-8 text-center">{t('loading')}</div>;
 
     return (
         <div className="max-w-6xl mx-auto py-6">
@@ -197,20 +199,20 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                 onClose={() => setNotification({ ...notification, show: false })}
             />
             <button onClick={onBack} className="text-sm text-slate-500 hover:text-blue-600 flex items-center gap-1 mb-4 transition-colors">
-                <ArrowLeft size={14} /> Back to Dashboard
+                <ArrowLeft size={14} /> {t('backToDashboard')}
             </button>
 
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Users className="text-purple-600" /> User Management
+                        <Users className="text-purple-600" /> {t('title')}
                     </h1>
-                    <p className="text-sm text-slate-500 mt-1">Manage staff access and roles ({employees.length} Employees total).</p>
+                    <p className="text-sm text-slate-500 mt-1">{t('subtitle', { count: employees.length })}</p>
                 </div>
                 <div className="flex w-full md:w-auto gap-3">
                     <input
                         type="text"
-                        placeholder="Search employee..."
+                        placeholder={t('searchPlaceholder')}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="flex-1 md:w-64 px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-purple-500 bg-white"
@@ -221,7 +223,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                         className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg shadow-emerald-900/20 flex items-center gap-2 whitespace-nowrap transition-all"
                     >
                         <RefreshCw size={18} className={isSyncing ? "animate-spin" : ""} />
-                        {isSyncing ? 'Syncing...' : 'Sync Nusawork'}
+                        {isSyncing ? t('syncing') : t('syncNusawork')}
                     </button>
                     <button
                         onClick={() => {
@@ -231,7 +233,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                         }}
                         className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg shadow-purple-900/20 flex items-center gap-2 whitespace-nowrap"
                     >
-                        <UserPlus size={18} /> Add User
+                        <UserPlus size={18} /> {t('addUser')}
                     </button>
                 </div>
             </div>
@@ -239,11 +241,11 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
             {/* Existing Users List */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-8">
                 <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-600 flex items-center text-sm">
-                    <div className="w-12 text-center">ID</div>
-                    <div className="flex-1 pl-2">Employee Name / Email</div>
-                    <div className="w-48">Position / Branch / Report To</div>
-                    <div className="w-32 text-center">LMS Status</div>
-                    <div className="w-16 text-center">Action</div>
+                    <div className="w-12 text-center">{t('table.id')}</div>
+                    <div className="flex-1 pl-2">{t('table.employeeNameEmail')}</div>
+                    <div className="w-48">{t('table.positionBranchReportTo')}</div>
+                    <div className="w-32 text-center">{t('table.lmsStatus')}</div>
+                    <div className="w-16 text-center">{t('table.action')}</div>
                 </div>
                 <div className="divide-y divide-slate-50 max-h-[600px] overflow-y-auto">
                     {filteredEmployees.map((emp) => {
@@ -263,25 +265,25 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                         </div>
                                         <div className="flex items-center gap-2 text-slate-400 text-xs">
                                             <MapPin size={12} />
-                                            <span className="truncate">{emp.branch_name || 'No Branch'}</span>
+                                            <span className="truncate">{emp.branch_name || t('employee.noBranch')}</span>
                                         </div>
                                         <div className="flex items-center gap-2 text-slate-400 text-[11px] font-medium">
                                             <Users size={12} className="text-slate-400" />
-                                            <span className="truncate text-slate-500">Report to: {emp.id_report_to || 'None'}</span>
+                                            <span className="truncate text-slate-500">{t('employee.reportTo', { id: emp.id_report_to || t('employee.reportToNone') })}</span>
                                         </div>
                                     </div>
                                 </div>
                                 <div className="w-32 text-center">
                                     {linkedUser ? (
                                         <div className="flex flex-col gap-1 items-center">
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg 
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg
                                                 ${(linkedUser.role === 'HR' || linkedUser.role === 'HR_ADMIN') ? 'bg-orange-100 text-orange-700' :
                                                     linkedUser.role === 'SUPERVISOR' ? 'bg-blue-100 text-blue-700' :
                                                         'bg-green-100 text-green-700'}`}>
-                                                {linkedUser.role}
+                                                {t(`roles.${linkedUser.role}`)}
                                             </span>
                                             <span className={`text-[10px] font-medium ${emp.active_status && emp.active_status.toLowerCase() !== 'active' ? 'text-rose-600' : 'text-green-600'}`}>
-                                                {emp.active_status && emp.active_status.toLowerCase() !== 'active' ? 'Inactive Account' : 'Active Account'}
+                                                {emp.active_status && emp.active_status.toLowerCase() !== 'active' ? t('employee.inactiveAccount') : t('employee.activeAccount')}
                                             </span>
                                             {emp.active_status && (
                                                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg ${emp.active_status.toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
@@ -291,7 +293,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                         </div>
                                     ) : (
                                         <div className="flex flex-col gap-1 items-center">
-                                            <span className="text-xs text-slate-300 italic">No Access</span>
+                                            <span className="text-xs text-slate-300 italic">{t('employee.noAccess')}</span>
                                             {emp.active_status && (
                                                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg ${emp.active_status.toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
                                                     {emp.active_status}
@@ -306,14 +308,14 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                             <button
                                                 onClick={() => handleEdit(linkedUser)}
                                                 className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                title="Edit LMS Access"
+                                                title={t('actions.editAccess')}
                                             >
                                                 <Edit size={18} />
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(String(linkedUser.id))}
                                                 className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                title="Revoke LMS Access"
+                                                title={t('actions.revokeAccess')}
                                             >
                                                 <Trash2 size={18} />
                                             </button>
@@ -332,7 +334,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                                 setIsFormOpen(true);
                                             }}
                                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                            title="Create LMS Account"
+                                            title={t('actions.createAccount')}
                                         >
                                             <UserPlus size={18} />
                                         </button>
@@ -342,7 +344,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                         );
                     })}
                     {filteredEmployees.length === 0 && (
-                        <div className="p-8 text-center text-slate-500 italic">No employees found.</div>
+                        <div className="p-8 text-center text-slate-500 italic">{t('employee.noEmployeesFound')}</div>
                     )}
                 </div>
             </div>
@@ -352,12 +354,12 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                            <h2 className="font-bold text-lg text-slate-800">{editingUser ? 'Edit User' : 'Create New User'}</h2>
-                            <button onClick={() => { setIsFormOpen(false); setEditingUser(null); }} className="text-slate-400 hover:text-slate-600">Close</button>
+                            <h2 className="font-bold text-lg text-slate-800">{editingUser ? t('modal.editUser') : t('modal.createUser')}</h2>
+                            <button onClick={() => { setIsFormOpen(false); setEditingUser(null); }} className="text-slate-400 hover:text-slate-600">{t('modal.close')}</button>
                         </div>
                         <form onSubmit={handleSubmit} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Full Name</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('modal.fullName')}</label>
                                 <input
                                     required
                                     value={formData.name}
@@ -366,7 +368,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Email</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('modal.email')}</label>
                                 <div className="relative">
                                     <Mail size={16} className="absolute left-3 top-3 text-slate-400" />
                                     <input
@@ -379,14 +381,14 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Password</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('modal.password')}</label>
                                 <div className="relative">
                                     <Lock size={16} className="absolute left-3 top-3 text-slate-400" />
                                     <input
                                         // Password required only on creation
                                         required={!editingUser}
                                         type="password"
-                                        placeholder={editingUser ? "(Leave blank to keep current)" : ""}
+                                        placeholder={editingUser ? t('modal.passwordKeepCurrent') : ""}
                                         value={formData.password}
                                         onChange={e => setFormData({ ...formData, password: e.target.value })}
                                         className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-purple-500"
@@ -394,7 +396,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Role</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('modal.role')}</label>
                                 <div className="relative">
                                     <Shield size={16} className="absolute left-3 top-3 text-slate-400" />
                                     <select
@@ -402,14 +404,14 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                         onChange={e => setFormData({ ...formData, role: e.target.value as Role })}
                                         className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-purple-500 bg-white"
                                     >
-                                        <option value="STAFF">Staff</option>
-                                        <option value="SUPERVISOR">Supervisor</option>
-                                        <option value="HR">HR Admin</option>
+                                        <option value="STAFF">{t('modal.roleStaff')}</option>
+                                        <option value="SUPERVISOR">{t('modal.roleSupervisor')}</option>
+                                        <option value="HR">{t('modal.roleHrAdmin')}</option>
                                     </select>
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">SimAsset Employee Link (Optional)</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('modal.employeeLink')}</label>
                                 <div className="relative">
                                     <Briefcase size={16} className="absolute left-3 top-3 text-slate-400" />
                                     <select
@@ -427,7 +429,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                         }}
                                         className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-purple-500 bg-white"
                                     >
-                                        <option value="">-- No Link --</option>
+                                        <option value="">{t('modal.noLink')}</option>
                                         {employees.map(emp => (
                                             <option key={emp.id} value={emp.id_employee}>
                                                 {emp.full_name} ({emp.job_position})
@@ -437,7 +439,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                 </div>
                             </div>
                             <button className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-lg shadow-purple-900/20 mt-4">
-                                {editingUser ? 'Update User' : 'Create Account'}
+                                {editingUser ? t('modal.updateUser') : t('modal.createAccount')}
                             </button>
                         </form>
                     </div>

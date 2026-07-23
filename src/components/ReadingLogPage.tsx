@@ -1,5 +1,6 @@
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { BookOpen, ArrowLeft, Search, Book, Trophy, Trash2, XCircle, CheckCircle, Clock, ChevronLeft, ChevronRight, Star, Wallet } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry, User } from '../types';
 import PopupNotification from './PopupNotification';
@@ -44,6 +45,7 @@ const SearchableDropdown = ({
     options: string[];
     placeholder: string;
 }) => {
+    const { t } = useTranslation('readingLogPage');
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
     const [dropdownId] = useState(() => Math.random().toString(36).substring(2, 9));
@@ -87,7 +89,7 @@ const SearchableDropdown = ({
                         <Search size={14} className="text-slate-400 mr-2 shrink-0 ml-1" />
                         <input
                             type="text"
-                            placeholder="Cari kategori..."
+                            placeholder={t('dropdown.searchPlaceholder')}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="w-full bg-transparent border-none text-xs outline-none focus:ring-0 text-slate-700 p-1 font-semibold"
@@ -102,7 +104,7 @@ const SearchableDropdown = ({
                     <div className="overflow-y-auto max-h-48 py-1">
                         {filteredOptions.length === 0 ? (
                             <div className="px-4 py-2.5 text-xs text-slate-400 italic text-center">
-                                Tidak ada kategori cocok
+                                {t('dropdown.noMatch')}
                             </div>
                         ) : (
                             filteredOptions.map((opt, idx) => (
@@ -131,6 +133,7 @@ const SearchableDropdown = ({
 };
 
 const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
+    const { t } = useTranslation('readingLogPage');
     const [readingLogs, setReadingLogs] = useState<ReadingLogEntry[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -184,12 +187,12 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         title: string,
         message: string,
         onConfirm: (val?: string) => void = () => { },
-        confirmText = 'Yes, Delete',
+        confirmText = t('confirm.yesDelete'),
         variant: 'danger' | 'warning' | 'info' | 'success' = 'danger',
-        cancelText = 'Cancel',
+        cancelText = t('confirm.cancel'),
         hideConfirm = false,
         showInput = false,
-        inputPlaceholder = 'Enter note...'
+        inputPlaceholder = t('confirm.enterNotePlaceholder')
     ) => {
         setConfirmConfig({ isOpen: true, title, message, onConfirm, confirmText, variant, cancelText, hideConfirm, showInput, inputPlaceholder });
     };
@@ -236,8 +239,8 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
     const handleDelete = (id: number | string) => {
         setCancelNote('');
         openConfirm(
-            'Cancel Reading Log',
-            'Are you sure you want to cancel this reading log? Please provide a reason.',
+            t('confirm.cancelLogTitle'),
+            t('confirm.cancelLogMessage'),
             async (reason) => {
                 try {
                     const finalReason = reason || 'Cancelled by user';
@@ -267,22 +270,22 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 cancelledBy: user.name
                             });
                         }
-                        setNotification({ show: true, type: 'success', message: "Log cancelled successfully." });
+                        setNotification({ show: true, type: 'success', message: t('notifications.logCancelled') });
                         setTimeout(() => {
                             window.location.reload();
                         }, 1000);
                     }
                 } catch (err) {
                     console.error("Failed to cancel log", err);
-                    setNotification({ show: true, type: 'error', message: "Failed to cancel log." });
+                    setNotification({ show: true, type: 'error', message: t('notifications.cancelLogFailed') });
                 }
             },
-            'Yes, Cancel',
+            t('confirm.yesCancel'),
             'warning',
-            'Back',
+            t('confirm.back'),
             false,
             true,
-            'Enter cancellation reason...'
+            t('confirm.cancelReasonPlaceholder')
         );
     };
 
@@ -300,13 +303,13 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                 if (viewLog && viewLog.id === id) {
                     setViewLog(updatedLog);
                 }
-                setNotification({ show: true, type: 'success', message: 'Incentive claim sent to HR successfully!' });
+                setNotification({ show: true, type: 'success', message: t('notifications.claimSentToHr') });
             } else {
-                setNotification({ show: true, type: 'error', message: 'Failed to send claim.' });
+                setNotification({ show: true, type: 'error', message: t('notifications.sendClaimFailed') });
             }
         } catch (err) {
             console.error(err);
-            setNotification({ show: true, type: 'error', message: 'Failed to connect to server.' });
+            setNotification({ show: true, type: 'error', message: t('notifications.connectServerFailed') });
         } finally {
             setIsLoading(false);
         }
@@ -454,19 +457,19 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                     });
                 } catch (uploadErr) {
                     console.error("Upload failed:", uploadErr);
-                    setNotification({ show: true, type: 'error', message: "Data saved, but photo failed to upload." });
+                    setNotification({ show: true, type: 'error', message: t('notifications.savedButPhotoFailed') });
                 }
             }
 
             setReadingLogs([newLog, ...readingLogs]);
             setPrivateReportForm({ title: '', category: '', startDate: '', finishDate: today, link: '', evidenceUrl: '' });
-            setNotification({ show: true, type: 'success', message: "Private reading log saved successfully!" });
+            setNotification({ show: true, type: 'success', message: t('notifications.privateLogSaved') });
             setTimeout(() => {
                 window.location.reload();
             }, 1500);
         } catch (err) {
             console.error(err);
-            setNotification({ show: true, type: 'error', message: "Error connecting to server." });
+            setNotification({ show: true, type: 'error', message: t('notifications.errorConnectingServer') });
         } finally {
             setIsLoading(false);
         }
@@ -477,7 +480,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         const { title, category, startDate, finishDate, link } = privateReportForm;
 
         if (!title || !category || !startDate || !finishDate || !link || !privateFile) {
-            setNotification({ show: true, type: 'error', message: 'Please complete all required fields: Title, Category, Start/Finish Date, Review Link, and Evidence Photo.' });
+            setNotification({ show: true, type: 'error', message: t('notifications.requiredFieldsPrivate') });
             return;
         }
 
@@ -487,12 +490,12 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
         if (diffDays <= 1) {
             openConfirm(
-                'Reading Time Confirmation',
-                'The duration between start and finish is very short (0-1 days).',
+                t('confirm.readingTimeTitle'),
+                t('confirm.readingTimeMessage'),
                 () => { },
                 '',
                 'warning',
-                'OK',
+                t('confirm.ok'),
                 true
             );
             return;
@@ -565,16 +568,16 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                     });
                 } catch (uploadErr) {
                     console.error("Upload failed:", uploadErr);
-                    setNotification({ show: true, type: 'error', message: "Claim saved, but photo failed to upload." });
+                    setNotification({ show: true, type: 'error', message: t('notifications.claimSavedButPhotoFailed') });
                 }
             }
-            setNotification({ show: true, type: 'success', message: "Claim saved successfully!" });
+            setNotification({ show: true, type: 'success', message: t('notifications.claimSaved') });
             setTimeout(() => {
                 window.location.reload();
             }, 1500);
         } catch (err) {
             console.error(err);
-            setNotification({ show: true, type: 'error', message: "Error connecting to server." });
+            setNotification({ show: true, type: 'error', message: t('notifications.errorConnectingServer') });
         } finally {
             setIsLoading(false);
         }
@@ -584,7 +587,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         e.preventDefault();
 
         if (!claimFile || !claimForm.startDate || !claimForm.finishDate || !claimForm.link || (!selectedLog && !claimForm.category)) {
-            setNotification({ show: true, type: 'error', message: 'Please complete all required fields.' });
+            setNotification({ show: true, type: 'error', message: t('notifications.requiredFieldsClaim') });
             return;
         }
 
@@ -594,12 +597,12 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
         if (diffDays <= 1) {
             openConfirm(
-                'Reading Time Confirmation',
-                'The duration between start and finish is very short (0-1 days).',
+                t('confirm.readingTimeTitle'),
+                t('confirm.readingTimeMessage'),
                 () => { },
                 '',
                 'warning',
-                'OK',
+                t('confirm.ok'),
                 true
             );
             return;
@@ -614,10 +617,10 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
             <div className="flex items-center justify-between">
                 <button onClick={onBack} className="text-sm text-slate-500 hover:text-blue-600 flex items-center gap-1 transition-colors">
-                    <ArrowLeft size={14} /> Back to Dashboard
+                    <ArrowLeft size={14} /> {t('header.backToDashboard')}
                 </button>
                 <div className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                    <BookOpen className="text-blue-600" /> Reading Log
+                    <BookOpen className="text-blue-600" /> {t('header.title')}
                 </div>
             </div>
 
@@ -668,10 +671,10 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                         <div className="relative z-10 flex flex-col md:flex-row justify-between gap-8">
                             <div className="space-y-2">
                                 <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10">
-                                    <Star size={12} className="text-yellow-400 fill-yellow-400" /> Member Milestone {filterYear}
+                                    <Star size={12} className="text-yellow-400 fill-yellow-400" /> {t('stats.memberMilestone', { year: filterYear })}
                                 </div>
-                                <h2 className="text-3xl font-black tracking-tight leading-none">Your Reading Journey</h2>
-                                <p className="text-blue-100/80 font-medium">Keep reading to unlock more rewards and knowledge.</p>
+                                <h2 className="text-3xl font-black tracking-tight leading-none">{t('stats.journeyTitle')}</h2>
+                                <p className="text-blue-100/80 font-medium">{t('stats.journeySubtitle')}</p>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-1 max-w-4xl">
@@ -681,11 +684,11 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                         <div className="p-2 bg-blue-500 rounded-lg shadow-lg shadow-blue-500/20">
                                             <BookOpen size={18} />
                                         </div>
-                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Total Read</span>
+                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">{t('stats.totalRead')}</span>
                                     </div>
                                     <div className="flex items-baseline gap-1">
                                         <span className="text-3xl font-black tracking-tighter">{totalRead}</span>
-                                        <span className="text-sm font-bold opacity-60">Books</span>
+                                        <span className="text-sm font-bold opacity-60">{t('stats.books')}</span>
                                     </div>
                                 </div>
 
@@ -695,12 +698,12 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                         <div className={`p-2 rounded-lg shadow-lg ${totalApproved >= 5 ? 'bg-green-500 shadow-green-500/20' : 'bg-orange-500 shadow-orange-500/20'}`}>
                                             <Trophy size={18} />
                                         </div>
-                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Incentive Limit</span>
+                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">{t('stats.incentiveLimit')}</span>
                                     </div>
                                     <div className="space-y-2">
                                         <div className="flex justify-between items-end">
                                             <span className="text-2xl font-black tracking-tighter">{totalApproved}/5</span>
-                                            <span className="text-[10px] font-bold opacity-60">Approved</span>
+                                            <span className="text-[10px] font-bold opacity-60">{t('stats.approved')}</span>
                                         </div>
                                         <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
                                             <div className={`h-full transition-all duration-1000 ${totalApproved >= 5 ? 'bg-green-400' : 'bg-orange-400'}`} style={{ width: `${progress}%` }}></div>
@@ -714,13 +717,13 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                         <div className="p-2 bg-emerald-500 rounded-lg shadow-lg shadow-emerald-500/20">
                                             <Wallet size={18} />
                                         </div>
-                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Total Insentive</span>
+                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">{t('stats.totalIncentive')}</span>
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-lg font-black tracking-tighter text-emerald-300 whitespace-nowrap" title={formatCurrency(totalEarned)}>
                                             {formatCurrency(totalEarned)}
                                         </span>
-                                        <span className="text-[10px] font-bold opacity-60">Claimed Incentives</span>
+                                        <span className="text-[10px] font-bold opacity-60">{t('stats.claimedIncentives')}</span>
                                     </div>
                                 </div>
 
@@ -730,11 +733,11 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                         <div className="p-2 bg-purple-500 rounded-lg shadow-lg shadow-purple-500/20">
                                             <Clock size={18} />
                                         </div>
-                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">Reading Hours</span>
+                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">{t('stats.readingHours')}</span>
                                     </div>
                                     <div className="flex items-baseline gap-1">
                                         <span className="text-3xl font-black tracking-tighter">{totalLearningHours}</span>
-                                        <span className="text-sm font-bold opacity-60">Hours</span>
+                                        <span className="text-sm font-bold opacity-60">{t('stats.hours')}</span>
                                     </div>
                                 </div>
                             </div>
@@ -749,12 +752,12 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                     <button onClick={() => setPrivateModalOpen(true)} className="flex-1 flex flex-col items-center justify-center gap-3 p-6 bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-3xl shadow-xl shadow-purple-600/20 hover:shadow-purple-600/40 hover:-translate-y-1 transition-all group border border-white/10 relative overflow-hidden">
                         <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         <Book size={32} className="group-hover:scale-110 transition-transform" />
-                        <span className="font-bold text-lg tracking-wide">E-Book / Personal Book</span>
+                        <span className="font-bold text-lg tracking-wide">{t('actions.ebook')}</span>
                     </button>
                     <a href="https://simas.nusa.id/book/pinjam/" target="_blank" rel="noreferrer" className="flex-1 flex flex-col items-center justify-center gap-3 p-6 bg-gradient-to-br from-blue-600 to-cyan-600 text-white rounded-3xl shadow-xl shadow-blue-600/20 hover:shadow-blue-600/40 hover:-translate-y-1 transition-all group border border-white/10 relative overflow-hidden text-center cursor-pointer">
                         <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         <BookOpen size={32} className="group-hover:scale-110 transition-transform" />
-                        <span className="font-bold text-lg tracking-wide">Office Book / SIMAS</span>
+                        <span className="font-bold text-lg tracking-wide">{t('actions.officeBook')}</span>
                     </a>
                 </div>
 
@@ -764,23 +767,23 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                         <div className="p-4 border-b border-slate-100 flex gap-3">
                             <div className="relative flex-1">
                                 <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                                <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search logs..." className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                                <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={t('list.searchPlaceholder')} className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
                             </div>
                             <div className="flex items-center gap-2">
                                 <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 outline-none cursor-pointer">
-                                    <option value="all">All Status</option>
-                                    <option value="Reading">Reading</option>
-                                    <option value="Finished">Read</option>
-                                    <option value="Approved">Approved</option>
-                                    <option value="Pending">Under Review</option>
-                                    <option value="Rejected">Rejected</option>
-                                    <option value="Cancelled">Cancel</option>
+                                    <option value="all">{t('list.statusAll')}</option>
+                                    <option value="Reading">{t('list.statusReading')}</option>
+                                    <option value="Finished">{t('list.statusRead')}</option>
+                                    <option value="Approved">{t('list.statusApproved')}</option>
+                                    <option value="Pending">{t('list.statusPending')}</option>
+                                    <option value="Rejected">{t('list.statusRejected')}</option>
+                                    <option value="Cancelled">{t('list.statusCancelled')}</option>
                                 </select>
                             </div>
                         </div>
                         <div className="divide-y divide-slate-50">
                             {paginatedLogs.length === 0 ? (
-                                <div className="p-12 text-center text-slate-400"><BookOpen size={48} className="mx-auto mb-3 opacity-20" /><p>No logs found.</p></div>
+                                <div className="p-12 text-center text-slate-400"><BookOpen size={48} className="mx-auto mb-3 opacity-20" /><p>{t('list.noLogsFound')}</p></div>
                             ) : (
                                 paginatedLogs.map((log) => {
                                     const isMyLog = (!!log.employee_id && !!user.employee_id && log.employee_id === user.employee_id) || (!log.employee_id && log.userName === user.name);
@@ -797,9 +800,9 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                         {log.status === 'Finished' ? (
                                                             <div className="flex flex-col gap-1">
                                                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-500 font-medium">
-                                                                    <span>Start: {new Date(log.startDate || log.date).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                                                    <span>{t('list.start', { date: new Date(log.startDate || log.date).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) })}</span>
                                                                     <span className="hidden xs:inline">•</span>
-                                                                    <span>Finish: {log.finishDate ? new Date(log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</span>
+                                                                    <span>{t('list.finish', { date: log.finishDate ? new Date(log.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-' })}</span>
                                                                     {log.startDate && log.finishDate && (
                                                                         <span className="text-[8px] whitespace-nowrap font-black bg-indigo-600 text-white px-1.5 py-0.5 rounded shadow-sm inline-flex items-center gap-1 w-fit mt-0.5">
                                                                             <Clock size={8} />
@@ -817,13 +820,13 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                                     )}
                                                                 </div>
                                                                 <div className={`mt-1 font-bold uppercase tracking-wider ${log.hrApprovalStatus === 'Approved' ? 'text-blue-600 font-black' : (log.hrApprovalStatus === 'Pending' ? 'text-yellow-600' : 'text-slate-400')}`}>
-                                                                    {log.hrApprovalStatus === 'Approved' ? `Approved ${log.approvedBy ? `by ${log.approvedBy}` : ''}` : (log.hrApprovalStatus === 'Pending' ? 'Under Review' : 'Draft')}
+                                                                    {log.hrApprovalStatus === 'Approved' ? (log.approvedBy ? t('list.approvedBy', { name: log.approvedBy }) : t('list.approvedPlain')) : (log.hrApprovalStatus === 'Pending' ? t('list.underReview') : t('list.draft'))}
                                                                 </div>
                                                             </div>
                                                         ) : log.status === 'Cancelled' ? (
-                                                            <span className="font-bold text-red-500 uppercase">Log Cancelled</span>
+                                                            <span className="font-bold text-red-500 uppercase">{t('list.logCancelled')}</span>
                                                         ) : (
-                                                            <span className="font-bold text-orange-600 uppercase">Reading (Started: {new Date(log.date).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })})</span>
+                                                            <span className="font-bold text-orange-600 uppercase">{t('list.readingStarted', { date: new Date(log.date).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) })}</span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -832,14 +835,14 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                 {isMyLog && log.hrApprovalStatus === 'Draft' && log.status !== 'Cancelled' && (
                                                     <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                                                         {log.status === 'Reading' ? (
-                                                            <button onClick={(e) => { e.stopPropagation(); openClaimModal(log); }} className="px-4 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-sm flex-1 sm:flex-none text-center">Finish</button>
+                                                            <button onClick={(e) => { e.stopPropagation(); openClaimModal(log); }} className="px-4 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-sm flex-1 sm:flex-none text-center">{t('list.finishButton')}</button>
                                                         ) : (
                                                             (() => {
                                                                 const cat = (log.category || '').trim().toLowerCase();
                                                                 const isNoIncentive = cat === 'buku fiksi/novel' || cat === 'majalah' || cat === 'fiction';
                                                                 const totalApproved = readingLogs.filter(l => l.hrApprovalStatus === 'Approved' && new Date(l.finishDate || l.date).getFullYear() === filterYear).length;
                                                                 if (!isNoIncentive && totalApproved < 5) {
-                                                                    return <button onClick={(e) => { e.stopPropagation(); handleClaimIncentive(log.id); }} className="px-4 py-1.5 text-[11px] font-bold bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all shadow-sm flex-1 sm:flex-none text-center">Claim Incentive</button>;
+                                                                    return <button onClick={(e) => { e.stopPropagation(); handleClaimIncentive(log.id); }} className="px-4 py-1.5 text-[11px] font-bold bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all shadow-sm flex-1 sm:flex-none text-center">{t('list.claimIncentiveButton')}</button>;
                                                                 }
                                                                 return null;
                                                             })()
@@ -849,13 +852,13 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                             className="group flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-slate-500 rounded-xl px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm transition-all active:scale-95 text-slate-500 text-[11px] font-bold flex-1 sm:flex-none"
                                                         >
                                                             <Trash2 size={14} className="text-slate-400 group-hover:text-red-500 transition-colors" />
-                                                            Cancel
+                                                            {t('list.cancelButton')}
                                                         </button>
                                                     </div>
                                                 )}
                                                 {log.hrApprovalStatus && log.hrApprovalStatus !== 'Draft' && (
                                                     <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md ${log.hrApprovalStatus === 'Approved' ? 'bg-blue-100 text-blue-700' : (log.hrApprovalStatus === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700')}`}>
-                                                        {log.hrApprovalStatus === 'Pending' ? 'Review' : log.hrApprovalStatus}
+                                                        {log.hrApprovalStatus === 'Pending' ? t('list.reviewBadge') : log.hrApprovalStatus}
                                                     </span>
                                                 )}
                                             </div>
@@ -869,7 +872,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                         {totalPages > 1 && (
                             <div className="p-4 border-t border-slate-50 flex items-center justify-between bg-slate-50/30">
                                 <p className="text-xs text-slate-500 font-medium">
-                                    Showing <span className="text-slate-800 font-bold">{Math.min(filteredLogs.length, (currentPage - 1) * ITEMS_PER_PAGE + 1)}</span> to <span className="text-slate-800 font-bold">{Math.min(filteredLogs.length, currentPage * ITEMS_PER_PAGE)}</span> of <span className="text-slate-800 font-bold">{filteredLogs.length}</span> logs
+                                    {t('list.paginationShowing')} <span className="text-slate-800 font-bold">{Math.min(filteredLogs.length, (currentPage - 1) * ITEMS_PER_PAGE + 1)}</span> {t('list.paginationTo')} <span className="text-slate-800 font-bold">{Math.min(filteredLogs.length, currentPage * ITEMS_PER_PAGE)}</span> {t('list.paginationOf')} <span className="text-slate-800 font-bold">{filteredLogs.length}</span> {t('list.paginationLogs')}
                                 </p>
                                 <div className="flex gap-2">
                                     <button
@@ -918,51 +921,51 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
                             <div>
-                                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Book size={20} className="text-purple-600" /> Report Private Reading</h3>
-                                <p className="text-sm text-slate-500">Report personal books you finished reading</p>
+                                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Book size={20} className="text-purple-600" /> {t('privateModal.title')}</h3>
+                                <p className="text-sm text-slate-500">{t('privateModal.subtitle')}</p>
                             </div>
                             <button onClick={() => setPrivateModalOpen(false)} className="text-slate-400 hover:text-slate-600"><XCircle size={24} /></button>
                         </div>
                         <form onSubmit={handlePrivateReportSubmit} className="p-6 space-y-4 overflow-y-auto">
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Book Title <span className="text-red-500">*</span></label>
-                                <input required value={privateReportForm.title} onChange={e => setPrivateReportForm({ ...privateReportForm, title: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none" placeholder="Enter book title..." />
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('privateModal.bookTitleLabel')} <span className="text-red-500">*</span></label>
+                                <input required value={privateReportForm.title} onChange={e => setPrivateReportForm({ ...privateReportForm, title: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none" placeholder={t('privateModal.bookTitlePlaceholder')} />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Category</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('privateModal.categoryLabel')}</label>
                                 <SearchableDropdown
                                     value={privateReportForm.category}
                                     onChange={(val) => setPrivateReportForm({ ...privateReportForm, category: val })}
                                     options={categories}
-                                    placeholder="Select Category..."
+                                    placeholder={t('privateModal.categoryPlaceholder')}
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
-                                <div><label className="block text-sm font-semibold text-slate-700 mb-1">Start Date <span className="text-red-500">*</span></label><input type="date" max={today} required value={privateReportForm.startDate} onChange={e => setPrivateReportForm({ ...privateReportForm, startDate: e.target.value })} onClick={(e) => e.currentTarget.showPicker()} className="w-full px-4 py-2 border border-slate-200 rounded-xl" /></div>
-                                <div><label className="block text-sm font-semibold text-slate-700 mb-1">Finish Date <span className="text-red-500">*</span></label><input type="date" required readOnly value={privateReportForm.finishDate} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-500 cursor-not-allowed" /></div>
+                                <div><label className="block text-sm font-semibold text-slate-700 mb-1">{t('privateModal.startDateLabel')} <span className="text-red-500">*</span></label><input type="date" max={today} required value={privateReportForm.startDate} onChange={e => setPrivateReportForm({ ...privateReportForm, startDate: e.target.value })} onClick={(e) => e.currentTarget.showPicker()} className="w-full px-4 py-2 border border-slate-200 rounded-xl" /></div>
+                                <div><label className="block text-sm font-semibold text-slate-700 mb-1">{t('privateModal.finishDateLabel')} <span className="text-red-500">*</span></label><input type="date" required readOnly value={privateReportForm.finishDate} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-500 cursor-not-allowed" /></div>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Review Link <span className="text-red-500">*</span></label>
-                                <input required type="url" value={privateReportForm.link} onChange={e => setPrivateReportForm({ ...privateReportForm, link: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none" placeholder="Goodreads / GDrive link..." />
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('privateModal.reviewLinkLabel')} <span className="text-red-500">*</span></label>
+                                <input required type="url" value={privateReportForm.link} onChange={e => setPrivateReportForm({ ...privateReportForm, link: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none" placeholder={t('privateModal.reviewLinkPlaceholder')} />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Cover Photo Evidence <span className="text-red-500">*</span></label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('privateModal.evidenceLabel')} <span className="text-red-500">*</span></label>
                                 <div className="space-y-3">
                                     <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50 relative">
                                         <input type="file" onChange={(e) => handleFileChange(e, 'privateReport')} className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" />
-                                        {privateFile ? (<div className="flex items-center justify-center gap-2 text-green-600 font-bold"><CheckCircle size={18} /> Photo Selected</div>) : (<span className="text-slate-500 text-sm">Click to select photo</span>)}
+                                        {privateFile ? (<div className="flex items-center justify-center gap-2 text-green-600 font-bold"><CheckCircle size={18} /> {t('privateModal.photoSelected')}</div>) : (<span className="text-slate-500 text-sm">{t('privateModal.clickToSelectPhoto')}</span>)}
                                     </div>
                                     {privatePreview && (
                                         <div className="relative h-40 rounded-xl overflow-hidden border">
-                                            <img src={privatePreview} alt="Preview" className="w-full h-full object-cover" />
+                                            <img src={privatePreview} alt={t('detailModal.previewAlt')} className="w-full h-full object-cover" />
                                             <button type="button" onClick={() => { setPrivateFile(null); setPrivatePreview(''); }} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full"><XCircle size={14} /></button>
                                         </div>
                                     )}
                                 </div>
                             </div>
                             <div className="pt-4 flex gap-3">
-                                <button type="button" onClick={() => setPrivateModalOpen(false)} className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl outline-none">Cancel</button>
-                                <button type="submit" disabled={isLoading} className="flex-1 px-4 py-3 bg-purple-600 text-white font-bold rounded-xl shadow-lg">{isLoading ? 'Saving...' : 'Save Report'}</button>
+                                <button type="button" onClick={() => setPrivateModalOpen(false)} className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl outline-none">{t('privateModal.cancelButton')}</button>
+                                <button type="submit" disabled={isLoading} className="flex-1 px-4 py-3 bg-purple-600 text-white font-bold rounded-xl shadow-lg">{isLoading ? t('privateModal.saving') : t('privateModal.saveReport')}</button>
                             </div>
                         </form>
                     </div>
@@ -974,50 +977,50 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
-                            <div><h3 className="text-xl font-bold text-slate-800">{selectedLog ? `Finish: ${selectedLog.title}` : 'Claim Reading'}</h3><p className="text-sm text-slate-500">Submit details for verification</p></div>
+                            <div><h3 className="text-xl font-bold text-slate-800">{selectedLog ? t('claimModal.finishTitle', { title: selectedLog.title }) : t('claimModal.claimTitle')}</h3><p className="text-sm text-slate-500">{t('claimModal.subtitle')}</p></div>
                             <button onClick={() => setClaimModalOpen(false)} className="text-slate-400 hover:text-slate-600"><XCircle size={24} /></button>
                         </div>
                         <form onSubmit={handleClaimSubmit} className="p-6 space-y-4 overflow-y-auto">
                             {!selectedLog && (
                                 <>
-                                    <div><label className="block text-sm font-semibold text-slate-700 mb-1">Book Title <span className="text-red-500">*</span></label><input required value={claimForm.title} onChange={e => setClaimForm({ ...claimForm, title: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none" placeholder="Title..." /></div>
+                                    <div><label className="block text-sm font-semibold text-slate-700 mb-1">{t('claimModal.bookTitleLabel')} <span className="text-red-500">*</span></label><input required value={claimForm.title} onChange={e => setClaimForm({ ...claimForm, title: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none" placeholder={t('claimModal.bookTitlePlaceholder')} /></div>
                                     <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-1">Category</label>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('claimModal.categoryLabel')}</label>
                                         <SearchableDropdown
                                             value={claimForm.category}
                                             onChange={(val) => setClaimForm({ ...claimForm, category: val })}
                                             options={categories}
-                                            placeholder="Select Category..."
+                                            placeholder={t('claimModal.categoryPlaceholder')}
                                         />
                                     </div>
                                 </>
                             )}
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className="block text-sm font-semibold text-slate-700 mb-1">Start Date <span className="text-red-500">*</span></label><input type="datetime-local" required disabled={!!selectedLog} value={claimForm.startDate} onChange={e => setClaimForm({ ...claimForm, startDate: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl" /></div>
-                                <div><label className="block text-sm font-semibold text-slate-700 mb-1">Finish Date <span className="text-red-500">*</span></label><input type="date" required readOnly value={claimForm.finishDate} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50" /></div>
+                                <div><label className="block text-sm font-semibold text-slate-700 mb-1">{t('claimModal.startDateLabel')} <span className="text-red-500">*</span></label><input type="datetime-local" required disabled={!!selectedLog} value={claimForm.startDate} onChange={e => setClaimForm({ ...claimForm, startDate: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl" /></div>
+                                <div><label className="block text-sm font-semibold text-slate-700 mb-1">{t('claimModal.finishDateLabel')} <span className="text-red-500">*</span></label><input type="date" required readOnly value={claimForm.finishDate} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50" /></div>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Review Link <span className="text-red-500">*</span></label>
-                                <input type="url" required value={claimForm.link} onChange={e => setClaimForm({ ...claimForm, link: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none" placeholder="GDrive / Blog link..." />
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('claimModal.reviewLinkLabel')} <span className="text-red-500">*</span></label>
+                                <input type="url" required value={claimForm.link} onChange={e => setClaimForm({ ...claimForm, link: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none" placeholder={t('claimModal.reviewLinkPlaceholder')} />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Evidence Photo <span className="text-red-500">*</span></label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('claimModal.evidenceLabel')} <span className="text-red-500">*</span></label>
                                 <div className="space-y-3">
                                     <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50 relative">
                                         <input type="file" onChange={(e) => handleFileChange(e, 'claimFinish')} className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" />
-                                        {claimFile ? (<div className="flex items-center justify-center gap-2 text-green-600 font-bold"><CheckCircle size={18} /> Photo Selected</div>) : (<span className="text-slate-500 text-sm">Click to select photo</span>)}
+                                        {claimFile ? (<div className="flex items-center justify-center gap-2 text-green-600 font-bold"><CheckCircle size={18} /> {t('claimModal.photoSelected')}</div>) : (<span className="text-slate-500 text-sm">{t('claimModal.clickToSelectPhoto')}</span>)}
                                     </div>
                                     {claimPreview && (
                                         <div className="relative h-40 rounded-xl overflow-hidden border">
-                                            <img src={claimPreview} alt="Preview" className="w-full h-full object-cover" />
+                                            <img src={claimPreview} alt={t('detailModal.previewAlt')} className="w-full h-full object-cover" />
                                             <button type="button" onClick={() => { setClaimFile(null); setClaimPreview(''); }} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full"><XCircle size={14} /></button>
                                         </div>
                                     )}
                                 </div>
                             </div>
                             <div className="pt-4 flex gap-3">
-                                <button type="button" onClick={() => setClaimModalOpen(false)} className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl outline-none">Cancel</button>
-                                <button type="submit" disabled={isLoading} className="flex-1 px-4 py-3 bg-green-600 text-white font-bold rounded-xl shadow-lg">{isLoading ? 'Sending...' : 'Claim / Report'}</button>
+                                <button type="button" onClick={() => setClaimModalOpen(false)} className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl outline-none">{t('claimModal.cancelButton')}</button>
+                                <button type="submit" disabled={isLoading} className="flex-1 px-4 py-3 bg-green-600 text-white font-bold rounded-xl shadow-lg">{isLoading ? t('claimModal.sending') : t('claimModal.claimOrReport')}</button>
                             </div>
                         </form>
                     </div>
@@ -1031,26 +1034,26 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                         <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50">
                             <div>
                                 <h3 className="text-xl font-bold text-slate-800">{viewLog.title}</h3>
-                                <p className="text-sm text-slate-500 mt-1">{viewLog.category} • {viewLog.source || 'Private'}</p>
+                                <p className="text-sm text-slate-500 mt-1">{viewLog.category} • {viewLog.source || t('detailModal.sourceFallback')}</p>
                             </div>
                             <button onClick={() => setDetailModalOpen(false)} className="text-slate-400 hover:text-slate-600"><XCircle size={24} /></button>
                         </div>
                         <div className="p-6 overflow-y-auto space-y-4">
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="bg-slate-50 p-3 rounded-xl border">
-                                    <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">Status</div>
-                                    <div className={`font-semibold ${viewLog.status === 'Finished' ? 'text-green-600' : 'text-blue-600'}`}>{viewLog.status === 'Finished' ? 'Read' : viewLog.status}</div>
+                                    <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">{t('detailModal.statusLabel')}</div>
+                                    <div className={`font-semibold ${viewLog.status === 'Finished' ? 'text-green-600' : 'text-blue-600'}`}>{viewLog.status === 'Finished' ? t('detailModal.readStatus') : viewLog.status}</div>
                                 </div>
                                 <div className="bg-slate-50 p-3 rounded-xl border">
-                                    <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">HR Approval</div>
-                                    <div className="font-semibold text-slate-700">{viewLog.hrApprovalStatus || 'Draft'}</div>
+                                    <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">{t('detailModal.hrApprovalLabel')}</div>
+                                    <div className="font-semibold text-slate-700">{viewLog.hrApprovalStatus || t('detailModal.draftFallback')}</div>
                                 </div>
                             </div>
 
                             {viewLog.rejectionReason && (
                                 <div className="bg-red-50 p-3 rounded-xl border border-red-100">
                                     <div className="text-[10px] font-bold text-red-600 uppercase mb-1 flex justify-between items-center">
-                                        <span>Note</span>
+                                        <span>{t('detailModal.noteLabel')}</span>
                                         {viewLog.cancelledAt && (
                                             <span className="text-[9px] opacity-60 normal-case flex items-center gap-1">
                                                 <Clock size={10} /> {new Date(viewLog.cancelledAt).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
@@ -1060,7 +1063,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                     <p className="text-sm text-red-800 italic">"{viewLog.rejectionReason}"</p>
                                     {viewLog.cancelledBy && (
                                         <div className="mt-2 text-[10px] text-red-600/70 font-bold flex items-center gap-1">
-                                            <span>• By: {viewLog.cancelledBy}</span>
+                                            <span>• {t('detailModal.cancelledBy', { name: viewLog.cancelledBy })}</span>
                                         </div>
                                     )}
                                 </div>
@@ -1068,12 +1071,12 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
                             <div className="space-y-2 text-sm">
                                 <div className="flex justify-between py-1 border-b border-slate-50">
-                                    <span className="text-slate-500">Start Date</span>
+                                    <span className="text-slate-500">{t('detailModal.startDateLabel')}</span>
                                     <span className="font-semibold">{new Date(viewLog.startDate || viewLog.date).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                                 </div>
                                 {viewLog.finishDate && (
                                     <div className="flex justify-between py-1 border-b border-slate-50 items-center">
-                                        <span className="text-slate-500">Finish Date</span>
+                                        <span className="text-slate-500">{t('detailModal.finishDateLabel')}</span>
                                         <div className="flex items-center gap-2">
                                             <span className="font-semibold">{new Date(viewLog.finishDate).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                                             {viewLog.startDate && viewLog.finishDate && (
@@ -1096,7 +1099,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 )}
                                 {(viewLog as ReadingLogEntry).claimedAt && (
                                     <div className="flex justify-between py-1 border-b border-slate-50 items-center">
-                                        <span className="text-slate-500">Claimed Date</span>
+                                        <span className="text-slate-500">{t('detailModal.claimedDateLabel')}</span>
                                         <span className="font-semibold text-purple-600">
                                             {new Date((viewLog as ReadingLogEntry).claimedAt!).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                         </span>
@@ -1105,12 +1108,12 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 {viewLog.hrApprovalStatus === 'Approved' && (
                                     <>
                                         <div className="flex justify-between py-1 border-b border-slate-50">
-                                            <span className="text-slate-500">Approved by</span>
-                                            <span className="font-semibold text-blue-600">{viewLog.approvedBy || 'HR Administrator'}</span>
+                                            <span className="text-slate-500">{t('detailModal.approvedByLabel')}</span>
+                                            <span className="font-semibold text-blue-600">{viewLog.approvedBy || t('detailModal.approvedByFallback')}</span>
                                         </div>
                                         {viewLog.approvedAt && (
                                             <div className="flex justify-between py-1 border-b border-slate-50">
-                                                <span className="text-slate-500">Approved time</span>
+                                                <span className="text-slate-500">{t('detailModal.approvedTimeLabel')}</span>
                                                 <span className="font-semibold text-slate-700">{new Date(viewLog.approvedAt).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                                             </div>
                                         )}
@@ -1118,20 +1121,20 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 )}
                                 {viewLog.link && (
                                     <div className="pt-2">
-                                        <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">Review Link</div>
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">{t('detailModal.reviewLinkLabel')}</div>
                                         <a href={viewLog.link} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all">{viewLog.link}</a>
                                     </div>
                                 )}
                                 {viewLog.evidenceUrl && (
                                     <div className="pt-2">
-                                        <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">Evidence Photo</div>
-                                        <img src={getFullImageUrl(viewLog.evidenceUrl)} className="w-full rounded-xl border" alt="Evidence" />
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">{t('detailModal.evidencePhotoLabel')}</div>
+                                        <img src={getFullImageUrl(viewLog.evidenceUrl)} className="w-full rounded-xl border" alt={t('detailModal.evidenceAlt')} />
                                     </div>
                                 )}
                                 {viewLog.returnEvidenceUrl && (
                                     <div className="pt-2">
-                                        <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">Return Evidence Photo</div>
-                                        <img src={getFullImageUrl(viewLog.returnEvidenceUrl)} className="w-full rounded-xl border" alt="Return Evidence" />
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">{t('detailModal.returnEvidencePhotoLabel')}</div>
+                                        <img src={getFullImageUrl(viewLog.returnEvidenceUrl)} className="w-full rounded-xl border" alt={t('detailModal.returnEvidenceAlt')} />
                                     </div>
                                 )}
                             </div>

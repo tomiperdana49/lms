@@ -1,0 +1,85 @@
+{
+  "quizEditor": {
+    "quizQuestions": "Quiz Questions",
+    "deleteQuiz": "Delete Quiz",
+    "question": "Question {{number}}",
+    "questionPlaceholder": "Enter question here...",
+    "answerOptions": "Answer Options",
+    "optionPlaceholder": "Option {{number}}",
+    "removeOption": "Remove Option",
+    "minOptionsError": "Minimum 2 options required",
+    "addOption": "+ Add Option",
+    "addQuestion": "+ Add Question"
+  },
+  "errors": {
+    "loadCoursesFailed": "Failed to load courses: {{message}}",
+    "deleteCourseFailed": "Failed to delete course.",
+    "saveCourseFailed": "Failed to save course: {{message}}",
+    "checkConnection": "Please check the connection."
+  },
+  "confirm": {
+    "deleteCourseTitle": "Delete Course",
+    "deleteCourseMessage": "Are you sure you want to delete this course? This action cannot be undone.",
+    "deletePreTestTitle": "Delete Pre-Test",
+    "deletePreTestMessage": "Delete this entry requirement quiz?",
+    "deleteQuizTitle": "Delete Quiz",
+    "deleteQuizMessage": "Delete this module quiz? All questions will be lost.",
+    "deletePostTestTitle": "Delete Post-Test",
+    "deletePostTestMessage": "Delete this final evaluation quiz?",
+    "yesProceed": "Yes, Proceed"
+  },
+  "notifications": {
+    "courseDeleted": "Course deleted successfully.",
+    "courseSaved": "Course Saved Successfully! (ID: {{id}})"
+  },
+  "editor": {
+    "managingModule": "Managing Module",
+    "creatingModule": "Creating Module",
+    "section1Title": "Basic Information",
+    "moduleNameLabel": "Module Name",
+    "moduleNamePlaceholder": "New Untitled Course",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Description here...",
+    "totalDurationLabel": "Total Duration Label",
+    "totalDurationPlaceholder": "e.g. 60 Hours of Learning",
+    "section2Title": "Course Entry Pre-Test",
+    "requirementLevel1": "Requirement Level 1",
+    "createPreTestButton": "Create Pre-Test Quiz (Mandatory before starting material)",
+    "preTestDefaultTitle": "Pre-Test: {{courseTitle}}",
+    "entryRequirementActive": "✓ Course Entry Requirement Active",
+    "deleteRequirement": "Delete Requirement",
+    "section3Title": "Material List (Video & Module Quizzes)",
+    "addCourse": "Add Course",
+    "coursePlaceholder": "New Course",
+    "durationPlaceholder": "Duration (e.g. 10:00)",
+    "videoIdPlaceholder": "YouTube Video ID or Link",
+    "moduleQuizTitle": "Module Quiz (After Video)",
+    "moduleQuizDefaultTitle": "Module Quiz: {{moduleTitle}}",
+    "addModuleQuiz": "+ Add Module Quiz",
+    "section4Title": "Course Conclusion (Final Evaluation)",
+    "finalPostTest": "Final Post-Test",
+    "finalPostTestDefaultTitle": "Final Post-Test",
+    "delete": "Delete",
+    "createFinalEvalButton": "Create Final Evaluation Quiz (Post-Test)",
+    "close": "Close",
+    "saveChanges": "Save Changes"
+  },
+  "header": {
+    "badge": "Module Architecture",
+    "title": "Online Module Management",
+    "subtitle": "Digital Learning Architecture: Design, edit, and manage high-standard curriculum modules.",
+    "newModule": "New Module"
+  },
+  "card": {
+    "badge": "Module",
+    "editCourse": "Edit Course",
+    "deleteCourse": "Delete Course",
+    "coursesCount": "{{count}} Courses",
+    "reorder": "Reorder"
+  },
+  "empty": {
+    "title": "No Courses Found",
+    "message": "Get started by creating your first training course.",
+    "createNewCourse": "Create New Course"
+  }
+}

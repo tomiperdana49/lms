@@ -1,0 +1,51 @@
+{
+  "menu": {
+    "dashboard": "Dashboard",
+    "readingLog": "Reading Log",
+    "onlineModules": "Online Modules",
+    "calendar": "Calendar",
+    "incentives": "Incentives",
+    "training": "Training",
+    "internal": "Internal",
+    "external": "External",
+    "adminPanel": "Admin Panel",
+    "feedback": "Feedback",
+    "signOut": "Sign Out"
+  },
+  "admin": {
+    "overview": "Overview",
+    "calendar": "Calendar",
+    "managementHeader": "MANAGEMENT",
+    "userManagement": "User Management",
+    "onlineModulesManagement": "Online Modules Management",
+    "trainingHeader": "TRAINING",
+    "internal": "Internal",
+    "external": "External",
+    "reportHeader": "REPORT",
+    "readingLog": "Reading Log",
+    "quizReport": "Quiz Report",
+    "hrReport": "HR Report",
+    "incentives": "Incentives"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "new": "New",
+    "noNotifications": "No notifications found",
+    "markAllAsRead": "Mark all as read",
+    "upcomingMeeting": "Upcoming Meeting",
+    "meetingMessage": "{{title}} at {{time}} ({{type}})",
+    "trainingStatus": "Training: {{status}}",
+    "trainingMessage": "Request for \"{{title}}\" is {{status}}.",
+    "readingStatusTitle": "Book Status: {{status}}",
+    "readingMessage": "Your book \"{{title}}\" has been {{statusLabel}}.",
+    "statusUpdated": "updated",
+    "statusApproved": "approved by HR",
+    "statusRejectedWithReason": "rejected by HR with reason: \"{{reason}}\"",
+    "statusRejected": "rejected by HR",
+    "statusCancelledWithReason": "cancelled/removed with reason: \"{{reason}}\"",
+    "statusCancelled": "cancelled/removed"
+  },
+  "footer": "© 2026 PT Media Antar Nusa",
+  "userFallback": "User",
+  "branchFallback": "Nusanet"
+}
