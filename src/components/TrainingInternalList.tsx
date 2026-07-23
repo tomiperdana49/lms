@@ -190,8 +190,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [showParticipantModal, setShowParticipantModal] = useState<'sudah' | 'belum' | null>(null);
     const [showFeedbackList, setShowFeedbackList] = useState(false);
 
-    // Force re-render state for auto-refresh updates
-    const [, setForceUpdate] = useState(0);
+    // No longer using force update since refresh button was removed
 
     const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -664,7 +663,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                             console.log('[AUTO-REFRESH] New meetingSummary state:', {
                                 feedbackCount: newSummary.feedback,
                                 allQuizResultsLength: newSummary.allQuizResults?.length || 0,
-                                quizTypes: newSummary.allQuizResults?.map(r => r.quizType || r.quiz_type)
+                                quizTypes: newSummary.allQuizResults?.map((r: any) => r.quizType || r.quiz_type)
                             });
 
                             // Trigger re-render by updating selectedMeeting with a new reference
@@ -1854,7 +1853,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                         // Debug: Log the actual data structure
                                         console.log('[Modal Data] allQuizResults:', results);
-                                        console.log('[Modal Data] participants from guests:', selectedMeeting.guests?.details || []);
+                                        console.log('[Modal Data] participants from guests:', (selectedMeeting.guests as any)?.details || []);
 
                                         // Get participant list from multiple possible sources
                                         let participants: string[] = [];
@@ -1899,18 +1898,17 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             const target = String(participantId).toLowerCase().trim();
 
                                             // Get all possible IDs from the item (quiz result or feedback)
-                                            const itemIdStr = (item.student_id || item.employee_id || item.user_id || item.email || item.user_email || '').toString().toLowerCase().trim();
-                                            const itemEmployeeId = String(item.employee_id || '').toLowerCase().trim();
-                                            const itemUserId = String(item.user_id || '').toLowerCase().trim();
-                                            const itemEmail = String(item.email || item.user_email || '').toLowerCase().trim();
-                                            const studentNameStr = (item.student_name || '').toString().toLowerCase().trim();
+                                            const itemIdStr = (item.student_id || item.user_id || '').toString().toLowerCase().trim();
+                                            const itemEmployeeIdForMatch = String(item.employee_id || '').toLowerCase().trim();
+                                            const itemUserIdForMatch = String(item.user_id || '').toLowerCase().trim();
+                                            const itemEmailForMatch = String(item.email || item.user_email || '').toLowerCase().trim();
 
                                             // CRITICAL: Match by user_id/email first (for feedback data)
-                                            if (target.includes('@') && itemUserId === target) {
+                                            if (target.includes('@') && itemUserIdForMatch === target) {
                                                 console.log('[isMatch] SUCCESS: user_id match (email):', target);
                                                 return true;
                                             }
-                                            if (itemEmail === target) {
+                                            if (itemEmailForMatch === target) {
                                                 console.log('[isMatch] SUCCESS: email match:', target);
                                                 return true;
                                             }
@@ -1925,7 +1923,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 matchedEmployeeId = String(empByEmail.id_employee || empByEmail.id || '');
                                                 console.log('[isMatch] Found employee by email:', empByEmail.full_name, 'employee_id:', matchedEmployeeId);
                                                 // Check if item has matching employee_id
-                                                if (itemEmployeeId && itemEmployeeId === String(matchedEmployeeId).toLowerCase().trim()) {
+                                                if (itemEmployeeIdForMatch && itemEmployeeIdForMatch === String(matchedEmployeeId).toLowerCase().trim()) {
                                                     console.log('[isMatch] SUCCESS: Matched via employee lookup from email');
                                                     return true;
                                                 }
@@ -1940,14 +1938,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             if (emp) {
                                                 // Check if item's employee_id matches found employee
                                                 const empEmployeeId = String(emp.id_employee || emp.id || '').toLowerCase().trim();
-                                                if (itemEmployeeId && itemEmployeeId === empEmployeeId) {
+                                                if (itemEmployeeIdForMatch === empEmployeeId) {
                                                     console.log('[isMatch] SUCCESS: Employee match via employees list');
                                                     return true;
                                                 }
                                             }
 
                                             // No match found
-                                            console.log('[isMatch] FAILED for target:', target, 'itemIdStr:', itemIdStr, 'itemEmployeeId:', itemEmployeeId);
+                                            console.log('[isMatch] FAILED for target:', target, 'itemIdStr:', itemIdStr, 'itemEmployeeId:', itemEmployeeIdForMatch);
                                             return false;
                                         };
 
