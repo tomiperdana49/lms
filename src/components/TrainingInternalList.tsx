@@ -190,6 +190,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [showParticipantModal, setShowParticipantModal] = useState<'sudah' | 'belum' | null>(null);
     const [showFeedbackList, setShowFeedbackList] = useState(false);
 
+    // Force re-render state for auto-refresh updates
+    const [, setForceUpdate] = useState(0);
+
     const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -553,11 +556,132 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     useEffect(() => {
         if (selectedMeeting) {
             fetchResults(selectedMeeting.id);
+
+            // Re-fetch meeting details from server to get latest settings (pre-test/post-test/feedback toggles)
+            // This ensures participants see the updated status when host changes them
+            const refetchMeeting = async () => {
+                try {
+                    const res = await fetch(`${API_BASE_URL}/api/meetings/${selectedMeeting.id}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        // Update selectedMeeting with fresh data from server
+                        setSelectedMeeting(data);
+                    }
+                } catch (err) {
+                    console.error('Failed to refetch meeting details:', err);
+                }
+            };
+            refetchMeeting();
         } else {
             setMeetingQuizResults([]);
             setUserFeedback(null);
         }
-    }, [selectedMeeting]);
+    }, [selectedMeeting?.id]); // Only re-run when ID changes, not on every selectedMeeting change
+
+    // Track previous meeting data for change detection across intervals
+    const prevMeetingRef = useRef(selectedMeeting);
+    
+    // Update ref when selectedMeeting changes
+    useEffect(() => {
+        if (selectedMeeting) {
+            prevMeetingRef.current = selectedMeeting;
+        }
+    }, [selectedMeeting?.id]);
+
+    // Auto-refresh for participants: poll every 10 seconds when detail modal is open
+    useEffect(() => {
+        if (!selectedMeeting) return;
+
+        // Only poll for participants (not host/HR who update the meeting directly)
+        const isHostOrHR = effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' ||
+                          (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id);
+
+        if (isHostOrHR) return; // Skip polling for hosts and HR
+
+        console.log('[AUTO-REFRESH] Starting poll interval for meeting', selectedMeeting.id);
+
+        const intervalId = setInterval(async () => {
+            try {
+                // Fetch fresh data from server
+                const res = await fetch(`${API_BASE_URL}/api/meetings/${selectedMeeting.id}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    
+                    const prev = prevMeetingRef.current || selectedMeeting;
+                    console.log('[AUTO-REFRESH] Server:', {
+                        pre: data.is_pre_test_active, post: data.is_post_test_active, feedback: data.is_feedback_active, closed: data.is_closed
+                    }, 'Previous:', {
+                        pre: Number(prev?.is_pre_test_active), post: Number(prev?.is_post_test_active), feedback: Number(prev?.is_feedback_active), closed: Number(prev?.is_closed)
+                    });
+
+                    // Compare with previous server state (not local selectedMeeting which is stale in closure)
+                    const needsUpdate = 
+                        Number(data.is_pre_test_active) !== Number(prev?.is_pre_test_active) ||
+                        Number(data.is_post_test_active) !== Number(prev?.is_post_test_active) ||
+                        Number(data.is_feedback_active) !== Number(prev?.is_feedback_active) ||
+                        Number(data.is_closed) !== Number(prev?.is_closed);
+
+                    if (needsUpdate) {
+                        console.log('[AUTO-REFRESH] Change detected! Updating...');
+
+                        // Show notification BEFORE updating state (based on the change direction)
+                        if (!prev?.is_pre_test_active && data.is_pre_test_active) {
+                            setNotification({ show: true, type: 'success', message: 'Pre-Test is now available!' });
+                        } else if (!prev?.is_post_test_active && data.is_post_test_active) {
+                            setNotification({ show: true, type: 'success', message: 'Post-Test is now available!' });
+                        } else if (!prev?.is_feedback_active && data.is_feedback_active) {
+                            setNotification({ show: true, type: 'success', message: 'Feedback form is now open!' });
+                        }
+
+                        // Update selectedMeeting AND update ref
+                        setSelectedMeeting(data);
+                        prevMeetingRef.current = data;
+                    }
+
+                    // CRITICAL: Always refresh meetingSummary to get latest quiz/feedback results
+                    // This ensures counter and participant data auto-update without page reload
+                    try {
+                        const summaryRes = await fetch(`${API_BASE_URL}/api/meetings/summary/${selectedMeeting.id}`);
+                        if (summaryRes.ok) {
+                            const summaryData = await summaryRes.json();
+                            console.log('[AUTO-REFRESH] Summary refreshed:', {
+                                feedbackCount: summaryData.feedback,
+                                quizResultsCount: summaryData.allQuizResults?.length || 0,
+                                allFeedbackCount: summaryData.allFeedbackResults?.length || 0,
+                                feedbacks: summaryData.allFeedbackResults,
+                                quizResults: summaryData.allQuizResults
+                            });
+
+                            // Always update state with fresh data (new reference to force React update)
+                            const newSummary = {
+                                ...summaryData,
+                                allFeedbackResults: [...(summaryData.allFeedbackResults || [])],
+                                allQuizResults: [...(summaryData.allQuizResults || [])],  // CRITICAL: Copy quiz results too!
+                                __timestamp: Date.now()
+                            };
+
+                            setMeetingSummary(newSummary);
+                            console.log('[AUTO-REFRESH] New meetingSummary state:', {
+                                feedbackCount: newSummary.feedback,
+                                allQuizResultsLength: newSummary.allQuizResults?.length || 0,
+                                quizTypes: newSummary.allQuizResults?.map(r => r.quizType || r.quiz_type)
+                            });
+
+                            // Trigger re-render by updating selectedMeeting with a new reference
+                            setSelectedMeeting(prev => prev ? ({...prev}) : null);
+                        }
+                    } catch (e) { console.error('[AUTO-REFRESH] Summary refresh failed:', e); }
+                }
+            } catch (err) {
+                console.error('[AUTO-REFRESH] Failed:', err);
+            }
+        }, 3000); // Poll every 3 seconds for faster auto-update
+
+        return () => {
+            console.log('[AUTO-REFRESH] Clearing interval');
+            clearInterval(intervalId);
+        };
+    }, [selectedMeeting?.id, effectiveRole]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -1728,6 +1852,10 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         const results = meetingSummary.allQuizResults || [];
                                         const feedbacks = meetingSummary.allFeedbackResults || [];
 
+                                        // Debug: Log the actual data structure
+                                        console.log('[Modal Data] allQuizResults:', results);
+                                        console.log('[Modal Data] participants from guests:', selectedMeeting.guests?.details || []);
+
                                         // Get participant list from multiple possible sources
                                         let participants: string[] = [];
                                         if (selectedMeeting.guests?.emails && selectedMeeting.guests.emails.length > 0) {
@@ -1738,6 +1866,21 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             participants = selectedMeeting.guests.employee_ids;
                                         } else if (selectedMeeting.guests && Array.isArray((selectedMeeting.guests as any).details)) {
                                             // Fallback: details array - extract employee_ids or names
+                                            participants = (selectedMeeting.guests as any).details.map((d: any) => d.employee_id || d.name).filter(Boolean);
+                                        } else if (results.length > 0 && (!selectedMeeting.guests || Object.keys(selectedMeeting.guests).length === 0)) {
+                                            // CRITICAL FALLBACK: If guests.details is empty, get participants from quiz results!
+                                            console.log('[RenderRow] No guests found - using quizResults for participant list');
+                                            const ids = new Set<string>();
+                                            results.forEach(r => {
+                                                const id = (r.student_id || r.employee_id);
+                                                if (id) ids.add(String(id));
+                                            });
+
+                                            // Also add user_ids from feedback results
+                                            feedbacks.forEach(f => {
+                                                const uid = f.user_id;
+                                                if (uid) ids.add(String(uid));
+                                            });
                                             participants = (selectedMeeting.guests as any).details.map((d: any) => d.employee_id || d.name).filter(Boolean);
                                         } else if (results.length > 0) {
                                             // Last resort: get unique student/employee IDs from quiz results
@@ -1751,39 +1894,89 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                         const isMatch = (item: any, participantId: string) => {
                                             if (!item) return false;
-                                            const idStr = (item.student_id || item.employee_id || item.user_id || item.email || item.user_email || '').toString().toLowerCase().trim();
+
+                                            // Normalize strings for comparison
+                                            const target = String(participantId).toLowerCase().trim();
+
+                                            // Get all possible IDs from the item (quiz result or feedback)
+                                            const itemIdStr = (item.student_id || item.employee_id || item.user_id || item.email || item.user_email || '').toString().toLowerCase().trim();
+                                            const itemEmployeeId = String(item.employee_id || '').toLowerCase().trim();
+                                            const itemUserId = String(item.user_id || '').toLowerCase().trim();
+                                            const itemEmail = String(item.email || item.user_email || '').toLowerCase().trim();
                                             const studentNameStr = (item.student_name || '').toString().toLowerCase().trim();
-                                            const target = participantId.toLowerCase().trim();
 
-                                            // Match by ID
-                                            if (idStr === target) return true;
-                                            if (target.includes('@') && idStr === target.split('@')[0]) return true;
+                                            // CRITICAL: Match by user_id/email first (for feedback data)
+                                            if (target.includes('@') && itemUserId === target) {
+                                                console.log('[isMatch] SUCCESS: user_id match (email):', target);
+                                                return true;
+                                            }
+                                            if (itemEmail === target) {
+                                                console.log('[isMatch] SUCCESS: email match:', target);
+                                                return true;
+                                            }
 
-                                            // Match by employee lookup
-                                            const emp = employees.find(e => e.email?.toLowerCase() === target || String(e.id_employee).toLowerCase() === target || String(e.id).toLowerCase() === target);
+                                            // CRITICAL: Match participant email to employee, then check if item has that employee_id
+                                            let matchedEmployeeId = null;
+                                            const empByEmail = employees.find(e => {
+                                                const eEmail = (e.email || '').toLowerCase().trim();
+                                                return eEmail === target || eEmail === target.split('@')[0];
+                                            });
+                                            if (empByEmail) {
+                                                matchedEmployeeId = String(empByEmail.id_employee || empByEmail.id || '');
+                                                console.log('[isMatch] Found employee by email:', empByEmail.full_name, 'employee_id:', matchedEmployeeId);
+                                                // Check if item has matching employee_id
+                                                if (itemEmployeeId && itemEmployeeId === String(matchedEmployeeId).toLowerCase().trim()) {
+                                                    console.log('[isMatch] SUCCESS: Matched via employee lookup from email');
+                                                    return true;
+                                                }
+                                            }
+
+                                            // Match by name from guest details
+                                            const emp = employees.find(e => {
+                                                const eId = String(e.id_employee || '').toLowerCase().trim();
+                                                const eEmail = (e.email || '').toLowerCase().trim();
+                                                return eId === target || eEmail === target || eEmail === target.split('@')[0];
+                                            });
                                             if (emp) {
-                                                const empIds = [String(emp.id_employee).toLowerCase(), String(emp.id).toLowerCase(), emp.email?.toLowerCase()].filter(Boolean);
-                                                if (empIds.includes(idStr)) return true;
-                                                // Also match by employee full name against student_name
-                                                if (studentNameStr && emp.full_name?.toLowerCase().includes(studentNameStr) || studentNameStr === emp.full_name?.toLowerCase()) return true;
+                                                // Check if item's employee_id matches found employee
+                                                const empEmployeeId = String(emp.id_employee || emp.id || '').toLowerCase().trim();
+                                                if (itemEmployeeId && itemEmployeeId === empEmployeeId) {
+                                                    console.log('[isMatch] SUCCESS: Employee match via employees list');
+                                                    return true;
+                                                }
                                             }
 
-                                            // Match by name directly (for cases where student_id is temp/random but student_name is correct)
-                                            const participantEmp = employees.find(e =>
-                                                e.full_name?.toLowerCase() === target ||
-                                                e.full_name?.toLowerCase().includes(target)
-                                            );
-                                            if (participantEmp && studentNameStr) {
-                                                if (studentNameStr === participantEmp.full_name?.toLowerCase()) return true;
-                                            }
-
+                                            // No match found
+                                            console.log('[isMatch] FAILED for target:', target, 'itemIdStr:', itemIdStr, 'itemEmployeeId:', itemEmployeeId);
                                             return false;
                                         };
 
                                         const renderedRows = participants.map((participantId: string) => {
                                             // Get quiz results for this participant
-                                            const preScores = results.filter(r => isMatch(r, participantId) && (r.quizType || r.quiz_type || "").toUpperCase().includes('PRE')).map(r => Number(r.score) || 0);
-                                            const postScores = results.filter(r => isMatch(r, participantId) && (r.quizType || r.quiz_type || "").toUpperCase().includes('POST')).map(r => Number(r.score) || 0);
+                                            console.log('[RenderRow] Processing participantID:', participantId, '(type:', typeof participantId + ')');
+
+                                            // Debug: Log all results and their types
+                                            console.log('[RenderRow] All quizResults from server:', results.map(r => ({
+                                                student_id: r.student_id,
+                                                employee_id: r.employee_id,
+                                                student_name: r.student_name,
+                                                quizType: r.quizType || r.quiz_type,
+                                                score: r.score
+                                            })));
+
+                                            // First filter by match, then check type - ensure isMatch is called consistently
+                                            const matchedResults = results.filter(r => {
+                                                const matched = isMatch(r, participantId);
+                                                if (matched) {
+                                                    console.log('[RenderRow] MATCHED result:', r.student_name, 'quizType:', r.quizType || r.quiz_type);
+                                                }
+                                                return matched;
+                                            });
+
+                                            const preScores = matchedResults.filter(r => ((r.quizType || r.quiz_type || "")).toUpperCase().includes('PRE')).map(r => Number(r.score) || 0);
+                                            const postScores = matchedResults.filter(r => ((r.quizType || r.quiz_type || "")).toUpperCase().includes('POST')).map(r => Number(r.score) || 0);
+
+                                            console.log('[RenderRow] MATCHED results for', participantId, '- count:', matchedResults.length, 'preScores:', preScores, 'postScores:', postScores);
 
                                             // Get pre/post test questions from meeting data to determine if tests are required
                                             let preQuestions: any[] = [];
@@ -1808,7 +2001,48 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                             const hasPreTest = preScores.length > 0;
                                             const hasPostTest = postScores.length > 0;
-                                            const hasFeedback = feedbacks.some(f => isMatch(f, participantId));
+
+                                            // Enhanced feedback matching - try multiple approaches
+                                            let hasFeedback = false;
+                                            console.log('[Feedback Match] Checking participant:', participantId, 'with', feedbacks.length, 'feedback records');
+
+                                            for (const f of feedbacks) {
+                                                console.log('[Feedback Match] Trying to match:', {
+                                                    participantId,
+                                                    fb_employee_id: f.employee_id,
+                                                    fb_user_id: f.user_id
+                                                });
+
+                                                // Direct user_id match (primary method for feedback)
+                                                const fbUserId = String(f.user_id || '').toLowerCase().trim();
+                                                if (fbUserId && fbUserId === participantId.toLowerCase().trim()) {
+                                                    hasFeedback = true;
+                                                    console.log('[Feedback Match] SUCCESS via direct user_id match:', fbUserId);
+                                                    break;
+                                                }
+
+                                                // Direct employee_id match via employee lookup
+                                                const fbEmployeeId = String(f.employee_id || '').toLowerCase().trim();
+                                                if (fbEmployeeId) {
+                                                    const emp = employees.find(e => {
+                                                        const eEmail = (e.email || '').toLowerCase().trim();
+                                                        return eEmail === participantId.toLowerCase().trim() ||
+                                                               eEmail === participantId.toLowerCase().split('@')[0];
+                                                    });
+                                                    if (emp && fbEmployeeId === String(emp.id_employee || emp.id).toLowerCase().trim()) {
+                                                        hasFeedback = true;
+                                                        console.log('[Feedback Match] SUCCESS via employee_id match:', fbEmployeeId);
+                                                        break;
+                                                    }
+                                                }
+
+                                                // Try standard isMatch as fallback
+                                                if (isMatch(f, participantId)) {
+                                                    hasFeedback = true;
+                                                    console.log('[Feedback Match] SUCCESS via isMatch');
+                                                    break;
+                                                }
+                                            }
 
                                             // Participant is "done" if:
                                             // - They completed Feedback (required for all)
@@ -1835,15 +2069,38 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             const postScore = hasPostTest ? Math.max(...postScores) : '-';
 
                                             let fbScore: any = '-';
-                                            const f = feedbacks.find(f => isMatch(f, participantId));
-                                            if (f) {
-                                                const fData = f.feedbackData || f.feedback_data || f.data;
-                                                if (fData) {
-                                                    try {
-                                                        const data = typeof fData === 'string' ? JSON.parse(fData) : fData;
-                                                        const scores = Object.values(data || {}).filter(v => typeof v === 'number' || !isNaN(Number(v as any))).map(v => Number(v as any));
-                                                        if (scores.length > 0) fbScore = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
-                                                    } catch(e) {}
+                                            // Find the matching feedback using same logic as hasFeedback
+                                            if (hasFeedback) {
+                                                const f = feedbacks.find(feedback => {
+                                                    const fbUserId = String(feedback.user_id || '').toLowerCase().trim();
+                                                    const fbEmployeeId = String(feedback.employee_id || '').toLowerCase().trim();
+                                                    const target = participantId.toLowerCase().trim();
+
+                                                    // Direct user_id match
+                                                    if (fbUserId === target) return true;
+
+                                                    // Match via employee lookup
+                                                    if (fbEmployeeId) {
+                                                        const emp = employees.find(e => {
+                                                            const eEmail = (e.email || '').toLowerCase().trim();
+                                                            return eEmail === target || eEmail === target.split('@')[0];
+                                                        });
+                                                        if (emp && fbEmployeeId === String(emp.id_employee || emp.id).toLowerCase().trim()) return true;
+                                                    }
+
+                                                    return false;
+                                                });
+
+                                                if (f) {
+                                                    console.log('[Feedback Score] Found feedback for', participantId);
+                                                    const fData = f.feedbackData || f.feedback_data || f.data;
+                                                    if (fData) {
+                                                        try {
+                                                            const data = typeof fData === 'string' ? JSON.parse(fData) : fData;
+                                                            const scores = Object.values(data || {}).filter(v => typeof v === 'number' || !isNaN(Number(v as any))).map(v => Number(v as any));
+                                                            if (scores.length > 0) fbScore = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
+                                                        } catch(e) {}
+                                                    }
                                                 }
                                             }
 
@@ -3751,7 +4008,10 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 {(() => {
                                                     let preTestData;
                                                     try { preTestData = typeof selectedMeeting.pre_test_data === 'string' ? JSON.parse(selectedMeeting.pre_test_data || '{}') : (selectedMeeting.pre_test_data || {}); } catch(e) { preTestData = {}; }
+                                                    // Don't show Pre-Test card if no questions
                                                     if (!Array.isArray(preTestData?.questions) || preTestData.questions.length === 0) return null;
+                                                    const isHostOrHR = effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' ||
+                                                                       (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id);
                                                     return (
                                                         <div className="flex flex-col gap-2">
                                                     <button
@@ -4038,6 +4298,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 });
                                 if (response.ok) {
                                     fetchResults(selectedMeeting.id);
+                                    // Also refresh meetingSummary to update "Sudah Selesai/Belum Selesai" counters
+                                    try {
+                                        const sRes = await fetch(`${API_BASE_URL}/api/meetings/summary/${selectedMeeting.id}`);
+                                        if (sRes.ok) {
+                                            const sData = await sRes.json();
+                                            setMeetingSummary(sData);
+                                        }
+                                    } catch (e) { console.error("Failed to refresh summary", e); }
                                     if (isManagementMode) {
                                         fetch(`${API_BASE_URL}/api/quiz/results/all`).then(r => r.json()).then(setAllResults);
                                         fetch(`${API_BASE_URL}/api/feedback/all`).then(r => r.json()).then(setAllFeedback);
@@ -4047,7 +4315,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     if (showQuiz === 'POST' && score < 80) {
                                         setNotification({
                                             show: true,
-                                            type: 'info',
+                                            type: 'success',
                                             message: `Nilai Anda: ${score}. Skor minimal untuk lulus adalah 80. Silakan coba lagi.`,
                                             onClose: () => {
                                                 // Reopen the quiz
@@ -4094,6 +4362,22 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 });
                                 if (response.ok) {
                                     setUserFeedback(feedback);
+                                    // Also refresh meetingSummary to update "Sudah Selesai/Belum Selesai" counters
+                                    try {
+                                        console.log('[DEBUG] Submitting feedback, refreshing summary...');
+                                        // Add small delay to ensure database commit is complete
+                                        await new Promise(r => setTimeout(r, 500));
+                                        const sRes = await fetch(`${API_BASE_URL}/api/meetings/summary/${selectedMeeting.id}`);
+                                        if (sRes.ok) {
+                                            const sData = await sRes.json();
+                                            console.log('[DEBUG] New summary data:', sData);
+                                            setMeetingSummary(sData);
+                                            // Also update selectedMeeting to trigger any dependent renders
+                                            setSelectedMeeting(prev => prev ? ({...prev, __summaryRefreshed: Date.now()} as any) : prev);
+                                        } else {
+                                            console.error('[DEBUG] Failed to fetch summary, status:', sRes.status);
+                                        }
+                                    } catch (e) { console.error("Failed to refresh summary", e); }
                                     if (isManagementMode) {
                                         fetch(`${API_BASE_URL}/api/quiz/results/all`).then(r => r.json()).then(setAllResults);
                                         fetch(`${API_BASE_URL}/api/feedback/all`).then(r => r.json()).then(setAllFeedback);

@@ -2250,6 +2250,32 @@ app.get('/api/quiz/results/meeting-all/:meetingId', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// New endpoint to fetch single meeting by ID (for participant auto-refresh)
+app.get('/api/meetings/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const meetings = await query('SELECT * FROM meetings WHERE id = ?', [id]);
+        
+        if (!meetings || meetings.length === 0) {
+            return res.status(404).json({ error: 'Meeting not found' });
+        }
+        
+        const m = meetings[0];
+        // Return same format as PUT endpoint for consistency
+        res.json({
+            ...m,
+            description: m.agenda,
+            guests: m.guests_json ? (typeof m.guests_json === 'string' ? JSON.parse(m.guests_json) : m.guests_json) : undefined,
+            costReport: m.cost_report_json ? (typeof m.cost_report_json === 'string' ? JSON.parse(m.cost_report_json) : m.cost_report_json) : undefined,
+            pre_test_data: m.pre_test_data ? (typeof m.pre_test_data === 'string' ? JSON.parse(m.pre_test_data) : m.pre_test_data) : undefined,
+            post_test_data: m.post_test_data ? (typeof m.post_test_data === 'string' ? JSON.parse(m.post_test_data) : m.post_test_data) : undefined,
+            feedback_data: m.feedback_data ? (typeof m.feedback_data === 'string' ? JSON.parse(m.feedback_data) : m.feedback_data) : undefined
+        });
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
+    }
+});
+
 app.put('/api/meetings/:id', async (req, res) => {
     try {
         const { id } = req.params;
