@@ -3165,33 +3165,22 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                         <span className="text-[10px] text-slate-400">{id} {emp?.branch_name ? `• ${emp.branch_name}` : ''}</span>
                                                                     </div>
                                                                 </label>
-                                                                <div className="flex items-center gap-3">
-                                                                    <label className="flex items-center gap-2 cursor-pointer hover:text-indigo-600 transition-colors">
+                                                                <div className="flex items-center justify-between">
+                                                                    <label className="flex items-center gap-2 cursor-pointer hover:text-indigo-600 transition-colors flex-1">
                                                                         <input
-                                                                            type="radio"
+                                                                            type="checkbox"
                                                                             name={`participation-${id}`}
-                                                                            className="w-3.5 h-3.5 text-indigo-600 border-slate-300 focus:ring-indigo-500"
-                                                                            checked={currentType === 'Targeted Participants'}
-                                                                            onChange={() => {
-                                                                                const newTypes = { ...participationTypes, [id]: 'Targeted Participants' as const };
-                                                                                setReportData({ ...reportData, participationTypesByEmployee: newTypes });
-                                                                            }}
-                                                                        />
-                                                                        <span className="text-xs text-slate-600 font-semibold">TARGET</span>
-                                                                    </label>
-                                                                    <label className="flex items-center gap-2 cursor-pointer hover:text-indigo-600 transition-colors">
-                                                                        <input
-                                                                            type="radio"
-                                                                            name={`participation-${id}`}
-                                                                            className="w-3.5 h-3.5 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                                                                            className="w-3.5 h-3.5 text-indigo-600 border-slate-300 focus:ring-indigo-500 rounded"
                                                                             checked={currentType === 'Self Registered'}
-                                                                            onChange={() => {
-                                                                                const newTypes = { ...participationTypes, [id]: 'Self Registered' as const };
+                                                                            onChange={(e) => {
+                                                                                const newTypes = { ...participationTypes, [id]: e.target.checked ? 'Self Registered' : 'Targeted Participants' };
                                                                                 setReportData({ ...reportData, participationTypesByEmployee: newTypes });
                                                                             }}
                                                                         />
-                                                                        <span className="text-xs text-slate-600 font-semibold">SELF</span>
                                                                     </label>
+                                                                    <span className="text-xs text-slate-600 font-semibold">
+                                                                        Self Registered
+                                                                    </span>
                                                                 </div>
                                                             </div>
                                                         );
@@ -3211,33 +3200,22 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                     />
                                                                     <span className="text-sm text-slate-700 font-medium truncate">{email}</span>
                                                                 </label>
-                                                                <div className="flex items-center gap-3">
-                                                                    <label className="flex items-center gap-2 cursor-pointer hover:text-indigo-600 transition-colors">
+                                                                <div className="flex items-center justify-between">
+                                                                    <label className="flex items-center gap-2 cursor-pointer hover:text-indigo-600 transition-colors flex-1">
                                                                         <input
-                                                                            type="radio"
+                                                                            type="checkbox"
                                                                             name={`participation-${email}`}
-                                                                            className="w-3.5 h-3.5 text-indigo-600 border-slate-300 focus:ring-indigo-500"
-                                                                            checked={currentType === 'Targeted Participants'}
-                                                                            onChange={() => {
-                                                                                const newTypes = { ...participationTypes, [email]: 'Targeted Participants' as const };
-                                                                                setReportData({ ...reportData, participationTypesByEmployee: newTypes });
-                                                                            }}
-                                                                        />
-                                                                        <span className="text-xs text-slate-600 font-semibold">TARGET</span>
-                                                                    </label>
-                                                                    <label className="flex items-center gap-2 cursor-pointer hover:text-indigo-600 transition-colors">
-                                                                        <input
-                                                                            type="radio"
-                                                                            name={`participation-${email}`}
-                                                                            className="w-3.5 h-3.5 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                                                                            className="w-3.5 h-3.5 text-indigo-600 border-slate-300 focus:ring-indigo-500 rounded"
                                                                             checked={currentType === 'Self Registered'}
-                                                                            onChange={() => {
-                                                                                const newTypes = { ...participationTypes, [email]: 'Self Registered' as const };
+                                                                            onChange={(e) => {
+                                                                                const newTypes = { ...participationTypes, [email]: e.target.checked ? 'Self Registered' : 'Targeted Participants' };
                                                                                 setReportData({ ...reportData, participationTypesByEmployee: newTypes });
                                                                             }}
                                                                         />
-                                                                        <span className="text-xs text-slate-600 font-semibold">SELF</span>
                                                                     </label>
+                                                                    <span className="text-xs text-slate-600 font-semibold">
+                                                                        Self Registered
+                                                                    </span>
                                                                 </div>
                                                             </div>
                                                         );
@@ -3781,7 +3759,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             // Only show participants with text answers for q11 or q12
                                             if (q11_text || q12_text) {
                                                 feedbackByParticipant.push({
-                                                    name: 'Anonim', // Display as anonymous
+                                                    name: emp?.full_name || userEmail || `Employee ${employeeId}`, // Display participant name
                                                     email: emp?.email || userEmail,
                                                     q11: q11_text,
                                                     q12: q12_text
