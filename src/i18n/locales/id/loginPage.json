@@ -10,5 +10,7 @@
   "loginFailed": "Login Gagal: {{message}} (Status: {{status}})",
   "connectionError": "Kesalahan Koneksi: {{message}}",
   "googleLoginFailed": "Login Google Gagal",
-  "googleLoginError": "Kesalahan Login Google"
+  "googleLoginError": "Kesalahan Login Google",
+  "sessionExpiredIdle": "Sesi Anda berakhir karena tidak ada aktivitas selama 30 menit. Silakan login kembali.",
+  "sessionExpiredAbsolute": "Sesi Anda berakhir setelah 8 jam. Silakan login kembali."
 }

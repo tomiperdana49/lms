@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { LogIn, Lock, Mail } from 'lucide-react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { jwtDecode } from "jwt-decode";
@@ -10,9 +10,11 @@ import LanguageSwitcher from './LanguageSwitcher';
 
 interface LoginPageProps {
     onLogin: (user: User) => void;
+    sessionExpiredReason?: 'idle' | 'absolute' | null;
+    onSessionExpiredReasonShown?: () => void;
 }
 
-const LoginPage = ({ onLogin }: LoginPageProps) => {
+const LoginPage = ({ onLogin, sessionExpiredReason, onSessionExpiredReasonShown }: LoginPageProps) => {
     const { t } = useTranslation('loginPage');
     const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
@@ -21,9 +23,22 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
     // Notification State
     const [notification, setNotification] = useState<{
         show: boolean;
-        type: 'success' | 'error';
+        type: 'success' | 'error' | 'info';
         message: string;
     }>({ show: false, type: 'success', message: '' });
+
+    // Show a notice if we were redirected here by an idle/absolute session timeout.
+    useEffect(() => {
+        if (sessionExpiredReason) {
+            setNotification({
+                show: true,
+                type: 'info',
+                message: sessionExpiredReason === 'idle' ? t('sessionExpiredIdle') : t('sessionExpiredAbsolute')
+            });
+            onSessionExpiredReasonShown?.();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();

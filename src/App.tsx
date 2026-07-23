@@ -16,11 +16,21 @@ import type { Page, Role, User } from './types';
 
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
+// Session policy: 30 min idle timeout, 8 hour absolute timeout, renewed on every user activity.
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const ABSOLUTE_TIMEOUT_MS = 8 * 60 * 60 * 1000;
+const SESSION_CHECK_INTERVAL_MS = 15 * 1000;
+const ACTIVITY_WRITE_THROTTLE_MS = 5 * 1000;
+const LOGIN_AT_KEY = 'lms_login_at';
+const LAST_ACTIVITY_KEY = 'lms_last_activity';
+
 function App() {
   const [user, setUser] = useState<User | null>(() => {
     const savedUser = localStorage.getItem('lms_user');
     return savedUser ? JSON.parse(savedUser) : null;
   });
+
+  const [sessionExpiredReason, setSessionExpiredReason] = useState<'idle' | 'absolute' | null>(null);
 
   const [activePage, setActivePage] = useState<Page>(() => {
     const savedPage = localStorage.getItem('lms_active_page');
@@ -62,6 +72,66 @@ function App() {
     } else {
       localStorage.removeItem('lms_user');
     }
+  }, [user]);
+
+  const forceLogout = (reason: 'idle' | 'absolute') => {
+    setUser(null);
+    setActivePage('dashboard');
+    localStorage.removeItem('lms_user');
+    localStorage.removeItem('lms_active_page');
+    localStorage.removeItem(LOGIN_AT_KEY);
+    localStorage.removeItem(LAST_ACTIVITY_KEY);
+    setSessionExpiredReason(reason);
+  };
+
+  // Session policy: initialize login/activity timestamps.
+  // Runs whenever `user` becomes truthy (fresh login, or restored from localStorage on reload).
+  useEffect(() => {
+    if (!user) return;
+    const now = String(Date.now());
+    if (!localStorage.getItem(LOGIN_AT_KEY)) {
+      localStorage.setItem(LOGIN_AT_KEY, now);
+    }
+    if (!localStorage.getItem(LAST_ACTIVITY_KEY)) {
+      localStorage.setItem(LAST_ACTIVITY_KEY, now);
+    }
+  }, [user]);
+
+  // Session policy: renew (touch last-activity) on any user interaction, throttled to avoid
+  // hammering localStorage. Shared across tabs via localStorage so idle time resets everywhere.
+  useEffect(() => {
+    if (!user) return;
+    let lastWrite = 0;
+    const touchActivity = () => {
+      const now = Date.now();
+      if (now - lastWrite > ACTIVITY_WRITE_THROTTLE_MS) {
+        lastWrite = now;
+        localStorage.setItem(LAST_ACTIVITY_KEY, String(now));
+      }
+    };
+    const events: (keyof WindowEventMap)[] = ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'];
+    events.forEach(evt => window.addEventListener(evt, touchActivity, { passive: true }));
+    return () => events.forEach(evt => window.removeEventListener(evt, touchActivity));
+  }, [user]);
+
+  // Session policy: enforce idle (30 min) and absolute (8 hour) timeouts, forcing logout on expiry.
+  useEffect(() => {
+    if (!user) return;
+    const checkTimeouts = () => {
+      const now = Date.now();
+      const loginAt = Number(localStorage.getItem(LOGIN_AT_KEY)) || now;
+      const lastActivity = Number(localStorage.getItem(LAST_ACTIVITY_KEY)) || now;
+
+      if (now - lastActivity >= IDLE_TIMEOUT_MS) {
+        forceLogout('idle');
+      } else if (now - loginAt >= ABSOLUTE_TIMEOUT_MS) {
+        forceLogout('absolute');
+      }
+    };
+
+    checkTimeouts(); // catch expiry that happened while the tab/browser was closed
+    const intervalId = setInterval(checkTimeouts, SESSION_CHECK_INTERVAL_MS);
+    return () => clearInterval(intervalId);
   }, [user]);
 
   useEffect(() => {
@@ -145,7 +215,15 @@ function App() {
   if (!user) {
     return (
       <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-        <LoginPage onLogin={setUser} />
+        <LoginPage
+          onLogin={(loggedInUser) => {
+            localStorage.setItem(LOGIN_AT_KEY, String(Date.now()));
+            localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+            setUser(loggedInUser);
+          }}
+          sessionExpiredReason={sessionExpiredReason}
+          onSessionExpiredReasonShown={() => setSessionExpiredReason(null)}
+        />
       </GoogleOAuthProvider>
     );
   }
@@ -156,6 +234,8 @@ function App() {
     setActivePage('dashboard');
     localStorage.removeItem('lms_user');
     localStorage.removeItem('lms_active_page');
+    localStorage.removeItem(LOGIN_AT_KEY);
+    localStorage.removeItem(LAST_ACTIVITY_KEY);
   };
 
   // We use the logged-in user's role
