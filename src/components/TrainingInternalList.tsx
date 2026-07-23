@@ -587,15 +587,15 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         }
     }, [selectedMeeting?.id]);
 
-    // Auto-refresh for participants: poll every 10 seconds when detail modal is open
+    // Auto-refresh: poll every 3 seconds when detail modal is open.
+    // Participants get notified when the host toggles pre-test/post-test/feedback availability.
+    // Hosts/HR get the meetingSummary refreshed so participant progress (e.g. "Peserta Belum/Sudah Selesai")
+    // updates live without needing to reload the page.
     useEffect(() => {
         if (!selectedMeeting) return;
 
-        // Only poll for participants (not host/HR who update the meeting directly)
         const isHostOrHR = effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' ||
                           (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id);
-
-        if (isHostOrHR) return; // Skip polling for hosts and HR
 
         console.log('[AUTO-REFRESH] Starting poll interval for meeting', selectedMeeting.id);
 
@@ -605,7 +605,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 const res = await fetch(`${API_BASE_URL}/api/meetings/${selectedMeeting.id}`);
                 if (res.ok) {
                     const data = await res.json();
-                    
+
                     const prev = prevMeetingRef.current || selectedMeeting;
                     console.log('[AUTO-REFRESH] Server:', {
                         pre: data.is_pre_test_active, post: data.is_post_test_active, feedback: data.is_feedback_active, closed: data.is_closed
@@ -614,7 +614,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     });
 
                     // Compare with previous server state (not local selectedMeeting which is stale in closure)
-                    const needsUpdate = 
+                    const needsUpdate =
                         Number(data.is_pre_test_active) !== Number(prev?.is_pre_test_active) ||
                         Number(data.is_post_test_active) !== Number(prev?.is_post_test_active) ||
                         Number(data.is_feedback_active) !== Number(prev?.is_feedback_active) ||
@@ -623,13 +623,16 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     if (needsUpdate) {
                         console.log('[AUTO-REFRESH] Change detected! Updating...');
 
-                        // Show notification BEFORE updating state (based on the change direction)
-                        if (!prev?.is_pre_test_active && data.is_pre_test_active) {
-                            setNotification({ show: true, type: 'success', message: 'Pre-Test is now available!' });
-                        } else if (!prev?.is_post_test_active && data.is_post_test_active) {
-                            setNotification({ show: true, type: 'success', message: 'Post-Test is now available!' });
-                        } else if (!prev?.is_feedback_active && data.is_feedback_active) {
-                            setNotification({ show: true, type: 'success', message: 'Feedback form is now open!' });
+                        // Toggle-availability notifications are only meaningful for participants
+                        // reacting to the host's changes, not for the host themselves.
+                        if (!isHostOrHR) {
+                            if (!prev?.is_pre_test_active && data.is_pre_test_active) {
+                                setNotification({ show: true, type: 'success', message: 'Pre-Test is now available!' });
+                            } else if (!prev?.is_post_test_active && data.is_post_test_active) {
+                                setNotification({ show: true, type: 'success', message: 'Post-Test is now available!' });
+                            } else if (!prev?.is_feedback_active && data.is_feedback_active) {
+                                setNotification({ show: true, type: 'success', message: 'Feedback form is now open!' });
+                            }
                         }
 
                         // Update selectedMeeting AND update ref
