@@ -3227,8 +3227,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                             className="w-3.5 h-3.5 text-indigo-600 border-slate-300 focus:ring-indigo-500 rounded"
                                                                             checked={currentType === 'Self Registered'}
                                                                             onChange={(e) => {
-                                                                                const newTypes = { ...participationTypes, [id]: e.target.checked ? 'Self Registered' : 'Targeted Participants' };
-                                                                                setReportData({ ...reportData, participationTypesByEmployee: newTypes });
+                                                                                const newTypes = { ...participationTypes, [id]: (e.target.checked ? 'Self Registered' : 'Targeted Participants') };
+                                                                                setReportData({ ...reportData, participationTypesByEmployee: newTypes as any });
                                                                             }}
                                                                         />
                                                                     </label>
@@ -3263,7 +3263,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                             checked={currentType === 'Self Registered'}
                                                                             onChange={(e) => {
                                                                                 const newTypes = { ...participationTypes, [email]: e.target.checked ? 'Self Registered' : 'Targeted Participants' };
-                                                                                setReportData({ ...reportData, participationTypesByEmployee: newTypes });
+                                                                                setReportData({ ...reportData, participationTypesByEmployee: newTypes as any });
                                                                             }}
                                                                         />
                                                                     </label>
