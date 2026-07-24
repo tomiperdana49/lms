@@ -668,8 +668,8 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                     ).length;
 
                     return (
-                        <div className="relative z-10 flex flex-col md:flex-row justify-between gap-8">
-                            <div className="space-y-2">
+                        <div className="relative z-10 flex flex-col md:flex-row md:flex-wrap justify-between gap-8">
+                            <div className="space-y-2 md:max-w-sm">
                                 <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10">
                                     <Star size={12} className="text-yellow-400 fill-yellow-400" /> {t('stats.memberMilestone', { year: filterYear })}
                                 </div>
@@ -677,30 +677,30 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 <p className="text-blue-100/80 font-medium">{t('stats.journeySubtitle')}</p>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-1 max-w-4xl">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-1 min-w-[520px] max-w-4xl">
                                 {/* Card 1: Books Count */}
-                                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <div className="p-2 bg-blue-500 rounded-lg shadow-lg shadow-blue-500/20">
+                                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all h-full flex flex-col">
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <div className="p-2 bg-blue-500 rounded-lg shadow-lg shadow-blue-500/20 shrink-0">
                                             <BookOpen size={18} />
                                         </div>
-                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">{t('stats.totalRead')}</span>
+                                        <span className="text-[11px] font-bold text-blue-100 uppercase tracking-wide leading-tight min-w-0 break-words">{t('stats.totalRead')}</span>
                                     </div>
-                                    <div className="flex items-baseline gap-1">
+                                    <div className="flex items-baseline gap-1 mt-auto">
                                         <span className="text-3xl font-black tracking-tighter">{totalRead}</span>
                                         <span className="text-sm font-bold opacity-60">{t('stats.books')}</span>
                                     </div>
                                 </div>
 
                                 {/* Card 2: Annual Progress */}
-                                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all relative">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <div className={`p-2 rounded-lg shadow-lg ${totalApproved >= 5 ? 'bg-green-500 shadow-green-500/20' : 'bg-orange-500 shadow-orange-500/20'}`}>
+                                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all relative h-full flex flex-col">
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <div className={`p-2 rounded-lg shadow-lg shrink-0 ${totalApproved >= 5 ? 'bg-green-500 shadow-green-500/20' : 'bg-orange-500 shadow-orange-500/20'}`}>
                                             <Trophy size={18} />
                                         </div>
-                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">{t('stats.incentiveLimit')}</span>
+                                        <span className="text-[11px] font-bold text-blue-100 uppercase tracking-wide leading-tight min-w-0 break-words">{t('stats.incentiveLimit')}</span>
                                     </div>
-                                    <div className="space-y-2">
+                                    <div className="space-y-2 mt-auto">
                                         <div className="flex justify-between items-end">
                                             <span className="text-2xl font-black tracking-tighter">{totalApproved}/5</span>
                                             <span className="text-[10px] font-bold opacity-60">{t('stats.approved')}</span>
@@ -712,14 +712,14 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 </div>
 
                                 {/* Card 3: Total Incentives */}
-                                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <div className="p-2 bg-emerald-500 rounded-lg shadow-lg shadow-emerald-500/20">
+                                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all h-full flex flex-col">
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <div className="p-2 bg-emerald-500 rounded-lg shadow-lg shadow-emerald-500/20 shrink-0">
                                             <Wallet size={18} />
                                         </div>
-                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">{t('stats.totalIncentive')}</span>
+                                        <span className="text-[11px] font-bold text-blue-100 uppercase tracking-wide leading-tight min-w-0 break-words">{t('stats.totalIncentive')}</span>
                                     </div>
-                                    <div className="flex flex-col">
+                                    <div className="flex flex-col mt-auto">
                                         <span className="text-lg font-black tracking-tighter text-emerald-300 whitespace-nowrap" title={formatCurrency(totalEarned)}>
                                             {formatCurrency(totalEarned)}
                                         </span>
@@ -728,14 +728,14 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 </div>
 
                                 {/* Card 4: Reading Hours */}
-                                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <div className="p-2 bg-purple-500 rounded-lg shadow-lg shadow-purple-500/20">
+                                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all h-full flex flex-col">
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <div className="p-2 bg-purple-500 rounded-lg shadow-lg shadow-purple-500/20 shrink-0">
                                             <Clock size={18} />
                                         </div>
-                                        <span className="text-xs font-bold text-blue-100 uppercase tracking-wider">{t('stats.readingHours')}</span>
+                                        <span className="text-[11px] font-bold text-blue-100 uppercase tracking-wide leading-tight min-w-0 break-words">{t('stats.readingHours')}</span>
                                     </div>
-                                    <div className="flex items-baseline gap-1">
+                                    <div className="flex items-baseline gap-1 mt-auto">
                                         <span className="text-3xl font-black tracking-tighter">{totalLearningHours}</span>
                                         <span className="text-sm font-bold opacity-60">{t('stats.hours')}</span>
                                     </div>
