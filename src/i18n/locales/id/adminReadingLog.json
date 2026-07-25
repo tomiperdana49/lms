@@ -131,6 +131,8 @@
     "startDateLabel": "Tanggal Mulai",
     "finishDateLabel": "Tanggal Selesai",
     "evidenceUrlLabel": "URL Bukti / Gambar",
+    "changePhoto": "Ganti Foto",
+    "uploadingPhoto": "Mengunggah...",
     "reviewLinkLabel": "Tautan Goodreads / Ulasan",
     "delete": "Hapus",
     "cancel": "Batal",
@@ -197,6 +199,7 @@
     "simasSyncSuccess": "Sinkronisasi data SIMAS berhasil!",
     "simasSyncFailed": "Gagal menyinkronkan data SIMAS.",
     "simasSyncError": "Terjadi kesalahan saat sinkronisasi data.",
-    "failedToExportExcel": "Gagal mengekspor file Excel. Silakan coba lagi."
+    "failedToExportExcel": "Gagal mengekspor file Excel. Silakan coba lagi.",
+    "failedToUploadPhoto": "Gagal mengunggah foto. Silakan coba lagi."
   }
 }

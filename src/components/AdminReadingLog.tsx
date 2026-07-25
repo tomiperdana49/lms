@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2, RefreshCw, BookOpen, Trophy, ArrowUp, ArrowDown, Save, Download, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2, RefreshCw, BookOpen, Trophy, ArrowUp, ArrowDown, Save, Download, ZoomIn, ZoomOut, RotateCcw, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry, User, Employee } from '../types';
@@ -257,6 +257,9 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         log: null,
         formData: {}
     });
+    const [editEvidenceFile, setEditEvidenceFile] = useState<File | null>(null);
+    const [editEvidencePreview, setEditEvidencePreview] = useState<string | null>(null);
+    const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
 
     // Cancel Modal State (Admin)
     const [cancelModal, setCancelModal] = useState<{ open: boolean; log: ReadingLogEntry | null; reason: string }>({
@@ -341,6 +344,16 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             })
             .catch(err => console.error(err));
     };
+
+    useEffect(() => {
+        if (!editEvidenceFile) {
+            setEditEvidencePreview(null);
+            return;
+        }
+        const url = URL.createObjectURL(editEvidenceFile);
+        setEditEvidencePreview(url);
+        return () => URL.revokeObjectURL(url);
+    }, [editEvidenceFile]);
 
     useEffect(() => {
         fetchBranches();
@@ -703,6 +716,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
     };
 
     const handleEditLogClick = (log: ReadingLogEntry) => {
+        setEditEvidenceFile(null);
         setEditLogModal({
             open: true,
             log,
@@ -718,19 +732,48 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         });
     };
 
+    const uploadEvidenceFile = async (file: File): Promise<string> => {
+        const data = new FormData();
+        data.append('file', file);
+        const res = await fetch(`${API_BASE_URL}/api/upload`, {
+            method: 'POST',
+            body: data
+        });
+        if (!res.ok) throw new Error('Upload failed');
+        const result = await res.json();
+        return result.fileUrl;
+    };
+
     const handleEditLogSubmit = async () => {
         if (!editLogModal.log) return;
         try {
+            let formData = editLogModal.formData;
+
+            if (editEvidenceFile) {
+                setIsUploadingEvidence(true);
+                try {
+                    const uploadedUrl = await uploadEvidenceFile(editEvidenceFile);
+                    formData = { ...formData, evidenceUrl: uploadedUrl };
+                } catch (uploadErr) {
+                    console.error(uploadErr);
+                    alert(t('alerts.failedToUploadPhoto'));
+                    setIsUploadingEvidence(false);
+                    return;
+                }
+                setIsUploadingEvidence(false);
+            }
+
             const res = await fetch(`${API_BASE_URL}/api/logs/${editLogModal.log.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(editLogModal.formData)
+                body: JSON.stringify(formData)
             });
 
             if (res.ok) {
                 const updated = await res.json();
                 setAllLogs(allLogs.map(l => l.id === updated.id ? updated : l));
                 setEditLogModal({ open: false, log: null, formData: {} });
+                setEditEvidenceFile(null);
             }
         } catch (err) { console.error(err); }
     };
@@ -1777,7 +1820,22 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">{t('editModal.evidenceUrlLabel')}</label>
-                                <input type="text" className="w-full px-4 py-2 border border-slate-200 rounded-xl" value={editLogModal.formData.evidenceUrl || ''} onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, evidenceUrl: e.target.value } }))} />
+                                <div className="flex items-center gap-3">
+                                    <div className="w-20 h-20 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0">
+                                        {editEvidencePreview ? (
+                                            <img src={editEvidencePreview} alt="" className="w-full h-full object-cover" />
+                                        ) : editLogModal.formData.evidenceUrl ? (
+                                            <img src={getFullImageUrl(editLogModal.formData.evidenceUrl)} alt="" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <ImageIcon size={24} className="text-slate-300" />
+                                        )}
+                                    </div>
+                                    <label className="flex-1 cursor-pointer px-4 py-2 border border-dashed border-slate-300 rounded-xl text-sm font-bold text-slate-500 hover:border-blue-400 hover:text-blue-500 flex items-center justify-center gap-2 text-center">
+                                        <Upload size={16} />
+                                        {isUploadingEvidence ? t('editModal.uploadingPhoto') : t('editModal.changePhoto')}
+                                        <input type="file" accept="image/*" className="hidden" onChange={e => setEditEvidenceFile(e.target.files?.[0] || null)} />
+                                    </label>
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">{t('editModal.reviewLinkLabel')}</label>
@@ -1787,8 +1845,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         <div className="mt-6 flex justify-between gap-3">
                             <button onClick={() => handleDeleteLog(editLogModal.log!.id)} className="px-4 py-2 text-red-600 font-bold hover:bg-red-50 rounded-xl border border-red-200 flex items-center"><Trash2 size={16} className="mr-2" /> {t('editModal.delete')}</button>
                             <div className="flex gap-2">
-                                <button onClick={() => setEditLogModal({ open: false, log: null, formData: {} })} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">{t('editModal.cancel')}</button>
-                                <button onClick={handleEditLogSubmit} className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700">{t('editModal.saveChanges')}</button>
+                                <button onClick={() => { setEditLogModal({ open: false, log: null, formData: {} }); setEditEvidenceFile(null); }} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">{t('editModal.cancel')}</button>
+                                <button onClick={handleEditLogSubmit} disabled={isUploadingEvidence} className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{isUploadingEvidence ? t('editModal.uploadingPhoto') : t('editModal.saveChanges')}</button>
                             </div>
                         </div>
                     </div>

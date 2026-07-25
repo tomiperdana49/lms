@@ -131,6 +131,8 @@
     "startDateLabel": "Start Date",
     "finishDateLabel": "Finish Date",
     "evidenceUrlLabel": "Evidence URL / Image",
+    "changePhoto": "Change Photo",
+    "uploadingPhoto": "Uploading...",
     "reviewLinkLabel": "Goodreads / Review Link",
     "delete": "Delete",
     "cancel": "Cancel",
@@ -197,6 +199,7 @@
     "simasSyncSuccess": "SIMAS data synchronization successful!",
     "simasSyncFailed": "Failed to synchronize SIMAS data.",
     "simasSyncError": "Error during data synchronization.",
-    "failedToExportExcel": "Failed to export Excel file. Please try again."
+    "failedToExportExcel": "Failed to export Excel file. Please try again.",
+    "failedToUploadPhoto": "Failed to upload photo. Please try again."
   }
 }
