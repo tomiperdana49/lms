@@ -2046,9 +2046,13 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                             <div className="flex-1">
                                                 <div className="text-[10px] font-black text-slate-400 uppercase mb-1">{t('detailModal.reviewLink')}</div>
                                                 {detailModal.log.link ? (
-                                                    <a href={detailModal.log.link} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all flex items-center gap-1 font-bold">
-                                                        {detailModal.log.link}
-                                                        <ExternalLink size={12} className="inline shrink-0 text-blue-500" />
+                                                    <a
+                                                        href={detailModal.log.link}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-bold rounded-lg transition-colors w-fit"
+                                                    >
+                                                        <ExternalLink size={12} /> {t('detailModal.viewLink')}
                                                     </a>
                                                 ) : (
                                                     <span className="text-slate-400 italic text-[11px]">{t('detailModal.noReviewLink')}</span>
