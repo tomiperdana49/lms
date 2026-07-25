@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, Fragment, type FormEvent } from 'react';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import { useTranslation } from 'react-i18next';
 import {
     Users,
@@ -542,8 +542,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
             if (res.ok) {
                 const data = await res.json();
-                setSelectedMeeting(data);
-                setMeetings(prev => prev.map(m => m.id === data.id ? data : m));
+                const safeData = safeMeeting(data);
+                setSelectedMeeting(safeData);
+                setMeetings(prev => prev.map(m => m.id === safeData.id ? safeData : m));
                 setNotification({ show: true, type: 'success', message: t('notifications.statusUpdated') });
             } else {
                 throw new Error("Failed to update status.");
@@ -566,7 +567,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     if (res.ok) {
                         const data = await res.json();
                         // Update selectedMeeting with fresh data from server
-                        setSelectedMeeting(data);
+                        setSelectedMeeting(safeMeeting(data));
                     }
                 } catch (err) {
                     console.error('Failed to refetch meeting details:', err);
@@ -638,8 +639,10 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         }
 
                         // Update selectedMeeting AND update ref
-                        setSelectedMeeting(data);
-                        prevMeetingRef.current = data;
+                        const safeData = safeMeeting(data);
+                        setSelectedMeeting(safeData);
+                        prevMeetingRef.current = safeData;
+                        setMeetings(prev => prev.map(m => m.id === safeData.id ? safeData : m));
                     }
 
                     // CRITICAL: Always refresh meetingSummary to get latest quiz/feedback results
@@ -997,6 +1000,55 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             trainingPhotos: meeting.costReport?.trainingPhotos || ''
         });
         setIsReportOpen(true);
+
+        // Auto-check attendance for invited participants who already submitted feedback.
+        // Skip once the report is paid/locked, so a finalized attendance record isn't silently altered.
+        if (meeting.costReport?.isPaid) return;
+        const invitedEmployeeIds = (meeting.guests as any)?.employee_ids || [];
+        if (invitedEmployeeIds.length === 0) return;
+
+        fetch(`${API_BASE_URL}/api/meetings/summary/${meeting.id}`)
+            .then(res => (res.ok ? res.json() : null))
+            .then(summary => {
+                const feedbacks = summary?.allFeedbackResults || [];
+                if (feedbacks.length === 0) return;
+
+                // Resolve each feedback entry to an employee_id (direct field, or via email lookup)
+                const feedbackEmployeeIds = new Set<string>();
+                feedbacks.forEach((f: any) => {
+                    let empId = String(f.employee_id || '').trim();
+                    if (!empId && f.user_id) {
+                        const emp = employees.find(e => (e.email || '').toLowerCase() === String(f.user_id).toLowerCase().trim());
+                        if (emp) empId = String(emp.id_employee || emp.id || '');
+                    }
+                    if (empId) feedbackEmployeeIds.add(empId);
+                });
+                if (feedbackEmployeeIds.size === 0) return;
+
+                setReportData(prev => {
+                    const attendeeIds = [...(prev.attendee_ids || [])];
+                    const attendees = [...(prev.attendees || [])];
+                    let changed = false;
+
+                    invitedEmployeeIds.forEach((id: string) => {
+                        if (feedbackEmployeeIds.has(String(id)) && !attendeeIds.includes(id)) {
+                            attendeeIds.push(id);
+                            changed = true;
+                            const emp = employees.find(e => e.id_employee === id);
+                            if (emp?.email && !attendees.includes(emp.email)) attendees.push(emp.email);
+                        }
+                    });
+
+                    if (!changed) return prev;
+                    return {
+                        ...prev,
+                        attendees,
+                        attendee_ids: attendeeIds,
+                        participantsCount: Math.max(prev.participantsCount || 0, attendeeIds.length)
+                    };
+                });
+            })
+            .catch(err => console.error('Failed to auto-check attendance from feedback:', err));
     };
 
     const toggleAttendee = (email: string, employeeId?: string) => {
@@ -1416,7 +1468,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                 // Get feedback scores - calculate average from all participants for this meeting
                 let pte1: string | number = '-';
-                let materialScore: string | number = '-';
                 const meetingFeedbacks = meetingFeedbackMap.get(m.id) || [];
 
                 if (meetingFeedbacks && meetingFeedbacks.length > 0) {
@@ -1439,7 +1490,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     if (allScores.length > 0) {
                         const avg = allScores.reduce((a, b) => a + b, 0) / allScores.length;
                         pte1 = avg.toFixed(2);
-                        materialScore = avg.toFixed(2);
                     }
                 }
 
@@ -1488,19 +1538,51 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     "Venue/Meals Cost\n(Fee dari tempat pelaksanaan training)": Math.round(venueMealsCost),
                     "Total Cost\n(Training Cost + Venue/Meals)": Math.round(totalCost),
                     "PTE 1\n(Average feedback survey)": pte1,
-                    "Material\n(Average penilaian feedbacksurvey terkait materi training)": materialScore,
-                    "Facilitator2": '-',
-                    "Venue & Meals": '-',
+                    "Material\n(Average penilaian feedbacksurvey terkait materi training)": '',
+                    "Facilitator2": '',
+                    "Venue & Meals": '',
                     "Pre-Test": avgPre === '-' ? '-' : String(avgPre),
                     "Post-Test": avgPost === '-' ? '-' : String(avgPost),
                     "% Increment\n(Nilai Post Test - Nilai Pre Test)/ Nilai Pre Test": percentIncrement,
-                    "PTE 3": '-',
-                    "Notes": '-'
+                    "PTE 3": '',
+                    "Notes": ''
                 });
             });
         });
 
         const ws = XLSX.utils.json_to_sheet(dataRows);
+
+        // These columns are intentionally left blank for manual/offline input;
+        // highlight both header and data cells with the same gray fill so they stand out for the person filling them in.
+        const placeholderColumns = [
+            "Material\n(Average penilaian feedbacksurvey terkait materi training)",
+            "Facilitator2",
+            "Venue & Meals",
+            "PTE 3",
+            "Notes"
+        ];
+        if (dataRows.length > 0) {
+            const headers = Object.keys(dataRows[0]);
+            const grayFillStyle = {
+                fill: { fgColor: { rgb: "D9D9D9" }, patternType: "solid" as const }
+            };
+
+            placeholderColumns.forEach(colName => {
+                const colIdx = headers.indexOf(colName);
+                if (colIdx === -1) return;
+                const colLetter = XLSX.utils.encode_col(colIdx);
+
+                const headerCellRef = `${colLetter}1`;
+                if (ws[headerCellRef]) ws[headerCellRef].s = grayFillStyle;
+
+                for (let r = 0; r < dataRows.length; r++) {
+                    const cellRef = `${colLetter}${r + 2}`;
+                    if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '' };
+                    ws[cellRef].s = grayFillStyle;
+                }
+            });
+        }
+
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Hosts");
         XLSX.writeFile(wb, `Internal_Training_Hosts_${startDate}_to_${endDate}.xlsx`);
@@ -1670,8 +1752,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     esc((emp as any)?.directorate || '-'),
                     esc(emp?.organization_name || '-'), // Updated: Division taken from organization_name
                     esc((emp as any)?.department || '-'),
-                    esc((emp as any)?.lob || '-'),
-                    esc((emp as any)?.division_type_mapping || '-'),
+                    '', // LOB (intentionally left blank for manual/offline input)
+                    '', // Divison Type Mapping (intentionally left blank for manual/offline input)
                     Math.floor((mDate.getMonth() + 3) / 3),
                     mDate.getFullYear(),
                     mDate.toLocaleString('default', { month: 'long' }),
@@ -1767,13 +1849,35 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         return '>60 years';
                     })(),
                     esc((emp as any)?.gender || '-'),
-                    '-', // Action Plan (tidak ada data action plan)
-                    '-'  // Detail Participant Type
+                    '', // Action Plan (intentionally left blank for manual/offline input)
+                    ''  // Detail Participant Type (intentionally left blank for manual/offline input)
                 ]);
             });
         });
 
         const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+
+        // These columns are intentionally left blank for manual/offline input;
+        // highlight both header and data cells with the same gray fill so they stand out for the person filling them in.
+        const placeholderColumns = ["LOB", "Divison Type Mapping", "Action Plan", "Detail Participant Type"];
+        const grayFillStyle = {
+            fill: { fgColor: { rgb: "D9D9D9" }, patternType: "solid" as const }
+        };
+        placeholderColumns.forEach(colName => {
+            const colIdx = headers.indexOf(colName);
+            if (colIdx === -1) return;
+            const colLetter = XLSX.utils.encode_col(colIdx);
+
+            const headerCellRef = `${colLetter}1`;
+            if (ws[headerCellRef]) ws[headerCellRef].s = grayFillStyle;
+
+            for (let r = 0; r < dataRows.length; r++) {
+                const cellRef = `${colLetter}${r + 2}`;
+                if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '' };
+                ws[cellRef].s = grayFillStyle;
+            }
+        });
+
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Participants");
         XLSX.writeFile(wb, `Internal_Training_Participants_${startDate}_to_${endDate}.xlsx`);
@@ -2400,9 +2504,19 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                     return acc;
                                                                 }, []);
 
-                                                                const preParticipants = allParticipantIds.filter(email => meetingResults.some(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('PRE')));
-                                                                const postParticipants = allParticipantIds.filter(email => meetingResults.some(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('POST')));
-                                                                const fbParticipants = allParticipantIds.filter(email => meetingFeedback.some(f => isParticipantMatch(f, email)));
+                                                                // Averages should only reflect participants marked present in the Attendance checklist
+                                                                const attendedIdsSetForAvg = new Set((m.costReport?.attendee_ids || []).map(id => String(id).toLowerCase().trim()));
+                                                                const isAttendedEmail = (email: string) => {
+                                                                    const target = email.toLowerCase().trim();
+                                                                    if (attendedIdsSetForAvg.has(target)) return true;
+                                                                    const emp = (employees || []).find(e => e.email?.toLowerCase() === target || String(e.id_employee).toLowerCase() === target || String(e.id).toLowerCase() === target);
+                                                                    return !!emp && attendedIdsSetForAvg.has(String(emp.id_employee).toLowerCase().trim());
+                                                                };
+                                                                const attendedParticipantIds = allParticipantIds.filter(isAttendedEmail);
+
+                                                                const preParticipants = attendedParticipantIds.filter(email => meetingResults.some(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('PRE')));
+                                                                const postParticipants = attendedParticipantIds.filter(email => meetingResults.some(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('POST')));
+                                                                const fbParticipants = attendedParticipantIds.filter(email => meetingFeedback.some(f => isParticipantMatch(f, email)));
 
                                                                 const preScores = preParticipants.map(email => {
                                                                     const scores = meetingResults.filter(r => isParticipantMatch(r, email) && (r.quizType || (r as any).quiz_type || "").toUpperCase().includes('PRE')).map(r => Number(r.score) || 0);
@@ -3668,9 +3782,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     </button>
                                 </div>
                                 <div className="absolute -bottom-8 left-6">
-                                    <div className="w-16 h-16 bg-white rounded-2xl shadow-lg flex flex-col items-center justify-center border border-slate-100">
-                                        <span className="text-xs font-bold text-indigo-500 uppercase">{selectedMeeting.shortDate?.split(' ')[1]}</span>
-                                        <span className="text-2xl font-bold text-slate-800">{selectedMeeting.shortDate?.split(' ')[0]}</span>
+                                    <div className="w-16 h-16 bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden flex flex-col">
+                                        <div className="bg-indigo-600 text-white py-1 text-[10px] font-black uppercase tracking-widest text-center">
+                                            {(selectedMeeting.shortDate || 'TBD TBD').split(' ')[1]}
+                                        </div>
+                                        <div className="flex-1 flex items-center justify-center text-2xl font-black text-slate-800 leading-none">
+                                            {(selectedMeeting.shortDate || 'TBD').split(' ')[0]}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -3776,8 +3894,12 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         </p>
                                     </div>
 
-                                    {/* Feedback Peserta - Show/Hide */}
+                                    {/* Feedback Peserta - Show/Hide (Host & HR only) */}
                                     {(() => {
+                                        const isHostOrHR = effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' ||
+                                            (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id);
+                                        if (!isHostOrHR) return null;
+
                                         const allFeedback = meetingSummary?.allFeedbackResults || [];
                                         if (allFeedback.length === 0) return null;
 
@@ -4499,8 +4621,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                             if (res.ok) {
                                                 const data = await res.json();
-                                                setSelectedMeeting(data);
-                                                setMeetings(prev => prev.map(m => m.id === data.id ? data : m));
+                                                const safeData = safeMeeting(data);
+                                                setSelectedMeeting(safeData);
+                                                setMeetings(prev => prev.map(m => m.id === safeData.id ? safeData : m));
                                                 setNotification({ show: true, type: 'success', message: t('notifications.sessionClosed') });
                                             } else {
                                                 throw new Error("Failed to close session.");
