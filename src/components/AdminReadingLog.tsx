@@ -5,6 +5,21 @@ import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry, User, Employee } from '../types';
 import * as XLSX from 'xlsx';
 
+const getFullImageUrl = (path: string) => {
+    if (!path) return '';
+    if (path.startsWith('http')) return path;
+
+    let cleanPath = path.startsWith('/') ? path.slice(1) : path;
+
+    // If path starts with 'api/' and API_BASE_URL already contains '/api'
+    if (cleanPath.startsWith('api/') && API_BASE_URL.toLowerCase().endsWith('/api')) {
+        const root = API_BASE_URL.substring(0, API_BASE_URL.length - 4);
+        return `${root}/${cleanPath}`;
+    }
+
+    return `${API_BASE_URL}/${cleanPath}`;
+};
+
 interface AdminReadingLogProps {
     onBack: () => void;
     user: User;
@@ -1586,7 +1601,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                 <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">{t('verifyModal.borrowEvidence')}</p>
                                                 <div className="relative group cursor-zoom-in" onClick={() => setPhotoModal({ open: true, log: verifyModal.log })}>
                                                     <img
-                                                        src={verifyModal.log.evidenceUrl.startsWith('http') ? verifyModal.log.evidenceUrl : `${API_BASE_URL}${verifyModal.log.evidenceUrl}`}
+                                                        src={getFullImageUrl(verifyModal.log.evidenceUrl)}
                                                         alt={t('verifyModal.borrowEvidence')}
                                                         className="w-full h-14 object-cover rounded-lg border border-slate-200 shadow-sm transition-transform group-hover:scale-[1.02]"
                                                     />
@@ -1601,7 +1616,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                 <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">{t('verifyModal.returnEvidence')}</p>
                                                 <div className="relative group cursor-zoom-in" onClick={() => setPhotoModal({ open: true, log: verifyModal.log })}>
                                                     <img
-                                                        src={verifyModal.log.returnEvidenceUrl.startsWith('http') ? verifyModal.log.returnEvidenceUrl : `${API_BASE_URL}${verifyModal.log.returnEvidenceUrl}`}
+                                                        src={getFullImageUrl(verifyModal.log.returnEvidenceUrl)}
                                                         alt={t('verifyModal.returnEvidence')}
                                                         className="w-full h-14 object-cover rounded-lg border border-slate-200 shadow-sm transition-transform group-hover:scale-[1.02]"
                                                     />
@@ -2010,7 +2025,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     <div className="pt-2">
                                         <div className="text-[10px] font-black text-slate-400 uppercase mb-2">{t('detailModal.evidencePhoto')}</div>
                                         <img
-                                            src={detailModal.log.evidenceUrl.startsWith('http') ? detailModal.log.evidenceUrl : `${API_BASE_URL}${detailModal.log.evidenceUrl}`}
+                                            src={getFullImageUrl(detailModal.log.evidenceUrl)}
                                             className="w-full rounded-xl border border-slate-200 bg-slate-50 max-h-[220px] object-cover hover:scale-[1.02] transition-transform duration-300 cursor-zoom-in"
                                             alt={t('detailModal.evidencePhoto')}
                                             onClick={() => setPhotoModal({ open: true, log: detailModal.log })}
@@ -2021,7 +2036,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     <div className="pt-2">
                                         <div className="text-[10px] font-black text-slate-400 uppercase mb-2">{t('detailModal.returnEvidencePhoto')}</div>
                                         <img
-                                            src={detailModal.log.returnEvidenceUrl.startsWith('http') ? detailModal.log.returnEvidenceUrl : `${API_BASE_URL}${detailModal.log.returnEvidenceUrl}`}
+                                            src={getFullImageUrl(detailModal.log.returnEvidenceUrl)}
                                             className="w-full rounded-xl border border-slate-200 bg-slate-50 max-h-[220px] object-cover hover:scale-[1.02] transition-transform duration-300 cursor-zoom-in"
                                             alt={t('detailModal.returnEvidencePhoto')}
                                             onClick={() => setPhotoModal({ open: true, log: detailModal.log })}
@@ -2049,7 +2064,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                         <ImageIcon className="text-blue-500" size={18} />
                                         {photoModal.log.source === 'SIMAS' ? t('photoModal.borrowingEvidencePhoto') : t('photoModal.evidencePhoto')}
                                     </p>
-                                    <ZoomableImage src={photoModal.log.evidenceUrl.startsWith('http') ? photoModal.log.evidenceUrl : `${API_BASE_URL}${photoModal.log.evidenceUrl}`} alt={t('photoModal.borrowingEvidencePhoto')} />
+                                    <ZoomableImage src={getFullImageUrl(photoModal.log.evidenceUrl)} alt={t('photoModal.borrowingEvidencePhoto')} />
                                 </div>
                             )}
 
@@ -2059,7 +2074,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                         <ImageIcon className="text-green-500" size={18} />
                                         {t('photoModal.returnEvidencePhoto')}
                                     </p>
-                                    <ZoomableImage src={photoModal.log.returnEvidenceUrl.startsWith('http') ? photoModal.log.returnEvidenceUrl : `${API_BASE_URL}${photoModal.log.returnEvidenceUrl}`} alt={t('photoModal.returnEvidencePhoto')} />
+                                    <ZoomableImage src={getFullImageUrl(photoModal.log.returnEvidenceUrl)} alt={t('photoModal.returnEvidencePhoto')} />
                                 </div>
                             )}
                         </div>
