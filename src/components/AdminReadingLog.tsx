@@ -259,6 +259,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
     });
     const [editEvidenceFile, setEditEvidenceFile] = useState<File | null>(null);
     const [editEvidencePreview, setEditEvidencePreview] = useState<string | null>(null);
+    const [editReturnEvidenceFile, setEditReturnEvidenceFile] = useState<File | null>(null);
+    const [editReturnEvidencePreview, setEditReturnEvidencePreview] = useState<string | null>(null);
     const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
 
     // Cancel Modal State (Admin)
@@ -354,6 +356,16 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         setEditEvidencePreview(url);
         return () => URL.revokeObjectURL(url);
     }, [editEvidenceFile]);
+
+    useEffect(() => {
+        if (!editReturnEvidenceFile) {
+            setEditReturnEvidencePreview(null);
+            return;
+        }
+        const url = URL.createObjectURL(editReturnEvidenceFile);
+        setEditReturnEvidencePreview(url);
+        return () => URL.revokeObjectURL(url);
+    }, [editReturnEvidenceFile]);
 
     useEffect(() => {
         fetchBranches();
@@ -717,6 +729,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
 
     const handleEditLogClick = (log: ReadingLogEntry) => {
         setEditEvidenceFile(null);
+        setEditReturnEvidenceFile(null);
         setEditLogModal({
             open: true,
             log,
@@ -727,6 +740,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 finishDate: log.finishDate,
                 link: log.link || log.review,
                 evidenceUrl: log.evidenceUrl,
+                returnEvidenceUrl: log.returnEvidenceUrl,
                 category: log.category
             }
         });
@@ -749,11 +763,17 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
         try {
             let formData = editLogModal.formData;
 
-            if (editEvidenceFile) {
+            if (editEvidenceFile || editReturnEvidenceFile) {
                 setIsUploadingEvidence(true);
                 try {
-                    const uploadedUrl = await uploadEvidenceFile(editEvidenceFile);
-                    formData = { ...formData, evidenceUrl: uploadedUrl };
+                    if (editEvidenceFile) {
+                        const uploadedUrl = await uploadEvidenceFile(editEvidenceFile);
+                        formData = { ...formData, evidenceUrl: uploadedUrl };
+                    }
+                    if (editReturnEvidenceFile) {
+                        const uploadedReturnUrl = await uploadEvidenceFile(editReturnEvidenceFile);
+                        formData = { ...formData, returnEvidenceUrl: uploadedReturnUrl };
+                    }
                 } catch (uploadErr) {
                     console.error(uploadErr);
                     alert(t('alerts.failedToUploadPhoto'));
@@ -774,6 +794,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 setAllLogs(allLogs.map(l => l.id === updated.id ? updated : l));
                 setEditLogModal({ open: false, log: null, formData: {} });
                 setEditEvidenceFile(null);
+                setEditReturnEvidenceFile(null);
             }
         } catch (err) { console.error(err); }
     };
@@ -1837,6 +1858,27 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     </label>
                                 </div>
                             </div>
+                            {editLogModal.log?.returnEvidenceUrl && (
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">{t('detailModal.returnEvidencePhoto')}</label>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-20 h-20 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0">
+                                            {editReturnEvidencePreview ? (
+                                                <img src={editReturnEvidencePreview} alt="" className="w-full h-full object-cover" />
+                                            ) : editLogModal.formData.returnEvidenceUrl ? (
+                                                <img src={getFullImageUrl(editLogModal.formData.returnEvidenceUrl)} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <ImageIcon size={24} className="text-slate-300" />
+                                            )}
+                                        </div>
+                                        <label className="flex-1 cursor-pointer px-4 py-2 border border-dashed border-slate-300 rounded-xl text-sm font-bold text-slate-500 hover:border-blue-400 hover:text-blue-500 flex items-center justify-center gap-2 text-center">
+                                            <Upload size={16} />
+                                            {isUploadingEvidence ? t('editModal.uploadingPhoto') : t('editModal.changePhoto')}
+                                            <input type="file" accept="image/*" className="hidden" onChange={e => setEditReturnEvidenceFile(e.target.files?.[0] || null)} />
+                                        </label>
+                                    </div>
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">{t('editModal.reviewLinkLabel')}</label>
                                 <input type="text" className="w-full px-4 py-2 border border-slate-200 rounded-xl" value={editLogModal.formData.link || ''} onChange={e => setEditLogModal(prev => ({ ...prev, formData: { ...prev.formData, link: e.target.value } }))} />
@@ -1845,7 +1887,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         <div className="mt-6 flex justify-between gap-3">
                             <button onClick={() => handleDeleteLog(editLogModal.log!.id)} className="px-4 py-2 text-red-600 font-bold hover:bg-red-50 rounded-xl border border-red-200 flex items-center"><Trash2 size={16} className="mr-2" /> {t('editModal.delete')}</button>
                             <div className="flex gap-2">
-                                <button onClick={() => { setEditLogModal({ open: false, log: null, formData: {} }); setEditEvidenceFile(null); }} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">{t('editModal.cancel')}</button>
+                                <button onClick={() => { setEditLogModal({ open: false, log: null, formData: {} }); setEditEvidenceFile(null); setEditReturnEvidenceFile(null); }} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">{t('editModal.cancel')}</button>
                                 <button onClick={handleEditLogSubmit} disabled={isUploadingEvidence} className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{isUploadingEvidence ? t('editModal.uploadingPhoto') : t('editModal.saveChanges')}</button>
                             </div>
                         </div>

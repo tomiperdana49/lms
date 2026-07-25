@@ -1812,6 +1812,7 @@ app.put('/api/logs/:id', async (req, res) => {
         if (updates.startDate !== undefined) dbUpdates.start_date = new Date(updates.startDate);
         if (updates.finishDate !== undefined) dbUpdates.finish_date = new Date(updates.finishDate);
         if (updates.evidenceUrl !== undefined) dbUpdates.evidence_url = updates.evidenceUrl;
+        if (updates.returnEvidenceUrl !== undefined) dbUpdates.return_evidence_url = updates.returnEvidenceUrl;
         if (updates.hrApprovalStatus !== undefined) dbUpdates.hr_approval_status = updates.hrApprovalStatus;
         if (updates.incentiveAmount !== undefined) dbUpdates.incentive_amount = updates.incentiveAmount;
         if (updates.rejectionReason !== undefined) dbUpdates.rejection_reason = updates.rejectionReason;
