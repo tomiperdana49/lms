@@ -1602,7 +1602,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             "Gender", "Action Plan", "Detail Participant Type"
         ];
 
-        const filtered = filteredMeetings;
+        const filtered = [...filteredMeetings].sort((a, b) => {
+            const aTime = new Date(a.date).getTime();
+            const bTime = new Date(b.date).getTime();
+            if (isNaN(aTime) && isNaN(bTime)) return 0;
+            if (isNaN(aTime)) return 1;
+            if (isNaN(bTime)) return -1;
+            return aTime - bTime;
+        });
         let globalIndex = 1;
 
         // Helper to calculate duration from time string like '09:30 - 15:30'
@@ -1714,6 +1721,19 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     const year = date.getFullYear();
                     return `${day}/${month}/${year}`;
                 };
+                // Format date as DD/MM/YYYY HH:mm, appending a time string (e.g. "09:30") when available
+                const formatDDMMYYYYWithTime = (date: Date, timeStr?: string) => {
+                    const datePart = formatDDMMYYYY(date);
+                    const cleanTime = (timeStr || '').trim();
+                    return cleanTime ? `${datePart} ${cleanTime}` : datePart;
+                };
+                const [meetingStartTime, meetingEndTime] = (() => {
+                    if (m.time && m.time.includes('-')) {
+                        const [start, end] = m.time.split('-');
+                        return [start?.trim() || '', end?.trim() || ''];
+                    }
+                    return ['', ''];
+                })();
                 // Helper to escape commas in CSV
                 const esc = (val: any) => {
                     if (val === null || val === undefined) return "";
@@ -1759,26 +1779,16 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     mDate.toLocaleString('default', { month: 'long' }),
                     mDate.getMonth() + 1,
 
-                    // Calculate Start Date based on date + startTime from meeting time string
+                    // Start Date = meeting date + start time (e.g. "02/01/2026 09:30")
                     (() => {
-                        let startDate = m.date || '';
-                        if (m.time && m.time.includes('-')) {
-                            const parts = m.time.split('-');
-                            if (parts.length >= 1) {
-                                // First part has the start time info, date is already in m.date
-                                startDate = m.date;
-                            }
-                        }
-                        return formatDDMMYYYY(new Date(startDate));
+                        const startDate = m.date || '';
+                        return formatDDMMYYYYWithTime(new Date(startDate), meetingStartTime);
                     })(),  // Start Date
 
-                    // Calculate End Date - if multi-day, use end time from meeting
+                    // End Date = meeting date + end time (assumes single-day events)
                     (() => {
-                        let endDate = m.date || ''; // Default to same date
-
-                        // If we have both start and end times (multi-day event)
-                        // For now assume single day events, so end date = start date
-                        return formatDDMMYYYY(new Date(endDate));
+                        const endDate = m.date || ''; // Default to same date
+                        return formatDDMMYYYYWithTime(new Date(endDate), meetingEndTime);
                     })(),  // End Date
 
                     // Calculate Training Hours from time string like '09:30 - 15:30'
