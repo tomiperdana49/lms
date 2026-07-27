@@ -1423,6 +1423,10 @@ app.get('/api/learning-stats', async (req, res) => {
             }
         }
 
+        const byDateAsc = (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime();
+        trainingDetails.sort(byDateAsc);
+        bookDetails.sort(byDateAsc);
+
         res.json({
             jamTraining: Math.round(jamTraining),
             jamBuku: Math.round(jamBuku),
