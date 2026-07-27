@@ -97,6 +97,25 @@ const HRReportGenerator = () => {
         return { start, end };
     };
 
+    // Branch filter must be resolved via the record's owning employee (employee_id -> employees.branch_name),
+    // not the free-text `location` field on meetings/logs/requests (e.g. meeting room address), which is
+    // unrelated to company branch and left empty most of the time.
+    const matchesBranch = (employeeId?: string | null) => {
+        if (selectedBranch === 'All') return true;
+        if (!employeeId) return false;
+        const emp = employees.find(e => e.id_employee === employeeId);
+        return emp?.branch_name === selectedBranch;
+    };
+
+    // Meetings have no reliable host employee_id (host is stored as a free-text name), so branch
+    // relevance is resolved from the meeting's participant list instead: a meeting counts toward a
+    // branch if at least one invited/attending employee belongs to it.
+    const meetingMatchesBranch = (m: Meeting) => {
+        if (selectedBranch === 'All') return true;
+        const ids = (m.costReport?.attendee_ids?.length ? m.costReport.attendee_ids : m.guests?.employee_ids) || [];
+        return ids.some(id => employees.find(e => e.id_employee === id)?.branch_name === selectedBranch);
+    };
+
     const isInPeriod = (dateStr: string, range: { start: Date, end: Date }) => {
         const d = new Date(dateStr);
         return d >= range.start && d <= range.end;
@@ -112,7 +131,7 @@ const HRReportGenerator = () => {
         const range = { start, end };
 
         meetings.forEach(m => {
-            if (selectedBranch !== 'All' && m.location !== selectedBranch) return;
+            if (!meetingMatchesBranch(m)) return;
             if (m.costReport && m.costReport.isPaid && isInPeriod(m.date, range)) {
                 internalTraining += (
                     safeNum(m.costReport.trainerIncentive ?? (m.costReport as any).trainer) +
@@ -125,7 +144,7 @@ const HRReportGenerator = () => {
         });
 
         logs.filter(l => l.hrApprovalStatus === 'Approved' && l.incentiveAmount).forEach(l => {
-            if (selectedBranch !== 'All' && l.location !== selectedBranch) return;
+            if (!matchesBranch(l.employee_id)) return;
             const dateToCheck = l.claimedAt || l.approvedAt || l.finishDate || l.date;
             if (isInPeriod(dateToCheck, range)) {
                 readingIncentive += safeNum(l.incentiveAmount);
@@ -133,17 +152,14 @@ const HRReportGenerator = () => {
         });
 
         requests.filter(r => r.status === 'APPROVED').forEach(r => {
-            if (selectedBranch !== 'All' && r.location !== selectedBranch) return;
+            if (!matchesBranch(r.employee_id)) return;
             if (isInPeriod(r.date, range)) {
                 externalTraining += safeNum(r.cost) + safeNum(r.additionalCost);
             }
         });
         
         externalRequests.filter(r => r.status === 'Processed').forEach(r => {
-            if (selectedBranch !== 'All') {
-                const emp = employees.find(e => e.id_employee === r.employee_id);
-                if (emp?.branch_name !== selectedBranch) return;
-            }
+            if (!matchesBranch(r.employee_id)) return;
             const dateToCheck = r.updated_at || r.created_at || r.start_date;
             if (isInPeriod(dateToCheck, range)) {
                 externalTraining += safeNum(r.registration_fee) + safeNum(r.travel_flight_cost) + safeNum(r.accommodation_cost) + safeNum(r.miscellaneous_cost);
@@ -151,10 +167,7 @@ const HRReportGenerator = () => {
         });
 
         incentives.filter(i => ['Active', 'Paid'].includes(i.status)).forEach(i => {
-            if (selectedBranch !== 'All') {
-                const emp = employees.find(e => e.id_employee === i.employee_id);
-                if (emp?.branch_name !== selectedBranch) return;
-            }
+            if (!matchesBranch(i.employee_id)) return;
             const isOneTime = i.paymentType === 'One-Time';
             const iStart = new Date(i.startDate);
             const iEnd = new Date(i.endDate);
@@ -207,7 +220,7 @@ const HRReportGenerator = () => {
         const range = { start, end };
 
         meetings.forEach(m => {
-            if (selectedBranch !== 'All' && m.location !== selectedBranch) return;
+            if (!meetingMatchesBranch(m)) return;
             if (m.costReport && m.costReport.isPaid && isInPeriod(m.date, range)) {
                 const trainerInc = safeNum(m.costReport.trainerIncentive ?? (m.costReport as any).trainer);
                 const snackC = safeNum(m.costReport.snackCost ?? (m.costReport as any).snack);
@@ -236,7 +249,7 @@ const HRReportGenerator = () => {
         });
 
         logs.filter(l => l.hrApprovalStatus === 'Approved' && l.incentiveAmount).forEach(l => {
-            if (selectedBranch !== 'All' && l.location !== selectedBranch) return;
+            if (!matchesBranch(l.employee_id)) return;
             const dateToCheck = l.claimedAt || l.approvedAt || l.finishDate || l.date;
             if (isInPeriod(dateToCheck, range)) {
                 txs.push({
@@ -251,7 +264,7 @@ const HRReportGenerator = () => {
         });
 
         requests.filter(r => r.status === 'APPROVED').forEach(r => {
-            if (selectedBranch !== 'All' && r.location !== selectedBranch) return;
+            if (!matchesBranch(r.employee_id)) return;
             if (isInPeriod(r.date, range)) {
                 const details = [t('transactions.mainCostDetail', { amount: formatCurrency(r.cost || 0) })];
                 if (r.additionalCost) details.push(t('transactions.additionalDetail', { amount: formatCurrency(r.additionalCost) }));
@@ -268,10 +281,7 @@ const HRReportGenerator = () => {
         });
 
         externalRequests.filter(r => r.status === 'Processed').forEach(r => {
-            if (selectedBranch !== 'All') {
-                const emp = employees.find(e => e.id_employee === r.employee_id);
-                if (emp?.branch_name !== selectedBranch) return;
-            }
+            if (!matchesBranch(r.employee_id)) return;
             const dateToCheck = r.updated_at || r.created_at || r.start_date;
             if (isInPeriod(dateToCheck, range)) {
                 const details = [t('transactions.registrationDetail', { amount: formatCurrency(safeNum(r.registration_fee)) })];
@@ -291,10 +301,7 @@ const HRReportGenerator = () => {
         });
 
         incentives.filter(i => ['Active', 'Paid'].includes(i.status)).forEach(i => {
-            if (selectedBranch !== 'All') {
-                const emp = employees.find(e => e.id_employee === i.employee_id);
-                if (emp?.branch_name !== selectedBranch) return;
-            }
+            if (!matchesBranch(i.employee_id)) return;
             const isOneTime = i.paymentType === 'One-Time';
             const iStart = new Date(i.startDate);
             const iEnd = new Date(i.endDate);
