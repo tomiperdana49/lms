@@ -466,9 +466,6 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 const userApprovedLogs = item.stats.logsRange.filter((l: ReadingLogEntry) => l.hrApprovalStatus === 'Approved');
                 if (userApprovedLogs.length === 0) return;
                 
-                let userTotalBase = 0;
-                let userTotalBonus = 0;
-
                 const logsData = userApprovedLogs.map((log: ReadingLogEntry) => {
                     let baseAmount = 0;
                     let bonusAmount = 0;
@@ -489,15 +486,10 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         }
                     }
 
-                    userTotalBase += baseAmount;
-                    userTotalBonus += bonusAmount;
-
                     return { log, baseAmount, bonusAmount };
                 });
 
-                const userTotalAmount = userTotalBase + userTotalBonus;
-
-                logsData.forEach(({ log, baseAmount, bonusAmount }, idx) => {
+                logsData.forEach(({ log, baseAmount, bonusAmount }) => {
                     const timestampStr = log.claimedAt || log.approvedAt || log.finishDate || log.date;
 
                     let rowMonthName = monthName;
@@ -521,7 +513,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         'Cabang': item.user.branch || 'Others',
                         'Insentif Buku': baseAmount,
                         'Reward Tambahan': bonusAmount,
-                        'Insentif Total': idx === 0 ? userTotalAmount : null,
+                        'Insentif Total': null,
                         'Total Penggunaan Budget Learning': null,
                         _timestampStr: timestampStr
                     });
@@ -541,12 +533,34 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 d._rawDate = date.getTime();
             });
 
+            // Within the same employee/month group, push the row that earned the milestone
+            // bonus to the bottom so "Reward Tambahan" and "Insentif Total" always land together.
             dataToExport.sort((a, b) => {
                 if (a._sortMonth !== b._sortMonth) return a._sortMonth - b._sortMonth;
                 const nameCmp = (a['Employee Name'] || '').localeCompare(b['Employee Name'] || '');
                 if (nameCmp !== 0) return nameCmp;
+                const bonusCmp = (a['Reward Tambahan'] > 0 ? 1 : 0) - (b['Reward Tambahan'] > 0 ? 1 : 0);
+                if (bonusCmp !== 0) return bonusCmp;
                 return a._rawDate - b._rawDate;
             });
+
+            // Assign Insentif Total to the last row of each employee/month group,
+            // summing that group's own rows (now that bonus rows sort last).
+            for (let i = 0; i < dataToExport.length; i++) {
+                const next = dataToExport[i + 1];
+                const isLastInGroup = !next ||
+                    next['Employee Name'] !== dataToExport[i]['Employee Name'] ||
+                    next['Periode Bulan'] !== dataToExport[i]['Periode Bulan'];
+                if (!isLastInGroup) continue;
+
+                let total = 0;
+                for (let j = i; j >= 0; j--) {
+                    if (dataToExport[j]['Employee Name'] !== dataToExport[i]['Employee Name'] ||
+                        dataToExport[j]['Periode Bulan'] !== dataToExport[i]['Periode Bulan']) break;
+                    total += (dataToExport[j]['Insentif Buku'] || 0) + (dataToExport[j]['Reward Tambahan'] || 0);
+                }
+                dataToExport[i]['Insentif Total'] = total;
+            }
 
             dataToExport.forEach(d => {
                 delete d._timestampStr;
