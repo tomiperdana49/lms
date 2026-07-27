@@ -11,6 +11,17 @@
   "totalHours": "Total Jam",
   "learningCost": "Biaya Belajar",
   "totalCost": "Total Biaya",
+  "detailModal": {
+    "hoursTitle": "Detail Jam Belajar",
+    "costTitle": "Detail Biaya Belajar",
+    "trainingSection": "Training Internal",
+    "readingSection": "Log Bacaan",
+    "noTraining": "Belum ada training internal yang dihadiri.",
+    "noReading": "Belum ada buku yang disetujui.",
+    "subtotal": "Subtotal",
+    "grandTotal": "Total Keseluruhan",
+    "close": "Tutup"
+  },
   "menu": {
     "readingLogTitle": "Log Bacaan",
     "readingLogSubtitle": "Log bacaan buku",

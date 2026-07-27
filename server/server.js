@@ -1309,9 +1309,11 @@ app.get('/api/learning-stats', async (req, res) => {
         let biayaTraining = 0;
         let jamBuku = 0;
         let biayaBuku = 0;
+        const trainingDetails = [];
+        const bookDetails = [];
 
         // 1. Internal Training (meetings)
-        const meetings = await query("SELECT time, guests_json, cost_report_json, host, employee_id FROM meetings WHERE type IN ('Offline', 'Online', 'Hybrid', 'Internal')");
+        const meetings = await query("SELECT title, date, time, guests_json, cost_report_json, host, employee_id FROM meetings WHERE type IN ('Offline', 'Online', 'Hybrid', 'Internal')");
         for (const meeting of meetings) {
             // Skip if the user is the host
             if ((targetName && meeting.host === targetName) ||
@@ -1338,6 +1340,9 @@ app.get('/api/learning-stats', async (req, res) => {
             }
 
             if (isAttended) {
+                let itemHours = 0;
+                let itemCost = 0;
+
                 // Parse duration
                 if (meeting.time) {
                     const parts = meeting.time.split('-');
@@ -1348,9 +1353,10 @@ app.get('/api/learning-stats', async (req, res) => {
                         };
                         const startH = parseTime(parts[0].trim());
                         const endH = parseTime(parts[1].trim());
-                        if (endH > startH) jamTraining += (endH - startH);
+                        if (endH > startH) itemHours = endH - startH;
                     }
                 }
+                jamTraining += itemHours;
 
                 // Parse cost
                 if (costReport && costReport.participantsCount > 0) {
@@ -1359,25 +1365,34 @@ app.get('/api/learning-stats', async (req, res) => {
                     const lCost = Number(costReport.lunchCost) || 0;
                     const oCost = Number(costReport.otherCost) || 0;
                     const totalCost = tInc + sCost + lCost + oCost;
-                    biayaTraining += (totalCost / costReport.participantsCount);
+                    itemCost = totalCost / costReport.participantsCount;
                 }
+                biayaTraining += itemCost;
+
+                trainingDetails.push({
+                    title: meeting.title,
+                    date: meeting.date,
+                    hours: Math.round(itemHours * 100) / 100,
+                    cost: Math.round(itemCost)
+                });
             }
         }
 
         // 2. Baca Buku (reading_logs)
         if (targetEmpId) {
-            const logs = await query("SELECT incentive_amount, category FROM reading_logs WHERE employee_id = ? AND hr_approval_status = 'Approved'", [targetEmpId]);
+            const logs = await query("SELECT title, finish_date, date, incentive_amount, category FROM reading_logs WHERE employee_id = ? AND hr_approval_status = 'Approved'", [targetEmpId]);
             // Biaya buku
             for (const log of logs) {
                 const incentive = Number(log.incentive_amount) || 0;
                 biayaBuku += incentive;
 
                 const category = log.category || '';
+                let itemHours = 0;
 
                 if (category === 'Buku Fiksi/Novel' || category === 'Majalah') {
                     // 0 hours
                 } else if (category === 'Komik Bisnis/Non Fiksi') {
-                    jamBuku += 3;
+                    itemHours = 3;
                 } else if ([
                     'Buku Biografi dan Sejarah',
                     'Buku Bisnis dan Manajemen',
@@ -1389,13 +1404,22 @@ app.get('/api/learning-stats', async (req, res) => {
                     'Buku Terlaris',
                     'Buku Wajib Baca'
                 ].includes(category)) {
-                    jamBuku += 15;
+                    itemHours = 15;
                 } else {
                     // Fallback to old logic just in case an old entry has no category
-                    if (incentive === 100000) jamBuku += 15;
-                    else if (incentive === 50000) jamBuku += 3;
-                    else if (incentive > 0) jamBuku += (incentive / 100000) * 15;
+                    if (incentive === 100000) itemHours = 15;
+                    else if (incentive === 50000) itemHours = 3;
+                    else if (incentive > 0) itemHours = (incentive / 100000) * 15;
                 }
+
+                jamBuku += itemHours;
+
+                bookDetails.push({
+                    title: log.title,
+                    date: log.finish_date || log.date,
+                    hours: Math.round(itemHours * 100) / 100,
+                    cost: Math.round(incentive)
+                });
             }
         }
 
@@ -1405,7 +1429,9 @@ app.get('/api/learning-stats', async (req, res) => {
             biayaTraining: Math.round(biayaTraining),
             biayaBuku: Math.round(biayaBuku),
             totalJam: Math.round(jamTraining + jamBuku),
-            totalBiaya: Math.round(biayaTraining + biayaBuku)
+            totalBiaya: Math.round(biayaTraining + biayaBuku),
+            trainingDetails,
+            bookDetails
         });
 
     } catch (err) {

@@ -1,9 +1,27 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, Users, Calendar as CalendarIcon, Video, GraduationCap, Star, Briefcase, Award } from 'lucide-react';
+import { BookOpen, Users, Calendar as CalendarIcon, Video, GraduationCap, Star, Briefcase, Award, X, Clock, Wallet } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Page, Role } from '../types';
 import LMSCalendar from './LMSCalendar';
 import { API_BASE_URL } from '../config';
+
+interface LearningStatDetail {
+    title: string;
+    date: string;
+    hours: number;
+    cost: number;
+}
+
+interface LearningStats {
+    totalJam: number;
+    totalBiaya: number;
+    jamTraining: number;
+    jamBuku: number;
+    biayaTraining: number;
+    biayaBuku: number;
+    trainingDetails: LearningStatDetail[];
+    bookDetails: LearningStatDetail[];
+}
 
 interface DashboardHomeProps {
     onNavigate?: (page: Page) => void;
@@ -17,7 +35,11 @@ import NotificationPanel from './NotificationPanel';
 
 const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: DashboardHomeProps) => {
     const { t } = useTranslation('dashboardHome');
-    const [learningStats, setLearningStats] = useState({ totalJam: 0, totalBiaya: 0 });
+    const [learningStats, setLearningStats] = useState<LearningStats>({
+        totalJam: 0, totalBiaya: 0, jamTraining: 0, jamBuku: 0, biayaTraining: 0, biayaBuku: 0,
+        trainingDetails: [], bookDetails: []
+    });
+    const [detailModal, setDetailModal] = useState<'hours' | 'cost' | null>(null);
 
     useEffect(() => {
         if (userEmail) {
@@ -117,21 +139,38 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
 
                     {/* Quick Stats Bar */}
                     <div className="flex gap-4 w-full md:w-auto md:mr-12 lg:mr-24">
-                        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-white/10 flex-1 md:flex-none md:min-w-[140px] group hover:bg-white/15 transition-all text-center">
+                        <button
+                            type="button"
+                            onClick={() => setDetailModal('hours')}
+                            className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-white/10 flex-1 md:flex-none md:min-w-[140px] group hover:bg-white/15 transition-all text-center cursor-pointer"
+                        >
                             <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-70">{t('learningHours')}</div>
                             <div className="text-xl sm:text-2xl font-black tracking-tighter">{learningStats.totalJam} {t('hours')}</div>
                             <div className="text-[9px] font-medium text-blue-200 mt-1">{t('totalHours')}</div>
-                        </div>
-                        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-white/10 flex-1 md:flex-none md:min-w-[140px] group hover:bg-white/15 transition-all text-center">
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setDetailModal('cost')}
+                            className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-white/10 flex-1 md:flex-none md:min-w-[140px] group hover:bg-white/15 transition-all text-center cursor-pointer"
+                        >
                             <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-70">{t('learningCost')}</div>
                             <div className="text-xl sm:text-2xl font-black tracking-tighter">
                                 Rp {learningStats.totalBiaya.toLocaleString('id-ID')}
                             </div>
                             <div className="text-[9px] font-medium text-blue-200 mt-1">{t('totalCost')}</div>
-                        </div>
+                        </button>
                     </div>
                 </div>
             </div>
+
+            {detailModal && (
+                <LearningStatsDetailModal
+                    mode={detailModal}
+                    stats={learningStats}
+                    onClose={() => setDetailModal(null)}
+                    t={t}
+                />
+            )}
 
             {/* 3-Column Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 lg:overflow-hidden min-h-0">
@@ -195,6 +234,99 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
                     <NotificationPanel userEmail={userEmail} userName={userName} userRole={userRole} />
                 </div>
 
+            </div>
+        </div>
+    );
+};
+
+interface LearningStatsDetailModalProps {
+    mode: 'hours' | 'cost';
+    stats: LearningStats;
+    onClose: () => void;
+    t: (key: string) => string;
+}
+
+const LearningStatsDetailModal = ({ mode, stats, onClose, t }: LearningStatsDetailModalProps) => {
+    const isHours = mode === 'hours';
+
+    const formatDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr || '-';
+        const pad = (n: number) => String(n).padStart(2, '0');
+        return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+    };
+
+    const formatValue = (item: LearningStatDetail) =>
+        isHours ? `${item.hours} ${t('hours')}` : `Rp ${item.cost.toLocaleString('id-ID')}`;
+
+    const sections = [
+        {
+            key: 'training',
+            label: t('detailModal.trainingSection'),
+            icon: <Users size={16} />,
+            items: stats.trainingDetails,
+            subtotal: isHours ? stats.jamTraining : stats.biayaTraining,
+            emptyLabel: t('detailModal.noTraining')
+        },
+        {
+            key: 'reading',
+            label: t('detailModal.readingSection'),
+            icon: <BookOpen size={16} />,
+            items: stats.bookDetails,
+            subtotal: isHours ? stats.jamBuku : stats.biayaBuku,
+            emptyLabel: t('detailModal.noReading')
+        }
+    ];
+
+    const grandTotal = isHours ? stats.totalJam : stats.totalBiaya;
+
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col animate-in fade-in zoom-in duration-200">
+                <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        {isHours ? <Clock size={20} className="text-blue-600" /> : <Wallet size={20} className="text-blue-600" />}
+                        {isHours ? t('detailModal.hoursTitle') : t('detailModal.costTitle')}
+                    </h3>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+                </div>
+
+                <div className="overflow-y-auto p-6 space-y-6 flex-1">
+                    {sections.map(section => (
+                        <div key={section.key}>
+                            <div className="flex items-center gap-2 text-slate-500 mb-2">
+                                {section.icon}
+                                <span className="text-xs font-black uppercase tracking-widest">{section.label}</span>
+                            </div>
+                            {section.items.length === 0 ? (
+                                <p className="text-sm text-slate-400 italic pl-1">{section.emptyLabel}</p>
+                            ) : (
+                                <div className="rounded-xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
+                                    {section.items.map((item, idx) => (
+                                        <div key={idx} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                                            <div className="min-w-0">
+                                                <p className="font-semibold text-slate-700 truncate">{item.title}</p>
+                                                <p className="text-[11px] text-slate-400">{formatDate(item.date)}</p>
+                                            </div>
+                                            <span className="font-bold text-slate-700 whitespace-nowrap">{formatValue(item)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            <div className="flex justify-between items-center px-1 mt-2 text-xs font-bold text-slate-500">
+                                <span>{t('detailModal.subtotal')}</span>
+                                <span>{isHours ? `${section.subtotal} ${t('hours')}` : `Rp ${section.subtotal.toLocaleString('id-ID')}`}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl shrink-0">
+                    <span className="text-sm font-black text-slate-700 uppercase tracking-wide">{t('detailModal.grandTotal')}</span>
+                    <span className="text-lg font-black text-blue-600">
+                        {isHours ? `${grandTotal} ${t('hours')}` : `Rp ${grandTotal.toLocaleString('id-ID')}`}
+                    </span>
+                </div>
             </div>
         </div>
     );
