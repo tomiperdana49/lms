@@ -1470,6 +1470,42 @@ app.get('/api/employees', async (req, res) => {
     }
 });
 
+// Resolve employee_ids not found in the local employees table by looking them up in Nusawork.
+// Used e.g. by the Training Internal import, where imported participants may not yet be synced locally.
+app.post('/api/employees/resolve', async (req, res) => {
+    try {
+        const employeeIds = Array.isArray(req.body.employeeIds) ? req.body.employeeIds : [];
+        const uniqueIds = [...new Set(employeeIds.filter(Boolean).map(String))];
+        if (uniqueIds.length === 0) return res.json({ resolved: [] });
+
+        const placeholders = uniqueIds.map(() => '?').join(', ');
+        const existing = await querySimAsset(
+            `SELECT id_employee FROM employees WHERE id_employee IN (${placeholders})`,
+            uniqueIds
+        );
+        const existingIds = new Set(existing.map(e => String(e.id_employee)));
+        const missingIds = uniqueIds.filter(id => !existingIds.has(id));
+
+        if (missingIds.length === 0) return res.json({ resolved: [] });
+
+        const token = await getNusanetToken();
+        if (!token) {
+            return res.status(401).json({ error: 'Nusawork authentication unavailable', resolved: [] });
+        }
+
+        const resolved = [];
+        for (const id of missingIds) {
+            const emp = await syncEmployeeFromNusawork(id, token);
+            if (emp) resolved.push(emp);
+        }
+
+        res.json({ resolved, missingCount: missingIds.length });
+    } catch (err) {
+        console.error('[API] Error in /api/employees/resolve:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/branches', async (req, res) => {
     try {
         const branches = await querySimAsset('SELECT id_branch, name FROM branches WHERE deleted_at IS NULL ORDER BY name ASC');
@@ -2170,6 +2206,35 @@ app.post('/api/meetings', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Google Drive "view" links aren't stable for direct embedding (unofficial thumbnail endpoint
+// gets rate-limited, ~429). Download the file once at import time and re-host it locally instead.
+const downloadDriveImageToUploads = async (driveUrl) => {
+    const match = driveUrl.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/) || driveUrl.match(/drive\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/);
+    if (!match) return null;
+    const fileId = match[1];
+
+    try {
+        const response = await fetch(`https://drive.google.com/uc?export=download&id=${fileId}`);
+        if (!response.ok) {
+            console.warn(`[DRIVE IMPORT] Failed to download Drive file ${fileId}: status ${response.status}`);
+            return null;
+        }
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.startsWith('image/')) {
+            console.warn(`[DRIVE IMPORT] Drive file ${fileId} is not an image (content-type: ${contentType}), skipping.`);
+            return null;
+        }
+        const ext = contentType.split('/')[1]?.split(';')[0] || 'jpg';
+        const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.${ext}`;
+        const buffer = Buffer.from(await response.arrayBuffer());
+        fs.writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
+        return `/uploads/${filename}`;
+    } catch (e) {
+        console.warn(`[DRIVE IMPORT] Error downloading Drive file ${fileId}:`, e.message);
+        return null;
+    }
+};
+
 app.post('/api/meetings/bulk', async (req, res) => {
     try {
         const meetings = req.body.meetings;
@@ -2177,6 +2242,11 @@ app.post('/api/meetings/bulk', async (req, res) => {
 
         const inserted = [];
         for (const m of meetings) {
+            if (m.cost_report?.trainingPhotos?.includes('drive.google.com')) {
+                const localPath = await downloadDriveImageToUploads(m.cost_report.trainingPhotos);
+                if (localPath) m.cost_report.trainingPhotos = localPath;
+            }
+
             const participants = Array.isArray(m.participants) ? m.participants : [];
             let guests = {
                 status: 'Awaiting',
@@ -2218,11 +2288,10 @@ app.post('/api/meetings/bulk', async (req, res) => {
                     m.pre_test_data ? JSON.stringify(m.pre_test_data) : null,
                     m.post_test_data ? JSON.stringify(m.post_test_data) : null,
                     m.feedback_data ? JSON.stringify(m.feedback_data) : null,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0
+                    m.is_pre_test_active ? 1 : 0,
+                    m.is_post_test_active ? 1 : 0,
+                    m.is_feedback_active ? 1 : 0,
+                    m.is_closed ? 1 : 0
                 ]
             );
 
@@ -2240,7 +2309,7 @@ app.post('/api/meetings/bulk', async (req, res) => {
                     await query('INSERT INTO quiz_results (student_id, student_name, meeting_id, score, date, quiz_type, employee_id) VALUES (?, ?, ?, ?, NOW(), "POST", ?)', [studentId, studentName, meetingId, p.post_test_score, p.employee_id || null]);
                 }
                 if (p.feedback_score !== null && p.feedback_score !== '') {
-                    const fbData = JSON.stringify({ rating: p.feedback_score, imported: true });
+                    const fbData = JSON.stringify({ rating: p.feedback_score });
                     await query('INSERT INTO course_feedback (user_id, employee_id, meeting_id, feedback_data, submitted_at) VALUES (?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE feedback_data = ?, submitted_at = NOW()', [studentId, p.employee_id || null, meetingId, fbData, fbData]);
                 }
             }

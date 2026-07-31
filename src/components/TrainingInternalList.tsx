@@ -368,7 +368,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 other: parseIndonesianNumber(row['Insentif Other']),
                                 total: parseIndonesianNumber(row['Insentif Total'] || row['Budget Learning per orang / Total Cost']),
                                 isPaid: row['Lapor Insentif']?.toString().toLowerCase().trim() === 'sudah' ? true : false,
-                                isFinalized: row['Lapor Insentif']?.toString().toLowerCase().trim() === 'sudah' ? true : false
+                                isFinalized: row['Lapor Insentif']?.toString().toLowerCase().trim() === 'sudah' ? true : false,
+                                trainingPhotos: row['Lampiran (Foto/Video)'] || ''
                             },
                             participants: []
                         });
@@ -428,6 +429,37 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     return m;
                 });
                 
+                // Resolve any imported employee_ids that aren't in the local employees directory yet
+                // (e.g. newly hired staff not synced locally) by looking them up in Nusawork.
+                const importedEmployeeIds = new Set<string>();
+                formattedMeetings.forEach((m: any) => {
+                    (m.participants || []).forEach((p: any) => {
+                        if (p.employee_id) importedEmployeeIds.add(String(p.employee_id));
+                    });
+                });
+                const knownEmployeeIds = new Set(employees.map(e => String(e.id_employee || e.id)));
+                const unresolvedEmployeeIds = Array.from(importedEmployeeIds).filter(id => !knownEmployeeIds.has(id));
+
+                if (unresolvedEmployeeIds.length > 0) {
+                    try {
+                        const resolveRes = await fetch(`${API_BASE_URL}/api/employees/resolve`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ employeeIds: unresolvedEmployeeIds })
+                        });
+                        if (resolveRes.ok) {
+                            const { resolved } = await resolveRes.json();
+                            if (resolved?.length) {
+                                fetch(`${API_BASE_URL}/api/employees`)
+                                    .then(r => r.json())
+                                    .then(data => setEmployees(data));
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Failed to resolve unknown employee_ids from Nusawork:', e);
+                    }
+                }
+
                 if (formattedMeetings.length > 0) {
                     const res = await fetch(`${API_BASE_URL}/api/meetings/bulk`, {
                         method: 'POST',
@@ -1925,6 +1957,16 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         return `${API_BASE_URL}${path}`;
     };
 
+    // Google Drive "view" links can't be used directly as <img> src (they render an HTML page, not the image bytes).
+    // Convert them to Drive's thumbnail endpoint so the photo actually renders; clicking still opens the original link.
+    const getDisplayImageUrl = (path?: string) => {
+        const full = getFullImageUrl(path);
+        if (!full) return full;
+        const driveMatch = full.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/) || full.match(/drive\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/);
+        if (driveMatch) return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w1000`;
+        return full;
+    };
+
     const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -2043,6 +2085,17 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             const itemEmployeeIdForMatch = String(item.employee_id || '').toLowerCase().trim();
                                             const itemUserIdForMatch = String(item.user_id || '').toLowerCase().trim();
                                             const itemEmailForMatch = String(item.email || item.user_email || '').toLowerCase().trim();
+
+                                            // CRITICAL: Direct ID match first - covers participants (e.g. imported records)
+                                            // whose employee record isn't resolvable in the currently loaded employees directory.
+                                            if (itemEmployeeIdForMatch && itemEmployeeIdForMatch === target) {
+                                                console.log('[isMatch] SUCCESS: direct employee_id match:', target);
+                                                return true;
+                                            }
+                                            if (itemIdStr && itemIdStr === target) {
+                                                console.log('[isMatch] SUCCESS: direct student_id/user_id match:', target);
+                                                return true;
+                                            }
 
                                             // CRITICAL: Match by user_id/email first (for feedback data)
                                             if (target.includes('@') && itemUserIdForMatch === target) {
@@ -3480,7 +3533,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     >
                                         {reportData.trainingPhotos ? (
                                             <>
-                                                <img src={getFullImageUrl(reportData.trainingPhotos)} alt={t('reportModal.trainingPhotoAlt')} className="absolute inset-0 w-full h-full object-cover" />
+                                                <img src={getDisplayImageUrl(reportData.trainingPhotos)} alt={t('reportModal.trainingPhotoAlt')} className="absolute inset-0 w-full h-full object-cover" />
                                                 {!reportData.isPaid && (
                                                     <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                         <div className="bg-white/20 backdrop-blur-md p-3 rounded-full text-white">
@@ -4020,8 +4073,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 className="relative h-40 rounded-2xl overflow-hidden border border-slate-100 group cursor-pointer shadow-sm hover:shadow-md transition-all"
                                                 onClick={() => window.open(getFullImageUrl(selectedMeeting.costReport?.trainingPhotos), '_blank')}
                                             >
-                                                <img 
-                                                    src={getFullImageUrl(selectedMeeting.costReport.trainingPhotos)} 
+                                                <img
+                                                    src={getDisplayImageUrl(selectedMeeting.costReport.trainingPhotos)}
                                                     alt={t('detailModal.trainingEvidenceAlt')}
                                                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                                                 />
