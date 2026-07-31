@@ -17,7 +17,8 @@
     "totalInvestment": "Total Investment",
     "pendingApproval": "Pending Approval",
     "successfulEnrollments": "Successful Enrollments",
-    "averagePerHead": "Average Per Head"
+    "averagePerHead": "Average Per Head",
+    "clearFilter": "Clear filter"
   },
   "filters": {
     "searchPlaceholder": "Search employee, title, or vendor...",
@@ -25,6 +26,7 @@
   },
   "list": {
     "empty": "No matching requests found",
+    "onlyOwnHidden": "Your own request already counts toward the total above, but isn't shown here to avoid self-approval.",
     "certificateAlt": "Certificate",
     "supervisor": "Supervisor",
     "hrDept": "HR DEPT",
@@ -32,7 +34,9 @@
     "viewDocument": "View Document",
     "openDocument": "Open Document",
     "viewCertificateAttachment": "View Certificate/Attachment",
-    "viewDossier": "View Dossier"
+    "viewDossier": "View Dossier",
+    "detail": "Detail",
+    "delete": "Delete"
   },
   "recapTable": {
     "professionalEntity": "Professional Entity",
@@ -48,18 +52,26 @@
     "processTitle": "Process Training Request",
     "ltrId": "LTR-ID: {{id}} • {{name}}",
     "trainingTitle": "Training Title",
+    "titleLabel": "Title / Course Name",
     "vendorLocation": "Vendor & Location",
+    "vendor": "Vendor",
+    "location": "Location",
     "strategicJustification": "Strategic Justification",
-    "financeAllocation": "Finance Allocation",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "financeAllocation": "Cost Allocation",
     "trainingFee": "Training Fee",
-    "travelCost": "Travel Cost",
+    "travelCost": "Transportation Cost",
     "accommodation": "Accommodation",
-    "miscellaneous": "Miscellaneous",
+    "miscellaneous": "Other Cost",
     "paymentMethod": "Payment Method",
     "paymentMethodReimbursement": "Reimbursement",
     "paymentMethodDirectPayment": "Direct Payment",
     "uploadCertificateEvidence": "Upload Certificate Evidence",
     "certificateAlreadyUploaded": "Certificate evidence already uploaded.",
+    "certificationResult": "Certification Result",
+    "certificationPassed": "Passed",
+    "certificationNotPassed": "Not Passed",
     "certificateExpiryDate": "Certificate Expiry Date",
     "grantIncentive": "Grant Certificate Incentive",
     "incentiveReward": "Reward Amount",

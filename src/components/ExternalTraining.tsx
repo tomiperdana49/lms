@@ -7,7 +7,7 @@ import {
  CheckCircle,
  XCircle,
 
- DollarSign,
+ Wallet,
  Briefcase,
  Link,
  Calendar,
@@ -65,6 +65,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  const [endDate, setEndDate] = useState('');
  const [regFee, setRegFee] = useState('');
  const [attachment, setAttachment] = useState('');
+ const [paymentMethod, setPaymentMethod] = useState<'Reimbursement' | 'Direct Payment'>('Reimbursement');
 
 
  useEffect(() => {
@@ -110,12 +111,13 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  registration_fee: Number(regFee.replace(/\./g, '')) || 0,
  attachment_link: attachment,
  vendor,
- location
+ location,
+ payment_method: paymentMethod
  })
  });
  if (res.ok) {
  showNotif('success', t('notifications.submitSuccess'));
- setTitle(''); setVendor(''); setLocation(''); setRegFee(''); setAttachment(''); setStartDate(''); setEndDate('');
+ setTitle(''); setVendor(''); setLocation(''); setRegFee(''); setAttachment(''); setStartDate(''); setEndDate(''); setPaymentMethod('Reimbursement');
  fetchMyRequests();
  } else {
  throw new Error(t('notifications.submitFailed'));
@@ -165,6 +167,22 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  };
 
  const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(num);
+ const formatScheduleDateTime = (value: string) => {
+ const d = new Date(value);
+ return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+ };
+
+ const getFullImageUrl = (path: string) => path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
+
+ // Google Drive "view" links can't be used directly as <img> src; convert to Drive's thumbnail endpoint.
+ const getDisplayImageUrl = (path: string) => {
+ const full = getFullImageUrl(path);
+ const driveMatch = full.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/) || full.match(/drive\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/);
+ if (driveMatch) return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w1000`;
+ return full;
+ };
+
+ const isPdfLink = (path: string) => /\.pdf(\?|$)/i.test(path);
 
  return (
  <div className="space-y-6 animate-in fade-in">
@@ -207,18 +225,18 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <div>
  <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.category')}</label>
  <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg">
- <option value="Training">{t('form.categoryTraining')}</option>
  <option value="Sertifikat">{t('form.categoryCertificate')}</option>
+ <option value="Training">{t('form.categoryTraining')}</option>
  <option value="Modul">{t('form.categoryModule')}</option>
  </select>
  </div>
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.titleLabel')}</label>
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.titleLabel')} <span className="text-red-500">*</span></label>
  <input required type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" placeholder={t('form.titlePlaceholder')} />
  </div>
  <div className="grid grid-cols-2 gap-4">
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.vendor')}</label>
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.vendor')} <span className="text-red-500">*</span></label>
  <input required type="text" value={vendor} onChange={e => setVendor(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" placeholder={t('form.vendorPlaceholder')} />
  </div>
  <div>
@@ -226,18 +244,16 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <input type="text" value={location} onChange={e => setLocation(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" placeholder={t('form.locationPlaceholder')} />
  </div>
  </div>
- <div className="grid grid-cols-2 gap-4">
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.startDate')}</label>
- <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" />
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.startDate')} <span className="text-red-500">*</span></label>
+ <input required type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" />
  </div>
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.endDate')}</label>
- <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" />
- </div>
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.endDate')} <span className="text-red-500">*</span></label>
+ <input required type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" />
  </div>
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.registrationFee')}</label>
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.registrationFee')} <span className="text-red-500">*</span></label>
  <input
  required
  type="text"
@@ -250,6 +266,25 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg"
  placeholder="0"
  />
+ </div>
+ <div>
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.paymentMethod')}</label>
+ <div className="grid grid-cols-2 gap-3">
+ {(['Reimbursement', 'Direct Payment'] as const).map(method => (
+ <button
+ key={method}
+ type="button"
+ onClick={() => setPaymentMethod(method)}
+ className={`py-2 rounded-lg text-sm font-medium border transition-colors ${
+ paymentMethod === method
+ ? 'bg-blue-600 text-white border-blue-600'
+ : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-300'
+ }`}
+ >
+ {method === 'Reimbursement' ? t('form.paymentMethodReimbursement') : t('form.paymentMethodDirectPayment')}
+ </button>
+ ))}
+ </div>
  </div>
  <div>
  <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.attachmentLink')}</label>
@@ -287,7 +322,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <h3 className="font-semibold text-gray-800 text-lg">{req.title}</h3>
  <div className="flex items-center gap-4 text-sm text-gray-500 mt-2">
  <span className="flex items-center gap-1"><Calendar className="w-4 h-4"/> {req.start_date ? new Date(req.start_date).toLocaleDateString() : '-'}</span>
- <span className="flex items-center gap-1"><DollarSign className="w-4 h-4"/> {t('request.registrationLabel', { amount: formatRp(req.registration_fee || 0) })}</span>
+ <span className="flex items-center gap-1"><Wallet className="w-4 h-4"/> {t('request.registrationLabel', { amount: formatRp(req.registration_fee || 0) })}</span>
  </div>
  </div>
  {req.status === 'Processed' && req.payment_method && (
@@ -324,29 +359,29 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  {req.end_date && (
  <div className="flex items-center gap-2 text-gray-600">
  <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
- <span>{t('request.detailSchedule')}: <span className="font-semibold text-gray-800">{req.start_date ? new Date(req.start_date).toLocaleDateString() : '-'} &mdash; {new Date(req.end_date).toLocaleDateString()}</span></span>
+ <span>{t('request.detailSchedule')}: <span className="font-semibold text-gray-800">{req.start_date ? formatScheduleDateTime(req.start_date) : '-'} &mdash; {formatScheduleDateTime(req.end_date)}</span></span>
  </div>
  )}
  {Number(req.travel_flight_cost) > 0 && (
  <div className="flex items-center gap-2 text-gray-600">
- <DollarSign className="w-4 h-4 text-gray-400 shrink-0" />
+ <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
  <span>{t('request.detailTravelCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.travel_flight_cost))}</span></span>
  </div>
  )}
  {Number(req.accommodation_cost) > 0 && (
  <div className="flex items-center gap-2 text-gray-600">
- <DollarSign className="w-4 h-4 text-gray-400 shrink-0" />
+ <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
  <span>{t('request.detailAccommodationCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.accommodation_cost))}</span></span>
  </div>
  )}
  {Number(req.miscellaneous_cost) > 0 && (
  <div className="flex items-center gap-2 text-gray-600">
- <DollarSign className="w-4 h-4 text-gray-400 shrink-0" />
+ <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
  <span>{t('request.detailMiscCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.miscellaneous_cost))}</span></span>
  </div>
  )}
  <div className="flex items-center gap-2 text-gray-600">
- <DollarSign className="w-4 h-4 text-gray-400 shrink-0" />
+ <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
  <span>{t('request.detailTotalCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.registration_fee || 0) + Number(req.travel_flight_cost || 0) + Number(req.accommodation_cost || 0) + Number(req.miscellaneous_cost || 0))}</span></span>
  </div>
  {req.approved_by && (
@@ -362,10 +397,21 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  </a>
  )}
  {req.certificate_link && (
- <a href={req.certificate_link} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold">
- <Award className="w-4 h-4 shrink-0" />
- {t('request.detailCertificate')}: {t('request.viewLink')}
+ <div className="sm:col-span-2">
+ <span className="flex items-center gap-2 text-gray-600 mb-2">
+ <Award className="w-4 h-4 shrink-0 text-gray-400" />
+ {t('request.detailCertificate')}
+ </span>
+ {isPdfLink(req.certificate_link) ? (
+ <a href={getFullImageUrl(req.certificate_link)} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold">
+ <Link className="w-4 h-4 shrink-0" /> {t('request.viewLink')}
  </a>
+ ) : (
+ <a href={getFullImageUrl(req.certificate_link)} target="_blank" rel="noreferrer" className="block w-48 h-32 rounded-lg overflow-hidden border border-gray-200 hover:opacity-90 transition-opacity">
+ <img src={getDisplayImageUrl(req.certificate_link)} alt={t('request.detailCertificate')} className="w-full h-full object-cover" />
+ </a>
+ )}
+ </div>
  )}
  {req.certificate_expiry_date && (
  <div className="flex items-center gap-2 text-gray-600">
@@ -435,10 +481,10 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/50">
  <p className="text-xs text-slate-500 mb-1 font-medium flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5"/> {t('team.schedule')}</p>
- <p className="text-sm font-semibold text-slate-700">{req.start_date ? new Date(req.start_date).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}) : '-'} &mdash; {req.end_date ? new Date(req.end_date).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}) : '-'}</p>
+ <p className="text-sm font-semibold text-slate-700">{req.start_date ? new Date(req.start_date).toLocaleString('en-GB', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'}) : '-'} &mdash; {req.end_date ? new Date(req.end_date).toLocaleString('en-GB', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'}) : '-'}</p>
  </div>
  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/50">
- <p className="text-xs text-slate-500 mb-1 font-medium flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5"/> {t('team.registrationFee')}</p>
+ <p className="text-xs text-slate-500 mb-1 font-medium flex items-center gap-1.5"><Wallet className="w-3.5 h-3.5"/> {t('team.registrationFee')}</p>
  <p className="text-sm font-bold text-slate-800">{formatRp(req.registration_fee || 0)}</p>
  </div>
  {req.vendor && (

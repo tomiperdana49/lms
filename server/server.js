@@ -3036,12 +3036,14 @@ app.get('/api/feedback/all', async (req, res) => {
 // 1. Employee creates new request
 app.post('/api/external-training/request', async (req, res) => {
     try {
-        const { employee_id, employee_name, category, title, start_date, end_date, registration_fee, attachment_link, vendor, location } = req.body;
+        const { employee_id, employee_name, category, title, start_date, end_date, registration_fee, attachment_link, vendor, location, payment_method } = req.body;
+        // datetime-local inputs send "YYYY-MM-DDTHH:MM"; MySQL DATETIME literals need a space instead of "T"
+        const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
         const result = await query(`
-            INSERT INTO external_training_requests 
-            (employee_id, employee_name, category, title, start_date, end_date, registration_fee, attachment_link, vendor, location)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [employee_id, employee_name, category, title, start_date || null, end_date || null, registration_fee || 0, attachment_link || '', vendor || '', location || '']);
+            INSERT INTO external_training_requests
+            (employee_id, employee_name, category, title, start_date, end_date, registration_fee, attachment_link, vendor, location, payment_method)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [employee_id, employee_name, category, title, toMysqlDatetime(start_date), toMysqlDatetime(end_date), registration_fee || 0, attachment_link || '', vendor || '', location || '', payment_method || 'Reimbursement']);
         res.json({ success: true, id: result.insertId });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3133,7 +3135,9 @@ app.get('/api/external-training/hr', async (req, res) => {
 // 6. HR processes payment
 app.post('/api/external-training/hr-process', async (req, res) => {
     try {
-        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date } = req.body;
+        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date, title, vendor, location, start_date, end_date, certification_result } = req.body;
+        // datetime-local inputs send "YYYY-MM-DDTHH:MM"; MySQL DATETIME literals need a space instead of "T"
+        const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
 
         let sql = `UPDATE external_training_requests SET status = 'Processed', travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, payment_method = ?`;
         let params = [travel_flight_cost || 0, accommodation_cost || 0, miscellaneous_cost || 0, payment_method];
@@ -3149,6 +3153,30 @@ app.post('/api/external-training/hr-process', async (req, res) => {
         if (certificate_expiry_date !== undefined) {
             sql += `, certificate_expiry_date = ?`;
             params.push(certificate_expiry_date || null);
+        }
+        if (title !== undefined) {
+            sql += `, title = ?`;
+            params.push(title);
+        }
+        if (vendor !== undefined) {
+            sql += `, vendor = ?`;
+            params.push(vendor);
+        }
+        if (location !== undefined) {
+            sql += `, location = ?`;
+            params.push(location);
+        }
+        if (start_date !== undefined) {
+            sql += `, start_date = ?`;
+            params.push(toMysqlDatetime(start_date));
+        }
+        if (end_date !== undefined) {
+            sql += `, end_date = ?`;
+            params.push(toMysqlDatetime(end_date));
+        }
+        if (certification_result !== undefined) {
+            sql += `, certification_result = ?`;
+            params.push(certification_result || null);
         }
         sql += ` WHERE id = ?`;
         params.push(id);

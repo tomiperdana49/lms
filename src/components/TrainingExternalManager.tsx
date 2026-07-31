@@ -4,7 +4,6 @@ import {
     XCircle,
     CheckCircle2,
     FileText,
-    Printer,
     DollarSign,
     Calendar,
     Trash2,
@@ -56,6 +55,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     const [selectedBranch, setSelectedBranch] = useState<string>('All Branches');
     const [branches, setBranches] = useState<string[]>(['All Branches']);
     const [searchQuery, setSearchQuery] = useState('');
+    const [statusDrilldown, setStatusDrilldown] = useState<'PENDING' | 'APPROVED' | null>(null);
 
     const fetchRequests = async () => {
         try {
@@ -143,8 +143,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     const [selectedRequest, setSelectedRequest] = useState<TrainingRequest | null>(null);
     const [hrCertificateFile, setHrCertificateFile] = useState<File | null>(null);
     const [hrCertificateExpiryDate, setHrCertificateExpiryDate] = useState('');
-    const [isRejectMode, setIsRejectMode] = useState(false);
-    const [rejectReason, setRejectReason] = useState('');
+    const [hrCertificationResult, setHrCertificationResult] = useState<'Passed' | 'Not Passed'>('Passed');
     const [recapDetailUser, setRecapDetailUser] = useState<string | null>(null);
 
     // Cost Breakdown State
@@ -159,6 +158,21 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     const [hrIncentiveReward, setHrIncentiveReward] = useState('');
     const [hrIncentivePaymentType, setHrIncentivePaymentType] = useState<'One-Time' | 'Recurring'>('One-Time');
 
+    // HR correction fields - lets HR fix data submitted by the employee before processing
+    const [hrEditTitle, setHrEditTitle] = useState('');
+    const [hrEditVendor, setHrEditVendor] = useState('');
+    const [hrEditLocation, setHrEditLocation] = useState('');
+    const [hrEditStartDate, setHrEditStartDate] = useState('');
+    const [hrEditEndDate, setHrEditEndDate] = useState('');
+
+    const toDatetimeLocalValue = (v: any) => {
+        if (!v) return '';
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return '';
+        const pad = (n: number) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
     useEffect(() => {
         if (selectedRequest) {
             setBreakdownCost({
@@ -170,10 +184,16 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             setHrPaymentMethod(selectedRequest._original?.payment_method === 'Direct Payment' ? 'Direct Payment' : 'Reimbursement');
             const expiry = selectedRequest._original?.certificate_expiry_date;
             setHrCertificateExpiryDate(expiry ? String(expiry).slice(0, 10) : '');
+            setHrCertificationResult(selectedRequest._original?.certification_result === 'Not Passed' ? 'Not Passed' : 'Passed');
             setHrCertificateFile(null);
             setHrGrantIncentive(false);
             setHrIncentiveReward('');
             setHrIncentivePaymentType('One-Time');
+            setHrEditTitle(selectedRequest.title || '');
+            setHrEditVendor(selectedRequest._original?.vendor || '');
+            setHrEditLocation(selectedRequest._original?.location || '');
+            setHrEditStartDate(toDatetimeLocalValue(selectedRequest._original?.start_date));
+            setHrEditEndDate(toDatetimeLocalValue(selectedRequest._original?.end_date));
         }
     }, [selectedRequest]);
 
@@ -219,8 +239,6 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     };
 
     const filteredRequests = requests.filter(req => {
-        if (req.employeeName === userName) return false;
-
         const d = new Date(req.date);
         const [start, end] = getPeriodDates();
 
@@ -263,95 +281,94 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
         );
     });
 
+    const drilldownFiltered = filteredRequests.filter(req => {
+        if (statusDrilldown === 'PENDING') return req.status.startsWith('PENDING');
+        if (statusDrilldown === 'APPROVED') return req.status === 'APPROVED';
+        return true;
+    });
+
+    // Own submitted requests are hidden from the actionable list (to avoid self-approval)
+    // but must still count toward the aggregate stats above.
+    const visibleRequests = drilldownFiltered.filter(req => req.employeeName !== userName);
+    const onlyOwnRequestsHidden = statusDrilldown !== null && visibleRequests.length === 0 && drilldownFiltered.length > 0;
+
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount);
     };
 
-    const handleAction = async (_id: number, action: 'approve' | 'reject', reason?: string) => {
+    const handleApprove = async () => {
         if (!selectedRequest) return;
-        if (action === 'reject' && !reason) {
-            alert(t('alerts.rejectionReasonRequired'));
-            return;
-        }
 
         try {
-            let res;
-            if (action === 'approve') {
-                let certLink = selectedRequest?._original?.certificate_link;
-                const isCertificateCategory = selectedRequest?._original?.category === 'Sertifikat';
-                if (isCertificateCategory && !certLink && !hrCertificateFile) {
-                    alert(t('alerts.certificateEvidenceRequired'));
-                    return;
-                }
-                if (isCertificateCategory && !hrCertificateExpiryDate) {
-                    alert(t('alerts.certificateExpiryRequired'));
-                    return;
-                }
-                if (isCertificateCategory && hrGrantIncentive && !hrIncentiveReward) {
-                    alert(t('alerts.incentiveRewardRequired'));
-                    return;
-                }
-                if (hrCertificateFile) {
-                    const formData = new FormData();
-                    formData.append('file', hrCertificateFile);
-                    const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
-                        method: 'POST',
-                        body: formData
-                    });
-                    if (uploadRes.ok) {
-                        const uploadData = await uploadRes.json();
-                        certLink = uploadData.fileUrl;
-                    }
-                }
-                res = await fetch(`${API_BASE_URL}/api/external-training/hr-process`, {
+            let certLink = selectedRequest?._original?.certificate_link;
+            const isCertificateCategory = selectedRequest?._original?.category === 'Sertifikat';
+            const requiresCertificateProof = isCertificateCategory && hrCertificationResult === 'Passed';
+            if (requiresCertificateProof && !certLink && !hrCertificateFile) {
+                alert(t('alerts.certificateEvidenceRequired'));
+                return;
+            }
+            if (requiresCertificateProof && !hrCertificateExpiryDate) {
+                alert(t('alerts.certificateExpiryRequired'));
+                return;
+            }
+            if (requiresCertificateProof && hrGrantIncentive && !hrIncentiveReward) {
+                alert(t('alerts.incentiveRewardRequired'));
+                return;
+            }
+            if (hrCertificateFile) {
+                const formData = new FormData();
+                formData.append('file', hrCertificateFile);
+                const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        id: selectedRequest.id,
-                        travel_flight_cost: breakdownCost.transport,
-                        accommodation_cost: breakdownCost.accommodation,
-                        miscellaneous_cost: breakdownCost.others,
-                        payment_method: hrPaymentMethod,
-                        registration_fee: breakdownCost.training,
-                        certificate_link: certLink,
-                        certificate_expiry_date: isCertificateCategory ? hrCertificateExpiryDate : undefined
-                    })
+                    body: formData
                 });
-                if (res.ok && isCertificateCategory && hrGrantIncentive) {
-                    await fetch(`${API_BASE_URL}/api/incentives`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            employeeName: selectedRequest.employeeName,
-                            employee_id: selectedRequest.employee_id,
-                            courseName: selectedRequest.title,
-                            description: t('requestModal.incentiveAutoDescription', { vendor: selectedRequest.vendor }),
-                            startDate: selectedRequest._original?.start_date || new Date().toISOString(),
-                            endDate: hrCertificateExpiryDate,
-                            evidenceUrl: certLink,
-                            status: 'Active',
-                            reward: hrIncentiveReward,
-                            paymentType: hrIncentivePaymentType
-                        })
-                    });
+                if (uploadRes.ok) {
+                    const uploadData = await uploadRes.json();
+                    certLink = uploadData.fileUrl;
                 }
-            } else {
-                res = await fetch(`${API_BASE_URL}/api/external-training/approve`, {
+            }
+            const res = await fetch(`${API_BASE_URL}/api/external-training/hr-process`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: selectedRequest.id,
+                    travel_flight_cost: breakdownCost.transport,
+                    accommodation_cost: breakdownCost.accommodation,
+                    miscellaneous_cost: breakdownCost.others,
+                    payment_method: hrPaymentMethod,
+                    registration_fee: breakdownCost.training,
+                    certificate_link: certLink,
+                    certificate_expiry_date: requiresCertificateProof ? hrCertificateExpiryDate : undefined,
+                    certification_result: isCertificateCategory ? hrCertificationResult : undefined,
+                    title: hrEditTitle,
+                    vendor: hrEditVendor,
+                    location: hrEditLocation,
+                    start_date: hrEditStartDate,
+                    end_date: hrEditEndDate
+                })
+            });
+            if (res.ok && requiresCertificateProof && hrGrantIncentive) {
+                await fetch(`${API_BASE_URL}/api/incentives`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        id: selectedRequest.id,
-                        status: 'Rejected',
-                        approved_by: userName || 'Admin'
+                        employeeName: selectedRequest.employeeName,
+                        employee_id: selectedRequest.employee_id,
+                        courseName: selectedRequest.title,
+                        description: t('requestModal.incentiveAutoDescription', { vendor: selectedRequest.vendor }),
+                        startDate: selectedRequest._original?.start_date || new Date().toISOString(),
+                        endDate: hrCertificateExpiryDate,
+                        evidenceUrl: certLink,
+                        status: 'Active',
+                        reward: hrIncentiveReward,
+                        paymentType: hrIncentivePaymentType
                     })
                 });
             }
             if (res.ok) {
                 await fetchRequests();
                 setSelectedRequest(null);
-                setIsRejectMode(false);
-                setRejectReason('');
             }
         } catch (err) {
             console.error("Action failed", err);
@@ -366,78 +383,6 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                 setRequests(requests.filter(r => r.id !== id));
             }
         } catch (err) { console.error(err); }
-    };
-
-    const handlePrint = (req: TrainingRequest) => {
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-            printWindow.document.write(`
-                <html>
-                <head>
-                    <title>${t('printDocument.windowTitle', { id: req.id })}</title>
-                    <style>
-                        body { font-family: 'Inter', sans-serif; padding: 50px; color: #1e293b; line-height: 1.6; }
-                        .header { text-align: center; margin-bottom: 50px; border-bottom: 2px solid #f1f5f9; padding-bottom: 30px; }
-                        .title { font-size: 28px; font-weight: 900; color: #0f172a; margin-bottom: 5px; }
-                        .doc-id { font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.1em; }
-                        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px; }
-                        .label { font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 900; letter-spacing: 0.05em; margin-bottom: 5px; }
-                        .value { font-size: 15px; font-weight: 700; color: #334155; }
-                        .box { background: #f8fafc; padding: 25px; border-radius: 16px; border: 1px solid #f1f5f9; margin-bottom: 40px; }
-                        .footer { margin-top: 80px; text-align: center; font-size: 11px; color: #94a3b8; font-weight: 600; }
-                        .stamp { border: 3px solid #10b981; color: #10b981; display: inline-block; padding: 12px 25px; font-weight: 900; text-transform: uppercase; transform: rotate(-3deg); margin-top: 30px; border-radius: 8px; font-size: 14px; }
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <div class="title">${t('printDocument.heading')}</div>
-                        <div class="doc-id">${t('printDocument.reference', { id: req.id })}</div>
-                    </div>
-
-                    <div class="grid">
-                        <div>
-                            <div class="label">${t('printDocument.employeeName')}</div>
-                            <div class="value">${req.employeeName}</div>
-                            <div style="font-size: 13px; color: #64748b; font-weight: 500;">${req.employeeRole}</div>
-                        </div>
-                        <div>
-                            <div class="label">${t('printDocument.approvalDate')}</div>
-                            <div class="value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-                        </div>
-                    </div>
-
-                    <div class="box">
-                        <div class="grid" style="margin-bottom: 0;">
-                            <div>
-                                <div class="label">${t('printDocument.trainingProgram')}</div>
-                                <div class="value">${req.title}</div>
-                            </div>
-                            <div>
-                                <div class="label">${t('printDocument.vendorProvider')}</div>
-                                <div class="value">${req.vendor}</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="grid">
-                        <div>
-                            <div class="label">${t('printDocument.totalApprovedBudget')}</div>
-                            <div class="value" style="font-size: 20px; color: #0f172a;">${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(req.cost)}</div>
-                        </div>
-                        <div style="text-align: right;">
-                             <div class="stamp">${t('printDocument.approvedByHr')}</div>
-                        </div>
-                    </div>
-
-                    <div class="footer">
-                        ${t('printDocument.footer')}
-                    </div>
-                </body>
-                </html>
-            `);
-            printWindow.document.close();
-            setTimeout(() => printWindow.print(), 500);
-        }
     };
 
     const handleOpenSettlement = (req: TrainingRequest) => {
@@ -596,22 +541,49 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             {/* Insight Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
-                    { label: t('stats.totalInvestment'), value: formatCurrency(stats.totalBudget), icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                    { label: t('stats.pendingApproval'), value: stats.pendingCount, icon: Clock, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                    { label: t('stats.successfulEnrollments'), value: stats.approvedCount, icon: CheckCircle2, color: 'text-blue-600', bg: 'bg-blue-50' },
-                    { label: t('stats.averagePerHead'), value: formatCurrency(stats.averageCost), icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' }
-                ].map((stat, i) => (
-                    <div key={i} className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-5 group hover:border-indigo-100 transition-all duration-300">
-                        <div className={`p-4 ${stat.bg} ${stat.color} rounded-2xl group-hover:scale-110 transition-transform duration-500`}>
-                            <stat.icon size={24} strokeWidth={2.5} />
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
-                            <p className="text-xl font-black text-slate-900 leading-none">{stat.value}</p>
-                        </div>
-                    </div>
-                ))}
+                    { label: t('stats.totalInvestment'), value: formatCurrency(stats.totalBudget), icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50', filter: null },
+                    { label: t('stats.pendingApproval'), value: stats.pendingCount, icon: Clock, color: 'text-indigo-600', bg: 'bg-indigo-50', filter: 'PENDING' as const },
+                    { label: t('stats.successfulEnrollments'), value: stats.approvedCount, icon: CheckCircle2, color: 'text-blue-600', bg: 'bg-blue-50', filter: 'APPROVED' as const },
+                    { label: t('stats.averagePerHead'), value: formatCurrency(stats.averageCost), icon: Users, color: 'text-amber-600', bg: 'bg-amber-50', filter: null }
+                ].map((stat, i) => {
+                    const isActive = stat.filter !== null && statusDrilldown === stat.filter;
+                    const isClickable = stat.filter !== null;
+                    return (
+                        <button
+                            key={i}
+                            type="button"
+                            disabled={!isClickable}
+                            onClick={() => {
+                                if (!isClickable) return;
+                                setViewMode('list');
+                                setStatusDrilldown(prev => prev === stat.filter ? null : stat.filter);
+                            }}
+                            className={`bg-white p-6 rounded-[32px] border shadow-sm flex items-center gap-5 group transition-all duration-300 text-left ${
+                                isClickable ? 'cursor-pointer hover:border-indigo-200 hover:shadow-md' : 'cursor-default'
+                            } ${isActive ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-slate-100'}`}
+                        >
+                            <div className={`p-4 ${stat.bg} ${stat.color} rounded-2xl group-hover:scale-110 transition-transform duration-500`}>
+                                <stat.icon size={24} strokeWidth={2.5} />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
+                                <p className="text-xl font-black text-slate-900 leading-none">{stat.value}</p>
+                            </div>
+                        </button>
+                    );
+                })}
             </div>
+
+            {statusDrilldown && (
+                <div className="flex items-center gap-2 -mt-2">
+                    <span className="text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-full">
+                        {statusDrilldown === 'PENDING' ? t('stats.pendingApproval') : t('stats.successfulEnrollments')}
+                    </span>
+                    <button onClick={() => setStatusDrilldown(null)} className="text-xs font-bold text-slate-400 hover:text-slate-600">
+                        {t('stats.clearFilter')}
+                    </button>
+                </div>
+            )}
 
             {/* Global Filter Bar */}
             <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex flex-row items-center gap-4 overflow-x-auto no-scrollbar">
@@ -675,15 +647,18 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
 
             {viewMode === 'list' ? (
                 <div className="grid grid-cols-1 gap-4">
-                    {filteredRequests.length === 0 ? (
+                    {visibleRequests.length === 0 ? (
                         <div className="bg-white p-20 rounded-[40px] border border-slate-100 flex flex-col items-center gap-3">
                             <div className="w-16 h-16 rounded-3xl bg-slate-50 flex items-center justify-center text-slate-200">
                                 <FileText size={32} />
                             </div>
                             <p className="text-sm font-black text-slate-400 uppercase tracking-widest">{t('list.empty')}</p>
+                            {onlyOwnRequestsHidden && (
+                                <p className="text-xs text-slate-400 max-w-sm text-center">{t('list.onlyOwnHidden')}</p>
+                            )}
                         </div>
                     ) : (
-                        filteredRequests.map(req => (
+                        visibleRequests.map(req => (
                             <div key={req.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group relative">
                                 <div className="flex flex-col md:flex-row md:items-start gap-4">
                                     <div className="space-y-3 flex-1">
@@ -757,12 +732,18 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                                 <Link size={20} />
                                             </a>
                                         )}
-                                        <button onClick={() => setSelectedRequest(req)} className="p-3 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title={t('list.viewDossier')}>
-                                            <FileText size={20} />
-                                        </button>
+                                        {req.status === 'APPROVED' ? (
+                                            <button onClick={() => setSelectedRequest(req)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-all" title={t('list.viewDossier')}>
+                                                <CheckCircle2 size={14} /> {t('statusBadge.approved')}
+                                            </button>
+                                        ) : (
+                                            <button onClick={() => setSelectedRequest(req)} className="flex items-center gap-1.5 px-3 py-2 text-slate-600 border border-slate-200 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 rounded-xl text-xs font-bold transition-all" title={t('list.viewDossier')}>
+                                                <FileText size={16} /> {t('list.detail')}
+                                            </button>
+                                        )}
                                         {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
-                                            <button onClick={() => handleDeleteRequest(req.id)} className="p-3 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
-                                                <Trash2 size={20} />
+                                            <button onClick={() => handleDeleteRequest(req.id)} className="flex items-center gap-1.5 px-3 py-2 text-slate-600 border border-slate-200 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 rounded-xl text-xs font-bold transition-all">
+                                                <Trash2 size={16} /> {t('list.delete')}
                                             </button>
                                         )}
                                     </div>
@@ -819,7 +800,9 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             )}
 
             {/* Modal Components */}
-            {selectedRequest && (
+            {selectedRequest && (() => {
+                const isHrEditable = (userRole === 'HR' || userRole === 'HR_ADMIN') && selectedRequest.status === 'PENDING_HR';
+                return (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
@@ -833,17 +816,47 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                         </div>
                         <div className="p-6 space-y-4 overflow-y-auto">
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.trainingTitle')}</label>
-                                <input readOnly value={selectedRequest.title} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-700 cursor-not-allowed" />
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">{isHrEditable ? t('requestModal.titleLabel') : t('requestModal.trainingTitle')}</label>
+                                {isHrEditable ? (
+                                    <input value={hrEditTitle} onChange={(e) => setHrEditTitle(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
+                                ) : (
+                                    <input readOnly value={selectedRequest.title} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-700 cursor-not-allowed" />
+                                )}
                             </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.vendorLocation')}</label>
-                                <input readOnly value={`${selectedRequest.vendor} - ${selectedRequest.location}`} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-700 cursor-not-allowed" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.strategicJustification')}</label>
-                                <textarea readOnly value={selectedRequest.justification} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-700 cursor-not-allowed resize-none" rows={2} />
-                            </div>
+                            {isHrEditable ? (
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.vendor')}</label>
+                                        <input value={hrEditVendor} onChange={(e) => setHrEditVendor(e.target.value)} placeholder={t('requestModal.vendor')} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.location')}</label>
+                                        <input value={hrEditLocation} onChange={(e) => setHrEditLocation(e.target.value)} placeholder={t('requestModal.location')} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.vendorLocation')}</label>
+                                    <input readOnly value={`${selectedRequest.vendor} - ${selectedRequest.location}`} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-700 cursor-not-allowed" />
+                                </div>
+                            )}
+                            {isHrEditable ? (
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.startDate')}</label>
+                                        <input type="datetime-local" value={hrEditStartDate} onChange={(e) => setHrEditStartDate(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.endDate')}</label>
+                                        <input type="datetime-local" value={hrEditEndDate} onChange={(e) => setHrEditEndDate(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.strategicJustification')}</label>
+                                    <textarea readOnly value={selectedRequest.justification} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-700 cursor-not-allowed resize-none" rows={2} />
+                                </div>
+                            )}
 
                             {(userRole === 'HR' || userRole === 'HR_ADMIN') && selectedRequest.status === 'PENDING_HR' && (
                                 <>
@@ -896,6 +909,26 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                     {selectedRequest._original?.category === 'Sertifikat' && (
                                         <div className="mt-4 space-y-4">
                                             <div>
+                                                <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.certificationResult')}</label>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {(['Passed', 'Not Passed'] as const).map(result => (
+                                                        <button
+                                                            key={result}
+                                                            type="button"
+                                                            onClick={() => setHrCertificationResult(result)}
+                                                            className={`py-2 rounded-xl text-sm font-bold border transition-colors ${
+                                                                hrCertificationResult === result
+                                                                    ? (result === 'Passed' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-rose-600 text-white border-rose-600')
+                                                                    : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                                                            }`}
+                                                        >
+                                                            {result === 'Passed' ? t('requestModal.certificationPassed') : t('requestModal.certificationNotPassed')}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            {hrCertificationResult === 'Passed' && (
+                                            <div>
                                                 <label className="block text-sm font-semibold text-slate-700 mb-1">
                                                     {t('requestModal.uploadCertificateEvidence')} <span className="text-red-500">*</span>
                                                 </label>
@@ -909,6 +942,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                                     <p className="text-xs text-emerald-600 mt-1">{t('requestModal.certificateAlreadyUploaded')}</p>
                                                 )}
                                             </div>
+                                            )}
+                                            {hrCertificationResult === 'Passed' && (
                                             <div>
                                                 <label className="block text-sm font-semibold text-slate-700 mb-1">
                                                     {t('requestModal.certificateExpiryDate')} <span className="text-red-500">*</span>
@@ -920,6 +955,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                                     className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none text-sm focus:border-indigo-500"
                                                 />
                                             </div>
+                                            )}
+                                            {hrCertificationResult === 'Passed' && (
                                             <div className="pt-2 border-t border-slate-100">
                                                 <label className="flex items-center gap-2 cursor-pointer select-none">
                                                     <input
@@ -975,56 +1012,31 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                                     </div>
                                                 )}
                                             </div>
+                                            )}
                                         </div>
                                     )}
                                 </>
                             )}
 
-                            {isRejectMode && (
-                                <div className="mt-4 p-4 bg-red-50 rounded-xl border border-red-100">
-                                    <label className="block text-sm font-semibold text-red-700 mb-1">{t('requestModal.rejectionReason')}</label>
-                                    <input
-                                        autoFocus
-                                        placeholder={t('requestModal.rejectionReasonPlaceholder')}
-                                        className="w-full px-4 py-2 border border-red-200 rounded-xl outline-none text-sm mb-3"
-                                        value={rejectReason}
-                                        onChange={(e) => setRejectReason(e.target.value)}
-                                    />
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setIsRejectMode(false)} className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl text-sm">{t('requestModal.cancel')}</button>
-                                        <button onClick={() => handleAction(selectedRequest.id, 'reject', rejectReason)} className="flex-1 py-2 bg-red-600 text-white font-bold rounded-xl text-sm">{t('requestModal.confirmReject')}</button>
-                                    </div>
-                                </div>
-                            )}
-
                         </div>
 
-                        {!isRejectMode && (
-                            <div className="p-6 border-t border-slate-100 bg-slate-50 flex flex-wrap gap-3 rounded-b-2xl">
-                                {selectedRequest.evidenceUrl && (
-                                    <a href={selectedRequest.evidenceUrl} target="_blank" rel="noopener noreferrer" className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl text-sm text-center">
-                                        {t('requestModal.evidence')}
-                                    </a>
-                                )}
-                                <button onClick={() => handlePrint(selectedRequest)} className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl text-sm flex items-center justify-center gap-2">
-                                    <Printer size={16} /> {t('requestModal.print')}
-                                </button>
+                        <div className="p-6 border-t border-slate-100 bg-slate-50 flex flex-wrap gap-3 rounded-b-2xl">
+                            {selectedRequest.evidenceUrl && (
+                                <a href={selectedRequest.evidenceUrl} target="_blank" rel="noopener noreferrer" className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl text-sm text-center">
+                                    {t('requestModal.evidence')}
+                                </a>
+                            )}
+                            {((userRole === 'SUPERVISOR' && selectedRequest.status === 'PENDING_SUPERVISOR') || (userRole === 'HR' && selectedRequest.status === 'PENDING_HR')) && (
+                                <button onClick={handleApprove} className="flex-[2] py-2 bg-indigo-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-indigo-700 transition-colors">{t('requestModal.approveRequest')}</button>
+                            )}
 
-                                {((userRole === 'SUPERVISOR' && selectedRequest.status === 'PENDING_SUPERVISOR') || (userRole === 'HR' && selectedRequest.status === 'PENDING_HR')) && (
-                                    <>
-                                        <button onClick={() => setIsRejectMode(true)} className="flex-1 py-2 bg-red-50 text-red-600 font-bold rounded-xl text-sm">{t('requestModal.reject')}</button>
-                                        <button onClick={() => handleAction(selectedRequest.id, 'approve')} className="flex-[2] py-2 bg-indigo-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-indigo-700 transition-colors">{t('requestModal.approveRequest')}</button>
-                                    </>
-                                )}
-
-                                {selectedRequest.status === 'APPROVED' && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
-                                    <button onClick={() => handleOpenSettlement(selectedRequest)} className="flex-[2] py-2 bg-emerald-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-emerald-700 transition-colors">{t('requestModal.updateSettlement')}</button>
-                                )}
-                            </div>
-                        )}
+                            {selectedRequest.status === 'APPROVED' && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                                <button onClick={() => handleOpenSettlement(selectedRequest)} className="flex-[2] py-2 bg-emerald-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-emerald-700 transition-colors">{t('requestModal.updateSettlement')}</button>
+                            )}
+                        </div>
                     </div>
                 </div>
-            )}
+                ); })()}
 
             {/* Recap Detail Modal */}
             {recapDetailUser && (

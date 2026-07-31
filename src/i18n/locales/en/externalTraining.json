@@ -7,9 +7,9 @@
   "form": {
     "newRequest": "New Request",
     "category": "Category",
-    "categoryTraining": "Training",
-    "categoryCertificate": "Certificate",
-    "categoryModule": "Module",
+    "categoryTraining": "Training without Certification",
+    "categoryCertificate": "Training with Certification",
+    "categoryModule": "Video Module – Self-Paced Learning",
     "titleLabel": "Title / Course Name",
     "titlePlaceholder": "e.g. Advanced Leadership",
     "vendor": "Vendor",
@@ -21,6 +21,9 @@
     "registrationFee": "Registration Fee (Rp)",
     "attachmentLink": "Attachment Link (Optional)",
     "attachmentPlaceholder": "Google Drive link, etc.",
+    "paymentMethod": "Payment Method",
+    "paymentMethodReimbursement": "Reimbursement",
+    "paymentMethodDirectPayment": "Direct Payment",
     "submitting": "Submitting...",
     "submitRequest": "Submit Request"
   },
@@ -32,9 +35,9 @@
     "rejected": "Rejected"
   },
   "categoryLabels": {
-    "Training": "Training",
-    "Sertifikat": "Certificate",
-    "Modul": "Module"
+    "Training": "Training without Certification",
+    "Sertifikat": "Training with Certification",
+    "Modul": "Video Module – Self-Paced Learning"
   },
   "statusLabels": {
     "Pending": "Pending",

@@ -310,6 +310,17 @@ export const initDB = async () => {
             console.log("Added certificate_expiry_date column to external_training_requests.");
         } catch (e) { /* Ignore if exists */ }
 
+        try {
+            await connection.query("ALTER TABLE external_training_requests MODIFY COLUMN start_date DATETIME");
+            await connection.query("ALTER TABLE external_training_requests MODIFY COLUMN end_date DATETIME");
+            console.log("Widened external_training_requests start_date/end_date to DATETIME.");
+        } catch (e) { /* Ignore if already widened */ }
+
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN certification_result VARCHAR(20)");
+            console.log("Added certification_result column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
         connection.release();
     } catch (err) {
         console.error('Database initialization failed:', err);

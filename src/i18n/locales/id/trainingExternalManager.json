@@ -17,7 +17,8 @@
     "totalInvestment": "Total Investasi",
     "pendingApproval": "Menunggu Persetujuan",
     "successfulEnrollments": "Pendaftaran Berhasil",
-    "averagePerHead": "Rata-rata Per Orang"
+    "averagePerHead": "Rata-rata Per Orang",
+    "clearFilter": "Hapus filter"
   },
   "filters": {
     "searchPlaceholder": "Cari karyawan, judul, atau vendor...",
@@ -25,6 +26,7 @@
   },
   "list": {
     "empty": "Tidak ada permintaan yang cocok ditemukan",
+    "onlyOwnHidden": "Permintaan Anda sendiri sudah terhitung di total di atas, tapi tidak ditampilkan di sini untuk mencegah persetujuan sendiri.",
     "certificateAlt": "Sertifikat",
     "supervisor": "Atasan",
     "hrDept": "DEPT HR",
@@ -32,7 +34,9 @@
     "viewDocument": "Lihat Dokumen",
     "openDocument": "Buka Dokumen",
     "viewCertificateAttachment": "Lihat Sertifikat/Lampiran",
-    "viewDossier": "Lihat Berkas"
+    "viewDossier": "Lihat Berkas",
+    "detail": "Detail",
+    "delete": "Hapus"
   },
   "recapTable": {
     "professionalEntity": "Entitas Profesional",
@@ -48,18 +52,26 @@
     "processTitle": "Proses Permintaan Pelatihan",
     "ltrId": "LTR-ID: {{id}} • {{name}}",
     "trainingTitle": "Judul Pelatihan",
+    "titleLabel": "Judul / Nama Kursus",
     "vendorLocation": "Vendor & Lokasi",
+    "vendor": "Vendor",
+    "location": "Lokasi",
     "strategicJustification": "Justifikasi Strategis",
-    "financeAllocation": "Alokasi Keuangan",
+    "startDate": "Tanggal Mulai",
+    "endDate": "Tanggal Selesai",
+    "financeAllocation": "Alokasi Biaya",
     "trainingFee": "Biaya Pelatihan",
-    "travelCost": "Biaya Perjalanan",
+    "travelCost": "Biaya Transportasi",
     "accommodation": "Akomodasi",
-    "miscellaneous": "Lain-lain",
+    "miscellaneous": "Biaya Lainnya",
     "paymentMethod": "Metode Pembayaran",
     "paymentMethodReimbursement": "Reimbursement",
     "paymentMethodDirectPayment": "Direct Payment",
     "uploadCertificateEvidence": "Unggah Bukti Sertifikat",
     "certificateAlreadyUploaded": "Bukti sertifikat sudah diunggah sebelumnya.",
+    "certificationResult": "Hasil Sertifikasi",
+    "certificationPassed": "Lulus",
+    "certificationNotPassed": "Tidak Lulus",
     "certificateExpiryDate": "Tanggal Kedaluwarsa Sertifikat",
     "grantIncentive": "Berikan Insentif Sertifikat",
     "incentiveReward": "Nominal Insentif",

@@ -7,9 +7,9 @@
   "form": {
     "newRequest": "Permintaan Baru",
     "category": "Kategori",
-    "categoryTraining": "Pelatihan",
-    "categoryCertificate": "Sertifikat",
-    "categoryModule": "Modul",
+    "categoryTraining": "Pelatihan tanpa Sertifikasi",
+    "categoryCertificate": "Pelatihan dengan Sertifikasi",
+    "categoryModule": "Video Modul – Pembelajaran Mandiri",
     "titleLabel": "Judul / Nama Kursus",
     "titlePlaceholder": "cth. Kepemimpinan Lanjutan",
     "vendor": "Penyedia",
@@ -21,6 +21,9 @@
     "registrationFee": "Biaya Pendaftaran (Rp)",
     "attachmentLink": "Tautan Lampiran (Opsional)",
     "attachmentPlaceholder": "Tautan Google Drive, dll.",
+    "paymentMethod": "Metode Pembayaran",
+    "paymentMethodReimbursement": "Reimbursement",
+    "paymentMethodDirectPayment": "Direct Payment",
     "submitting": "Mengirim...",
     "submitRequest": "Kirim Permintaan"
   },
@@ -32,9 +35,9 @@
     "rejected": "Ditolak"
   },
   "categoryLabels": {
-    "Training": "Pelatihan",
-    "Sertifikat": "Sertifikat",
-    "Modul": "Modul"
+    "Training": "Pelatihan tanpa Sertifikasi",
+    "Sertifikat": "Pelatihan dengan Sertifikasi",
+    "Modul": "Video Modul – Pembelajaran Mandiri"
   },
   "statusLabels": {
     "Pending": "Menunggu",
