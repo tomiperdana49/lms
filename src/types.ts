@@ -272,6 +272,7 @@ export interface ExternalTrainingRequest {
     created_at?: string;
     updated_at?: string;
     certificate_link?: string;
+    certificate_expiry_date?: string;
     vendor?: string;
     location?: string;
     leader_name?: string;

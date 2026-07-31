@@ -142,6 +142,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     // --- Modal State ---
     const [selectedRequest, setSelectedRequest] = useState<TrainingRequest | null>(null);
     const [hrCertificateFile, setHrCertificateFile] = useState<File | null>(null);
+    const [hrCertificateExpiryDate, setHrCertificateExpiryDate] = useState('');
     const [isRejectMode, setIsRejectMode] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
     const [recapDetailUser, setRecapDetailUser] = useState<string | null>(null);
@@ -153,6 +154,10 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
         accommodation: 0,
         others: 0
     });
+    const [hrPaymentMethod, setHrPaymentMethod] = useState<'Reimbursement' | 'Direct Payment'>('Reimbursement');
+    const [hrGrantIncentive, setHrGrantIncentive] = useState(false);
+    const [hrIncentiveReward, setHrIncentiveReward] = useState('');
+    const [hrIncentivePaymentType, setHrIncentivePaymentType] = useState<'One-Time' | 'Recurring'>('One-Time');
 
     useEffect(() => {
         if (selectedRequest) {
@@ -162,6 +167,13 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                 accommodation: Number(selectedRequest.costAccommodation) || 0,
                 others: Number(selectedRequest.costOthers) || 0
             });
+            setHrPaymentMethod(selectedRequest._original?.payment_method === 'Direct Payment' ? 'Direct Payment' : 'Reimbursement');
+            const expiry = selectedRequest._original?.certificate_expiry_date;
+            setHrCertificateExpiryDate(expiry ? String(expiry).slice(0, 10) : '');
+            setHrCertificateFile(null);
+            setHrGrantIncentive(false);
+            setHrIncentiveReward('');
+            setHrIncentivePaymentType('One-Time');
         }
     }, [selectedRequest]);
 
@@ -267,8 +279,17 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             let res;
             if (action === 'approve') {
                 let certLink = selectedRequest?._original?.certificate_link;
-                if (selectedRequest?._original?.category === 'Sertifikat' && !certLink && !hrCertificateFile) {
+                const isCertificateCategory = selectedRequest?._original?.category === 'Sertifikat';
+                if (isCertificateCategory && !certLink && !hrCertificateFile) {
                     alert(t('alerts.certificateEvidenceRequired'));
+                    return;
+                }
+                if (isCertificateCategory && !hrCertificateExpiryDate) {
+                    alert(t('alerts.certificateExpiryRequired'));
+                    return;
+                }
+                if (isCertificateCategory && hrGrantIncentive && !hrIncentiveReward) {
+                    alert(t('alerts.incentiveRewardRequired'));
                     return;
                 }
                 if (hrCertificateFile) {
@@ -291,11 +312,30 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                         travel_flight_cost: breakdownCost.transport,
                         accommodation_cost: breakdownCost.accommodation,
                         miscellaneous_cost: breakdownCost.others,
-                        payment_method: selectedRequest._original?.payment_method || 'Reimbursement',
+                        payment_method: hrPaymentMethod,
                         registration_fee: breakdownCost.training,
-                        certificate_link: certLink
+                        certificate_link: certLink,
+                        certificate_expiry_date: isCertificateCategory ? hrCertificateExpiryDate : undefined
                     })
                 });
+                if (res.ok && isCertificateCategory && hrGrantIncentive) {
+                    await fetch(`${API_BASE_URL}/api/incentives`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            employeeName: selectedRequest.employeeName,
+                            employee_id: selectedRequest.employee_id,
+                            courseName: selectedRequest.title,
+                            description: t('requestModal.incentiveAutoDescription', { vendor: selectedRequest.vendor }),
+                            startDate: selectedRequest._original?.start_date || new Date().toISOString(),
+                            endDate: hrCertificateExpiryDate,
+                            evidenceUrl: certLink,
+                            status: 'Active',
+                            reward: hrIncentiveReward,
+                            paymentType: hrIncentivePaymentType
+                        })
+                    });
+                }
             } else {
                 res = await fetch(`${API_BASE_URL}/api/external-training/approve`, {
                     method: 'POST',
@@ -834,15 +874,107 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                             ))}
                                         </div>
                                     </div>
+                                    <div className="mt-4">
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.paymentMethod')}</label>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {(['Reimbursement', 'Direct Payment'] as const).map(method => (
+                                                <button
+                                                    key={method}
+                                                    type="button"
+                                                    onClick={() => setHrPaymentMethod(method)}
+                                                    className={`py-2 rounded-xl text-sm font-bold border transition-colors ${
+                                                        hrPaymentMethod === method
+                                                            ? 'bg-indigo-600 text-white border-indigo-600'
+                                                            : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                                                    }`}
+                                                >
+                                                    {method === 'Reimbursement' ? t('requestModal.paymentMethodReimbursement') : t('requestModal.paymentMethodDirectPayment')}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
                                     {selectedRequest._original?.category === 'Sertifikat' && (
-                                        <div className="mt-4">
-                                            <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.uploadCertificateEvidence')}</label>
-                                            <input
-                                                type="file"
-                                                accept="image/*,.pdf"
-                                                onChange={(e) => setHrCertificateFile(e.target.files ? e.target.files[0] : null)}
-                                                className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none text-sm"
-                                            />
+                                        <div className="mt-4 space-y-4">
+                                            <div>
+                                                <label className="block text-sm font-semibold text-slate-700 mb-1">
+                                                    {t('requestModal.uploadCertificateEvidence')} <span className="text-red-500">*</span>
+                                                </label>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*,.pdf"
+                                                    onChange={(e) => setHrCertificateFile(e.target.files ? e.target.files[0] : null)}
+                                                    className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none text-sm"
+                                                />
+                                                {selectedRequest._original?.certificate_link && !hrCertificateFile && (
+                                                    <p className="text-xs text-emerald-600 mt-1">{t('requestModal.certificateAlreadyUploaded')}</p>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-semibold text-slate-700 mb-1">
+                                                    {t('requestModal.certificateExpiryDate')} <span className="text-red-500">*</span>
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    value={hrCertificateExpiryDate}
+                                                    onChange={(e) => setHrCertificateExpiryDate(e.target.value)}
+                                                    className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none text-sm focus:border-indigo-500"
+                                                />
+                                            </div>
+                                            <div className="pt-2 border-t border-slate-100">
+                                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={hrGrantIncentive}
+                                                        onChange={(e) => setHrGrantIncentive(e.target.checked)}
+                                                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                    />
+                                                    <span className="text-sm font-semibold text-slate-700">{t('requestModal.grantIncentive')}</span>
+                                                </label>
+                                                {hrGrantIncentive && (
+                                                    <div className="grid grid-cols-2 gap-3 mt-3">
+                                                        <div>
+                                                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                                                {t('requestModal.incentiveReward')} <span className="text-red-500">*</span>
+                                                            </label>
+                                                            <div className="relative">
+                                                                <span className="absolute left-3 top-2.5 text-slate-400 text-sm">Rp</span>
+                                                                <input
+                                                                    type="text"
+                                                                    value={new Intl.NumberFormat('id-ID').format(Number(hrIncentiveReward.replace(/\D/g, '')) || 0)}
+                                                                    onChange={(e) => setHrIncentiveReward(e.target.value.replace(/\D/g, ''))}
+                                                                    className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl outline-none text-sm focus:border-indigo-500"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-semibold text-slate-700 mb-1">{t('requestModal.incentivePaymentType')}</label>
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                {(['One-Time', 'Recurring'] as const).map(type => (
+                                                                    <button
+                                                                        key={type}
+                                                                        type="button"
+                                                                        onClick={() => setHrIncentivePaymentType(type)}
+                                                                        className={`py-2 rounded-xl text-xs font-bold border transition-colors ${
+                                                                            hrIncentivePaymentType === type
+                                                                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                                                                : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                                                                        }`}
+                                                                    >
+                                                                        {type === 'One-Time' ? t('requestModal.incentiveOneTime') : t('requestModal.incentiveRecurring')}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                            {hrIncentivePaymentType === 'Recurring' && (
+                                                                <p className="text-[11px] text-slate-500 mt-1.5">
+                                                                    {hrCertificateExpiryDate
+                                                                        ? t('requestModal.incentiveRecurringStopHint', { date: new Date(hrCertificateExpiryDate).toLocaleDateString('id-ID') })
+                                                                        : t('requestModal.incentiveRecurringStopHintNoDate')}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </>

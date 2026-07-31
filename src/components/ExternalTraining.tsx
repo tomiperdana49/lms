@@ -10,7 +10,10 @@ import {
  DollarSign,
  Briefcase,
  Link,
- Calendar
+ Calendar,
+ ChevronDown,
+ MapPin,
+ Award
 } from 'lucide-react';
 import PopupNotification from './PopupNotification';
 
@@ -36,7 +39,15 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  }, [activeTab, isSupervisor]);
  const [requests, setRequests] = useState<ExternalTrainingRequest[]>([]);
  const [teamRequests, setTeamRequests] = useState<ExternalTrainingRequest[]>([]);
- 
+ const [expandedRequestIds, setExpandedRequestIds] = useState<Set<number>>(new Set());
+ const toggleRequestDetail = (id: number) => {
+ setExpandedRequestIds(prev => {
+ const next = new Set(prev);
+ if (next.has(id)) next.delete(id); else next.add(id);
+ return next;
+ });
+ };
+
  const [notification, setNotification] = useState({ show: false, type: 'success' as 'success' | 'error', message: '' });
  const [isLoading, setIsLoading] = useState(false);
 
@@ -286,6 +297,84 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  </div>
  )}
  </div>
+
+ <button
+ type="button"
+ onClick={() => toggleRequestDetail(req.id)}
+ className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700 w-fit"
+ >
+ <ChevronDown className={`w-4 h-4 transition-transform ${expandedRequestIds.has(req.id) ? 'rotate-180' : ''}`} />
+ {expandedRequestIds.has(req.id) ? t('request.hideDetail') : t('request.showDetail')}
+ </button>
+
+ {expandedRequestIds.has(req.id) && (
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-gray-50 border border-gray-100 rounded-lg text-sm">
+ {req.vendor && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Briefcase className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailVendor')}: <span className="font-semibold text-gray-800">{req.vendor}</span></span>
+ </div>
+ )}
+ {req.location && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailLocation')}: <span className="font-semibold text-gray-800">{req.location}</span></span>
+ </div>
+ )}
+ {req.end_date && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailSchedule')}: <span className="font-semibold text-gray-800">{req.start_date ? new Date(req.start_date).toLocaleDateString() : '-'} &mdash; {new Date(req.end_date).toLocaleDateString()}</span></span>
+ </div>
+ )}
+ {Number(req.travel_flight_cost) > 0 && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <DollarSign className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailTravelCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.travel_flight_cost))}</span></span>
+ </div>
+ )}
+ {Number(req.accommodation_cost) > 0 && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <DollarSign className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailAccommodationCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.accommodation_cost))}</span></span>
+ </div>
+ )}
+ {Number(req.miscellaneous_cost) > 0 && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <DollarSign className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailMiscCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.miscellaneous_cost))}</span></span>
+ </div>
+ )}
+ <div className="flex items-center gap-2 text-gray-600">
+ <DollarSign className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailTotalCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.registration_fee || 0) + Number(req.travel_flight_cost || 0) + Number(req.accommodation_cost || 0) + Number(req.miscellaneous_cost || 0))}</span></span>
+ </div>
+ {req.approved_by && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <CheckCircle className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailApprovedBy')}: <span className="font-semibold text-gray-800">{req.approved_by}</span></span>
+ </div>
+ )}
+ {req.attachment_link && (
+ <a href={req.attachment_link} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold">
+ <Link className="w-4 h-4 shrink-0" />
+ {t('request.detailAttachment')}: {t('request.viewLink')}
+ </a>
+ )}
+ {req.certificate_link && (
+ <a href={req.certificate_link} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold">
+ <Award className="w-4 h-4 shrink-0" />
+ {t('request.detailCertificate')}: {t('request.viewLink')}
+ </a>
+ )}
+ {req.certificate_expiry_date && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailCertificateExpiry')}: <span className="font-semibold text-gray-800">{new Date(req.certificate_expiry_date).toLocaleDateString()}</span></span>
+ </div>
+ )}
+ </div>
+ )}
 
  {req.status === 'Rejected' && req.rejection_reason && (
  <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-700 w-full">

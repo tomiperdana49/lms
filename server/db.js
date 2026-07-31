@@ -305,6 +305,11 @@ export const initDB = async () => {
             console.log("Added certificate_link column to external_training_requests.");
         } catch (e) { /* Ignore if exists */ }
 
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN certificate_expiry_date DATE");
+            console.log("Added certificate_expiry_date column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
         connection.release();
     } catch (err) {
         console.error('Database initialization failed:', err);

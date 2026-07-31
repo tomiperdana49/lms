@@ -3064,7 +3064,7 @@ app.get('/api/external-training/hr', async (req, res) => {
 // 6. HR processes payment
 app.post('/api/external-training/hr-process', async (req, res) => {
     try {
-        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link } = req.body;
+        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date } = req.body;
 
         let sql = `UPDATE external_training_requests SET status = 'Processed', travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, payment_method = ?`;
         let params = [travel_flight_cost || 0, accommodation_cost || 0, miscellaneous_cost || 0, payment_method];
@@ -3076,6 +3076,10 @@ app.post('/api/external-training/hr-process', async (req, res) => {
         if (certificate_link !== undefined) {
             sql += `, certificate_link = ?`;
             params.push(certificate_link);
+        }
+        if (certificate_expiry_date !== undefined) {
+            sql += `, certificate_expiry_date = ?`;
+            params.push(certificate_expiry_date || null);
         }
         sql += ` WHERE id = ?`;
         params.push(id);
@@ -3136,8 +3140,9 @@ app.get('/api/incentives', async (req, res) => {
 app.post('/api/incentives', async (req, res) => {
     try {
         const i = req.body;
+        const status = i.status || 'Pending';
         const result = await query(
-            'INSERT INTO incentives (employee_name, employee_id, course_name, description, start_date, end_date, evidence_url, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO incentives (employee_name, employee_id, course_name, description, start_date, end_date, evidence_url, status, reward, payment_type, approved_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 i.employeeName,
                 i.employee_id,
@@ -3146,7 +3151,10 @@ app.post('/api/incentives', async (req, res) => {
                 new Date(i.startDate),
                 new Date(i.endDate),
                 i.evidenceUrl || '',
-                i.status || 'Pending'
+                status,
+                i.reward || 0,
+                i.paymentType || 'Recurring',
+                status === 'Active' ? new Date() : null
             ]
         );
         const newInc = await query('SELECT * FROM incentives WHERE id = ?', [result.insertId]);

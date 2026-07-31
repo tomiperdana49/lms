@@ -50,7 +50,22 @@
   "request": {
     "registrationLabel": "Reg: {{amount}}",
     "paymentVia": "Payment via",
-    "rejectionReasonLabel": "Rejection Reason:"
+    "rejectionReasonLabel": "Rejection Reason:",
+    "showDetail": "Show Detail",
+    "hideDetail": "Hide Detail",
+    "detailVendor": "Vendor",
+    "detailLocation": "Location",
+    "detailSchedule": "Schedule",
+    "detailRegistrationFee": "Registration Fee",
+    "detailTravelCost": "Travel Cost",
+    "detailAccommodationCost": "Accommodation Cost",
+    "detailMiscCost": "Miscellaneous Cost",
+    "detailTotalCost": "Total Cost",
+    "detailAttachment": "Attachment",
+    "detailCertificate": "Certificate",
+    "detailCertificateExpiry": "Certificate Expiry",
+    "detailApprovedBy": "Approved By",
+    "viewLink": "View Link"
   },
   "team": {
     "idLabel": "ID: {{id}}",
