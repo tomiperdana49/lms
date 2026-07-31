@@ -140,29 +140,41 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [startDate, setStartDate] = useState<string>(() => {
         const d = new Date();
         const year = d.getFullYear();
+
+        // Regular users default to the full current year
+        if (effectiveRole === 'STAFF') {
+            return `${year}-01-01`;
+        }
+
         const month = d.getMonth();
         const day = d.getDate();
-        
+
         // If today is 26th or later, start from 26th of this month
         // Otherwise, start from 26th of last month
-        const start = day >= 26 
+        const start = day >= 26
             ? new Date(year, month, 26)
             : new Date(year, month - 1, 26);
-            
+
         return `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
     });
     const [endDate, setEndDate] = useState<string>(() => {
         const d = new Date();
         const year = d.getFullYear();
+
+        // Regular users default to the full current year
+        if (effectiveRole === 'STAFF') {
+            return `${year}-12-31`;
+        }
+
         const month = d.getMonth();
         const day = d.getDate();
-        
+
         // If today is 26th or later, end at 25th of next month
         // Otherwise, end at 25th of this month
         const end = day >= 26
             ? new Date(year, month + 1, 25)
             : new Date(year, month, 25);
-            
+
         return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
     });
     const [selectedBranch, setSelectedBranch] = useState<string>('All Branches');
