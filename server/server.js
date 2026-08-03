@@ -443,6 +443,14 @@ const findLocalEmployeeByEmailOrId = async (email, employeeId) => {
     return null;
 };
 
+// Nusawork's employee filter API restricts results to employees active within
+// this window (e.g. excludes past employees who already resigned). Fixed start
+// at 2026-01-01, end always follows today so resigned employees stay findable.
+const getNusaworkFilterPeriods = () => {
+    const today = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
+    return ['2026-01-01', today];
+};
+
 const syncEmployeeFromNusawork = async (identifier, token) => {
     if (!token) {
         console.warn(`[NUSANET SYNC] Cannot sync ${identifier}: No access token available.`);
@@ -467,7 +475,8 @@ const syncEmployeeFromNusawork = async (identifier, token) => {
                 },
                 page_count: 999999,
                 paginate: true,
-                search: identifier
+                search: identifier,
+                periods: getNusaworkFilterPeriods()
             })
         });
 
@@ -516,7 +525,8 @@ const syncEmployeeFromNusawork = async (identifier, token) => {
                             fields: { active_status: ["active", "Resign"] },
                             page_count: 999999,
                             paginate: true,
-                            search: altQuery
+                            search: altQuery,
+                            periods: getNusaworkFilterPeriods()
                         })
                     });
                     if (altRes.ok) {
@@ -1116,7 +1126,8 @@ app.post('/api/admin/sync-all-nusawork', async (req, res) => {
                         active_status: ["active", "Resign"]
                     },
                     page_count: 999999,
-                    paginate: true
+                    paginate: true,
+                    periods: getNusaworkFilterPeriods()
                 })
             });
 
