@@ -2246,13 +2246,26 @@ const downloadDriveImageToUploads = async (driveUrl) => {
     }
 };
 
+// Runs `worker` over `items` with at most `limit` in flight at once, preserving input order in the result array.
+const runWithConcurrency = async (items, limit, worker) => {
+    const results = new Array(items.length);
+    let next = 0;
+    const lanes = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (next < items.length) {
+            const i = next++;
+            results[i] = await worker(items[i]);
+        }
+    });
+    await Promise.all(lanes);
+    return results;
+};
+
 app.post('/api/meetings/bulk', async (req, res) => {
     try {
         const meetings = req.body.meetings;
         if (!Array.isArray(meetings)) return res.status(400).json({ error: 'Expected an array of meetings' });
 
-        const inserted = [];
-        for (const m of meetings) {
+        const insertOne = async (m) => {
             if (m.cost_report?.trainingPhotos?.includes('drive.google.com')) {
                 const localPath = await downloadDriveImageToUploads(m.cost_report.trainingPhotos);
                 if (localPath) m.cost_report.trainingPhotos = localPath;
@@ -2308,25 +2321,32 @@ app.post('/api/meetings/bulk', async (req, res) => {
 
             const meetingId = result.insertId;
 
+            const participantQueries = [];
             for (const p of participants) {
                 if (!p.employee_id && !p.name) continue;
                 const studentId = p.employee_id || `temp_${Math.random()}`;
                 const studentName = p.name || 'Unknown';
 
                 if (p.pre_test_score !== null && p.pre_test_score !== '') {
-                    await query('INSERT INTO quiz_results (student_id, student_name, meeting_id, score, date, quiz_type, employee_id) VALUES (?, ?, ?, ?, NOW(), "PRE", ?)', [studentId, studentName, meetingId, p.pre_test_score, p.employee_id || null]);
+                    participantQueries.push(query('INSERT INTO quiz_results (student_id, student_name, meeting_id, score, date, quiz_type, employee_id) VALUES (?, ?, ?, ?, NOW(), "PRE", ?)', [studentId, studentName, meetingId, p.pre_test_score, p.employee_id || null]));
                 }
                 if (p.post_test_score !== null && p.post_test_score !== '') {
-                    await query('INSERT INTO quiz_results (student_id, student_name, meeting_id, score, date, quiz_type, employee_id) VALUES (?, ?, ?, ?, NOW(), "POST", ?)', [studentId, studentName, meetingId, p.post_test_score, p.employee_id || null]);
+                    participantQueries.push(query('INSERT INTO quiz_results (student_id, student_name, meeting_id, score, date, quiz_type, employee_id) VALUES (?, ?, ?, ?, NOW(), "POST", ?)', [studentId, studentName, meetingId, p.post_test_score, p.employee_id || null]));
                 }
                 if (p.feedback_score !== null && p.feedback_score !== '') {
                     const fbData = JSON.stringify({ rating: p.feedback_score });
-                    await query('INSERT INTO course_feedback (user_id, employee_id, meeting_id, feedback_data, submitted_at, is_imported) VALUES (?, ?, ?, ?, NOW(), 1) ON DUPLICATE KEY UPDATE feedback_data = ?, submitted_at = NOW(), is_imported = 1', [studentId, p.employee_id || null, meetingId, fbData, fbData]);
+                    participantQueries.push(query('INSERT INTO course_feedback (user_id, employee_id, meeting_id, feedback_data, submitted_at, is_imported) VALUES (?, ?, ?, ?, NOW(), 1) ON DUPLICATE KEY UPDATE feedback_data = ?, submitted_at = NOW(), is_imported = 1', [studentId, p.employee_id || null, meetingId, fbData, fbData]));
                 }
             }
+            await Promise.all(participantQueries);
 
-            inserted.push({ ...m, id: meetingId });
-        }
+            return { ...m, id: meetingId };
+        };
+
+        // Bounded concurrency instead of one-row-at-a-time: on the live DB (remote host),
+        // per-row network round-trip latency was multiplying out past nginx's proxy_read_timeout
+        // (504 Gateway Timeout on large imports).
+        const inserted = await runWithConcurrency(meetings, 5, insertOne);
         res.json({ success: true, count: inserted.length, meetings: inserted });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
