@@ -1366,10 +1366,10 @@ app.get('/api/learning-stats', async (req, res) => {
 
                 // Parse cost
                 if (costReport && costReport.participantsCount > 0) {
-                    const tInc = Number(costReport.trainerIncentive) || 0;
-                    const sCost = Number(costReport.snackCost) || 0;
-                    const lCost = Number(costReport.lunchCost) || 0;
-                    const oCost = Number(costReport.otherCost) || 0;
+                    const tInc = Number(costReport.trainerIncentive ?? costReport.trainer) || 0;
+                    const sCost = Number(costReport.snackCost ?? costReport.snack) || 0;
+                    const lCost = Number(costReport.lunchCost ?? costReport.lunch) || 0;
+                    const oCost = Number(costReport.otherCost ?? costReport.other) || 0;
                     const totalCost = tInc + sCost + lCost + oCost;
                     itemCost = totalCost / costReport.participantsCount;
                 }
