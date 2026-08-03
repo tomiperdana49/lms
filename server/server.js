@@ -2239,7 +2239,7 @@ const downloadDriveImageToUploads = async (driveUrl) => {
         const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.${ext}`;
         const buffer = Buffer.from(await response.arrayBuffer());
         fs.writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
-        return `/uploads/${filename}`;
+        return `/api/uploads/${filename}`;
     } catch (e) {
         console.warn(`[DRIVE IMPORT] Error downloading Drive file ${fileId}:`, e.message);
         return null;
