@@ -35,7 +35,9 @@
     "yourScore": "Your score: {{score}}",
     "feedbackThanks": "Thank you for your feedback!",
     "sessionClosed": "Session closed successfully.",
-    "sessionCloseError": "Failed to close session."
+    "sessionCloseError": "Failed to close session.",
+    "sessionReopened": "Session reopened successfully.",
+    "sessionReopenError": "Failed to reopen session."
   },
   "cancelMeetingModal": {
     "title": "Cancel Meeting",
@@ -221,6 +223,7 @@
     "required": "REQUIRED",
     "closeSession": "CLOSE SESSION",
     "sessionClosed": "SESSION CLOSED",
+    "reopenSession": "REOPEN SESSION",
     "done": "Completed",
     "pendingCount": "Not Completed",
     "preTestTitle": "Pre-Test Assessment",

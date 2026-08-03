@@ -270,6 +270,11 @@ export const initDB = async () => {
             console.error("Error creating course_feedback table:", e);
         }
 
+        try {
+            await connection.query("ALTER TABLE course_feedback ADD COLUMN is_imported TINYINT DEFAULT 0");
+            console.log("Added is_imported column to course_feedback.");
+        } catch (e) { /* Ignore if exists */ }
+
         // MIGRATION: Add external_training_requests table
         try {
             await connection.query(`

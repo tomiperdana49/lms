@@ -2310,7 +2310,7 @@ app.post('/api/meetings/bulk', async (req, res) => {
                 }
                 if (p.feedback_score !== null && p.feedback_score !== '') {
                     const fbData = JSON.stringify({ rating: p.feedback_score });
-                    await query('INSERT INTO course_feedback (user_id, employee_id, meeting_id, feedback_data, submitted_at) VALUES (?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE feedback_data = ?, submitted_at = NOW()', [studentId, p.employee_id || null, meetingId, fbData, fbData]);
+                    await query('INSERT INTO course_feedback (user_id, employee_id, meeting_id, feedback_data, submitted_at, is_imported) VALUES (?, ?, ?, ?, NOW(), 1) ON DUPLICATE KEY UPDATE feedback_data = ?, submitted_at = NOW(), is_imported = 1', [studentId, p.employee_id || null, meetingId, fbData, fbData]);
                 }
             }
 
@@ -2995,7 +2995,7 @@ app.post('/api/feedback/submit', async (req, res) => {
         // We use ON DUPLICATE KEY UPDATE to allow users to update their feedback
         // The unique keys are (user_id, course_id) and (user_id, meeting_id)
         await query(
-            'INSERT INTO course_feedback (user_id, employee_id, course_id, meeting_id, feedback_data, submitted_at) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE feedback_data = ?, submitted_at = ?',
+            'INSERT INTO course_feedback (user_id, employee_id, course_id, meeting_id, feedback_data, submitted_at, is_imported) VALUES (?, ?, ?, ?, ?, ?, 0) ON DUPLICATE KEY UPDATE feedback_data = ?, submitted_at = ?, is_imported = 0',
             [userId, employeeId || null, courseId || null, meetingId || null, JSON.stringify(feedbackData), now, JSON.stringify(feedbackData), now]
         );
 
@@ -3010,7 +3010,10 @@ app.post('/api/feedback/submit', async (req, res) => {
 app.get('/api/feedback/meeting/:userId/:meetingId', async (req, res) => {
     try {
         const { userId, meetingId } = req.params;
-        const rows = await query('SELECT * FROM course_feedback WHERE user_id = ? AND meeting_id = ?', [userId, meetingId]);
+        // Imported rows (from bulk training import) hold a historical PTE score for
+        // reporting only — they are not a real submission by this participant, so they
+        // must not make the feedback form show as already submitted.
+        const rows = await query('SELECT * FROM course_feedback WHERE user_id = ? AND meeting_id = ? AND (is_imported IS NULL OR is_imported = 0)', [userId, meetingId]);
         res.json(rows[0] || null);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });

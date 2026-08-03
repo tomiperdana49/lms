@@ -360,7 +360,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                             location: row.Location || row.location || row.Lokasi || '',
                             description: row.Description || row.description || row.Deskripsi || '',
                             material_link: row['Link Materi'] || '',
-                            is_closed: true,
+                            is_closed: row['Lapor Insentif']?.toString().toLowerCase().trim() === 'sudah' ? true : false,
+                            is_feedback_active: row['Lapor Insentif']?.toString().toLowerCase().trim() === 'sudah' ? false : true,
                             cost_report: {
                                 trainer: parseIndonesianNumber(row['Insentif Trainer']),
                                 snack: parseIndonesianNumber(row['Insentif Snack']),
@@ -642,7 +643,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         if (!selectedMeeting) return;
 
         const isHostOrHR = effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' ||
-                          (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id);
+                          (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id) ||
+                          (selectedMeeting.host && user.name && selectedMeeting.host === user.name);
 
         console.log('[AUTO-REFRESH] Starting poll interval for meeting', selectedMeeting.id);
 
@@ -773,8 +775,10 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         // PERMISSION CHECK: Non-HR can ONLY see meetings they are invited to OR if they are the Host
         if (effectiveRole !== 'HR' && effectiveRole !== 'HR_ADMIN') {
             const invites = m.guests?.emails || [];
-            const isInvited = userEmail && invites.some(email => email.toLowerCase() === userEmail.toLowerCase());
-            const isHost = (m.employee_id && user.employee_id && m.employee_id === user.employee_id) || 
+            const invitedEmployeeIds = (m.guests as any)?.employee_ids || [];
+            const isInvited = (userEmail && invites.some(email => email.toLowerCase() === userEmail.toLowerCase())) ||
+                               (user.employee_id && invitedEmployeeIds.some((id: string) => String(id) === String(user.employee_id)));
+            const isHost = (m.employee_id && user.employee_id && m.employee_id === user.employee_id) ||
                            (m.host && user.name && m.host === user.name);
 
             if (!isInvited && !isHost) return false;
@@ -1296,6 +1300,71 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             setNotification({ show: true, type: 'error', message: t('notifications.meetingCancelError') });
         } finally {
             setMeetingToDelete(null);
+        }
+    };
+
+    const handleCloseSession = async (photoUrl: string) => {
+        if (!selectedMeeting) return;
+
+        const costReportPayload = {
+            ...selectedMeeting.costReport,
+            trainingPhotos: photoUrl
+        };
+        const updatedMeeting = {
+            ...selectedMeeting,
+            is_closed: 1,
+            costReport: costReportPayload
+        };
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/meetings/${selectedMeeting.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedMeeting)
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                const safeData = safeMeeting(data);
+                setSelectedMeeting(safeData);
+                setMeetings(prev => prev.map(m => m.id === safeData.id ? safeData : m));
+                setNotification({ show: true, type: 'success', message: t('notifications.sessionClosed') });
+            } else {
+                throw new Error("Failed to close session.");
+            }
+        } catch (e) {
+            console.error(e);
+            setNotification({ show: true, type: 'error', message: t('notifications.sessionCloseError') });
+        }
+
+        setIsCloseModalOpen(false);
+        setCloseSessionPhotoUrl('');
+    };
+
+    const handleReopenSession = async () => {
+        if (!selectedMeeting) return;
+
+        const updatedMeeting = { ...selectedMeeting, is_closed: 0 };
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/meetings/${selectedMeeting.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedMeeting)
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                const safeData = safeMeeting(data);
+                setSelectedMeeting(safeData);
+                setMeetings(prev => prev.map(m => m.id === safeData.id ? safeData : m));
+                setNotification({ show: true, type: 'success', message: t('notifications.sessionReopened') });
+            } else {
+                throw new Error("Failed to reopen session.");
+            }
+        } catch (e) {
+            console.error(e);
+            setNotification({ show: true, type: 'error', message: t('notifications.sessionReopenError') });
         }
     };
 
@@ -2270,6 +2339,10 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                                     // Direct user_id match
                                                     if (fbUserId === target) return true;
+
+                                                    // Direct employee_id match - covers imported participants
+                                                    // (identified by employee_id, not email)
+                                                    if (fbEmployeeId && fbEmployeeId === target) return true;
 
                                                     // Match via employee lookup
                                                     if (fbEmployeeId) {
@@ -3972,7 +4045,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     {/* Feedback Peserta - Show/Hide (Host & HR only) */}
                                     {(() => {
                                         const isHostOrHR = effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' ||
-                                            (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id);
+                                            (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id) ||
+                                            (selectedMeeting.host && user.name && selectedMeeting.host === user.name);
                                         if (!isHostOrHR) return null;
 
                                         const allFeedback = meetingSummary?.allFeedbackResults || [];
@@ -4160,7 +4234,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 </div>
                                  {/* Assessment Section */}
                                  {(() => {
-                                     const isHostOrHR = effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' || (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id);
+                                     const isHostOrHR = effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' || (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id) || (selectedMeeting.host && user.name && selectedMeeting.host === user.name);
                                      
                                      return (
                                          <div className="mt-6 space-y-3 border-t border-slate-100 pt-6">
@@ -4181,11 +4255,26 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                              {!!isHostOrHR && (
                                                 <div className="flex flex-col gap-2">
                                                     {!selectedMeeting.is_closed ? (
-                                                        <button 
-                                                            onClick={() => setIsCloseModalOpen(true)}
+                                                        <button
+                                                            onClick={() => {
+                                                                const existingPhotos = selectedMeeting.costReport?.trainingPhotos;
+                                                                if (existingPhotos) {
+                                                                    // Training Documentation already exists - close directly, no re-upload needed
+                                                                    handleCloseSession(existingPhotos);
+                                                                } else {
+                                                                    setIsCloseModalOpen(true);
+                                                                }
+                                                            }}
                                                             className="w-full mb-2 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-black rounded-xl border border-red-200 flex items-center justify-center gap-2 transition-all shadow-sm"
                                                         >
                                                             <Lock size={14} /> {t('detailModal.closeSession')}
+                                                        </button>
+                                                    ) : (effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') ? (
+                                                        <button
+                                                            onClick={handleReopenSession}
+                                                            className="w-full mb-2 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-xs font-black rounded-xl border border-emerald-200 flex items-center justify-center gap-2 transition-all shadow-sm"
+                                                        >
+                                                            <Lock size={14} /> {t('detailModal.reopenSession')}
                                                         </button>
                                                     ) : (
                                                         <div className="w-full mb-4 py-2 bg-slate-100 text-slate-500 text-xs font-black rounded-xl border border-slate-200 flex items-center justify-center gap-2 shadow-sm">
@@ -4244,7 +4333,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     // Don't show Pre-Test card if no questions
                                                     if (!Array.isArray(preTestData?.questions) || preTestData.questions.length === 0) return null;
                                                     const isHostOrHR = effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' ||
-                                                                       (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id);
+                                                                       (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id) ||
+                                                                       (selectedMeeting.host && user.name && selectedMeeting.host === user.name);
                                                     return (
                                                         <div className="flex flex-col gap-2">
                                                     <button
@@ -4674,43 +4764,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     {t('closeSessionModal.cancelButton')}
                                 </button>
                                 <button
-                                    onClick={async () => { 
-                                        if(!selectedMeeting) return;
-                                        
-                                        const costReportPayload = {
-                                            ...selectedMeeting.costReport,
-                                            trainingPhotos: closeSessionPhotoUrl
-                                        };
-                                        const updatedMeeting = { 
-                                            ...selectedMeeting, 
-                                            is_closed: 1,
-                                            costReport: costReportPayload 
-                                        };
-
-                                        try {
-                                            const res = await fetch(`${API_BASE_URL}/api/meetings/${selectedMeeting.id}`, {
-                                                method: 'PUT',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify(updatedMeeting)
-                                            });
-
-                                            if (res.ok) {
-                                                const data = await res.json();
-                                                const safeData = safeMeeting(data);
-                                                setSelectedMeeting(safeData);
-                                                setMeetings(prev => prev.map(m => m.id === safeData.id ? safeData : m));
-                                                setNotification({ show: true, type: 'success', message: t('notifications.sessionClosed') });
-                                            } else {
-                                                throw new Error("Failed to close session.");
-                                            }
-                                        } catch (e) {
-                                            console.error(e);
-                                            setNotification({ show: true, type: 'error', message: t('notifications.sessionCloseError') });
-                                        }
-
-                                        setIsCloseModalOpen(false);
-                                        setCloseSessionPhotoUrl('');
-                                    }}
+                                    onClick={() => handleCloseSession(closeSessionPhotoUrl)}
                                     className={`flex-1 py-2.5 rounded-xl text-white font-bold shadow-lg transition-colors bg-red-600 hover:bg-red-700 shadow-red-200 disabled:opacity-50 disabled:cursor-not-allowed`}
                                     disabled={!closeSessionPhotoUrl || isUploadingPhoto}
                                 >

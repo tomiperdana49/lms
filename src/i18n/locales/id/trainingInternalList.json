@@ -35,7 +35,9 @@
     "yourScore": "Nilai Anda: {{score}}",
     "feedbackThanks": "Terima kasih atas feedback Anda!",
     "sessionClosed": "Sesi berhasil ditutup.",
-    "sessionCloseError": "Gagal menutup sesi."
+    "sessionCloseError": "Gagal menutup sesi.",
+    "sessionReopened": "Sesi berhasil dibuka kembali.",
+    "sessionReopenError": "Gagal membuka kembali sesi."
   },
   "cancelMeetingModal": {
     "title": "Batalkan Pertemuan",
@@ -221,6 +223,7 @@
     "required": "WAJIB",
     "closeSession": "TUTUP SESI",
     "sessionClosed": "SESI DITUTUP",
+    "reopenSession": "BUKA KEMBALI SESI",
     "done": "Sudah Selesai",
     "pendingCount": "Belum Selesai",
     "preTestTitle": "Pre-Test Assessment",
