@@ -1339,16 +1339,11 @@ app.get('/api/learning-stats', async (req, res) => {
             try { if (meeting.cost_report_json) costReport = JSON.parse(meeting.cost_report_json); } catch (e) { }
             try { if (meeting.guests_json) guests = JSON.parse(meeting.guests_json); } catch (e) { }
 
-            // Check if attended from costReport first (more accurate)
-            if (costReport && costReport.attendees && targetEmail) {
-                if (costReport.attendees.includes(targetEmail)) isAttended = true;
-            } else if (costReport && costReport.attendee_ids && targetEmpId) {
-                if (costReport.attendee_ids.includes(targetEmpId)) isAttended = true;
-            } else if (guests && guests.emails && targetEmail) {
-                if (guests.emails.includes(targetEmail)) isAttended = true;
-            } else if (guests && guests.employee_ids && targetEmpId) {
-                if (guests.employee_ids.includes(targetEmpId)) isAttended = true;
-            }
+            // Check every available signal independently (don't stop at the first truthy container)
+            if (costReport && costReport.attendees && targetEmail && costReport.attendees.includes(targetEmail)) isAttended = true;
+            if (!isAttended && costReport && costReport.attendee_ids && targetEmpId && costReport.attendee_ids.includes(targetEmpId)) isAttended = true;
+            if (!isAttended && guests && guests.emails && targetEmail && guests.emails.includes(targetEmail)) isAttended = true;
+            if (!isAttended && guests && guests.employee_ids && targetEmpId && guests.employee_ids.includes(targetEmpId)) isAttended = true;
 
             if (isAttended) {
                 let itemHours = 0;
