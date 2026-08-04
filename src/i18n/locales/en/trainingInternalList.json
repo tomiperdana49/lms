@@ -109,6 +109,8 @@
     "noMeetings": "No meetings scheduled.",
     "closed": "CLOSED",
     "active": "ACTIVE",
+    "paid": "PAID",
+    "certificateAvailable": "Certificate Available",
     "onlineLocation": "Online",
     "hostLabel": "Host:",
     "audience": "Audience",

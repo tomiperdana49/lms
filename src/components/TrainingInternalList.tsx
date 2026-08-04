@@ -27,7 +27,8 @@ import {
     Link,
     UploadCloud,
     MessageSquare,
-    Download
+    Download,
+    Award
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Role, Meeting, CostReport, Employee, QuizResult, User } from '../types';
@@ -3087,6 +3088,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     <Zap size={10} className="animate-pulse" /> {t('listView.active')}
                                                 </span>
                                             )}
+                                            {meeting.costReport?.isPaid && (
+                                                <span className="px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest bg-teal-50 text-teal-600 border border-teal-100/50 flex items-center gap-1.5 shadow-sm">
+                                                    <CheckCircle size={10} /> {t('listView.paid')}
+                                                </span>
+                                            )}
                                             <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm ${meeting.type === 'Online'
                                                 ? 'bg-blue-50 text-blue-600 border-blue-100/50'
                                                 : meeting.type === 'Hybrid' ? 'bg-purple-50 text-purple-600 border-purple-100/50' : 'bg-emerald-50 text-emerald-600 border-emerald-100/50'
@@ -3116,6 +3122,16 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             <span className="opacity-80">{t('listView.hostLabel')}</span> <span className="text-slate-700">{meeting.host}</span>
                                         </div>
                                     </div>
+
+                                    {!!(meeting.costReport?.isPaid && (
+                                        (user.employee_id && meeting.costReport?.attendee_ids?.includes(user.employee_id)) ||
+                                        (userEmail && meeting.costReport?.attendees?.includes(userEmail))
+                                    )) && (
+                                        <div className="flex items-center gap-2 mb-6 px-3 py-2 rounded-xl bg-amber-50 border border-amber-100 text-amber-700">
+                                            <Award size={16} className="shrink-0" />
+                                            <span className="text-[10px] font-black uppercase tracking-widest">{t('listView.certificateAvailable')}</span>
+                                        </div>
+                                    )}
 
                                     <div className="flex items-center justify-between border-t border-slate-100 pt-6 mt-auto">
                                         <div className="space-y-1">

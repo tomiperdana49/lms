@@ -109,6 +109,8 @@
     "noMeetings": "Belum ada pertemuan yang dijadwalkan.",
     "closed": "DITUTUP",
     "active": "AKTIF",
+    "paid": "SUDAH DIBAYAR",
+    "certificateAvailable": "Sertifikat Tersedia",
     "onlineLocation": "Online",
     "hostLabel": "Host:",
     "audience": "Peserta",
