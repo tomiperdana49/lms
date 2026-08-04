@@ -108,6 +108,17 @@ const query = async (sql, params) => {
     return results;
 };
 
+// --- CERTIFICATE HELPERS ---
+const ROMAN_MONTHS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+
+const generateCertSerial = (input) => {
+    let hash = 0;
+    for (let i = 0; i < input.length; i++) {
+        hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
+    }
+    return hash.toString(36).padStart(8, '0').slice(-8);
+};
+
 /**
  * Maps snake_case keys of an object to camelCase.
  * @param {Object} obj The object to map.
@@ -1537,6 +1548,81 @@ app.get('/api/learning-stats', async (req, res) => {
 
     } catch (err) {
         console.error('[API] Error in /api/learning-stats:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Issue (or fetch existing) internal training certificate for an attendee.
+// Server-side validates the meeting is paid and the employee actually attended,
+// so this cannot be used to mint certificates for arbitrary meetings/employees.
+app.post('/api/internal-certificates/issue', async (req, res) => {
+    try {
+        const { meetingId, employeeId, employeeEmail, employeeName } = req.body;
+        if (!meetingId || !employeeName || (!employeeId && !employeeEmail)) {
+            return res.status(400).json({ error: 'meetingId, employeeName and employeeId/employeeEmail are required' });
+        }
+
+        const meetings = await query('SELECT id, title, date, cost_report_json FROM meetings WHERE id = ?', [meetingId]);
+        if (meetings.length === 0) return res.status(404).json({ error: 'Meeting not found' });
+        const meeting = meetings[0];
+
+        let costReport = null;
+        try { if (meeting.cost_report_json) costReport = JSON.parse(meeting.cost_report_json); } catch (e) { }
+
+        const isAttendee = !!(costReport && (
+            (employeeId && costReport.attendee_ids?.includes(employeeId)) ||
+            (employeeEmail && costReport.attendees?.includes(employeeEmail))
+        ));
+
+        if (!costReport?.isPaid || !isAttendee) {
+            return res.status(403).json({ error: 'Not eligible for a certificate for this training session' });
+        }
+
+        // Idempotent: return existing certificate if one was already issued
+        const existing = await query(
+            'SELECT * FROM internal_certificates WHERE meeting_id = ? AND employee_id = ?',
+            [meetingId, employeeId || null]
+        );
+        if (existing.length > 0) {
+            const c = existing[0];
+            return res.json({ certNo: c.cert_no, serial: c.serial, employeeName: c.employee_name, trainingTitle: c.training_title, trainingDate: c.training_date, issuedAt: c.issued_at });
+        }
+
+        const trainingDate = meeting.date ? new Date(meeting.date) : new Date();
+        const certNo = `${String(meeting.id).padStart(3, '0')}/DIR/MAN-MDN/${ROMAN_MONTHS[trainingDate.getMonth()]}/${trainingDate.getFullYear()}`;
+        const serial = generateCertSerial(`${meeting.id}-${employeeId || employeeEmail}`);
+
+        await query(
+            'INSERT INTO internal_certificates (meeting_id, employee_id, employee_name, training_title, training_date, cert_no, serial) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [meetingId, employeeId || null, employeeName, meeting.title, meeting.date, certNo, serial]
+        );
+
+        res.json({ certNo, serial, employeeName, trainingTitle: meeting.title, trainingDate: meeting.date, issuedAt: new Date() });
+    } catch (err) {
+        console.error('[API] Error in /api/internal-certificates/issue:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Public verification lookup - no auth required, used by the QR code on the certificate.
+app.get('/api/internal-certificates/verify/:serial', async (req, res) => {
+    try {
+        const rows = await query('SELECT * FROM internal_certificates WHERE serial = ?', [req.params.serial]);
+        if (rows.length === 0) return res.status(404).json({ valid: false });
+
+        const c = rows[0];
+        res.json({
+            valid: true,
+            employeeName: c.employee_name,
+            trainingTitle: c.training_title,
+            trainingDate: c.training_date,
+            certNo: c.cert_no,
+            serial: c.serial,
+            issuedAt: c.issued_at,
+            companyName: 'PT Media Antar Nusa'
+        });
+    } catch (err) {
+        console.error('[API] Error in /api/internal-certificates/verify:', err);
         res.status(500).json({ error: err.message });
     }
 });

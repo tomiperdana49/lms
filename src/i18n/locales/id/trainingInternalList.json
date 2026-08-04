@@ -37,7 +37,8 @@
     "sessionClosed": "Sesi berhasil ditutup.",
     "sessionCloseError": "Gagal menutup sesi.",
     "sessionReopened": "Sesi berhasil dibuka kembali.",
-    "sessionReopenError": "Gagal membuka kembali sesi."
+    "sessionReopenError": "Gagal membuka kembali sesi.",
+    "certificateGenerationError": "Gagal membuat sertifikat. Silakan coba lagi."
   },
   "cancelMeetingModal": {
     "title": "Batalkan Pertemuan",
@@ -237,6 +238,7 @@
     "feedbackFormSubtitle": "Evaluasi penyelenggara (Bahasa Indonesia)",
     "submitted": "Terkirim",
     "accessFeedback": "Akses Feedback",
+    "downloadCertificate": "Unduh Sertifikat",
     "closeDetail": "Tutup Detail"
   },
   "closeSessionModal": {

@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, Fragment, type FormEvent } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { useTranslation } from 'react-i18next';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import QRCode from 'qrcode';
 import {
     Users,
     User as UserIcon,
@@ -23,12 +26,14 @@ import {
     Search,
     Link,
     UploadCloud,
-    MessageSquare
+    MessageSquare,
+    Download
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Role, Meeting, CostReport, Employee, QuizResult, User } from '../types';
 import PopupNotification from './PopupNotification';
 import ConfirmationModal from './ConfirmationModal';
+import InternalCertificateTemplate from './InternalCertificateTemplate';
 
 const renderTextWithLinks = (text: string) => {
     if (!text) return null;
@@ -86,6 +91,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [meetingToDelete, setMeetingToDelete] = useState<number | null>(null);
     const [confirmMarkPaid, setConfirmMarkPaid] = useState<boolean>(false);
     const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+    const [isDownloadingCert, setIsDownloadingCert] = useState(false);
+    const [certInfo, setCertInfo] = useState<{ certNo: string; serial: string; qrDataUrl: string; trainingDate: Date } | null>(null);
     const [closeSessionPhotoUrl, setCloseSessionPhotoUrl] = useState('');
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
@@ -1365,6 +1372,76 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         } catch (e) {
             console.error(e);
             setNotification({ show: true, type: 'error', message: t('notifications.sessionReopenError') });
+        }
+    };
+
+    const handleDownloadInternalCertificate = async () => {
+        if (!selectedMeeting) return;
+        setIsDownloadingCert(true);
+        try {
+            // 1. Issue (or fetch existing) certificate record from the server.
+            // Server re-validates isPaid + attendance before persisting anything.
+            const issueRes = await fetch(`${API_BASE_URL}/api/internal-certificates/issue`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    meetingId: selectedMeeting.id,
+                    employeeId: user.employee_id || null,
+                    employeeEmail: userEmail,
+                    employeeName: user.name
+                })
+            });
+            if (!issueRes.ok) throw new Error('Not eligible for certificate');
+            const issued = await issueRes.json();
+
+            // 2. Generate a QR code that points to the public verification page.
+            const verifyUrl = `${window.location.origin}/verify/${issued.serial}`;
+            const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 200 });
+
+            setCertInfo({
+                certNo: issued.certNo,
+                serial: issued.serial,
+                qrDataUrl,
+                trainingDate: issued.trainingDate ? new Date(issued.trainingDate) : new Date()
+            });
+
+            // Wait for the hidden certificate DOM to repaint with the new QR/cert data before capturing it,
+            // and for the certificate's script webfont to finish loading so it doesn't fall back to a system font.
+            await Promise.all([
+                document.fonts.ready,
+                new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+            ]);
+
+            const element = document.getElementById('internal-certificate-content');
+            if (!element) return;
+
+            const parent = element.parentElement;
+            if (parent) parent.style.display = 'block';
+            element.style.display = 'block';
+
+            const canvas = await html2canvas(element, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff'
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save(`Certificate_${selectedMeeting.title.replace(/\s+/g, '_')}_${user.name.replace(/\s+/g, '_')}.pdf`);
+
+            if (parent) parent.style.display = 'none';
+            element.style.display = 'none';
+        } catch (e) {
+            console.error(e);
+            setNotification({ show: true, type: 'error', message: t('notifications.certificateGenerationError') });
+        } finally {
+            setIsDownloadingCert(false);
         }
     };
 
@@ -4578,10 +4655,33 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     );
                                 })()}
 
+                                {(() => {
+                                    const isAttendeeOfMeeting = !!(
+                                        (user.employee_id && selectedMeeting.costReport?.attendee_ids?.includes(user.employee_id)) ||
+                                        (userEmail && selectedMeeting.costReport?.attendees?.includes(userEmail))
+                                    );
+                                    const canDownloadCertificate = !!(selectedMeeting.costReport?.isPaid && isAttendeeOfMeeting);
+                                    if (!canDownloadCertificate) return null;
+
+                                    return (
+                                        <button
+                                            onClick={handleDownloadInternalCertificate}
+                                            disabled={isDownloadingCert}
+                                            className="w-full mt-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 disabled:opacity-50"
+                                        >
+                                            {isDownloadingCert ? (
+                                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            ) : (
+                                                <Download size={18} />
+                                            )}
+                                            {t('detailModal.downloadCertificate')}
+                                        </button>
+                                    );
+                                })()}
 
                                 <button
                                     onClick={() => setSelectedMeeting(null)}
-                                    className="w-full mt-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all"
+                                    className="w-full mt-3 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all"
                                 >
                                     {t('detailModal.closeDetail')}
                                 </button>
@@ -4590,6 +4690,20 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     </div>
                 )
             }
+
+            {/* Hidden Certificate Content for PDF Generation */}
+            <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', display: 'none' }}>
+                {selectedMeeting && certInfo && (
+                    <InternalCertificateTemplate
+                        employeeName={user.name}
+                        trainingTitle={selectedMeeting.title}
+                        date={certInfo.trainingDate}
+                        certNo={certInfo.certNo}
+                        serial={certInfo.serial}
+                        qrDataUrl={certInfo.qrDataUrl}
+                    />
+                )}
+            </div>
 
             {/* Quiz Modal */}
             {showQuiz && selectedMeeting && (

@@ -37,7 +37,8 @@
     "sessionClosed": "Session closed successfully.",
     "sessionCloseError": "Failed to close session.",
     "sessionReopened": "Session reopened successfully.",
-    "sessionReopenError": "Failed to reopen session."
+    "sessionReopenError": "Failed to reopen session.",
+    "certificateGenerationError": "Failed to generate certificate. Please try again."
   },
   "cancelMeetingModal": {
     "title": "Cancel Meeting",
@@ -237,6 +238,7 @@
     "feedbackFormSubtitle": "Organizer evaluation (Indonesian)",
     "submitted": "Submitted",
     "accessFeedback": "Feedback Access",
+    "downloadCertificate": "Download Certificate",
     "closeDetail": "Close Detail"
   },
   "closeSessionModal": {

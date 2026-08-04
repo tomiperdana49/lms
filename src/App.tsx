@@ -12,6 +12,7 @@ import LoginPage from './components/LoginPage';
 import UserManagement from './components/UserManagement';
 import AdminDashboard from './components/AdminDashboard';
 import IncentiveManager from './components/IncentiveManager';
+import VerifyCertificate from './components/VerifyCertificate';
 import type { Page, Role, User } from './types';
 
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -25,6 +26,12 @@ const LOGIN_AT_KEY = 'lms_login_at';
 const LAST_ACTIVITY_KEY = 'lms_last_activity';
 
 function App() {
+  // Public certificate verification page - accessible without login, no hooks used above this check.
+  if (window.location.pathname.startsWith('/verify/')) {
+    const serial = window.location.pathname.split('/verify/')[1] || '';
+    return <VerifyCertificate serial={decodeURIComponent(serial)} />;
+  }
+
   const [user, setUser] = useState<User | null>(() => {
     const savedUser = localStorage.getItem('lms_user');
     return savedUser ? JSON.parse(savedUser) : null;

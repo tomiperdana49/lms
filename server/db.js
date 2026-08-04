@@ -326,6 +326,27 @@ export const initDB = async () => {
             console.log("Added certification_result column to external_training_requests.");
         } catch (e) { /* Ignore if exists */ }
 
+        // MIGRATION: Add internal_certificates table (issued internal training certificates)
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS internal_certificates (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    meeting_id INT NOT NULL,
+                    employee_id VARCHAR(50),
+                    employee_name VARCHAR(255) NOT NULL,
+                    training_title VARCHAR(255) NOT NULL,
+                    training_date DATE,
+                    cert_no VARCHAR(100),
+                    serial VARCHAR(20) UNIQUE NOT NULL,
+                    issued_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_internal_cert (meeting_id, employee_id)
+                )
+            `);
+            console.log("Verified internal_certificates table exists.");
+        } catch (e) {
+            console.error("Error creating internal_certificates table:", e);
+        }
+
         connection.release();
     } catch (err) {
         console.error('Database initialization failed:', err);
