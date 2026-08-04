@@ -115,7 +115,8 @@
     "hostLabel": "Host:",
     "audience": "Audience",
     "financialReportTitle": "Financial Report",
-    "editMeetingTitle": "Edit Meeting"
+    "editMeetingTitle": "Edit Meeting",
+    "duplicateMeetingTitle": "Duplicate Training"
   },
   "createModal": {
     "editTitle": "Edit Session",

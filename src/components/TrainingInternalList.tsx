@@ -28,7 +28,8 @@ import {
     UploadCloud,
     MessageSquare,
     Download,
-    Award
+    Award,
+    Copy
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Role, Meeting, CostReport, Employee, QuizResult, User } from '../types';
@@ -1036,6 +1037,56 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
         setInvitedEmails(meeting.guests?.emails || []);
         setInvitedEmployeeIds((meeting.guests as any).employee_ids || []);
+        setIsCreateOpen(true);
+    };
+
+    // Duplicate an existing meeting into the create form, with Time and
+    // Participants left blank so HR fills them in for the new session.
+    const openDuplicateModal = (meeting: ExtendedMeeting) => {
+        resetForm();
+        setIsEditing(false);
+        setEditId(null);
+        setEditIsClosed(false);
+
+        const formatDate = (dateStr: any) => {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '';
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        let hostId = meeting.employee_id || '';
+        if (!hostId && meeting.host) {
+            const foundEmp = employees.find(e => e.full_name && e.full_name.trim().toLowerCase() === meeting.host.trim().toLowerCase());
+            if (foundEmp) hostId = foundEmp.id_employee;
+        }
+
+        setFormData({
+            title: meeting.title,
+            date: formatDate(meeting.date),
+            startTime: '',
+            endTime: '',
+            host: meeting.host,
+            host_id: hostId,
+            type: meeting.type || 'Offline',
+            location: meeting.location || '',
+            meetLink: meeting.meetLink || '',
+            description: (meeting.description && meeting.description !== 'No description provided.') ? meeting.description : (meeting.agenda || ''),
+            competency_type: meeting.competency_type || '',
+            competency_name: meeting.competency_name || '',
+            pre_test_data: meeting.pre_test_data || { questions: [] },
+            post_test_data: meeting.post_test_data || { questions: [] },
+            material_link: meeting.material_link || '',
+            training_gr_type: meeting.training_gr_type || ''
+        });
+
+        // Participants are intentionally left empty for the duplicated session
+        setInvitedEmails([]);
+        setInvitedEmployeeIds([]);
+        setActiveCreateTab('details');
         setIsCreateOpen(true);
     };
 
@@ -3155,6 +3206,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         title={t('listView.editMeetingTitle')}
                                                     >
                                                         <FileText size={18} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); openDuplicateModal(meeting); }}
+                                                        className="w-10 h-10 flex items-center justify-center rounded-2xl bg-slate-50 text-slate-400 hover:bg-purple-50 hover:text-purple-600 transition-all border border-transparent hover:border-purple-100 shadow-sm"
+                                                        title={t('listView.duplicateMeetingTitle')}
+                                                    >
+                                                        <Copy size={18} />
                                                     </button>
                                                 </div>
                                             )}
