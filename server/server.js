@@ -1531,14 +1531,14 @@ app.get('/api/learning-stats', async (req, res) => {
         bookDetails.sort(byDateAsc);
 
         res.json({
-            jamTraining: Math.round(jamTraining),
-            jamTrainingExternal: Math.round(jamTrainingExternal),
-            jamOnline: Math.round(jamOnline),
-            jamBuku: Math.round(jamBuku),
+            jamTraining: Math.round(jamTraining * 100) / 100,
+            jamTrainingExternal: Math.round(jamTrainingExternal * 100) / 100,
+            jamOnline: Math.round(jamOnline * 100) / 100,
+            jamBuku: Math.round(jamBuku * 100) / 100,
             biayaTraining: Math.round(biayaTraining),
             biayaTrainingExternal: Math.round(biayaTrainingExternal),
             biayaBuku: Math.round(biayaBuku),
-            totalJam: Math.round(jamTraining + jamTrainingExternal + jamOnline + jamBuku),
+            totalJam: Math.round((jamTraining + jamTrainingExternal + jamOnline + jamBuku) * 100) / 100,
             totalBiaya: Math.round(biayaTraining + biayaTrainingExternal + biayaBuku),
             trainingDetails,
             trainingExternalDetails,

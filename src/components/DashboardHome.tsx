@@ -12,6 +12,15 @@ interface LearningStatDetail {
     cost: number;
 }
 
+const formatHoursMinutes = (value: number, t: (key: string) => string) => {
+    const totalMinutes = Math.round(value * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    if (h > 0 && m > 0) return `${h} ${t('hours')} ${m} ${t('minutes')}`;
+    if (h > 0) return `${h} ${t('hours')}`;
+    return `${m} ${t('minutes')}`;
+};
+
 interface LearningStats {
     totalJam: number;
     totalBiaya: number;
@@ -347,7 +356,7 @@ const LearningStatsDetailModal = ({ mode, stats, onClose, t }: LearningStatsDeta
                 <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl shrink-0">
                     <span className="text-sm font-black text-slate-700 uppercase tracking-wide">{t('detailModal.grandTotal')}</span>
                     <span className="text-lg font-black text-blue-600">
-                        {isHours ? `${grandTotal} ${t('hours')}` : `Rp ${grandTotal.toLocaleString('id-ID')}`}
+                        {isHours ? formatHoursMinutes(grandTotal, t) : `Rp ${grandTotal.toLocaleString('id-ID')}`}
                     </span>
                 </div>
             </div>
