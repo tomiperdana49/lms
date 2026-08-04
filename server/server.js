@@ -1305,12 +1305,14 @@ app.get('/api/learning-stats', async (req, res) => {
 
         let targetEmail = email;
         let targetEmpId = employee_id;
+        let targetUserId = null;
 
         // Find employee if missing
         let targetName = null;
         if (targetEmail) {
-            const users = await query('SELECT employee_id, name FROM users WHERE email = ?', [targetEmail]);
+            const users = await query('SELECT id, employee_id, name FROM users WHERE email = ?', [targetEmail]);
             if (users.length > 0) {
+                targetUserId = users[0].id;
                 if (!targetEmpId) targetEmpId = users[0].employee_id;
                 targetName = users[0].name;
             }
@@ -1318,9 +1320,14 @@ app.get('/api/learning-stats', async (req, res) => {
 
         let jamTraining = 0;
         let biayaTraining = 0;
+        let jamTrainingExternal = 0;
+        let biayaTrainingExternal = 0;
+        let jamOnline = 0;
         let jamBuku = 0;
         let biayaBuku = 0;
         const trainingDetails = [];
+        const trainingExternalDetails = [];
+        const onlineDetails = [];
         const bookDetails = [];
 
         // 1. Internal Training (meetings)
@@ -1384,7 +1391,84 @@ app.get('/api/learning-stats', async (req, res) => {
             }
         }
 
-        // 2. Baca Buku (reading_logs)
+        // 2. External Training (external_training_requests)
+        if (targetEmpId) {
+            const externalTrainings = await query(
+                "SELECT title, start_date, end_date, registration_fee, travel_flight_cost, accommodation_cost, miscellaneous_cost FROM external_training_requests WHERE employee_id = ? AND status = 'Processed'",
+                [targetEmpId]
+            );
+            for (const ext of externalTrainings) {
+                let itemHours = 0;
+                if (ext.start_date && ext.end_date) {
+                    const diffMs = new Date(ext.end_date).getTime() - new Date(ext.start_date).getTime();
+                    if (diffMs > 0) itemHours = diffMs / (1000 * 60 * 60);
+                }
+                jamTrainingExternal += itemHours;
+
+                const itemCost = (Number(ext.registration_fee) || 0) + (Number(ext.travel_flight_cost) || 0) +
+                    (Number(ext.accommodation_cost) || 0) + (Number(ext.miscellaneous_cost) || 0);
+                biayaTrainingExternal += itemCost;
+
+                trainingExternalDetails.push({
+                    title: ext.title,
+                    date: ext.start_date,
+                    hours: Math.round(itemHours * 100) / 100,
+                    cost: Math.round(itemCost)
+                });
+            }
+        }
+
+        // 3. Online Modules (progress on courses)
+        if (targetEmpId || targetUserId) {
+            const progressRows = await query(
+                `SELECT p.course_id, p.completed_module_ids, p.last_access, c.title as course_title
+                 FROM progress p LEFT JOIN courses c ON p.course_id = c.id
+                 WHERE (p.employee_id IS NOT NULL AND p.employee_id = ?) OR p.user_id = ?`,
+                [targetEmpId, targetUserId]
+            );
+
+            if (progressRows.length > 0) {
+                const moduleRows = await query('SELECT id, duration FROM course_modules');
+                const durationMap = {};
+                for (const m of moduleRows) durationMap[m.id] = m.duration;
+
+                const parseModuleDuration = (dur) => {
+                    if (!dur) return 0;
+                    if (typeof dur === 'string' && dur.includes(':')) {
+                        const [mm, ss] = dur.split(':').map(Number);
+                        return ((mm || 0) + (ss || 0) / 60) / 60;
+                    }
+                    const n = Number(dur);
+                    return isNaN(n) ? 0 : n / 60;
+                };
+
+                for (const p of progressRows) {
+                    let completedIds = [];
+                    try {
+                        completedIds = typeof p.completed_module_ids === 'string'
+                            ? JSON.parse(p.completed_module_ids)
+                            : (p.completed_module_ids || []);
+                    } catch (e) { }
+
+                    let courseHours = 0;
+                    for (const modId of completedIds) {
+                        courseHours += parseModuleDuration(durationMap[modId]);
+                    }
+                    jamOnline += courseHours;
+
+                    if (courseHours > 0) {
+                        onlineDetails.push({
+                            title: p.course_title || `Course #${p.course_id}`,
+                            date: p.last_access,
+                            hours: Math.round(courseHours * 100) / 100,
+                            cost: 0
+                        });
+                    }
+                }
+            }
+        }
+
+        // 4. Baca Buku (reading_logs)
         if (targetEmpId) {
             const logs = await query("SELECT title, finish_date, date, incentive_amount, category FROM reading_logs WHERE employee_id = ? AND hr_approval_status = 'Approved'", [targetEmpId]);
             // Biaya buku
@@ -1431,16 +1515,23 @@ app.get('/api/learning-stats', async (req, res) => {
 
         const byDateAsc = (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime();
         trainingDetails.sort(byDateAsc);
+        trainingExternalDetails.sort(byDateAsc);
+        onlineDetails.sort(byDateAsc);
         bookDetails.sort(byDateAsc);
 
         res.json({
             jamTraining: Math.round(jamTraining),
+            jamTrainingExternal: Math.round(jamTrainingExternal),
+            jamOnline: Math.round(jamOnline),
             jamBuku: Math.round(jamBuku),
             biayaTraining: Math.round(biayaTraining),
+            biayaTrainingExternal: Math.round(biayaTrainingExternal),
             biayaBuku: Math.round(biayaBuku),
-            totalJam: Math.round(jamTraining + jamBuku),
-            totalBiaya: Math.round(biayaTraining + biayaBuku),
+            totalJam: Math.round(jamTraining + jamTrainingExternal + jamOnline + jamBuku),
+            totalBiaya: Math.round(biayaTraining + biayaTrainingExternal + biayaBuku),
             trainingDetails,
+            trainingExternalDetails,
+            onlineDetails,
             bookDetails
         });
 

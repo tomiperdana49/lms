@@ -16,10 +16,15 @@ interface LearningStats {
     totalJam: number;
     totalBiaya: number;
     jamTraining: number;
+    jamTrainingExternal: number;
+    jamOnline: number;
     jamBuku: number;
     biayaTraining: number;
+    biayaTrainingExternal: number;
     biayaBuku: number;
     trainingDetails: LearningStatDetail[];
+    trainingExternalDetails: LearningStatDetail[];
+    onlineDetails: LearningStatDetail[];
     bookDetails: LearningStatDetail[];
 }
 
@@ -36,8 +41,10 @@ import NotificationPanel from './NotificationPanel';
 const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: DashboardHomeProps) => {
     const { t } = useTranslation('dashboardHome');
     const [learningStats, setLearningStats] = useState<LearningStats>({
-        totalJam: 0, totalBiaya: 0, jamTraining: 0, jamBuku: 0, biayaTraining: 0, biayaBuku: 0,
-        trainingDetails: [], bookDetails: []
+        totalJam: 0, totalBiaya: 0,
+        jamTraining: 0, jamTrainingExternal: 0, jamOnline: 0, jamBuku: 0,
+        biayaTraining: 0, biayaTrainingExternal: 0, biayaBuku: 0,
+        trainingDetails: [], trainingExternalDetails: [], onlineDetails: [], bookDetails: []
     });
     const [detailModal, setDetailModal] = useState<'hours' | 'cost' | null>(null);
 
@@ -261,6 +268,14 @@ const LearningStatsDetailModal = ({ mode, stats, onClose, t }: LearningStatsDeta
 
     const sections = [
         {
+            key: 'trainingExternal',
+            label: t('detailModal.trainingExternalSection'),
+            icon: <Briefcase size={16} />,
+            items: stats.trainingExternalDetails,
+            subtotal: isHours ? stats.jamTrainingExternal : stats.biayaTrainingExternal,
+            emptyLabel: t('detailModal.noTrainingExternal')
+        },
+        {
             key: 'training',
             label: t('detailModal.trainingSection'),
             icon: <Users size={16} />,
@@ -268,6 +283,14 @@ const LearningStatsDetailModal = ({ mode, stats, onClose, t }: LearningStatsDeta
             subtotal: isHours ? stats.jamTraining : stats.biayaTraining,
             emptyLabel: t('detailModal.noTraining')
         },
+        ...(isHours ? [{
+            key: 'online',
+            label: t('detailModal.onlineSection'),
+            icon: <Video size={16} />,
+            items: stats.onlineDetails,
+            subtotal: stats.jamOnline,
+            emptyLabel: t('detailModal.noOnline')
+        }] : []),
         {
             key: 'reading',
             label: t('detailModal.readingSection'),
