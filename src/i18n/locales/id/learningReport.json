@@ -1,0 +1,91 @@
+{
+  "title": "Laporan Pembelajaran",
+  "subtitle": "Ringkasan jam dan biaya pembelajaran {{name}} di semua kategori",
+  "exportButton": "Export Excel",
+  "loading": "Memuat laporan pembelajaran...",
+  "hours": "jam",
+  "minutes": "mnt",
+  "totalHours": "Total Jam Belajar",
+  "totalCost": "Total Biaya Belajar",
+  "filter": {
+    "label": "Periode",
+    "to": "s/d",
+    "reset": "Reset ke tahun ini"
+  },
+  "sections": {
+    "trainingExternal": "Training Eksternal",
+    "training": "Training Internal",
+    "online": "Modul Online",
+    "reading": "Log Bacaan",
+    "emptyTrainingExternal": "Belum ada catatan training eksternal.",
+    "emptyTraining": "Belum ada catatan training internal.",
+    "emptyOnline": "Belum ada modul online yang diselesaikan.",
+    "emptyReading": "Belum ada catatan bacaan yang disetujui."
+  },
+  "assessment": {
+    "preTest": "Pre-Test",
+    "postTest": "Post-Test",
+    "feedback": "Feedback",
+    "notSubmitted": "Belum submit"
+  },
+  "table": {
+    "category": "Kategori",
+    "title": "Judul",
+    "date": "Tanggal",
+    "hours": "Jam",
+    "cost": "Biaya",
+    "preTest": "Pre-Test",
+    "postTest": "Post-Test",
+    "feedback": "Feedback",
+    "noData": "Tidak ada catatan pembelajaran pada periode ini.",
+    "total": "Total"
+  },
+  "export": {
+    "sheetName": "Laporan Pembelajaran",
+    "categoryColumn": "Kategori",
+    "titleColumn": "Judul",
+    "dateColumn": "Tanggal",
+    "hoursColumn": "Jam",
+    "costColumn": "Biaya",
+    "preTestColumn": "Pre-Test",
+    "postTestColumn": "Post-Test",
+    "feedbackColumn": "Feedback",
+    "notTaken": "Belum diikuti",
+    "submitted": "Sudah submit",
+    "notSubmitted": "Belum submit",
+    "grandTotalRow": "TOTAL KESELURUHAN"
+  },
+  "team": {
+    "title": "Tim Saya",
+    "subtitle": "Ringkasan pembelajaran untuk semua yang melapor ke {{name}}",
+    "myTeamsButton": "My Teams",
+    "myReportButton": "Laporan Saya",
+    "loading": "Memuat laporan pembelajaran tim...",
+    "noSubordinates": "Belum ada yang melapor ke Anda.",
+    "totalMembers": "Anggota Tim",
+    "rosterTitle": "Anggota Tim",
+    "youBadge": "Anda",
+    "export": {
+      "sheetName": "Laporan Pembelajaran Tim",
+      "nameColumn": "Nama",
+      "typeColumn": "Tipe",
+      "materialTitleColumn": "Judul Materi",
+      "materialLinkColumn": "Link Materi",
+      "certificateLinkColumn": "Link Sertifikat",
+      "organizerColumn": "Penyelenggara",
+      "dateColumn": "Tanggal",
+      "monthColumn": "Bulan",
+      "durationColumn": "Durasi (Jam)",
+      "preTestColumn": "Pre-test",
+      "postTestColumn": "Post-test",
+      "costColumn": "Biaya",
+      "feedbackColumn": "Feedback",
+      "type": {
+        "trainingExternal": "External",
+        "training": "Internal",
+        "online": "Online",
+        "reading": "Reading"
+      }
+    }
+  }
+}

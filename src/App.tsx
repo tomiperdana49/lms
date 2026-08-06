@@ -12,6 +12,7 @@ import LoginPage from './components/LoginPage';
 import UserManagement from './components/UserManagement';
 import AdminDashboard from './components/AdminDashboard';
 import IncentiveManager from './components/IncentiveManager';
+import LearningReport from './components/LearningReport';
 import VerifyCertificate from './components/VerifyCertificate';
 import type { Page, Role, User } from './types';
 
@@ -284,6 +285,15 @@ function App() {
         )}
 
         {activePage === 'calendar' && <LMSCalendar userEmail={user?.email} />}
+
+        {activePage === 'learning-report' && (
+          <LearningReport
+            userEmail={user?.email}
+            userName={user?.name}
+            userEmployeeId={user?.employee_id}
+            isSupervisor={user?.isSupervisor}
+          />
+        )}
         {/* User Management Route - Only for HR */}
         {activePage === 'users' && <UserManagement userRole={userRole} onBack={() => setActivePage('dashboard')} />}
 

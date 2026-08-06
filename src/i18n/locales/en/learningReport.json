@@ -1,0 +1,91 @@
+{
+  "title": "Learning Report",
+  "subtitle": "A summary of {{name}}'s learning hours and cost across all categories",
+  "exportButton": "Export Excel",
+  "loading": "Loading your learning report...",
+  "hours": "hours",
+  "minutes": "min",
+  "totalHours": "Total Learning Hours",
+  "totalCost": "Total Learning Cost",
+  "filter": {
+    "label": "Period",
+    "to": "to",
+    "reset": "Reset to this year"
+  },
+  "sections": {
+    "trainingExternal": "External Training",
+    "training": "Internal Training",
+    "online": "Online Modules",
+    "reading": "Reading Log",
+    "emptyTrainingExternal": "No external training records yet.",
+    "emptyTraining": "No internal training records yet.",
+    "emptyOnline": "No online modules completed yet.",
+    "emptyReading": "No approved reading log entries yet."
+  },
+  "assessment": {
+    "preTest": "Pre-Test",
+    "postTest": "Post-Test",
+    "feedback": "Feedback",
+    "notSubmitted": "Not submitted"
+  },
+  "table": {
+    "category": "Category",
+    "title": "Title",
+    "date": "Date",
+    "hours": "Hours",
+    "cost": "Cost",
+    "preTest": "Pre-Test",
+    "postTest": "Post-Test",
+    "feedback": "Feedback",
+    "noData": "No learning records for this period.",
+    "total": "Total"
+  },
+  "export": {
+    "sheetName": "Learning Report",
+    "categoryColumn": "Category",
+    "titleColumn": "Title",
+    "dateColumn": "Date",
+    "hoursColumn": "Hours",
+    "costColumn": "Cost",
+    "preTestColumn": "Pre-Test",
+    "postTestColumn": "Post-Test",
+    "feedbackColumn": "Feedback",
+    "notTaken": "Not taken",
+    "submitted": "Submitted",
+    "notSubmitted": "Not submitted",
+    "grandTotalRow": "GRAND TOTAL"
+  },
+  "team": {
+    "title": "My Team",
+    "subtitle": "Learning summary for everyone reporting to {{name}}",
+    "myTeamsButton": "My Teams",
+    "myReportButton": "My Report",
+    "loading": "Loading your team's learning report...",
+    "noSubordinates": "No one currently reports to you.",
+    "totalMembers": "Team Members",
+    "rosterTitle": "Team Members",
+    "youBadge": "You",
+    "export": {
+      "sheetName": "Team Learning Report",
+      "nameColumn": "Name",
+      "typeColumn": "Type",
+      "materialTitleColumn": "Material Title",
+      "materialLinkColumn": "Material Link",
+      "certificateLinkColumn": "Certificate Link",
+      "organizerColumn": "Organizer",
+      "dateColumn": "Date",
+      "monthColumn": "Month",
+      "durationColumn": "Duration (Hours)",
+      "preTestColumn": "Pre-test",
+      "postTestColumn": "Post-test",
+      "costColumn": "Cost",
+      "feedbackColumn": "Feedback",
+      "type": {
+        "trainingExternal": "External",
+        "training": "Internal",
+        "online": "Online",
+        "reading": "Reading"
+      }
+    }
+  }
+}

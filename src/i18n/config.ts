@@ -13,6 +13,7 @@ import enExternalTraining from './locales/en/externalTraining.json';
 import enFeedbackModal from './locales/en/feedbackModal.json';
 import enHRReportGenerator from './locales/en/hrReportGenerator.json';
 import enIncentiveManager from './locales/en/incentiveManager.json';
+import enLearningReport from './locales/en/learningReport.json';
 import enLMSCalendar from './locales/en/lmsCalendar.json';
 import enNotificationPanel from './locales/en/notificationPanel.json';
 import enOnlineModulesManager from './locales/en/onlineModulesManager.json';
@@ -36,6 +37,7 @@ import idExternalTraining from './locales/id/externalTraining.json';
 import idFeedbackModal from './locales/id/feedbackModal.json';
 import idHRReportGenerator from './locales/id/hrReportGenerator.json';
 import idIncentiveManager from './locales/id/incentiveManager.json';
+import idLearningReport from './locales/id/learningReport.json';
 import idLMSCalendar from './locales/id/lmsCalendar.json';
 import idNotificationPanel from './locales/id/notificationPanel.json';
 import idOnlineModulesManager from './locales/id/onlineModulesManager.json';
@@ -68,6 +70,7 @@ i18n
                 feedbackModal: enFeedbackModal,
                 hrReportGenerator: enHRReportGenerator,
                 incentiveManager: enIncentiveManager,
+                learningReport: enLearningReport,
                 lmsCalendar: enLMSCalendar,
                 notificationPanel: enNotificationPanel,
                 onlineModulesManager: enOnlineModulesManager,
@@ -92,6 +95,7 @@ i18n
                 feedbackModal: idFeedbackModal,
                 hrReportGenerator: idHRReportGenerator,
                 incentiveManager: idIncentiveManager,
+                learningReport: idLearningReport,
                 lmsCalendar: idLMSCalendar,
                 notificationPanel: idNotificationPanel,
                 onlineModulesManager: idOnlineModulesManager,

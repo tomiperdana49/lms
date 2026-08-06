@@ -238,6 +238,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { icon: Library, label: t('menu.readingLog'), id: 'reading-log' },
         { icon: BookOpen, label: t('menu.onlineModules'), id: 'courses' },
         { icon: Calendar, label: t('menu.calendar'), id: 'calendar' },
+        { icon: TrendingUp, label: t('menu.learningReport'), id: 'learning-report' },
         ...(config?.moduleIncentive ? [{ icon: Award, label: t('menu.incentives'), id: 'incentives' }] : []),
     ];
 

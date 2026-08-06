@@ -1311,8 +1311,21 @@ app.post('/api/admin/sync-all-nusawork', async (req, res) => {
 // --- USER ROUTES ---
 app.get('/api/learning-stats', async (req, res) => {
     try {
-        const { email, employee_id } = req.query;
+        const { email, employee_id, startDate, endDate } = req.query;
         if (!email && !employee_id) return res.status(400).json({ error: 'Email or employee_id required' });
+
+        // Optional date-range filter (inclusive). When omitted, every record is included (unfiltered/all-time).
+        const rangeStart = startDate ? new Date(startDate) : null;
+        const rangeEnd = endDate ? new Date(`${endDate}T23:59:59.999`) : null;
+        const isWithinRange = (dateStr) => {
+            if (!rangeStart && !rangeEnd) return true;
+            if (!dateStr) return false;
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return false;
+            if (rangeStart && d < rangeStart) return false;
+            if (rangeEnd && d > rangeEnd) return false;
+            return true;
+        };
 
         let targetEmail = email;
         let targetEmpId = employee_id;
@@ -1342,7 +1355,36 @@ app.get('/api/learning-stats', async (req, res) => {
         const bookDetails = [];
 
         // 1. Internal Training (meetings)
-        const meetings = await query("SELECT title, date, time, guests_json, cost_report_json, host, employee_id FROM meetings WHERE type IN ('Offline', 'Online', 'Hybrid', 'Internal')");
+        const meetings = await query("SELECT id, title, date, time, guests_json, cost_report_json, host, employee_id FROM meetings WHERE type IN ('Offline', 'Online', 'Hybrid', 'Internal')");
+
+        // Fetch this user's pre/post-test scores and feedback submissions across all meetings up front
+        // (avoids N+1 queries inside the loop below).
+        const userQuizResults = await query(
+            `SELECT meeting_id, quiz_type, score FROM quiz_results
+             WHERE meeting_id IS NOT NULL AND module_id IS NULL
+               AND (student_id = ? OR (employee_id IS NOT NULL AND employee_id = ?))`,
+            [targetUserId, targetEmpId]
+        );
+        const quizByMeeting = {};
+        for (const r of userQuizResults) {
+            if (!quizByMeeting[r.meeting_id]) quizByMeeting[r.meeting_id] = {};
+            const quizType = (r.quiz_type || 'POST').toUpperCase();
+            if (quizByMeeting[r.meeting_id][quizType] === undefined || r.score > quizByMeeting[r.meeting_id][quizType]) {
+                quizByMeeting[r.meeting_id][quizType] = r.score;
+            }
+        }
+
+        const userFeedback = await query(
+            `SELECT meeting_id, submitted_at FROM course_feedback
+             WHERE meeting_id IS NOT NULL AND (is_imported IS NULL OR is_imported = 0)
+               AND (user_id = ? OR (employee_id IS NOT NULL AND employee_id = ?))`,
+            [targetUserId, targetEmpId]
+        );
+        const feedbackByMeeting = {};
+        for (const f of userFeedback) {
+            feedbackByMeeting[f.meeting_id] = f.submitted_at;
+        }
+
         for (const meeting of meetings) {
             // Skip if the user is the host
             if ((targetName && meeting.host === targetName) ||
@@ -1363,7 +1405,7 @@ app.get('/api/learning-stats', async (req, res) => {
             if (!isAttended && guests && guests.emails && targetEmail && guests.emails.includes(targetEmail)) isAttended = true;
             if (!isAttended && guests && guests.employee_ids && targetEmpId && guests.employee_ids.includes(targetEmpId)) isAttended = true;
 
-            if (isAttended) {
+            if (isAttended && isWithinRange(meeting.date)) {
                 let itemHours = 0;
                 let itemCost = 0;
 
@@ -1393,11 +1435,19 @@ app.get('/api/learning-stats', async (req, res) => {
                 }
                 biayaTraining += itemCost;
 
+                const meetingQuiz = quizByMeeting[meeting.id] || {};
+                const feedbackAt = feedbackByMeeting[meeting.id] || null;
+
                 trainingDetails.push({
                     title: meeting.title,
                     date: meeting.date,
                     hours: Math.round(itemHours * 100) / 100,
-                    cost: Math.round(itemCost)
+                    cost: Math.round(itemCost),
+                    preTestScore: meetingQuiz.PRE ?? null,
+                    postTestScore: meetingQuiz.POST ?? null,
+                    feedbackSubmitted: !!feedbackAt,
+                    feedbackDate: feedbackAt,
+                    organizer: meeting.host || null
                 });
             }
         }
@@ -1405,10 +1455,12 @@ app.get('/api/learning-stats', async (req, res) => {
         // 2. External Training (external_training_requests)
         if (targetEmpId) {
             const externalTrainings = await query(
-                "SELECT title, start_date, end_date, registration_fee, travel_flight_cost, accommodation_cost, miscellaneous_cost FROM external_training_requests WHERE employee_id = ? AND status = 'Processed'",
+                "SELECT title, vendor, certificate_link, start_date, end_date, registration_fee, travel_flight_cost, accommodation_cost, miscellaneous_cost FROM external_training_requests WHERE employee_id = ? AND status = 'Processed'",
                 [targetEmpId]
             );
             for (const ext of externalTrainings) {
+                if (!isWithinRange(ext.start_date)) continue;
+
                 let itemHours = 0;
                 if (ext.start_date && ext.end_date) {
                     const diffMs = new Date(ext.end_date).getTime() - new Date(ext.start_date).getTime();
@@ -1424,7 +1476,9 @@ app.get('/api/learning-stats', async (req, res) => {
                     title: ext.title,
                     date: ext.start_date,
                     hours: Math.round(itemHours * 100) / 100,
-                    cost: Math.round(itemCost)
+                    cost: Math.round(itemCost),
+                    organizer: ext.vendor || null,
+                    certificateLink: ext.certificate_link || null
                 });
             }
         }
@@ -1454,6 +1508,8 @@ app.get('/api/learning-stats', async (req, res) => {
                 };
 
                 for (const p of progressRows) {
+                    if (!isWithinRange(p.last_access)) continue;
+
                     let completedIds = [];
                     try {
                         completedIds = typeof p.completed_module_ids === 'string'
@@ -1484,6 +1540,8 @@ app.get('/api/learning-stats', async (req, res) => {
             const logs = await query("SELECT title, finish_date, date, incentive_amount, category FROM reading_logs WHERE employee_id = ? AND hr_approval_status = 'Approved'", [targetEmpId]);
             // Biaya buku
             for (const log of logs) {
+                if (!isWithinRange(log.finish_date || log.date)) continue;
+
                 const incentive = Number(log.incentive_amount) || 0;
                 biayaBuku += incentive;
 
