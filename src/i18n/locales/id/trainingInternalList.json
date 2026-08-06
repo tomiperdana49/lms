@@ -242,6 +242,7 @@
     "submitted": "Terkirim",
     "accessFeedback": "Akses Feedback",
     "downloadCertificate": "Unduh Sertifikat",
+    "downloadHostCertificate": "Unduh Sertifikat Host",
     "closeDetail": "Tutup Detail"
   },
   "closeSessionModal": {

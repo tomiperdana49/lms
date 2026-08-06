@@ -347,6 +347,43 @@ export const initDB = async () => {
             console.error("Error creating internal_certificates table:", e);
         }
 
+        // MIGRATION: Add role column to internal_certificates (distinguishes host vs participant certs)
+        try {
+            const [roleCol] = await connection.query(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'internal_certificates' AND COLUMN_NAME = 'role'"
+            );
+            if (roleCol.length === 0) {
+                await connection.query("ALTER TABLE internal_certificates ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'participant'");
+                await connection.query("ALTER TABLE internal_certificates DROP INDEX unique_internal_cert");
+                await connection.query("ALTER TABLE internal_certificates ADD UNIQUE KEY unique_internal_cert (meeting_id, employee_id, role)");
+                console.log("Added role column to internal_certificates and widened unique key.");
+            }
+        } catch (e) {
+            console.error("Error adding role column to internal_certificates:", e);
+        }
+
+        // MIGRATION: Add online_certificates table (issued online-module certificates)
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS online_certificates (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    course_id INT NOT NULL,
+                    user_id VARCHAR(50) NOT NULL,
+                    employee_id VARCHAR(50),
+                    employee_name VARCHAR(255) NOT NULL,
+                    course_title VARCHAR(255) NOT NULL,
+                    completion_date DATE,
+                    cert_no VARCHAR(100),
+                    serial VARCHAR(20) UNIQUE NOT NULL,
+                    issued_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_online_cert (course_id, user_id)
+                )
+            `);
+            console.log("Verified online_certificates table exists.");
+        } catch (e) {
+            console.error("Error creating online_certificates table:", e);
+        }
+
         connection.release();
     } catch (err) {
         console.error('Database initialization failed:', err);

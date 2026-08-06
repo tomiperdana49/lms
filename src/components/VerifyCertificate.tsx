@@ -14,6 +14,7 @@ interface CertData {
     trainingDate?: string;
     certNo?: string;
     serial?: string;
+    role?: 'participant' | 'host' | 'online';
     companyName?: string;
 }
 
@@ -24,11 +25,35 @@ const VerifyCertificate = ({ serial }: VerifyCertificateProps) => {
     const [scale, setScale] = useState(1);
 
     useEffect(() => {
-        fetch(`${API_BASE_URL}/api/internal-certificates/verify/${serial}`)
-            .then(res => res.json().then(json => ({ ok: res.ok, json })))
-            .then(({ ok, json }) => setData(ok ? json : { valid: false }))
-            .catch(() => setData({ valid: false }))
-            .finally(() => setLoading(false));
+        const load = async () => {
+            try {
+                const internalRes = await fetch(`${API_BASE_URL}/api/internal-certificates/verify/${serial}`);
+                const internalJson = await internalRes.json();
+                if (internalRes.ok && internalJson.valid) {
+                    setData(internalJson);
+                    return;
+                }
+
+                const onlineRes = await fetch(`${API_BASE_URL}/api/online-certificates/verify/${serial}`);
+                const onlineJson = await onlineRes.json();
+                if (onlineRes.ok && onlineJson.valid) {
+                    setData({
+                        ...onlineJson,
+                        trainingTitle: onlineJson.courseTitle,
+                        trainingDate: onlineJson.completionDate,
+                        role: 'online'
+                    });
+                    return;
+                }
+
+                setData({ valid: false });
+            } catch {
+                setData({ valid: false });
+            } finally {
+                setLoading(false);
+            }
+        };
+        load();
     }, [serial]);
 
     useEffect(() => {
@@ -69,7 +94,7 @@ const VerifyCertificate = ({ serial }: VerifyCertificateProps) => {
                                 <span className="font-bold text-slate-800 text-right">{data.employeeName}</span>
                             </div>
                             <div className="flex justify-between gap-4 text-sm">
-                                <span className="text-slate-500 shrink-0">Training</span>
+                                <span className="text-slate-500 shrink-0">{data.role === 'online' ? 'Module' : 'Training'}</span>
                                 <span className="font-bold text-slate-800 text-right">{data.trainingTitle}</span>
                             </div>
                             <div className="flex justify-between gap-4 text-sm">
@@ -100,6 +125,7 @@ const VerifyCertificate = ({ serial }: VerifyCertificateProps) => {
                                     date={data.trainingDate ? new Date(data.trainingDate) : new Date()}
                                     certNo={data.certNo || ''}
                                     serial={data.serial || ''}
+                                    role={data.role}
                                 />
                             </div>
                         </div>

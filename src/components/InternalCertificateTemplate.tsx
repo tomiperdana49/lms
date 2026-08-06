@@ -8,6 +8,8 @@ interface InternalCertificateTemplateProps {
     serial: string;
     qrDataUrl?: string;
     issuedIn?: string;
+    role?: 'participant' | 'host' | 'online';
+    elementId?: string;
 }
 
 const InternalCertificateTemplate: React.FC<InternalCertificateTemplateProps> = ({
@@ -17,13 +19,15 @@ const InternalCertificateTemplate: React.FC<InternalCertificateTemplateProps> = 
     certNo,
     serial,
     qrDataUrl,
-    issuedIn = 'Medan'
+    issuedIn = 'Medan',
+    role = 'participant',
+    elementId = 'internal-certificate-content'
 }) => {
     const formattedDate = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
     return (
         <div
-            id="internal-certificate-content"
+            id={elementId}
             className="relative bg-white overflow-hidden shadow-2xl"
             style={{
                 width: '1123px',
@@ -74,7 +78,11 @@ const InternalCertificateTemplate: React.FC<InternalCertificateTemplateProps> = 
             {/* --- Attendance line --- */}
             <div className="absolute z-10 left-0 right-0 text-center px-24" style={{ top: '452px' }}>
                 <p className="text-slate-600" style={{ fontSize: '15px' }}>
-                    Has successfully attended and completed the internal training session:
+                    {role === 'host'
+                        ? 'Has made an indelible mark by delivering an insightful and impactful training session:'
+                        : role === 'online'
+                        ? 'Has successfully completed the online learning module:'
+                        : 'Has successfully attended and completed the internal training session:'}
                 </p>
             </div>
 
@@ -88,8 +96,11 @@ const InternalCertificateTemplate: React.FC<InternalCertificateTemplateProps> = 
             {/* --- Appreciation Paragraph --- */}
             <div className="absolute z-10 text-center" style={{ top: '528px', left: '140px', right: '140px' }}>
                 <p className="text-slate-600 leading-relaxed" style={{ fontSize: '14.5px' }}>
-                    We appreciate your active participation and commitment throughout the session, which reflects
-                    your dedication to continuous learning and professional growth. Congratulations on this achievement.
+                    {role === 'host'
+                        ? 'We extend our sincere gratitude for your expertise and engaging presentation, which has significantly enriched the skills and knowledge of our team. Your valuable contribution is highly appreciated.'
+                        : role === 'online'
+                        ? 'We appreciate your commitment throughout the online learning module journey, which reflects your dedication to continuous learning and professional growth. Congratulations on this achievement.'
+                        : 'We appreciate your active participation and commitment throughout the session, which reflects your dedication to continuous learning and professional growth. Congratulations on this achievement.'}
                 </p>
             </div>
 

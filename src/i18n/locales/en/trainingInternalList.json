@@ -242,6 +242,7 @@
     "submitted": "Submitted",
     "accessFeedback": "Feedback Access",
     "downloadCertificate": "Download Certificate",
+    "downloadHostCertificate": "Download Host Certificate",
     "closeDetail": "Close Detail"
   },
   "closeSessionModal": {

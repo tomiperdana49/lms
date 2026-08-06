@@ -1557,47 +1557,53 @@ app.get('/api/learning-stats', async (req, res) => {
 // so this cannot be used to mint certificates for arbitrary meetings/employees.
 app.post('/api/internal-certificates/issue', async (req, res) => {
     try {
-        const { meetingId, employeeId, employeeEmail, employeeName } = req.body;
+        const { meetingId, employeeId, employeeEmail, employeeName, role } = req.body;
+        const certRole = role === 'host' ? 'host' : 'participant';
         if (!meetingId || !employeeName || (!employeeId && !employeeEmail)) {
             return res.status(400).json({ error: 'meetingId, employeeName and employeeId/employeeEmail are required' });
         }
 
-        const meetings = await query('SELECT id, title, date, cost_report_json FROM meetings WHERE id = ?', [meetingId]);
+        const meetings = await query('SELECT id, title, date, host, employee_id, cost_report_json FROM meetings WHERE id = ?', [meetingId]);
         if (meetings.length === 0) return res.status(404).json({ error: 'Meeting not found' });
         const meeting = meetings[0];
 
         let costReport = null;
         try { if (meeting.cost_report_json) costReport = JSON.parse(meeting.cost_report_json); } catch (e) { }
 
-        const isAttendee = !!(costReport && (
-            (employeeId && costReport.attendee_ids?.includes(employeeId)) ||
-            (employeeEmail && costReport.attendees?.includes(employeeEmail))
-        ));
+        const isEligible = certRole === 'host'
+            ? !!(
+                (employeeId && meeting.employee_id && employeeId === meeting.employee_id) ||
+                (meeting.host && employeeName.trim().toLowerCase() === meeting.host.trim().toLowerCase())
+            )
+            : !!(costReport && (
+                (employeeId && costReport.attendee_ids?.includes(employeeId)) ||
+                (employeeEmail && costReport.attendees?.includes(employeeEmail))
+            ));
 
-        if (!costReport?.isPaid || !isAttendee) {
+        if (!costReport?.isPaid || !isEligible) {
             return res.status(403).json({ error: 'Not eligible for a certificate for this training session' });
         }
 
         // Idempotent: return existing certificate if one was already issued
         const existing = await query(
-            'SELECT * FROM internal_certificates WHERE meeting_id = ? AND employee_id = ?',
-            [meetingId, employeeId || null]
+            'SELECT * FROM internal_certificates WHERE meeting_id = ? AND employee_id = ? AND role = ?',
+            [meetingId, employeeId || null, certRole]
         );
         if (existing.length > 0) {
             const c = existing[0];
-            return res.json({ certNo: c.cert_no, serial: c.serial, employeeName: c.employee_name, trainingTitle: c.training_title, trainingDate: c.training_date, issuedAt: c.issued_at });
+            return res.json({ certNo: c.cert_no, serial: c.serial, employeeName: c.employee_name, trainingTitle: c.training_title, trainingDate: c.training_date, issuedAt: c.issued_at, role: c.role });
         }
 
         const trainingDate = meeting.date ? new Date(meeting.date) : new Date();
         const certNo = `${String(meeting.id).padStart(3, '0')}/DIR/MAN-MDN/${ROMAN_MONTHS[trainingDate.getMonth()]}/${trainingDate.getFullYear()}`;
-        const serial = generateCertSerial(`${meeting.id}-${employeeId || employeeEmail}`);
+        const serial = generateCertSerial(`${meeting.id}-${employeeId || employeeEmail}-${certRole}`);
 
         await query(
-            'INSERT INTO internal_certificates (meeting_id, employee_id, employee_name, training_title, training_date, cert_no, serial) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [meetingId, employeeId || null, employeeName, meeting.title, meeting.date, certNo, serial]
+            'INSERT INTO internal_certificates (meeting_id, employee_id, employee_name, training_title, training_date, cert_no, serial, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [meetingId, employeeId || null, employeeName, meeting.title, meeting.date, certNo, serial, certRole]
         );
 
-        res.json({ certNo, serial, employeeName, trainingTitle: meeting.title, trainingDate: meeting.date, issuedAt: new Date() });
+        res.json({ certNo, serial, employeeName, trainingTitle: meeting.title, trainingDate: meeting.date, issuedAt: new Date(), role: certRole });
     } catch (err) {
         console.error('[API] Error in /api/internal-certificates/issue:', err);
         res.status(500).json({ error: err.message });
@@ -1619,10 +1625,97 @@ app.get('/api/internal-certificates/verify/:serial', async (req, res) => {
             certNo: c.cert_no,
             serial: c.serial,
             issuedAt: c.issued_at,
+            role: c.role,
             companyName: 'PT Media Antar Nusa'
         });
     } catch (err) {
         console.error('[API] Error in /api/internal-certificates/verify:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Issue (or fetch existing) online-module certificate.
+// Server-side re-validates the course has a final assessment and the student passed it (score >= 80),
+// so this cannot be used to mint certificates for arbitrary courses/students.
+app.post('/api/online-certificates/issue', async (req, res) => {
+    try {
+        const { courseId, userId, employeeId, employeeName } = req.body;
+        if (!courseId || !userId || !employeeName) {
+            return res.status(400).json({ error: 'courseId, userId and employeeName are required' });
+        }
+
+        const courses = await query('SELECT id, title, assessment_data FROM courses WHERE id = ?', [courseId]);
+        if (courses.length === 0) return res.status(404).json({ error: 'Course not found' });
+        const course = courses[0];
+
+        if (!course.assessment_data) {
+            return res.status(403).json({ error: 'This course has no final assessment to certify' });
+        }
+
+        // Resolve employee_id for a robust match (quiz results may be keyed by user id or employee id)
+        let resolvedEmployeeId = employeeId || null;
+        if (!resolvedEmployeeId) {
+            const userRows = await query('SELECT employee_id FROM users WHERE id = ?', [userId]);
+            resolvedEmployeeId = userRows.length > 0 ? userRows[0].employee_id : null;
+        }
+
+        const passResults = await query(
+            `SELECT date FROM quiz_results
+             WHERE course_id = ? AND module_id IS NULL AND quiz_type = 'POST' AND score >= 80
+               AND (student_id = ? OR (employee_id IS NOT NULL AND employee_id = ?))
+             ORDER BY date DESC LIMIT 1`,
+            [courseId, userId, resolvedEmployeeId]
+        );
+        if (passResults.length === 0) {
+            return res.status(403).json({ error: 'Not eligible for a certificate for this course' });
+        }
+        const completionDate = passResults[0].date;
+
+        // Idempotent: return existing certificate if one was already issued
+        const existing = await query(
+            'SELECT * FROM online_certificates WHERE course_id = ? AND user_id = ?',
+            [courseId, userId]
+        );
+        if (existing.length > 0) {
+            const c = existing[0];
+            return res.json({ certNo: c.cert_no, serial: c.serial, employeeName: c.employee_name, courseTitle: c.course_title, completionDate: c.completion_date, issuedAt: c.issued_at });
+        }
+
+        const dateObj = completionDate ? new Date(completionDate) : new Date();
+        const certNo = `${String(course.id).padStart(3, '0')}/DIR/MAN-MDN/${ROMAN_MONTHS[dateObj.getMonth()]}/${dateObj.getFullYear()}`;
+        const serial = generateCertSerial(`online-${course.id}-${userId}`);
+
+        await query(
+            'INSERT INTO online_certificates (course_id, user_id, employee_id, employee_name, course_title, completion_date, cert_no, serial) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [courseId, userId, resolvedEmployeeId, employeeName, course.title, completionDate, certNo, serial]
+        );
+
+        res.json({ certNo, serial, employeeName, courseTitle: course.title, completionDate, issuedAt: new Date() });
+    } catch (err) {
+        console.error('[API] Error in /api/online-certificates/issue:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Public verification lookup - no auth required, used by the QR code on the certificate.
+app.get('/api/online-certificates/verify/:serial', async (req, res) => {
+    try {
+        const rows = await query('SELECT * FROM online_certificates WHERE serial = ?', [req.params.serial]);
+        if (rows.length === 0) return res.status(404).json({ valid: false });
+
+        const c = rows[0];
+        res.json({
+            valid: true,
+            employeeName: c.employee_name,
+            courseTitle: c.course_title,
+            completionDate: c.completion_date,
+            certNo: c.cert_no,
+            serial: c.serial,
+            issuedAt: c.issued_at,
+            companyName: 'PT Media Antar Nusa'
+        });
+    } catch (err) {
+        console.error('[API] Error in /api/online-certificates/verify:', err);
         res.status(500).json({ error: err.message });
     }
 });

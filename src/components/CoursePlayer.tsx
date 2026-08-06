@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { PlayCircle, Lock, ChevronRight, BookOpen, ArrowLeft, X, Clock, CheckCircle, Award, AlertCircle, XCircle, Download, Calendar } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import QRCode from 'qrcode';
 import { useTranslation } from 'react-i18next';
-import CertificateTemplate from './CertificateTemplate';
+import InternalCertificateTemplate from './InternalCertificateTemplate';
 import { API_BASE_URL } from '../config';
 import type { Course, Quiz, User } from '../types';
 import PopupNotification from './PopupNotification';
@@ -91,6 +92,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
     const [loadingResults, setLoadingResults] = useState(false);
     const [courseToCancel, setCourseToCancel] = useState<Course | null>(null);
     const [isDownloading, setIsDownloading] = useState(false);
+    const [certInfo, setCertInfo] = useState<{ certNo: string; serial: string; qrDataUrl: string; completionDate: Date } | null>(null);
 
     // Player State
     const playerRef = useRef<YTPlayer | null>(null);
@@ -1075,17 +1077,50 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
     const handleDownloadCertificate = async () => {
         if (!activeCourse || assessmentScore === null) return;
-        
+
         setIsDownloading(true);
         try {
-            const element = document.getElementById('certificate-content');
+            // 1. Issue (or fetch existing) certificate record from the server.
+            // Server re-validates the course has an assessment and the student passed it before persisting anything.
+            const issueRes = await fetch(`${API_BASE_URL}/api/online-certificates/issue`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    courseId: activeCourse.id,
+                    userId: user.id,
+                    employeeId: user.employee_id || null,
+                    employeeName: user.name
+                })
+            });
+            if (!issueRes.ok) throw new Error('Not eligible for certificate');
+            const issued = await issueRes.json();
+
+            // 2. Generate a QR code that points to the public verification page.
+            const verifyUrl = `${window.location.origin}/verify/${issued.serial}`;
+            const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 200 });
+
+            setCertInfo({
+                certNo: issued.certNo,
+                serial: issued.serial,
+                qrDataUrl,
+                completionDate: issued.completionDate ? new Date(issued.completionDate) : new Date()
+            });
+
+            // Wait for the hidden certificate DOM to repaint with the new QR/cert data before capturing it,
+            // and for the certificate's script webfont to finish loading so it doesn't fall back to a system font.
+            await Promise.all([
+                document.fonts.ready,
+                new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+            ]);
+
+            const element = document.getElementById('online-certificate-content');
             if (!element) return;
 
             // Temporarily show the element for html2canvas
             const parent = element.parentElement;
             if (parent) parent.style.display = 'block';
             element.style.display = 'block';
-            
+
             const canvas = await html2canvas(element, {
                 scale: 2, // Higher resolution
                 useCORS: true,
@@ -1102,7 +1137,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
             pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
             pdf.save(`Certificate_${activeCourse.title.replace(/\s+/g, '_')}_${user.name.replace(/\s+/g, '_')}.pdf`);
-            
+
             // Hide it back
             if (parent) parent.style.display = 'none';
             element.style.display = 'none';
@@ -1458,18 +1493,16 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
             {/* Hidden Certificate Content for PDF Generation */}
             <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', display: 'none' }}>
-                {activeCourse && (
-                    <CertificateTemplate 
+                {activeCourse && certInfo && (
+                    <InternalCertificateTemplate
+                        elementId="online-certificate-content"
                         employeeName={user.name}
-                        courseTitle={activeCourse.title}
-                        date={activeCourse.completedAt ? new Date(activeCourse.completedAt) : new Date()}
-                        certificateId={`${user.employee_id || user.id}${
-                            (activeCourse.completedAt ? new Date(activeCourse.completedAt) : new Date()).getDate().toString().padStart(2, '0')
-                        }${
-                            ((activeCourse.completedAt ? new Date(activeCourse.completedAt) : new Date()).getMonth() + 1).toString().padStart(2, '0')
-                        }${
-                            (activeCourse.completedAt ? new Date(activeCourse.completedAt) : new Date()).getFullYear()
-                        }${activeCourse.id}`}
+                        trainingTitle={activeCourse.title}
+                        date={certInfo.completionDate}
+                        certNo={certInfo.certNo}
+                        serial={certInfo.serial}
+                        qrDataUrl={certInfo.qrDataUrl}
+                        role="online"
                     />
                 )}
             </div>

@@ -7,8 +7,6 @@ import enDashboardLayout from './locales/en/dashboardLayout.json';
 import enDashboardHome from './locales/en/dashboardHome.json';
 import enAdminDashboard from './locales/en/adminDashboard.json';
 import enAdminReadingLog from './locales/en/adminReadingLog.json';
-import enCertificateTemplate from './locales/en/certificateTemplate.json';
-import enCertificateView from './locales/en/certificateView.json';
 import enConfirmationModal from './locales/en/confirmationModal.json';
 import enCoursePlayer from './locales/en/coursePlayer.json';
 import enExternalTraining from './locales/en/externalTraining.json';
@@ -32,8 +30,6 @@ import idDashboardLayout from './locales/id/dashboardLayout.json';
 import idDashboardHome from './locales/id/dashboardHome.json';
 import idAdminDashboard from './locales/id/adminDashboard.json';
 import idAdminReadingLog from './locales/id/adminReadingLog.json';
-import idCertificateTemplate from './locales/id/certificateTemplate.json';
-import idCertificateView from './locales/id/certificateView.json';
 import idConfirmationModal from './locales/id/confirmationModal.json';
 import idCoursePlayer from './locales/id/coursePlayer.json';
 import idExternalTraining from './locales/id/externalTraining.json';
@@ -66,8 +62,6 @@ i18n
                 dashboardHome: enDashboardHome,
                 adminDashboard: enAdminDashboard,
                 adminReadingLog: enAdminReadingLog,
-                certificateTemplate: enCertificateTemplate,
-                certificateView: enCertificateView,
                 confirmationModal: enConfirmationModal,
                 coursePlayer: enCoursePlayer,
                 externalTraining: enExternalTraining,
@@ -92,8 +86,6 @@ i18n
                 dashboardHome: idDashboardHome,
                 adminDashboard: idAdminDashboard,
                 adminReadingLog: idAdminReadingLog,
-                certificateTemplate: idCertificateTemplate,
-                certificateView: idCertificateView,
                 confirmationModal: idConfirmationModal,
                 coursePlayer: idCoursePlayer,
                 externalTraining: idExternalTraining,

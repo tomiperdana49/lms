@@ -94,7 +94,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [confirmMarkPaid, setConfirmMarkPaid] = useState<boolean>(false);
     const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
     const [isDownloadingCert, setIsDownloadingCert] = useState(false);
-    const [certInfo, setCertInfo] = useState<{ certNo: string; serial: string; qrDataUrl: string; trainingDate: Date } | null>(null);
+    const [certInfo, setCertInfo] = useState<{ certNo: string; serial: string; qrDataUrl: string; trainingDate: Date; role: 'participant' | 'host' } | null>(null);
     const [closeSessionPhotoUrl, setCloseSessionPhotoUrl] = useState('');
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
@@ -1427,12 +1427,12 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         }
     };
 
-    const handleDownloadInternalCertificate = async () => {
+    const handleDownloadInternalCertificate = async (role: 'participant' | 'host' = 'participant') => {
         if (!selectedMeeting) return;
         setIsDownloadingCert(true);
         try {
             // 1. Issue (or fetch existing) certificate record from the server.
-            // Server re-validates isPaid + attendance before persisting anything.
+            // Server re-validates isPaid + attendance/hosting before persisting anything.
             const issueRes = await fetch(`${API_BASE_URL}/api/internal-certificates/issue`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1440,7 +1440,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     meetingId: selectedMeeting.id,
                     employeeId: user.employee_id || null,
                     employeeEmail: userEmail,
-                    employeeName: user.name
+                    employeeName: user.name,
+                    role
                 })
             });
             if (!issueRes.ok) throw new Error('Not eligible for certificate');
@@ -1454,7 +1455,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 certNo: issued.certNo,
                 serial: issued.serial,
                 qrDataUrl,
-                trainingDate: issued.trainingDate ? new Date(issued.trainingDate) : new Date()
+                trainingDate: issued.trainingDate ? new Date(issued.trainingDate) : new Date(),
+                role
             });
 
             // Wait for the hidden certificate DOM to repaint with the new QR/cert data before capturing it,
@@ -1485,7 +1487,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 format: [canvas.width, canvas.height]
             });
             pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-            pdf.save(`Certificate_${selectedMeeting.title.replace(/\s+/g, '_')}_${user.name.replace(/\s+/g, '_')}.pdf`);
+            const fileRolePrefix = role === 'host' ? 'Host_Certificate' : 'Certificate';
+            pdf.save(`${fileRolePrefix}_${selectedMeeting.title.replace(/\s+/g, '_')}_${user.name.replace(/\s+/g, '_')}.pdf`);
 
             if (parent) parent.style.display = 'none';
             element.style.display = 'none';
@@ -4739,7 +4742,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                     return (
                                         <button
-                                            onClick={handleDownloadInternalCertificate}
+                                            onClick={() => handleDownloadInternalCertificate('participant')}
                                             disabled={isDownloadingCert}
                                             className="w-full mt-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 disabled:opacity-50"
                                         >
@@ -4749,6 +4752,30 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 <Download size={18} />
                                             )}
                                             {t('detailModal.downloadCertificate')}
+                                        </button>
+                                    );
+                                })()}
+
+                                {(() => {
+                                    const isHostOfMeeting = !!(
+                                        (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id) ||
+                                        (selectedMeeting.host && user.name && selectedMeeting.host === user.name)
+                                    );
+                                    const canDownloadHostCertificate = !!(selectedMeeting.costReport?.isPaid && isHostOfMeeting);
+                                    if (!canDownloadHostCertificate) return null;
+
+                                    return (
+                                        <button
+                                            onClick={() => handleDownloadInternalCertificate('host')}
+                                            disabled={isDownloadingCert}
+                                            className="w-full mt-3 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 disabled:opacity-50"
+                                        >
+                                            {isDownloadingCert ? (
+                                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            ) : (
+                                                <Download size={18} />
+                                            )}
+                                            {t('detailModal.downloadHostCertificate')}
                                         </button>
                                     );
                                 })()}
@@ -4775,6 +4802,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         certNo={certInfo.certNo}
                         serial={certInfo.serial}
                         qrDataUrl={certInfo.qrDataUrl}
+                        role={certInfo.role}
                     />
                 )}
             </div>
