@@ -600,21 +600,23 @@ const OnlineModulesManager = () => {
 
     return (
         <div className="space-y-8">
-            <div className="bg-gradient-to-br from-violet-700 via-purple-600 to-indigo-800 rounded-[2.5rem] p-8 md:p-12 text-white shadow-2xl relative overflow-hidden group">
+            <div className="bg-gradient-to-br from-blue-700 via-indigo-700 to-purple-800 rounded-[2.5rem] p-8 md:p-12 text-white shadow-2xl relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12 group-hover:rotate-45 transition-transform duration-1000">
                     <BookOpen size={200} />
                 </div>
+                <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
+                <div className="absolute -left-10 -bottom-10 w-60 h-60 bg-blue-400/10 rounded-full blur-3xl"></div>
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
                     <div>
-                        <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/20 mb-4">
+                        <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10 mb-4">
                             {t('header.badge')}
                         </div>
                         <h1 className="text-3xl md:text-4xl font-black tracking-tighter mb-2">{t('header.title')}</h1>
-                        <p className="text-purple-100 font-medium max-w-xl opacity-90">{t('header.subtitle')}</p>
+                        <p className="text-blue-100/80 font-medium max-w-xl">{t('header.subtitle')}</p>
                     </div>
                     <button
                         onClick={handleAddNewCourse}
-                        className="bg-white text-purple-600 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-2xl hover:bg-purple-50 transition-all active:scale-95"
+                        className="bg-white text-indigo-700 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-2xl hover:bg-indigo-50 transition-all active:scale-95"
                     >
                         <Plus size={20} /> {t('header.newModule')}
                     </button>

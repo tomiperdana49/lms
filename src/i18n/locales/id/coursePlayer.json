@@ -3,7 +3,8 @@
     "badge": "Pusat Belajar",
     "title": "Modul Pembelajaran Online",
     "subtitle": "Akses modul premium untuk meningkatkan keterampilan profesional Anda.",
-    "studentsBadge": "Peserta"
+    "learningHours": "Jam Belajar",
+    "hoursUnit": "Jam"
   },
   "card": {
     "completed": "Selesai",

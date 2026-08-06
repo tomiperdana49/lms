@@ -2531,11 +2531,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             )}
 
             {/* Header / Hero Section */}
-            <div className="bg-gradient-to-br from-indigo-700 via-indigo-600 to-blue-600 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden shrink-0">
+            <div className="bg-gradient-to-br from-blue-700 via-indigo-700 to-purple-800 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden shrink-0 group">
                 <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12">
                     <Users size={180} />
                 </div>
-                
+                <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
+                <div className="absolute -left-10 -bottom-10 w-60 h-60 bg-blue-400/10 rounded-full blur-3xl"></div>
+
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div className="space-y-1.5">
                         <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10 mb-2">
@@ -2551,10 +2553,17 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                     <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto items-center">
                         {!isManagementMode && (
-                            <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/10 md:min-w-[140px] text-center shadow-lg">
-                                <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-80">{t('hero.internalTrainingHours')}</div>
-                                <div className="text-2xl font-black tracking-tighter text-white">{learningStats.jamTraining} <span className="text-base font-bold opacity-80 tracking-normal">{t('hero.hoursUnit')}</span></div>
-                                <div className="text-[9px] font-medium text-blue-200 mt-1">{t('hero.totalHours')}</div>
+                            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all md:min-w-[160px] shadow-lg flex flex-col">
+                                <div className="flex items-start gap-3 mb-3">
+                                    <div className="p-2 bg-blue-500 rounded-lg shadow-lg shadow-blue-500/20 shrink-0">
+                                        <Clock size={18} />
+                                    </div>
+                                    <span className="text-[11px] font-bold text-blue-100 uppercase tracking-wide leading-tight">{t('hero.internalTrainingHours')}</span>
+                                </div>
+                                <div className="flex items-baseline gap-1 mt-auto">
+                                    <span className="text-2xl font-black tracking-tighter text-white">{learningStats.jamTraining}</span>
+                                    <span className="text-sm font-bold opacity-60">{t('hero.hoursUnit')}</span>
+                                </div>
                             </div>
                         )}
 

@@ -135,11 +135,13 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
     return (
         <div className="max-w-[1600px] mx-auto pt-4 md:pt-6 px-4 md:px-6 min-h-screen lg:h-[calc(100vh-100px)] flex flex-col gap-6">
             {/* Header / Hero Section */}
-            <div className="bg-gradient-to-br from-indigo-600 via-blue-600 to-blue-700 rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden shrink-0">
+            <div className="bg-gradient-to-br from-blue-700 via-indigo-700 to-purple-800 rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden shrink-0 group">
                 <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12">
                     <GraduationCap size={200} />
                 </div>
-                
+                <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
+                <div className="absolute -left-10 -bottom-10 w-60 h-60 bg-blue-400/10 rounded-full blur-3xl"></div>
+
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div className="space-y-1">
                         <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10 mb-2">
@@ -154,26 +156,37 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
                     </div>
 
                     {/* Quick Stats Bar */}
-                    <div className="flex gap-4 w-full md:w-auto md:mr-12 lg:mr-24">
+                    <div className="grid grid-cols-2 gap-4 w-full md:w-auto md:mr-12 lg:mr-24 md:min-w-[320px]">
                         <button
                             type="button"
                             onClick={() => setDetailModal('hours')}
-                            className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-white/10 flex-1 md:flex-none md:min-w-[140px] group hover:bg-white/15 transition-all text-center cursor-pointer"
+                            className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all text-left cursor-pointer flex flex-col"
                         >
-                            <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-70">{t('learningHours')}</div>
-                            <div className="text-xl sm:text-2xl font-black tracking-tighter">{learningStats.totalJam} {t('hours')}</div>
-                            <div className="text-[9px] font-medium text-blue-200 mt-1">{t('totalHours')}</div>
+                            <div className="flex items-start gap-3 mb-3">
+                                <div className="p-2 bg-blue-500 rounded-lg shadow-lg shadow-blue-500/20 shrink-0">
+                                    <Clock size={18} />
+                                </div>
+                                <span className="text-[11px] font-bold text-blue-100 uppercase tracking-wide leading-tight min-w-0 break-words">{t('learningHours')}</span>
+                            </div>
+                            <div className="flex items-baseline gap-1 mt-auto">
+                                <span className="text-xl sm:text-2xl font-black tracking-tighter">{learningStats.totalJam}</span>
+                                <span className="text-sm font-bold opacity-60">{t('hours')}</span>
+                            </div>
                         </button>
                         <button
                             type="button"
                             onClick={() => setDetailModal('cost')}
-                            className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-white/10 flex-1 md:flex-none md:min-w-[140px] group hover:bg-white/15 transition-all text-center cursor-pointer"
+                            className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all text-left cursor-pointer flex flex-col"
                         >
-                            <div className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1 opacity-70">{t('learningCost')}</div>
-                            <div className="text-xl sm:text-2xl font-black tracking-tighter">
-                                Rp {learningStats.totalBiaya.toLocaleString('id-ID')}
+                            <div className="flex items-start gap-3 mb-3">
+                                <div className="p-2 bg-emerald-500 rounded-lg shadow-lg shadow-emerald-500/20 shrink-0">
+                                    <Wallet size={18} />
+                                </div>
+                                <span className="text-[11px] font-bold text-blue-100 uppercase tracking-wide leading-tight min-w-0 break-words">{t('learningCost')}</span>
                             </div>
-                            <div className="text-[9px] font-medium text-blue-200 mt-1">{t('totalCost')}</div>
+                            <span className="text-lg sm:text-xl font-black tracking-tighter text-emerald-300 mt-auto whitespace-nowrap" title={`Rp ${learningStats.totalBiaya.toLocaleString('id-ID')}`}>
+                                Rp {learningStats.totalBiaya.toLocaleString('id-ID')}
+                            </span>
                         </button>
                     </div>
                 </div>

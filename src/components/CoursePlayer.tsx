@@ -93,6 +93,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
     const [courseToCancel, setCourseToCancel] = useState<Course | null>(null);
     const [isDownloading, setIsDownloading] = useState(false);
     const [certInfo, setCertInfo] = useState<{ certNo: string; serial: string; qrDataUrl: string; completionDate: Date } | null>(null);
+    const [onlineLearningHours, setOnlineLearningHours] = useState(0);
 
     // Player State
     const playerRef = useRef<YTPlayer | null>(null);
@@ -231,6 +232,17 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
             loadCourses();
         }
     }, [userId, activeCourse, viewMode]);
+
+    // Fetch total online-module learning hours for the hero stat card
+    useEffect(() => {
+        if (!user?.email) return;
+        fetch(`${API_BASE_URL}/api/learning-stats?email=${encodeURIComponent(user.email)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (!data.error) setOnlineLearningHours(data.jamOnline || 0);
+            })
+            .catch(err => console.error('Error fetching online learning hours:', err));
+    }, [user?.email]);
 
     // Fetch quiz results when activeCourse changes
     useEffect(() => {
@@ -597,41 +609,39 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
         return (
             <div className="max-w-7xl mx-auto p-4 md:p-8 pb-24 space-y-8 animate-fade-in">
                 {/* Compact Hero Section */}
-                <div className="relative overflow-hidden rounded-[32px] bg-slate-900 p-8 md:p-12 text-white shadow-xl">
+                <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-blue-700 via-indigo-700 to-purple-800 p-8 md:p-12 text-white shadow-xl group">
+                    <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
+                    <div className="absolute -left-10 -bottom-10 w-60 h-60 bg-blue-400/10 rounded-full blur-3xl"></div>
                     <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
                         <div className="max-w-xl text-center md:text-left">
-                            <div className="inline-flex items-center gap-2 bg-indigo-500/20 backdrop-blur-md px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border border-white/10 mb-4">
-                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></div>
+                            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border border-white/10 mb-4">
+                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-300 animate-pulse"></div>
                                 {t('hero.badge')}
                             </div>
                             <h1 className="text-3xl md:text-4xl font-black mb-3 tracking-tight">
                                 {t('hero.title')}
                             </h1>
-                            <p className="text-slate-400 text-sm font-medium leading-relaxed max-w-lg opacity-90">
+                            <p className="text-blue-100/80 text-sm font-medium leading-relaxed max-w-lg">
                                 {t('hero.subtitle')}
                             </p>
                         </div>
-                        <div className="hidden lg:block">
-                            <div className="flex -space-x-3">
-                                {[
-                                    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop",
-                                    "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&h=100&fit=crop",
-                                    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop"
-                                ].map((url, i) => (
-                                    <div key={i} className="w-12 h-12 rounded-full border-4 border-slate-900 overflow-hidden shadow-xl ring-2 ring-indigo-500/10">
-                                        <img src={url} alt={t('hero.studentsBadge')} className="w-full h-full object-cover" />
+                        <div className="w-full md:w-auto shrink-0">
+                            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all text-left md:min-w-[180px] flex flex-col">
+                                <div className="flex items-start gap-3 mb-3">
+                                    <div className="p-2 bg-blue-500 rounded-lg shadow-lg shadow-blue-500/20 shrink-0">
+                                        <Clock size={18} />
                                     </div>
-                                ))}
-                                <div className="w-12 h-12 rounded-full border-4 border-slate-900 bg-indigo-600 flex flex-col items-center justify-center shadow-xl ring-2 ring-indigo-500/10">
-                                    <span className="text-[10px] font-black text-white leading-none">1k+</span>
-                                    <span className="text-[6px] font-bold text-indigo-200 uppercase tracking-tighter">{t('hero.studentsBadge')}</span>
+                                    <span className="text-[11px] font-bold text-blue-100 uppercase tracking-wide leading-tight">
+                                        {t('hero.learningHours')}
+                                    </span>
+                                </div>
+                                <div className="flex items-baseline gap-1 mt-auto">
+                                    <span className="text-2xl md:text-3xl font-black tracking-tighter">{Math.round(onlineLearningHours * 10) / 10}</span>
+                                    <span className="text-sm font-bold opacity-60">{t('hero.hoursUnit')}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    {/* Abstract Background Elements */}
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
-                    <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-600/10 rounded-full blur-3xl -ml-24 -mb-24"></div>
                 </div>
 
                 {/* Course Grid */}

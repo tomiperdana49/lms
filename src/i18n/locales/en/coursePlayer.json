@@ -3,7 +3,8 @@
     "badge": "Learning Hub",
     "title": "Online Learning Modules",
     "subtitle": "Access premium modules to enhance your professional skills.",
-    "studentsBadge": "Students"
+    "learningHours": "Learning Hours",
+    "hoursUnit": "Hours"
   },
   "card": {
     "completed": "Completed",
