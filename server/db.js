@@ -347,6 +347,11 @@ export const initDB = async () => {
             console.log("Added original_certificate_expiry_date column to external_training_requests.");
         } catch (e) { /* Ignore if exists */ }
 
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN hr_name VARCHAR(255)");
+            console.log("Added hr_name column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
         // MIGRATION: Add internal_certificates table (issued internal training certificates)
         try {
             await connection.query(`

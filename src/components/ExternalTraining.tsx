@@ -13,7 +13,8 @@ import {
  Calendar,
  ChevronDown,
  MapPin,
- Award
+ Award,
+ Gift
 } from 'lucide-react';
 import PopupNotification from './PopupNotification';
 
@@ -362,6 +363,12 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <span>{t('request.detailSchedule')}: <span className="font-semibold text-gray-800">{req.start_date ? formatScheduleDateTime(req.start_date) : '-'} &mdash; {formatScheduleDateTime(req.end_date)}</span></span>
  </div>
  )}
+ {Number(req.registration_fee) > 0 && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailRegistrationFee')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.registration_fee))}</span></span>
+ </div>
+ )}
  {Number(req.travel_flight_cost) > 0 && (
  <div className="flex items-center gap-2 text-gray-600">
  <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
@@ -384,10 +391,22 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
  <span>{t('request.detailTotalCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.registration_fee || 0) + Number(req.travel_flight_cost || 0) + Number(req.accommodation_cost || 0) + Number(req.miscellaneous_cost || 0))}</span></span>
  </div>
+ {Number(req.incentive_reward) > 0 && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Gift className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailIncentive')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.incentive_reward))}{req.incentive_payment_type === 'Recurring' ? ` / ${t('request.detailIncentivePerMonth')}` : ''}</span></span>
+ </div>
+ )}
  {req.approved_by && (
  <div className="flex items-center gap-2 text-gray-600">
  <CheckCircle className="w-4 h-4 text-gray-400 shrink-0" />
  <span>{t('request.detailApprovedBy')}: <span className="font-semibold text-gray-800">{req.approved_by}</span></span>
+ </div>
+ )}
+ {req.hr_name && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <CheckCircle className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailProcessedByHr')}: <span className="font-semibold text-gray-800">{req.hr_name}</span></span>
  </div>
  )}
  {req.attachment_link && (
@@ -396,21 +415,34 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  {t('request.detailAttachment')}: {t('request.viewLink')}
  </a>
  )}
- {req.certificate_link && (
+ {(req.certificate_link || req.renewal_certificate_link) && (
  <div className="sm:col-span-2">
  <span className="flex items-center gap-2 text-gray-600 mb-2">
  <Award className="w-4 h-4 shrink-0 text-gray-400" />
  {t('request.detailCertificate')}
  </span>
- {isPdfLink(req.certificate_link) ? (
- <a href={getFullImageUrl(req.certificate_link)} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold">
+ <div className="flex flex-wrap gap-4">
+ {[
+ { url: req.certificate_link, label: t('request.detailCertificateOriginal'), expiry: req.original_certificate_expiry_date },
+ { url: req.renewal_certificate_link, label: t('request.detailCertificateRenewed'), expiry: undefined }
+ ].filter((cert): cert is { url: string; label: string; expiry?: string } => !!cert.url).map((cert, idx, arr) => (
+ <div key={idx} className="flex flex-col gap-1">
+ {isPdfLink(cert.url) ? (
+ <a href={getFullImageUrl(cert.url)} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold w-48">
  <Link className="w-4 h-4 shrink-0" /> {t('request.viewLink')}
  </a>
  ) : (
- <a href={getFullImageUrl(req.certificate_link)} target="_blank" rel="noreferrer" className="block w-48 h-32 rounded-lg overflow-hidden border border-gray-200 hover:opacity-90 transition-opacity">
- <img src={getDisplayImageUrl(req.certificate_link)} alt={t('request.detailCertificate')} className="w-full h-full object-cover" />
+ <a href={getFullImageUrl(cert.url)} target="_blank" rel="noreferrer" className="block w-48 h-32 rounded-lg overflow-hidden border border-gray-200 hover:opacity-90 transition-opacity">
+ <img src={getDisplayImageUrl(cert.url)} alt={cert.label} className="w-full h-full object-cover" />
  </a>
  )}
+ {arr.length > 1 && <span className="text-xs font-semibold text-gray-500">{cert.label}</span>}
+ {cert.expiry && (
+ <span className="text-xs text-gray-500">{new Date(cert.expiry).toLocaleDateString()}</span>
+ )}
+ </div>
+ ))}
+ </div>
  </div>
  )}
  {req.certificate_expiry_date && (

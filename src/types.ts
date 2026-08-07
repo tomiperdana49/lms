@@ -274,10 +274,15 @@ export interface ExternalTrainingRequest {
     payment_method?: string;
     attachment_link?: string;
     approved_by?: string;
+    hr_name?: string;
+    incentive_reward?: number;
+    incentive_payment_type?: string;
     created_at?: string;
     updated_at?: string;
     certificate_link?: string;
     certificate_expiry_date?: string;
+    original_certificate_expiry_date?: string;
+    renewal_certificate_link?: string;
     vendor?: string;
     location?: string;
     leader_name?: string;

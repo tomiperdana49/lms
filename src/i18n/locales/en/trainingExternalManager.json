@@ -121,7 +121,7 @@
     "closeArchive": "CLOSE ARCHIVE"
   },
   "settlementModal": {
-    "title": "Finance Settlement",
+    "title": "Cost Allocation",
     "subtitle": "Final Actual Expenditure Review",
     "trainingCost": "Training Cost",
     "transport": "Transport",

@@ -3492,12 +3492,12 @@ app.get('/api/external-training/hr', async (req, res) => {
 // 6. HR processes payment
 app.post('/api/external-training/hr-process', async (req, res) => {
     try {
-        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date, title, vendor, location, start_date, end_date, certification_result, incentive_reward, incentive_payment_type } = req.body;
+        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date, title, vendor, location, start_date, end_date, certification_result, incentive_reward, incentive_payment_type, hr_name } = req.body;
         // datetime-local inputs send "YYYY-MM-DDTHH:MM"; MySQL DATETIME literals need a space instead of "T"
         const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
 
-        let sql = `UPDATE external_training_requests SET status = 'Processed', travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, payment_method = ?`;
-        let params = [travel_flight_cost || 0, accommodation_cost || 0, miscellaneous_cost || 0, payment_method];
+        let sql = `UPDATE external_training_requests SET status = 'Processed', travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, payment_method = ?, hr_name = ?`;
+        let params = [travel_flight_cost || 0, accommodation_cost || 0, miscellaneous_cost || 0, payment_method, hr_name || null];
 
         if (registration_fee !== undefined) {
             sql += `, registration_fee = ?`;
