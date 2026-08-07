@@ -1132,20 +1132,20 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
             element.style.display = 'block';
 
             const canvas = await html2canvas(element, {
-                scale: 2, // Higher resolution
+                scale: 3, // Higher resolution
                 useCORS: true,
                 logging: false,
                 backgroundColor: '#ffffff'
             });
 
-            const imgData = canvas.toDataURL('image/png');
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
             const pdf = new jsPDF({
                 orientation: 'landscape',
                 unit: 'px',
                 format: [canvas.width, canvas.height]
             });
 
-            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
             pdf.save(`Certificate_${activeCourse.title.replace(/\s+/g, '_')}_${user.name.replace(/\s+/g, '_')}.pdf`);
 
             // Hide it back
