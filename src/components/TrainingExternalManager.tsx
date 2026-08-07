@@ -12,11 +12,19 @@ import {
     Users,
     Clock,
     Briefcase,
-    Link
+    Link,
+    Award,
+    AlertTriangle
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { TrainingRequest } from '../types';
+import ConfirmationModal from './ConfirmationModal';
+
+const resolveFileUrl = (link?: string | null) => {
+    if (!link) return undefined;
+    return link.startsWith('/') ? `${API_BASE_URL}${link}` : link;
+};
 
 const getStatusColor = (status: string) => {
     switch (status) {
@@ -56,6 +64,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     const [branches, setBranches] = useState<string[]>(['All Branches']);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusDrilldown, setStatusDrilldown] = useState<'PENDING' | 'APPROVED' | null>(null);
+    const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
     const fetchRequests = async () => {
         try {
@@ -80,10 +89,15 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     costTransport: req.travel_flight_cost || 0,
                     costAccommodation: req.accommodation_cost || 0,
                     costOthers: req.miscellaneous_cost || 0,
-                    evidenceUrl: (req.certificate_link || req.attachment_link) ? ((req.certificate_link || req.attachment_link).startsWith('/') ? `${API_BASE_URL}${req.certificate_link || req.attachment_link}` : (req.certificate_link || req.attachment_link)) : undefined,
+                    evidenceUrl: resolveFileUrl(req.certificate_link || req.attachment_link),
+                    renewalCertificateUrl: resolveFileUrl(req.renewal_certificate_link),
                     hrName: req.status === 'Processed' ? t('common.hrProcessed') : '',
                     supervisorName: req.approved_by,
                     employee_id: req.employee_id,
+                    certificateExpiryDate: req.certificate_expiry_date,
+                    originalCertificateExpiryDate: req.original_certificate_expiry_date,
+                    incentiveReward: req.incentive_reward ? Number(req.incentive_reward) : undefined,
+                    incentivePaymentType: req.incentive_payment_type,
                     _original: req
                 }));
                 setRequests(mapped);
@@ -120,10 +134,15 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     costTransport: req.travel_flight_cost || 0,
                     costAccommodation: req.accommodation_cost || 0,
                     costOthers: req.miscellaneous_cost || 0,
-                    evidenceUrl: (req.certificate_link || req.attachment_link) ? ((req.certificate_link || req.attachment_link).startsWith('/') ? `${API_BASE_URL}${req.certificate_link || req.attachment_link}` : (req.certificate_link || req.attachment_link)) : undefined,
+                    evidenceUrl: resolveFileUrl(req.certificate_link || req.attachment_link),
+                    renewalCertificateUrl: resolveFileUrl(req.renewal_certificate_link),
                     hrName: req.status === 'Processed' ? t('common.hrProcessed') : '',
                     supervisorName: req.approved_by,
                     employee_id: req.employee_id,
+                    certificateExpiryDate: req.certificate_expiry_date,
+                    originalCertificateExpiryDate: req.original_certificate_expiry_date,
+                    incentiveReward: req.incentive_reward ? Number(req.incentive_reward) : undefined,
+                    incentivePaymentType: req.incentive_payment_type,
                     _original: req
                 }));
                 setRequests(mapped);
@@ -145,6 +164,75 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     const [hrCertificateExpiryDate, setHrCertificateExpiryDate] = useState('');
     const [hrCertificationResult, setHrCertificationResult] = useState<'Passed' | 'Not Passed'>('Passed');
     const [recapDetailUser, setRecapDetailUser] = useState<string | null>(null);
+
+    // Certificate Renewal State (HR-only: extends an already-processed certificate's expiry date)
+    const [renewTarget, setRenewTarget] = useState<TrainingRequest | null>(null);
+    const [renewExpiryDate, setRenewExpiryDate] = useState('');
+    const [renewGrantIncentive, setRenewGrantIncentive] = useState(false);
+    const [renewIncentiveReward, setRenewIncentiveReward] = useState('');
+    const [renewIncentivePaymentType, setRenewIncentivePaymentType] = useState<'One-Time' | 'Recurring'>('One-Time');
+    const [renewCertificateFile, setRenewCertificateFile] = useState<File | null>(null);
+
+    const openRenewModal = (req: TrainingRequest) => {
+        setRenewTarget(req);
+        setRenewExpiryDate(req.certificateExpiryDate ? req.certificateExpiryDate.slice(0, 10) : '');
+        setRenewGrantIncentive(false);
+        setRenewIncentiveReward('');
+        setRenewIncentivePaymentType('One-Time');
+        setRenewCertificateFile(null);
+    };
+
+    const handleRenewCertificate = async () => {
+        if (!renewTarget || !renewExpiryDate || !renewCertificateFile) return;
+        try {
+            let renewalCertificateLink: string | undefined;
+            if (renewCertificateFile) {
+                const formData = new FormData();
+                formData.append('file', renewCertificateFile);
+                const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (uploadRes.ok) {
+                    const uploadData = await uploadRes.json();
+                    renewalCertificateLink = uploadData.fileUrl;
+                }
+            }
+            const res = await fetch(`${API_BASE_URL}/api/external-training/renew-certificate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: renewTarget.id,
+                    certificate_expiry_date: renewExpiryDate,
+                    incentive_reward: renewGrantIncentive ? renewIncentiveReward : undefined,
+                    incentive_payment_type: renewGrantIncentive ? renewIncentivePaymentType : undefined,
+                    renewal_certificate_link: renewalCertificateLink
+                })
+            });
+            if (res.ok && renewGrantIncentive && renewIncentiveReward) {
+                await fetch(`${API_BASE_URL}/api/incentives`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        employeeName: renewTarget.employeeName,
+                        employee_id: renewTarget.employee_id,
+                        courseName: renewTarget.title,
+                        description: t('requestModal.renewIncentiveAutoDescription', { vendor: renewTarget.vendor }),
+                        startDate: new Date().toISOString(),
+                        endDate: renewExpiryDate,
+                        status: 'Active',
+                        reward: renewIncentiveReward,
+                        paymentType: renewIncentivePaymentType
+                    })
+                });
+            }
+            if (res.ok) {
+                await fetchRequests();
+                setRenewTarget(null);
+                if (selectedRequest?.id === renewTarget.id) setSelectedRequest(null);
+            }
+        } catch (err) { console.error(err); }
+    };
 
     // Cost Breakdown State
     const [breakdownCost, setBreakdownCost] = useState({
@@ -341,6 +429,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     certificate_link: certLink,
                     certificate_expiry_date: requiresCertificateProof ? hrCertificateExpiryDate : undefined,
                     certification_result: isCertificateCategory ? hrCertificationResult : undefined,
+                    incentive_reward: (requiresCertificateProof && hrGrantIncentive) ? hrIncentiveReward : undefined,
+                    incentive_payment_type: (requiresCertificateProof && hrGrantIncentive) ? hrIncentivePaymentType : undefined,
                     title: hrEditTitle,
                     vendor: hrEditVendor,
                     location: hrEditLocation,
@@ -375,10 +465,15 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
         }
     };
 
-    const handleDeleteRequest = async (id: number) => {
-        if (!window.confirm(t('alerts.confirmDeleteRequest'))) return;
+    const handleDeleteRequest = (id: number) => {
+        setDeleteTargetId(id);
+    };
+
+    const confirmDeleteRequest = async () => {
+        if (deleteTargetId === null) return;
+        const id = deleteTargetId;
         try {
-            const res = await fetch(`${API_BASE_URL}/api/training/${id}`, { method: 'DELETE' });
+            const res = await fetch(`${API_BASE_URL}/api/external-training/${id}`, { method: 'DELETE' });
             if (res.ok) {
                 setRequests(requests.filter(r => r.id !== id));
             }
@@ -668,7 +763,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                         </div>
                                         
                                         <p className="text-sm font-bold text-slate-500">
-                                            {req.employeeName} <span className="mx-2 text-slate-300">—</span> {req.employeeRole}
+                                            {req.employeeName} <span className="mx-2 text-slate-300">—</span> {t(`categoryLabels.${req.employeeRole}`, { defaultValue: req.employeeRole })}
                                         </p>
 
                                         <div className="flex flex-wrap items-center gap-2">
@@ -683,6 +778,22 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                             <div className="px-3 py-1.5 bg-slate-50 rounded-lg text-[10px] font-black text-slate-400 border border-slate-100 uppercase tracking-wider">
                                                 {req.vendor}
                                             </div>
+                                            {req.certificateExpiryDate && (() => {
+                                                const isExpired = new Date(req.certificateExpiryDate) < new Date();
+                                                return (
+                                                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black border uppercase tracking-wider ${isExpired ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
+                                                        <AlertTriangle size={14} className={isExpired ? 'text-rose-400' : 'text-amber-400'} />
+                                                        {isExpired ? t('list.certificateExpired') : t('list.certificateExpires')}: {new Date(req.certificateExpiryDate).toLocaleDateString('en-GB')}
+                                                    </div>
+                                                );
+                                            })()}
+                                            {!!req.incentiveReward && (
+                                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 rounded-lg text-[10px] font-black text-emerald-700 border border-emerald-100 uppercase tracking-wider">
+                                                    <Award size={14} className="text-emerald-500" />
+                                                    {t('list.incentive')}: {formatCurrency(req.incentiveReward)}
+                                                    {req.incentivePaymentType === 'Recurring' ? ` / ${t('list.month')}` : ''}
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="flex items-center gap-3 pt-2">
@@ -708,21 +819,37 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                         </div>
                                     </div>
 
-                                    {req.evidenceUrl && (
-                                        <div className="hidden lg:flex items-center justify-center mr-4">
-                                            {req.evidenceUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
-                                                <a href={req.evidenceUrl} target="_blank" rel="noreferrer" className="group/img relative block overflow-hidden rounded-xl border border-slate-100 shadow-sm w-40 h-28 shrink-0">
-                                                    <img src={req.evidenceUrl} alt={t('list.certificateAlt')} className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-500" />
-                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
-                                                        <span className="text-white text-[10px] font-black uppercase tracking-widest">{t('list.viewDocument')}</span>
-                                                    </div>
-                                                </a>
-                                            ) : (
-                                                <a href={req.evidenceUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center w-40 h-28 bg-slate-50 border border-slate-100 rounded-xl hover:bg-slate-100 hover:border-slate-300 transition-colors group/doc text-slate-400 hover:text-indigo-600 shrink-0">
-                                                    <FileText size={24} className="mb-2" />
-                                                    <span className="text-[9px] font-black uppercase tracking-widest text-center px-2">{t('list.openDocument')}</span>
-                                                </a>
-                                            )}
+                                    {(req.evidenceUrl || req.renewalCertificateUrl) && (
+                                        <div className="hidden lg:flex items-center gap-3 mr-4">
+                                            {[
+                                                { url: req.evidenceUrl, label: t('list.certificateOriginal'), expiry: req.originalCertificateExpiryDate || req.certificateExpiryDate },
+                                                { url: req.renewalCertificateUrl, label: t('list.certificateRenewed'), expiry: req.certificateExpiryDate }
+                                            ].filter(cert => cert.url).map((cert, idx) => (
+                                                <div key={idx} className="flex flex-col items-center gap-1">
+                                                    {cert.url!.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
+                                                        <a href={cert.url} target="_blank" rel="noreferrer" className="group/img relative block overflow-hidden rounded-xl border border-slate-100 shadow-sm w-36 h-24 shrink-0">
+                                                            <img src={cert.url} alt={t('list.certificateAlt')} className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-500" />
+                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                                                                <span className="text-white text-[10px] font-black uppercase tracking-widest">{t('list.viewDocument')}</span>
+                                                            </div>
+                                                        </a>
+                                                    ) : (
+                                                        <a href={cert.url} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center w-36 h-24 bg-slate-50 border border-slate-100 rounded-xl hover:bg-slate-100 hover:border-slate-300 transition-colors group/doc text-slate-400 hover:text-indigo-600 shrink-0">
+                                                            <FileText size={24} className="mb-2" />
+                                                            <span className="text-[9px] font-black uppercase tracking-widest text-center px-2">{t('list.openDocument')}</span>
+                                                        </a>
+                                                    )}
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{cert.label}</span>
+                                                    {cert.expiry && (() => {
+                                                        const isExpired = new Date(cert.expiry) < new Date();
+                                                        return (
+                                                            <span className={`text-[9px] font-bold ${isExpired ? 'text-rose-500' : 'text-amber-600'}`}>
+                                                                {isExpired ? t('list.certificateExpired') : t('list.certificateExpires')}: {new Date(cert.expiry).toLocaleDateString('en-GB')}
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            ))}
                                         </div>
                                     )}
 
@@ -1021,17 +1148,17 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                         </div>
 
                         <div className="p-6 border-t border-slate-100 bg-slate-50 flex flex-wrap gap-3 rounded-b-2xl">
-                            {selectedRequest.evidenceUrl && (
-                                <a href={selectedRequest.evidenceUrl} target="_blank" rel="noopener noreferrer" className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl text-sm text-center">
-                                    {t('requestModal.evidence')}
-                                </a>
-                            )}
                             {((userRole === 'SUPERVISOR' && selectedRequest.status === 'PENDING_SUPERVISOR') || (userRole === 'HR' && selectedRequest.status === 'PENDING_HR')) && (
                                 <button onClick={handleApprove} className="flex-[2] py-2 bg-indigo-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-indigo-700 transition-colors">{t('requestModal.approveRequest')}</button>
                             )}
 
                             {selectedRequest.status === 'APPROVED' && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
                                 <button onClick={() => handleOpenSettlement(selectedRequest)} className="flex-[2] py-2 bg-emerald-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-emerald-700 transition-colors">{t('requestModal.updateSettlement')}</button>
+                            )}
+                            {selectedRequest.status === 'APPROVED' && selectedRequest._original?.category === 'Sertifikat' && selectedRequest.certificateExpiryDate && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                                <button onClick={() => openRenewModal(selectedRequest)} className="flex-[2] py-2 bg-amber-500 text-white font-bold rounded-xl text-sm shadow-md hover:bg-amber-600 transition-colors flex items-center justify-center gap-1.5">
+                                    <Award size={16} /> {t('requestModal.renewCertificate')}
+                                </button>
                             )}
                         </div>
                     </div>
@@ -1177,6 +1304,111 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     </div>
                 </div>
             )}
+
+            {renewTarget && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+                        <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-amber-50/60 shrink-0">
+                            <div>
+                                <h2 className="font-black text-xl text-slate-900 tracking-tight flex items-center gap-2"><Award size={20} className="text-amber-500" /> {t('requestModal.renewCertificate')}</h2>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{renewTarget.title}</p>
+                            </div>
+                            <button onClick={() => setRenewTarget(null)} className="p-3 hover:bg-slate-100 rounded-2xl text-slate-300 transition-colors"><XCircle size={24} /></button>
+                        </div>
+
+                        <div className="p-6 space-y-5 overflow-y-auto">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
+                                    {t('requestModal.newExpiryDate')} <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="date"
+                                    value={renewExpiryDate}
+                                    onChange={(e) => setRenewExpiryDate(e.target.value)}
+                                    className="w-full px-4 py-2.5 rounded-2xl border-2 border-slate-100 focus:border-amber-500 outline-none text-sm font-black text-slate-700 bg-white transition-all"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
+                                    {t('requestModal.uploadRenewedCertificate')} <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="file"
+                                    accept="image/*,.pdf"
+                                    onChange={(e) => setRenewCertificateFile(e.target.files ? e.target.files[0] : null)}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm text-slate-600 bg-white"
+                                />
+                                <p className="text-[10px] text-slate-400 mt-1.5 ml-1">{t('requestModal.renewedCertificateHint')}</p>
+                            </div>
+
+                            <label className="flex items-center gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={renewGrantIncentive}
+                                    onChange={(e) => setRenewGrantIncentive(e.target.checked)}
+                                    className="w-4 h-4 rounded accent-amber-500"
+                                />
+                                <span className="text-sm font-bold text-slate-700">{t('requestModal.grantIncentiveForRenewal')}</span>
+                            </label>
+
+                            {renewGrantIncentive && (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
+                                            {t('requestModal.incentiveReward')} <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-3 text-xs font-black text-slate-300">Rp</span>
+                                            <input
+                                                type="text"
+                                                value={renewIncentiveReward ? new Intl.NumberFormat('id-ID').format(Number(renewIncentiveReward)) : ''}
+                                                onChange={(e) => setRenewIncentiveReward(e.target.value.replace(/\D/g, ''))}
+                                                className="w-full pl-10 pr-4 py-2.5 rounded-2xl border-2 border-slate-100 focus:border-amber-500 outline-none text-sm font-black text-slate-700 bg-white transition-all"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-700 mb-1">{t('requestModal.incentivePaymentType')}</label>
+                                        <div className="flex gap-2">
+                                            {(['One-Time', 'Recurring'] as const).map(type => (
+                                                <button
+                                                    key={type}
+                                                    type="button"
+                                                    onClick={() => setRenewIncentivePaymentType(type)}
+                                                    className={`flex-1 px-3 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider border-2 transition-all ${renewIncentivePaymentType === type ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-slate-100 text-slate-500'}`}
+                                                >
+                                                    {type === 'One-Time' ? t('requestModal.incentiveOneTime') : t('requestModal.incentiveRecurring')}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-5 bg-slate-50 border-t border-slate-100 flex justify-end gap-4 shrink-0">
+                            <button onClick={() => setRenewTarget(null)} className="px-8 py-3 bg-white text-slate-400 rounded-2xl font-black text-xs tracking-widest border border-slate-200">{t('settlementModal.cancel')}</button>
+                            <button
+                                onClick={handleRenewCertificate}
+                                disabled={!renewExpiryDate || !renewCertificateFile || (renewGrantIncentive && !renewIncentiveReward)}
+                                className="px-8 py-3 bg-amber-500 text-white rounded-2xl font-black text-xs tracking-widest shadow-lg shadow-amber-100 hover:bg-amber-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                {t('requestModal.confirmRenewal')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <ConfirmationModal
+                isOpen={deleteTargetId !== null}
+                onClose={() => setDeleteTargetId(null)}
+                onConfirm={confirmDeleteRequest}
+                title={t('alerts.confirmDeleteTitle')}
+                message={t('alerts.confirmDeleteRequest')}
+                variant="danger"
+            />
         </div>
     );
 };

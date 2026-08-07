@@ -1,4 +1,9 @@
 {
+  "categoryLabels": {
+    "Sertifikat": "Certification",
+    "Training": "Training",
+    "Modul": "Module"
+  },
   "statusBadge": {
     "approved": "Approved",
     "rejected": "Rejected",
@@ -36,7 +41,13 @@
     "viewCertificateAttachment": "View Certificate/Attachment",
     "viewDossier": "View Dossier",
     "detail": "Detail",
-    "delete": "Delete"
+    "delete": "Delete",
+    "certificateExpires": "Expires",
+    "certificateExpired": "Expired",
+    "incentive": "Incentive",
+    "month": "month",
+    "certificateOriginal": "Original",
+    "certificateRenewed": "Renewed"
   },
   "recapTable": {
     "professionalEntity": "Professional Entity",
@@ -79,6 +90,13 @@
     "incentiveOneTime": "One-Time",
     "incentiveRecurring": "Recurring",
     "incentiveAutoDescription": "Certificate incentive from external training - {{vendor}}",
+    "renewCertificate": "Renew Certificate",
+    "newExpiryDate": "New Expiry Date",
+    "grantIncentiveForRenewal": "Grant a new incentive for this renewal",
+    "confirmRenewal": "Confirm Renewal",
+    "renewIncentiveAutoDescription": "Certificate renewal incentive - {{vendor}}",
+    "uploadRenewedCertificate": "Upload Renewed Certificate",
+    "renewedCertificateHint": "The original certificate stays on file; this upload is kept alongside it as the renewed certificate.",
     "incentiveRecurringStopHint": "This recurring incentive will automatically stop after the certificate expiry date ({{date}}).",
     "incentiveRecurringStopHintNoDate": "This recurring incentive will automatically stop after the certificate expiry date.",
     "rejectionReason": "Rejection Reason",
@@ -121,7 +139,8 @@
     "certificateEvidenceRequired": "Please upload the certificate evidence before processing this request.",
     "certificateExpiryRequired": "Please fill in the certificate expiry date before processing this request.",
     "incentiveRewardRequired": "Please fill in the incentive reward amount before processing this request.",
-    "confirmDeleteRequest": "Are you sure you want to permanently delete this training request?"
+    "confirmDeleteRequest": "Are you sure you want to permanently delete this training request?",
+    "confirmDeleteTitle": "Delete Training Request"
   },
   "printDocument": {
     "windowTitle": "Training Approval - {{id}}",

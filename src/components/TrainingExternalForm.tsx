@@ -49,7 +49,7 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
         date: '',
         duration: '',
         location: '',
-        paymentMethod: 'REIMBURSEMENT' as 'REIMBURSEMENT' | 'DIRECT',
+        paymentMethod: 'DIRECT' as 'REIMBURSEMENT' | 'DIRECT',
         bankName: '',
         accountNumber: '',
         reason: '',
@@ -139,7 +139,7 @@ const TrainingExternalForm = ({ user, onNavigate }: { user: { name: string; role
                 setFormData({
                     title: '', vendor: '', cost: '', costTraining: '', costTransport: '', costAccommodation: '', costOthers: '',
                     date: '', duration: '', location: '',
-                    paymentMethod: 'REIMBURSEMENT', bankName: '', accountNumber: '', reason: '',
+                    paymentMethod: 'DIRECT', bankName: '', accountNumber: '', reason: '',
                     agreedToBond: false, agreedToPenalty: false, evidenceUrl: ''
                 });
                 setNotification({ show: true, type: 'success', message: t('notifications.submitSuccess') });

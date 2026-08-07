@@ -1,4 +1,9 @@
 {
+  "categoryLabels": {
+    "Sertifikat": "Sertifikasi",
+    "Training": "Training",
+    "Modul": "Modul"
+  },
   "statusBadge": {
     "approved": "Disetujui",
     "rejected": "Ditolak",
@@ -36,7 +41,13 @@
     "viewCertificateAttachment": "Lihat Sertifikat/Lampiran",
     "viewDossier": "Lihat Berkas",
     "detail": "Detail",
-    "delete": "Hapus"
+    "delete": "Hapus",
+    "certificateExpires": "Berlaku s/d",
+    "certificateExpired": "Kedaluwarsa",
+    "incentive": "Insentif",
+    "month": "bulan",
+    "certificateOriginal": "Asli",
+    "certificateRenewed": "Perpanjangan"
   },
   "recapTable": {
     "professionalEntity": "Entitas Profesional",
@@ -79,6 +90,13 @@
     "incentiveOneTime": "Sekali Bayar",
     "incentiveRecurring": "Berulang",
     "incentiveAutoDescription": "Insentif sertifikat dari pelatihan eksternal - {{vendor}}",
+    "renewCertificate": "Perpanjang Sertifikat",
+    "newExpiryDate": "Tanggal Kedaluwarsa Baru",
+    "grantIncentiveForRenewal": "Berikan insentif baru untuk perpanjangan ini",
+    "confirmRenewal": "Konfirmasi Perpanjangan",
+    "renewIncentiveAutoDescription": "Insentif perpanjangan sertifikat - {{vendor}}",
+    "uploadRenewedCertificate": "Unggah Sertifikat Perpanjangan",
+    "renewedCertificateHint": "Sertifikat asli tetap tersimpan; unggahan ini disimpan sebagai sertifikat perpanjangan di sampingnya.",
     "incentiveRecurringStopHint": "Insentif berulang ini akan otomatis berhenti setelah tanggal kedaluwarsa sertifikat ({{date}}).",
     "incentiveRecurringStopHintNoDate": "Insentif berulang ini akan otomatis berhenti setelah tanggal kedaluwarsa sertifikat.",
     "rejectionReason": "Alasan Penolakan",
@@ -121,7 +139,8 @@
     "certificateEvidenceRequired": "Silakan unggah bukti sertifikat sebelum memproses permintaan ini.",
     "certificateExpiryRequired": "Silakan isi tanggal kedaluwarsa sertifikat sebelum memproses permintaan ini.",
     "incentiveRewardRequired": "Silakan isi nominal insentif sebelum memproses permintaan ini.",
-    "confirmDeleteRequest": "Apakah Anda yakin ingin menghapus permanen permintaan pelatihan ini?"
+    "confirmDeleteRequest": "Apakah Anda yakin ingin menghapus permanen permintaan pelatihan ini?",
+    "confirmDeleteTitle": "Hapus Permintaan Training"
   },
   "printDocument": {
     "windowTitle": "Persetujuan Pelatihan - {{id}}",

@@ -126,6 +126,11 @@ export interface TrainingRequest {
     supervisorName?: string;
     hrName?: string;
     employee_id?: string;
+    certificateExpiryDate?: string;
+    originalCertificateExpiryDate?: string;
+    incentiveReward?: number;
+    incentivePaymentType?: string;
+    renewalCertificateUrl?: string;
     _original?: any;
 }
 

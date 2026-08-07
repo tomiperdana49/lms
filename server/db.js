@@ -326,6 +326,27 @@ export const initDB = async () => {
             console.log("Added certification_result column to external_training_requests.");
         } catch (e) { /* Ignore if exists */ }
 
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN incentive_reward DECIMAL(15,2)");
+            console.log("Added incentive_reward column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN incentive_payment_type VARCHAR(20)");
+            console.log("Added incentive_payment_type column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN renewal_certificate_link VARCHAR(500)");
+            console.log("Added renewal_certificate_link column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
+        // Frozen at first approval so it survives later renewals; certificate_expiry_date keeps tracking the current/latest expiry.
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN original_certificate_expiry_date DATE");
+            console.log("Added original_certificate_expiry_date column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
         // MIGRATION: Add internal_certificates table (issued internal training certificates)
         try {
             await connection.query(`

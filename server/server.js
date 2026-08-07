@@ -3492,7 +3492,7 @@ app.get('/api/external-training/hr', async (req, res) => {
 // 6. HR processes payment
 app.post('/api/external-training/hr-process', async (req, res) => {
     try {
-        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date, title, vendor, location, start_date, end_date, certification_result } = req.body;
+        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date, title, vendor, location, start_date, end_date, certification_result, incentive_reward, incentive_payment_type } = req.body;
         // datetime-local inputs send "YYYY-MM-DDTHH:MM"; MySQL DATETIME literals need a space instead of "T"
         const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
 
@@ -3508,8 +3508,8 @@ app.post('/api/external-training/hr-process', async (req, res) => {
             params.push(certificate_link);
         }
         if (certificate_expiry_date !== undefined) {
-            sql += `, certificate_expiry_date = ?`;
-            params.push(certificate_expiry_date || null);
+            sql += `, certificate_expiry_date = ?, original_certificate_expiry_date = COALESCE(original_certificate_expiry_date, ?)`;
+            params.push(certificate_expiry_date || null, certificate_expiry_date || null);
         }
         if (title !== undefined) {
             sql += `, title = ?`;
@@ -3535,11 +3535,38 @@ app.post('/api/external-training/hr-process', async (req, res) => {
             sql += `, certification_result = ?`;
             params.push(certification_result || null);
         }
+        if (incentive_reward !== undefined) {
+            sql += `, incentive_reward = ?`;
+            params.push(incentive_reward || null);
+        }
+        if (incentive_payment_type !== undefined) {
+            sql += `, incentive_payment_type = ?`;
+            params.push(incentive_payment_type || null);
+        }
         sql += ` WHERE id = ?`;
         params.push(id);
 
         await query(sql, params);
         res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// HR renews an already-processed certificate's expiry date (and optionally a fresh incentive amount),
+// without touching the cost/settlement fields set during the original approval.
+app.post('/api/external-training/renew-certificate', async (req, res) => {
+    try {
+        const { id, certificate_expiry_date, incentive_reward, incentive_payment_type, renewal_certificate_link } = req.body;
+        if (!id || !certificate_expiry_date) {
+            return res.status(400).json({ error: 'id and certificate_expiry_date are required' });
+        }
+
+        await query(
+            'UPDATE external_training_requests SET certificate_expiry_date = ?, incentive_reward = ?, incentive_payment_type = ?, renewal_certificate_link = ? WHERE id = ?',
+            [certificate_expiry_date, incentive_reward || null, incentive_payment_type || null, renewal_certificate_link || null, id]
+        );
+
+        const updated = await query('SELECT * FROM external_training_requests WHERE id = ?', [id]);
+        res.json(updated[0]);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -3815,6 +3842,14 @@ app.put('/api/external-training/:id', async (req, res) => {
 
         const updated = await query('SELECT * FROM external_training_requests WHERE id = ?', [id]);
         res.json(updated[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/external-training/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await query('DELETE FROM external_training_requests WHERE id = ?', [id]);
+        res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

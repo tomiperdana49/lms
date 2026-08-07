@@ -65,7 +65,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  const [endDate, setEndDate] = useState('');
  const [regFee, setRegFee] = useState('');
  const [attachment, setAttachment] = useState('');
- const [paymentMethod, setPaymentMethod] = useState<'Reimbursement' | 'Direct Payment'>('Reimbursement');
+ const [paymentMethod, setPaymentMethod] = useState<'Reimbursement' | 'Direct Payment'>('Direct Payment');
 
 
  useEffect(() => {
@@ -117,7 +117,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  });
  if (res.ok) {
  showNotif('success', t('notifications.submitSuccess'));
- setTitle(''); setVendor(''); setLocation(''); setRegFee(''); setAttachment(''); setStartDate(''); setEndDate(''); setPaymentMethod('Reimbursement');
+ setTitle(''); setVendor(''); setLocation(''); setRegFee(''); setAttachment(''); setStartDate(''); setEndDate(''); setPaymentMethod('Direct Payment');
  fetchMyRequests();
  } else {
  throw new Error(t('notifications.submitFailed'));
