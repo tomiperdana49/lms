@@ -425,7 +425,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  {[
  { url: req.certificate_link, label: t('request.detailCertificateOriginal'), expiry: req.original_certificate_expiry_date },
  { url: req.renewal_certificate_link, label: t('request.detailCertificateRenewed'), expiry: undefined }
- ].filter((cert): cert is { url: string; label: string; expiry?: string } => !!cert.url).map((cert, idx, arr) => (
+ ].filter((cert): cert is { url: string; label: string; expiry: string | undefined } => !!cert.url).map((cert, idx, arr) => (
  <div key={idx} className="flex flex-col gap-1">
  {isPdfLink(cert.url) ? (
  <a href={getFullImageUrl(cert.url)} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold w-48">
