@@ -16,6 +16,7 @@ interface CertData {
     serial?: string;
     role?: 'participant' | 'host' | 'online';
     companyName?: string;
+    issuedIn?: string;
 }
 
 const VerifyCertificate = ({ serial }: VerifyCertificateProps) => {
@@ -126,6 +127,7 @@ const VerifyCertificate = ({ serial }: VerifyCertificateProps) => {
                                     certNo={data.certNo || ''}
                                     serial={data.serial || ''}
                                     role={data.role}
+                                    issuedIn={data.issuedIn}
                                 />
                             </div>
                         </div>

@@ -410,6 +410,16 @@ export const initDB = async () => {
             console.error("Error creating online_certificates table:", e);
         }
 
+        try {
+            await connection.query("ALTER TABLE internal_certificates ADD COLUMN branch VARCHAR(100)");
+            console.log("Added branch column to internal_certificates.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE online_certificates ADD COLUMN branch VARCHAR(100)");
+            console.log("Added branch column to online_certificates.");
+        } catch (e) { /* Ignore if exists */ }
+
         connection.release();
     } catch (err) {
         console.error('Database initialization failed:', err);

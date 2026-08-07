@@ -92,7 +92,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
     const [loadingResults, setLoadingResults] = useState(false);
     const [courseToCancel, setCourseToCancel] = useState<Course | null>(null);
     const [isDownloading, setIsDownloading] = useState(false);
-    const [certInfo, setCertInfo] = useState<{ certNo: string; serial: string; qrDataUrl: string; completionDate: Date } | null>(null);
+    const [certInfo, setCertInfo] = useState<{ certNo: string; serial: string; qrDataUrl: string; completionDate: Date; issuedIn?: string } | null>(null);
     const [onlineLearningHours, setOnlineLearningHours] = useState(0);
 
     // Player State
@@ -1113,7 +1113,8 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                 certNo: issued.certNo,
                 serial: issued.serial,
                 qrDataUrl,
-                completionDate: issued.completionDate ? new Date(issued.completionDate) : new Date()
+                completionDate: issued.completionDate ? new Date(issued.completionDate) : new Date(),
+                issuedIn: issued.issuedIn
             });
 
             // Wait for the hidden certificate DOM to repaint with the new QR/cert data before capturing it,
@@ -1513,6 +1514,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         serial={certInfo.serial}
                         qrDataUrl={certInfo.qrDataUrl}
                         role="online"
+                        issuedIn={certInfo.issuedIn}
                     />
                 )}
             </div>

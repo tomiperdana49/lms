@@ -94,7 +94,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [confirmMarkPaid, setConfirmMarkPaid] = useState<boolean>(false);
     const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
     const [isDownloadingCert, setIsDownloadingCert] = useState(false);
-    const [certInfo, setCertInfo] = useState<{ certNo: string; serial: string; qrDataUrl: string; trainingDate: Date; role: 'participant' | 'host' } | null>(null);
+    const [certInfo, setCertInfo] = useState<{ certNo: string; serial: string; qrDataUrl: string; trainingDate: Date; role: 'participant' | 'host'; issuedIn?: string } | null>(null);
     const [closeSessionPhotoUrl, setCloseSessionPhotoUrl] = useState('');
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
@@ -1456,7 +1456,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 serial: issued.serial,
                 qrDataUrl,
                 trainingDate: issued.trainingDate ? new Date(issued.trainingDate) : new Date(),
-                role
+                role,
+                issuedIn: issued.issuedIn
             });
 
             // Wait for the hidden certificate DOM to repaint with the new QR/cert data before capturing it,
@@ -4812,6 +4813,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         serial={certInfo.serial}
                         qrDataUrl={certInfo.qrDataUrl}
                         role={certInfo.role}
+                        issuedIn={certInfo.issuedIn}
                     />
                 )}
             </div>

@@ -119,6 +119,17 @@ const generateCertSerial = (input) => {
     return hash.toString(36).padStart(8, '0').slice(-8);
 };
 
+// Branch names are stored as "PT. Media Antar Nusa - Medan" — the certificate only wants the city/unit suffix.
+// The head office ("HO") is physically located in Medan, so it's shown as "Medan" rather than the literal "HO".
+const formatIssuedIn = (branchName) => {
+    if (!branchName) return 'Medan';
+    const parts = String(branchName).split('-');
+    const last = parts[parts.length - 1].trim();
+    if (!last) return 'Medan';
+    if (last.toUpperCase() === 'HO') return 'Medan';
+    return last;
+};
+
 /**
  * Maps snake_case keys of an object to camelCase.
  * @param {Object} obj The object to map.
@@ -1649,19 +1660,29 @@ app.post('/api/internal-certificates/issue', async (req, res) => {
         );
         if (existing.length > 0) {
             const c = existing[0];
-            return res.json({ certNo: c.cert_no, serial: c.serial, employeeName: c.employee_name, trainingTitle: c.training_title, trainingDate: c.training_date, issuedAt: c.issued_at, role: c.role });
+            return res.json({ certNo: c.cert_no, serial: c.serial, employeeName: c.employee_name, trainingTitle: c.training_title, trainingDate: c.training_date, issuedAt: c.issued_at, role: c.role, issuedIn: formatIssuedIn(c.branch) });
         }
+
+        let employeeBranch = null;
+        try {
+            const empRows = await query(
+                'SELECT branch_name FROM employees WHERE id_employee = ? OR email = ? LIMIT 1',
+                [employeeId || null, employeeEmail || null]
+            );
+            if (empRows.length > 0) employeeBranch = empRows[0].branch_name;
+        } catch (e) { /* fall back to default issuedIn */ }
+        const issuedIn = formatIssuedIn(employeeBranch);
 
         const trainingDate = meeting.date ? new Date(meeting.date) : new Date();
         const certNo = `${String(meeting.id).padStart(3, '0')}/DIR/MAN-MDN/${ROMAN_MONTHS[trainingDate.getMonth()]}/${trainingDate.getFullYear()}`;
         const serial = generateCertSerial(`${meeting.id}-${employeeId || employeeEmail}-${certRole}`);
 
         await query(
-            'INSERT INTO internal_certificates (meeting_id, employee_id, employee_name, training_title, training_date, cert_no, serial, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [meetingId, employeeId || null, employeeName, meeting.title, meeting.date, certNo, serial, certRole]
+            'INSERT INTO internal_certificates (meeting_id, employee_id, employee_name, training_title, training_date, cert_no, serial, role, branch) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [meetingId, employeeId || null, employeeName, meeting.title, meeting.date, certNo, serial, certRole, employeeBranch]
         );
 
-        res.json({ certNo, serial, employeeName, trainingTitle: meeting.title, trainingDate: meeting.date, issuedAt: new Date(), role: certRole });
+        res.json({ certNo, serial, employeeName, trainingTitle: meeting.title, trainingDate: meeting.date, issuedAt: new Date(), role: certRole, issuedIn });
     } catch (err) {
         console.error('[API] Error in /api/internal-certificates/issue:', err);
         res.status(500).json({ error: err.message });
@@ -1684,6 +1705,7 @@ app.get('/api/internal-certificates/verify/:serial', async (req, res) => {
             serial: c.serial,
             issuedAt: c.issued_at,
             role: c.role,
+            issuedIn: formatIssuedIn(c.branch),
             companyName: 'PT Media Antar Nusa'
         });
     } catch (err) {
@@ -1736,19 +1758,28 @@ app.post('/api/online-certificates/issue', async (req, res) => {
         );
         if (existing.length > 0) {
             const c = existing[0];
-            return res.json({ certNo: c.cert_no, serial: c.serial, employeeName: c.employee_name, courseTitle: c.course_title, completionDate: c.completion_date, issuedAt: c.issued_at });
+            return res.json({ certNo: c.cert_no, serial: c.serial, employeeName: c.employee_name, courseTitle: c.course_title, completionDate: c.completion_date, issuedAt: c.issued_at, issuedIn: formatIssuedIn(c.branch) });
         }
+
+        let employeeBranch = null;
+        if (resolvedEmployeeId) {
+            try {
+                const empRows = await query('SELECT branch_name FROM employees WHERE id_employee = ? LIMIT 1', [resolvedEmployeeId]);
+                if (empRows.length > 0) employeeBranch = empRows[0].branch_name;
+            } catch (e) { /* fall back to default issuedIn */ }
+        }
+        const issuedIn = formatIssuedIn(employeeBranch);
 
         const dateObj = completionDate ? new Date(completionDate) : new Date();
         const certNo = `${String(course.id).padStart(3, '0')}/DIR/MAN-MDN/${ROMAN_MONTHS[dateObj.getMonth()]}/${dateObj.getFullYear()}`;
         const serial = generateCertSerial(`online-${course.id}-${userId}`);
 
         await query(
-            'INSERT INTO online_certificates (course_id, user_id, employee_id, employee_name, course_title, completion_date, cert_no, serial) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [courseId, userId, resolvedEmployeeId, employeeName, course.title, completionDate, certNo, serial]
+            'INSERT INTO online_certificates (course_id, user_id, employee_id, employee_name, course_title, completion_date, cert_no, serial, branch) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [courseId, userId, resolvedEmployeeId, employeeName, course.title, completionDate, certNo, serial, employeeBranch]
         );
 
-        res.json({ certNo, serial, employeeName, courseTitle: course.title, completionDate, issuedAt: new Date() });
+        res.json({ certNo, serial, employeeName, courseTitle: course.title, completionDate, issuedAt: new Date(), issuedIn });
     } catch (err) {
         console.error('[API] Error in /api/online-certificates/issue:', err);
         res.status(500).json({ error: err.message });
@@ -1770,6 +1801,7 @@ app.get('/api/online-certificates/verify/:serial', async (req, res) => {
             certNo: c.cert_no,
             serial: c.serial,
             issuedAt: c.issued_at,
+            issuedIn: formatIssuedIn(c.branch),
             companyName: 'PT Media Antar Nusa'
         });
     } catch (err) {
