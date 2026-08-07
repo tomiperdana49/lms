@@ -2795,7 +2795,13 @@ app.put('/api/meetings/:id', async (req, res) => {
 
 app.delete('/api/meetings/:id', async (req, res) => {
     try {
-        await query('DELETE FROM meetings WHERE id = ?', [req.params.id]);
+        const meetingId = req.params.id;
+        // Meetings has no FK cascade to these tables, so clean them up explicitly
+        // to avoid leaving orphaned quiz/feedback/certificate rows behind.
+        await query('DELETE FROM quiz_results WHERE meeting_id = ?', [meetingId]);
+        await query('DELETE FROM course_feedback WHERE meeting_id = ?', [meetingId]);
+        await query('DELETE FROM internal_certificates WHERE meeting_id = ?', [meetingId]);
+        await query('DELETE FROM meetings WHERE id = ?', [meetingId]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
