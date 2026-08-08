@@ -1461,9 +1461,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             });
 
             // Wait for the hidden certificate DOM to repaint with the new QR/cert data before capturing it,
-            // and for the certificate's script webfont to finish loading so it doesn't fall back to a system font.
+            // for the certificate's script webfont to finish loading so it doesn't fall back to a system font,
+            // and for the background artwork to fully decode so html2canvas doesn't capture it mid-load (blurry).
+            const preloadBg = new Image();
+            preloadBg.src = '/cert-internal-bg.png';
             await Promise.all([
                 document.fonts.ready,
+                preloadBg.decode().catch(() => {}),
                 new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
             ]);
 

@@ -35,13 +35,16 @@ const InternalCertificateTemplate: React.FC<InternalCertificateTemplateProps> = 
             }}
         >
             {/* --- BACKGROUND (logos + watermark) --- */}
-            <div className="absolute inset-0 z-0 pointer-events-none">
-                <img
-                    src="/cert-internal-bg.jpg"
-                    alt="Background"
-                    className="w-full h-full object-cover"
-                />
-            </div>
+            {/* CSS background-image (not <img>+object-cover) renders sharper under html2canvas at high scale. */}
+            <div
+                className="absolute inset-0 z-0 pointer-events-none"
+                style={{
+                    backgroundImage: "url('/cert-internal-bg.png')",
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat'
+                }}
+            />
 
             {/* --- Certificate of Appreciation --- */}
             <div className="absolute z-10 left-0 right-0 text-center" style={{ top: '176px' }}>
