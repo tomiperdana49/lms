@@ -1478,20 +1478,42 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             if (parent) parent.style.display = 'block';
             element.style.display = 'block';
 
+            // html2canvas softens large raster backgrounds when it rasterizes them itself, so hide the
+            // background here and draw it straight onto the export canvas via native drawImage instead
+            // (full source resolution, no re-encoding) before compositing the html2canvas foreground on top.
+            const bgElement = document.getElementById('internal-certificate-content-bg');
+            const prevBgDisplay = bgElement?.style.display;
+            if (bgElement) bgElement.style.display = 'none';
+            const prevRootBg = element.style.backgroundColor;
+            element.style.backgroundColor = 'transparent';
+
             const canvas = await html2canvas(element, {
                 scale: 3,
                 useCORS: true,
                 logging: false,
-                backgroundColor: '#ffffff'
+                backgroundColor: null
             });
 
-            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            if (bgElement) bgElement.style.display = prevBgDisplay || '';
+            element.style.backgroundColor = prevRootBg;
+
+            const compositeCanvas = document.createElement('canvas');
+            compositeCanvas.width = canvas.width;
+            compositeCanvas.height = canvas.height;
+            const ctx = compositeCanvas.getContext('2d');
+            if (!ctx) throw new Error('Canvas context unavailable');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(preloadBg, 0, 0, compositeCanvas.width, compositeCanvas.height);
+            ctx.drawImage(canvas, 0, 0);
+
+            const imgData = compositeCanvas.toDataURL('image/jpeg', 0.95);
             const pdf = new jsPDF({
                 orientation: 'landscape',
                 unit: 'px',
-                format: [canvas.width, canvas.height]
+                format: [compositeCanvas.width, compositeCanvas.height]
             });
-            pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+            pdf.addImage(imgData, 'JPEG', 0, 0, compositeCanvas.width, compositeCanvas.height);
             const fileRolePrefix = role === 'host' ? 'Host_Certificate' : 'Certificate';
             pdf.save(`${fileRolePrefix}_${selectedMeeting.title.replace(/\s+/g, '_')}_${user.name.replace(/\s+/g, '_')}.pdf`);
 

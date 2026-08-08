@@ -35,8 +35,11 @@ const InternalCertificateTemplate: React.FC<InternalCertificateTemplateProps> = 
             }}
         >
             {/* --- BACKGROUND (logos + watermark) --- */}
-            {/* CSS background-image (not <img>+object-cover) renders sharper under html2canvas at high scale. */}
+            {/* Shown on-screen via CSS, but hidden during html2canvas capture (see handleDownloadCertificate) —
+                html2canvas rasterizes large backgrounds softly, so the download draws this image straight onto
+                the export canvas via native drawImage instead, at full source resolution. */}
             <div
+                id={`${elementId}-bg`}
                 className="absolute inset-0 z-0 pointer-events-none"
                 style={{
                     backgroundImage: "url('/cert-internal-bg.png')",
