@@ -287,4 +287,6 @@ export interface ExternalTrainingRequest {
     location?: string;
     leader_name?: string;
     rejection_reason?: string;
+    training_gr_type?: string;
+    participation_type?: string;
 }

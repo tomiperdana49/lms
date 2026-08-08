@@ -352,6 +352,16 @@ export const initDB = async () => {
             console.log("Added hr_name column to external_training_requests.");
         } catch (e) { /* Ignore if exists */ }
 
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN training_gr_type VARCHAR(20)");
+            console.log("Added training_gr_type column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN participation_type VARCHAR(30)");
+            console.log("Added participation_type column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
         // MIGRATION: Add internal_certificates table (issued internal training certificates)
         try {
             await connection.query(`

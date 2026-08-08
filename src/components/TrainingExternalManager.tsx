@@ -252,6 +252,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     const [hrEditLocation, setHrEditLocation] = useState('');
     const [hrEditStartDate, setHrEditStartDate] = useState('');
     const [hrEditEndDate, setHrEditEndDate] = useState('');
+    const [hrEditGriType, setHrEditGriType] = useState('');
+    const [hrEditParticipationType, setHrEditParticipationType] = useState('');
 
     const toDatetimeLocalValue = (v: any) => {
         if (!v) return '';
@@ -282,6 +284,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             setHrEditLocation(selectedRequest._original?.location || '');
             setHrEditStartDate(toDatetimeLocalValue(selectedRequest._original?.start_date));
             setHrEditEndDate(toDatetimeLocalValue(selectedRequest._original?.end_date));
+            setHrEditGriType(selectedRequest._original?.training_gr_type || '');
+            setHrEditParticipationType(selectedRequest._original?.participation_type || '');
         }
     }, [selectedRequest]);
 
@@ -389,6 +393,34 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
         if (!selectedRequest) return;
 
         try {
+            if (!hrEditTitle.trim()) {
+                alert(t('alerts.titleRequired'));
+                return;
+            }
+            if (!hrEditVendor.trim()) {
+                alert(t('alerts.vendorRequired'));
+                return;
+            }
+            if (!hrEditLocation.trim()) {
+                alert(t('alerts.locationRequired'));
+                return;
+            }
+            if (!hrEditStartDate) {
+                alert(t('alerts.startDateRequired'));
+                return;
+            }
+            if (!hrEditEndDate) {
+                alert(t('alerts.endDateRequired'));
+                return;
+            }
+            if (!hrEditGriType) {
+                alert(t('alerts.griTypeRequired'));
+                return;
+            }
+            if (!hrEditParticipationType) {
+                alert(t('alerts.participationTypeRequired'));
+                return;
+            }
             let certLink = selectedRequest?._original?.certificate_link;
             const isCertificateCategory = selectedRequest?._original?.category === 'Sertifikat';
             const requiresCertificateProof = isCertificateCategory && hrCertificationResult === 'Passed';
@@ -436,7 +468,9 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     vendor: hrEditVendor,
                     location: hrEditLocation,
                     start_date: hrEditStartDate,
-                    end_date: hrEditEndDate
+                    end_date: hrEditEndDate,
+                    training_gr_type: hrEditGriType || null,
+                    participation_type: hrEditParticipationType || null
                 })
             });
             if (res.ok && requiresCertificateProof && hrGrantIncentive) {
@@ -944,9 +978,9 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                         </div>
                         <div className="p-6 space-y-4 overflow-y-auto">
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">{isHrEditable ? t('requestModal.titleLabel') : t('requestModal.trainingTitle')}</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">{isHrEditable ? t('requestModal.titleLabel') : t('requestModal.trainingTitle')} {isHrEditable && <span className="text-red-500">*</span>}</label>
                                 {isHrEditable ? (
-                                    <input value={hrEditTitle} onChange={(e) => setHrEditTitle(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
+                                    <input required value={hrEditTitle} onChange={(e) => setHrEditTitle(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
                                 ) : (
                                     <input readOnly value={selectedRequest.title} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-700 cursor-not-allowed" />
                                 )}
@@ -954,12 +988,12 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                             {isHrEditable ? (
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.vendor')}</label>
-                                        <input value={hrEditVendor} onChange={(e) => setHrEditVendor(e.target.value)} placeholder={t('requestModal.vendor')} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.vendor')} <span className="text-red-500">*</span></label>
+                                        <input required value={hrEditVendor} onChange={(e) => setHrEditVendor(e.target.value)} placeholder={t('requestModal.vendor')} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.location')}</label>
-                                        <input value={hrEditLocation} onChange={(e) => setHrEditLocation(e.target.value)} placeholder={t('requestModal.location')} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.location')} <span className="text-red-500">*</span></label>
+                                        <input required value={hrEditLocation} onChange={(e) => setHrEditLocation(e.target.value)} placeholder={t('requestModal.location')} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
                                     </div>
                                 </div>
                             ) : (
@@ -971,12 +1005,12 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                             {isHrEditable ? (
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.startDate')}</label>
-                                        <input type="datetime-local" value={hrEditStartDate} onChange={(e) => setHrEditStartDate(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.startDate')} <span className="text-red-500">*</span></label>
+                                        <input required type="datetime-local" value={hrEditStartDate} onChange={(e) => setHrEditStartDate(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.endDate')}</label>
-                                        <input type="datetime-local" value={hrEditEndDate} onChange={(e) => setHrEditEndDate(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.endDate')} <span className="text-red-500">*</span></label>
+                                        <input required type="datetime-local" value={hrEditEndDate} onChange={(e) => setHrEditEndDate(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
                                     </div>
                                 </div>
                             ) : (
@@ -988,6 +1022,25 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
 
                             {(userRole === 'HR' || userRole === 'HR_ADMIN') && selectedRequest.status === 'PENDING_HR' && (
                                 <>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.griType')} <span className="text-red-500">*</span></label>
+                                            <select value={hrEditGriType} onChange={(e) => setHrEditGriType(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none bg-white">
+                                                <option value="">{t('requestModal.griTypePlaceholder')}</option>
+                                                <option value="ESG">{t('requestModal.griEsg')}</option>
+                                                <option value="HSE">{t('requestModal.griHse')}</option>
+                                                <option value="Other">{t('requestModal.griOther')}</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.participationType')} <span className="text-red-500">*</span></label>
+                                            <select value={hrEditParticipationType} onChange={(e) => setHrEditParticipationType(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none bg-white">
+                                                <option value="">{t('requestModal.participationTypePlaceholder')}</option>
+                                                <option value="Self Registered">{t('requestModal.selfRegistered')}</option>
+                                                <option value="Targeted Participants">{t('requestModal.targetedParticipants')}</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                     <div className="pt-4 border-t border-slate-100">
                                         <h4 className="font-bold text-slate-800 mb-3">{t('requestModal.financeAllocation')}</h4>
                                         <div className="grid grid-cols-2 gap-3">

@@ -241,8 +241,8 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <input required type="text" value={vendor} onChange={e => setVendor(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" placeholder={t('form.vendorPlaceholder')} />
  </div>
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.location')}</label>
- <input type="text" value={location} onChange={e => setLocation(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" placeholder={t('form.locationPlaceholder')} />
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.location')} <span className="text-red-500">*</span></label>
+ <input required type="text" value={location} onChange={e => setLocation(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" placeholder={t('form.locationPlaceholder')} />
  </div>
  </div>
  <div>
@@ -355,6 +355,18 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <div className="flex items-center gap-2 text-gray-600">
  <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
  <span>{t('request.detailLocation')}: <span className="font-semibold text-gray-800">{req.location}</span></span>
+ </div>
+ )}
+ {req.training_gr_type && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Award className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailGriType')}: <span className="font-semibold text-gray-800">{t(`form.gri${req.training_gr_type === 'ESG' ? 'Esg' : req.training_gr_type === 'HSE' ? 'Hse' : 'Other'}`)}</span></span>
+ </div>
+ )}
+ {req.participation_type && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Award className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailParticipationType')}: <span className="font-semibold text-gray-800">{req.participation_type}</span></span>
  </div>
  )}
  {req.end_date && (

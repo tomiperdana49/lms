@@ -3530,7 +3530,7 @@ app.get('/api/external-training/hr', async (req, res) => {
 // 6. HR processes payment
 app.post('/api/external-training/hr-process', async (req, res) => {
     try {
-        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date, title, vendor, location, start_date, end_date, certification_result, incentive_reward, incentive_payment_type, hr_name } = req.body;
+        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date, title, vendor, location, start_date, end_date, certification_result, incentive_reward, incentive_payment_type, hr_name, training_gr_type, participation_type } = req.body;
         // datetime-local inputs send "YYYY-MM-DDTHH:MM"; MySQL DATETIME literals need a space instead of "T"
         const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
 
@@ -3580,6 +3580,14 @@ app.post('/api/external-training/hr-process', async (req, res) => {
         if (incentive_payment_type !== undefined) {
             sql += `, incentive_payment_type = ?`;
             params.push(incentive_payment_type || null);
+        }
+        if (training_gr_type !== undefined) {
+            sql += `, training_gr_type = ?`;
+            params.push(training_gr_type || null);
+        }
+        if (participation_type !== undefined) {
+            sql += `, participation_type = ?`;
+            params.push(participation_type || null);
         }
         sql += ` WHERE id = ?`;
         params.push(id);
@@ -3883,9 +3891,26 @@ app.put('/api/external-training/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Removes a locally-uploaded evidence file (skips external links like Google Drive) so deleting a
+// request doesn't leave orphaned files behind in UPLOADS_DIR.
+const deleteLocalUpload = (fileUrl) => {
+    if (!fileUrl || typeof fileUrl !== 'string') return;
+    const match = fileUrl.match(/^\/api\/uploads\/([^/?#]+)$/) || fileUrl.match(/^\/uploads\/([^/?#]+)$/);
+    if (!match) return;
+    const filePath = path.join(UPLOADS_DIR, match[1]);
+    fs.unlink(filePath, (err) => {
+        if (err && err.code !== 'ENOENT') console.error(`Failed to delete upload ${filePath}:`, err.message);
+    });
+};
+
 app.delete('/api/external-training/:id', async (req, res) => {
     try {
         const { id } = req.params;
+        const rows = await query('SELECT certificate_link, renewal_certificate_link FROM external_training_requests WHERE id = ?', [id]);
+        if (rows[0]) {
+            deleteLocalUpload(rows[0].certificate_link);
+            deleteLocalUpload(rows[0].renewal_certificate_link);
+        }
         await query('DELETE FROM external_training_requests WHERE id = ?', [id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
