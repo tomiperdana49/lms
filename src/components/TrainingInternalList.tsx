@@ -1464,7 +1464,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             // for the certificate's script webfont to finish loading so it doesn't fall back to a system font,
             // and for the background artwork to fully decode so html2canvas doesn't capture it mid-load (blurry).
             const preloadBg = new Image();
-            preloadBg.src = '/cert-internal-bg.png';
+            preloadBg.src = '/cert-internal-main.png';
             await Promise.all([
                 document.fonts.ready,
                 preloadBg.decode().catch(() => {}),

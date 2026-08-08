@@ -42,7 +42,7 @@ const InternalCertificateTemplate: React.FC<InternalCertificateTemplateProps> = 
                 id={`${elementId}-bg`}
                 className="absolute inset-0 z-0 pointer-events-none"
                 style={{
-                    backgroundImage: "url('/cert-internal-bg.png')",
+                    backgroundImage: "url('/cert-internal-main.png')",
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     backgroundRepeat: 'no-repeat'
