@@ -37,7 +37,7 @@ const InternalCertificateTemplate: React.FC<InternalCertificateTemplateProps> = 
             {/* --- BACKGROUND (logos + watermark) --- */}
             <div className="absolute inset-0 z-0 pointer-events-none">
                 <img
-                    src="/cert-internal-bg.png"
+                    src="/cert-internal-bg.jpg"
                     alt="Background"
                     className="w-full h-full object-cover"
                 />
