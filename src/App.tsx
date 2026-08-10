@@ -40,10 +40,22 @@ function App() {
 
   const [sessionExpiredReason, setSessionExpiredReason] = useState<'idle' | 'absolute' | null>(null);
 
+  // Deep links (e.g. from WhatsApp notifications) can force an initial page/tab via ?page=&tab=
+  const [deepLinkTab] = useState<string | null>(() => new URLSearchParams(window.location.search).get('tab'));
+
   const [activePage, setActivePage] = useState<Page>(() => {
+    const linkedPage = new URLSearchParams(window.location.search).get('page');
+    if (linkedPage) return linkedPage as Page;
     const savedPage = localStorage.getItem('lms_active_page');
     return (savedPage as Page) || 'dashboard';
   });
+
+  // Strip the deep-link query params once read, so they don't linger in the URL bar or get re-applied on refresh.
+  useEffect(() => {
+    if (window.location.search) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const [adminView, setAdminView] = useState<string>(() => {
     return localStorage.getItem('lms_admin_view') || 'overview';
@@ -278,9 +290,10 @@ function App() {
 
         {/* External Training (Unified Component) */}
         {activePage === 'external' && (
-          <ExternalTraining 
-            currentUser={user!} 
-            isManagementMode={userRole === 'HR' || userRole === 'HR_ADMIN'} 
+          <ExternalTraining
+            currentUser={user!}
+            isManagementMode={userRole === 'HR' || userRole === 'HR_ADMIN'}
+            defaultTab={deepLinkTab === 'team_approvals' ? 'team_approvals' : undefined}
           />
         )}
 
