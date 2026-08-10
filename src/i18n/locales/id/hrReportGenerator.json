@@ -20,7 +20,6 @@
     "internalTrainingColumn": "Pelatihan Internal",
     "readingIncentivesColumn": "Insentif Membaca",
     "externalTrainingColumn": "Pelatihan Eksternal",
-    "certIncentivesColumn": "Insentif Sertifikasi",
     "grandTotalColumn": "Total Keseluruhan",
     "ytdTotalRow": "TOTAL SEPANJANG TAHUN",
     "failedAlert": "Gagal mengekspor file Excel. Silakan coba lagi."
@@ -29,8 +28,6 @@
     "internalTraining": "Pelatihan Internal",
     "readingIncentive": "Insentif Membaca",
     "externalTraining": "Pelatihan Eksternal",
-    "certIncentiveOneTime": "Insentif Sertifikasi (Satu Kali)",
-    "certIncentiveRecurring": "Insentif Sertifikasi (Berulang)",
     "unknown": "Tidak Diketahui",
     "snackDetail": "Snack: {{amount}}",
     "lunchDetail": "Makan Siang: {{amount}}",
@@ -43,8 +40,7 @@
     "registrationDetail": "Registrasi: {{amount}}",
     "travelDetail": "Perjalanan: {{amount}}",
     "accommodationDetail": "Akomodasi: {{amount}}",
-    "miscDetail": "Lain-lain: {{amount}}",
-    "statusRewardDetail": "Status: {{status}} • Imbalan: {{amount}}"
+    "miscDetail": "Lain-lain: {{amount}}"
   },
   "header": {
     "title": "Generator Laporan HR",
@@ -62,8 +58,7 @@
   "categories": {
     "internal": "Internal",
     "external": "Eksternal",
-    "reading": "Membaca",
-    "cert": "Sertifikasi"
+    "reading": "Membaca"
   },
   "filters": {
     "allBranches": "SEMUA CABANG",
@@ -74,7 +69,6 @@
     "internal": "Internal",
     "reading": "Membaca",
     "external": "Eksternal",
-    "certInc": "Ins. Sertifikasi",
     "grandTotal": "Total Keseluruhan",
     "audit": "Audit",
     "ytdTotal": "TOTAL SEPANJANG TAHUN"

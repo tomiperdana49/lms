@@ -20,7 +20,6 @@
     "internalTrainingColumn": "Internal Training",
     "readingIncentivesColumn": "Reading Incentives",
     "externalTrainingColumn": "External Training",
-    "certIncentivesColumn": "Cert. Incentives",
     "grandTotalColumn": "Grand Total",
     "ytdTotalRow": "YTD TOTAL",
     "failedAlert": "Failed to export Excel file. Please try again."
@@ -29,8 +28,6 @@
     "internalTraining": "Internal Training",
     "readingIncentive": "Reading Incentive",
     "externalTraining": "External Training",
-    "certIncentiveOneTime": "Cert. Incentive (One-Time)",
-    "certIncentiveRecurring": "Cert. Incentive (Recurring)",
     "unknown": "Unknown",
     "snackDetail": "Snack: {{amount}}",
     "lunchDetail": "Lunch: {{amount}}",
@@ -43,8 +40,7 @@
     "registrationDetail": "Reg: {{amount}}",
     "travelDetail": "Travel: {{amount}}",
     "accommodationDetail": "Accomm: {{amount}}",
-    "miscDetail": "Misc: {{amount}}",
-    "statusRewardDetail": "Status: {{status}} • Reward: {{amount}}"
+    "miscDetail": "Misc: {{amount}}"
   },
   "header": {
     "title": "HR Report Generator",
@@ -62,8 +58,7 @@
   "categories": {
     "internal": "Internal",
     "external": "External",
-    "reading": "Reading",
-    "cert": "Cert."
+    "reading": "Reading"
   },
   "filters": {
     "allBranches": "ALL BRANCHES",
@@ -74,7 +69,6 @@
     "internal": "Internal",
     "reading": "Reading",
     "external": "External",
-    "certInc": "Cert. Inc",
     "grandTotal": "Grand Total",
     "audit": "Audit",
     "ytdTotal": "YTD TOTAL"

@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { LogIn, Lock, Mail } from 'lucide-react';
+import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { jwtDecode } from "jwt-decode";
 import { useTranslation } from 'react-i18next';
@@ -18,6 +18,7 @@ const LoginPage = ({ onLogin, sessionExpiredReason, onSessionExpiredReasonShown 
     const { t } = useTranslation('loginPage');
     const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
     // Notification State
@@ -125,7 +126,13 @@ const LoginPage = ({ onLogin, sessionExpiredReason, onSessionExpiredReasonShown 
             <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
                 <div className="bg-blue-600 p-8 text-center">
                     <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-                        <LogIn className="text-white" size={32} />
+                        <svg viewBox="0 0 64 64" className="w-9 h-9 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="8" y="16" width="48" height="32" rx="4" />
+                            <path d="M24 56h16M32 48v8" />
+                            <path d="M32 10l16 6-16 6-16-6z" />
+                            <path d="M20 18v6c0 2 5 4 12 4s12-2 12-4v-6" />
+                            <text x="32" y="37" textAnchor="middle" fontSize="12" fontWeight="700" fill="currentColor" stroke="none" fontFamily="Arial, sans-serif">LMS</text>
+                        </svg>
                     </div>
                     <h1 className="text-2xl font-bold text-white tracking-wider">{t('title')}</h1>
                     <p className="text-blue-100 text-sm mt-1">{t('subtitle')}</p>
@@ -153,13 +160,22 @@ const LoginPage = ({ onLogin, sessionExpiredReason, onSessionExpiredReasonShown 
                             <div className="relative">
                                 <Lock className="absolute left-3 top-3 text-slate-400" size={18} />
                                 <input
-                                    type="password"
+                                    type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    className="w-full pl-10 pr-11 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
                                     placeholder="••••••••"
                                     required
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(prev => !prev)}
+                                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                                    tabIndex={-1}
+                                    aria-label={showPassword ? t('hidePassword') : t('showPassword')}
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
                             </div>
                         </div>
 

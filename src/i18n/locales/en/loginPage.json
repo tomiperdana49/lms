@@ -4,6 +4,8 @@
   "emailLabel": "Email",
   "emailPlaceholder": "Email",
   "passwordLabel": "Password",
+  "showPassword": "Show password",
+  "hidePassword": "Hide password",
   "signIn": "Sign In",
   "signingIn": "Signing in...",
   "orContinueWith": "Or continue with",

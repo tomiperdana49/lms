@@ -25,8 +25,7 @@
     "reportHeader": "REPORT",
     "readingLog": "Reading Log",
     "quizReport": "Quiz Report",
-    "hrReport": "HR Report",
-    "incentives": "Incentives"
+    "hrReport": "HR Report"
   },
   "notifications": {
     "title": "Notifications",

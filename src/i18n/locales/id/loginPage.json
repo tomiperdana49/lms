@@ -4,6 +4,8 @@
   "emailLabel": "Email",
   "emailPlaceholder": "Email",
   "passwordLabel": "Kata Sandi",
+  "showPassword": "Tampilkan kata sandi",
+  "hidePassword": "Sembunyikan kata sandi",
   "signIn": "Masuk",
   "signingIn": "Sedang masuk...",
   "orContinueWith": "Atau lanjutkan dengan",

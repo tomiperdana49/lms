@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Download, Layers, Eye, XCircle, RefreshCw, Filter, Calendar, Building2, TrendingUp, DollarSign, PieChart } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
-import type { TrainingRequest, Meeting, Incentive, ReadingLogEntry } from '../types';
+import type { TrainingRequest, Meeting, ReadingLogEntry } from '../types';
 import * as XLSX from 'xlsx';
 
 const HRReportGenerator = () => {
@@ -11,7 +11,6 @@ const HRReportGenerator = () => {
     const [requests, setRequests] = useState<TrainingRequest[]>([]);
     const [externalRequests, setExternalRequests] = useState<any[]>([]);
     const [meetings, setMeetings] = useState<Meeting[]>([]);
-    const [incentives, setIncentives] = useState<Incentive[]>([]);
     const [logs, setLogs] = useState<ReadingLogEntry[]>([]);
     const [employees, setEmployees] = useState<any[]>([]);
 
@@ -33,10 +32,9 @@ const HRReportGenerator = () => {
     const fetchData = async () => {
         setRefreshing(true);
         try {
-            const [reqRes, meetRes, incRes, logsRes, empRes, extRes] = await Promise.all([
+            const [reqRes, meetRes, logsRes, empRes, extRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/api/training`),
                 fetch(`${API_BASE_URL}/api/meetings`),
-                fetch(`${API_BASE_URL}/api/incentives`),
                 fetch(`${API_BASE_URL}/api/logs`),
                 fetch(`${API_BASE_URL}/api/employees`),
                 fetch(`${API_BASE_URL}/api/external-training/all`)
@@ -44,7 +42,6 @@ const HRReportGenerator = () => {
 
             if (reqRes.ok) setRequests(await reqRes.json());
             if (meetRes.ok) setMeetings(await meetRes.json());
-            if (incRes.ok) setIncentives(await incRes.json());
             if (logsRes.ok) setLogs(await logsRes.json());
             if (empRes.ok) setEmployees(await empRes.json());
             if (extRes.ok) setExternalRequests(await extRes.json());
@@ -125,7 +122,6 @@ const HRReportGenerator = () => {
         let internalTraining = 0;
         let readingIncentive = 0;
         let externalTraining = 0;
-        let certIncentive = 0;
 
         const { start, end } = getPeriodRange(year, idx);
         const range = { start, end };
@@ -166,31 +162,12 @@ const HRReportGenerator = () => {
             }
         });
 
-        incentives.filter(i => ['Active', 'Paid'].includes(i.status)).forEach(i => {
-            if (!matchesBranch(i.employee_id)) return;
-            const isOneTime = i.paymentType === 'One-Time';
-            const iStart = new Date(i.startDate);
-            const iEnd = new Date(i.endDate);
-            const dateToUse = i.approvedDate ? new Date(i.approvedDate) : iStart;
-
-            if (isOneTime) {
-                if (isInPeriod(dateToUse.toISOString(), range)) {
-                    certIncentive += safeNum(i.reward);
-                }
-            } else {
-                if (range.start <= iEnd && range.end >= iStart) {
-                    certIncentive += safeNum(i.reward);
-                }
-            }
-        });
-
         return {
             month: monthName,
             internalTraining,
             readingIncentive,
             externalTraining,
-            certIncentive,
-            total: internalTraining + readingIncentive + externalTraining + certIncentive
+            total: internalTraining + readingIncentive + externalTraining
         };
     });
 
@@ -200,8 +177,7 @@ const HRReportGenerator = () => {
     const topCategory = [
         { label: t('categories.internal'), val: monthlyData.reduce((s, m) => s + m.internalTraining, 0) },
         { label: t('categories.external'), val: monthlyData.reduce((s, m) => s + m.externalTraining, 0) },
-        { label: t('categories.reading'), val: monthlyData.reduce((s, m) => s + m.readingIncentive, 0) },
-        { label: t('categories.cert'), val: monthlyData.reduce((s, m) => s + m.certIncentive, 0) }
+        { label: t('categories.reading'), val: monthlyData.reduce((s, m) => s + m.readingIncentive, 0) }
     ].sort((a, b) => b.val - a.val)[0];
 
     // Detail Data Generator
@@ -300,32 +276,6 @@ const HRReportGenerator = () => {
             }
         });
 
-        incentives.filter(i => ['Active', 'Paid'].includes(i.status)).forEach(i => {
-            if (!matchesBranch(i.employee_id)) return;
-            const isOneTime = i.paymentType === 'One-Time';
-            const iStart = new Date(i.startDate);
-            const iEnd = new Date(i.endDate);
-            const dateToUse = i.approvedDate ? new Date(i.approvedDate) : iStart;
-
-            let shouldInclude = false;
-            if (isOneTime) {
-                shouldInclude = isInPeriod(dateToUse.toISOString(), range);
-            } else {
-                shouldInclude = range.start <= iEnd && range.end >= iStart;
-            }
-
-            if (shouldInclude) {
-                txs.push({
-                    date: isOneTime ? dateToUse.toISOString() : range.end.toISOString(),
-                    category: `Cert. Incentive (${isOneTime ? 'One-Time' : 'Recurring'})`,
-                    item: i.courseName,
-                    pic: i.employeeName,
-                    details: t('transactions.statusRewardDetail', { status: i.status, amount: formatCurrency(safeNum(i.reward)) }),
-                    amount: safeNum(i.reward)
-                });
-            }
-        });
-
         return txs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     };
 
@@ -335,9 +285,6 @@ const HRReportGenerator = () => {
         if (category === 'Internal Training') return t('transactions.internalTraining');
         if (category === 'Reading Incentive') return t('transactions.readingIncentive');
         if (category === 'External Training') return t('transactions.externalTraining');
-        if (category.startsWith('Cert. Incentive')) {
-            return category.includes('One-Time') ? t('transactions.certIncentiveOneTime') : t('transactions.certIncentiveRecurring');
-        }
         return category;
     };
 
@@ -346,7 +293,6 @@ const HRReportGenerator = () => {
             const totalInternal = monthlyData.reduce((a, b) => a + b.internalTraining, 0);
             const totalReading = monthlyData.reduce((a, b) => a + b.readingIncentive, 0);
             const totalExternal = monthlyData.reduce((a, b) => a + b.externalTraining, 0);
-            const totalCert = monthlyData.reduce((a, b) => a + b.certIncentive, 0);
             const totalGrand = monthlyData.reduce((a, b) => a + b.total, 0);
 
             const noCol = t('export.noColumn');
@@ -354,7 +300,6 @@ const HRReportGenerator = () => {
             const internalCol = t('export.internalTrainingColumn');
             const readingCol = t('export.readingIncentivesColumn');
             const externalCol = t('export.externalTrainingColumn');
-            const certCol = t('export.certIncentivesColumn');
             const grandTotalCol = t('export.grandTotalColumn');
 
             const dataToExport = [
@@ -364,7 +309,6 @@ const HRReportGenerator = () => {
                     [internalCol]: row.internalTraining,
                     [readingCol]: row.readingIncentive,
                     [externalCol]: row.externalTraining,
-                    [certCol]: row.certIncentive,
                     [grandTotalCol]: row.total
                 })),
                 {
@@ -373,7 +317,6 @@ const HRReportGenerator = () => {
                     [internalCol]: totalInternal,
                     [readingCol]: totalReading,
                     [externalCol]: totalExternal,
-                    [certCol]: totalCert,
                     [grandTotalCol]: totalGrand
                 }
             ];
@@ -386,7 +329,6 @@ const HRReportGenerator = () => {
                 { wch: 22 },  // Internal Training
                 { wch: 22 },  // Reading Incentives
                 { wch: 22 },  // External Training
-                { wch: 22 },  // Cert. Incentives
                 { wch: 22 }   // Grand Total
             ];
             ws['!cols'] = colsWidths;
@@ -498,7 +440,6 @@ const HRReportGenerator = () => {
                             <th className="px-5 py-5 text-right">{t('table.internal')}</th>
                             <th className="px-5 py-5 text-right">{t('table.reading')}</th>
                             <th className="px-5 py-5 text-right">{t('table.external')}</th>
-                            <th className="px-5 py-5 text-right">{t('table.certInc')}</th>
                             <th className="px-5 py-5 text-right bg-indigo-50/50 text-indigo-700 w-[160px]">{t('table.grandTotal')}</th>
                             <th className="px-5 py-5 text-center w-[80px]">{t('table.audit')}</th>
                         </tr>
@@ -517,9 +458,6 @@ const HRReportGenerator = () => {
                                 </td>
                                 <td className="px-5 py-4 text-right font-mono text-slate-500 font-bold text-[11px]">
                                     {row.externalTraining > 0 ? formatCurrency(row.externalTraining) : <span className="opacity-20">-</span>}
-                                </td>
-                                <td className="px-5 py-4 text-right font-mono text-slate-500 font-bold text-[11px]">
-                                    {row.certIncentive > 0 ? formatCurrency(row.certIncentive) : <span className="opacity-20">-</span>}
                                 </td>
                                 <td className="px-5 py-4 text-right font-mono text-slate-900 font-black text-xs bg-indigo-50/20">
                                     {formatCurrency(row.total)}
@@ -541,7 +479,6 @@ const HRReportGenerator = () => {
                             <td className="px-5 py-6 text-right text-[10px]">{formatCurrency(monthlyData.reduce((a, b) => a + b.internalTraining, 0))}</td>
                             <td className="px-5 py-6 text-right text-[10px]">{formatCurrency(monthlyData.reduce((a, b) => a + b.readingIncentive, 0))}</td>
                             <td className="px-5 py-6 text-right text-[10px]">{formatCurrency(monthlyData.reduce((a, b) => a + b.externalTraining, 0))}</td>
-                            <td className="px-5 py-6 text-right text-[10px]">{formatCurrency(monthlyData.reduce((a, b) => a + b.certIncentive, 0))}</td>
                             <td className="px-5 py-6 text-right text-sm font-black bg-indigo-600">{formatCurrency(totalYTD)}</td>
                             <td></td>
                         </tr>

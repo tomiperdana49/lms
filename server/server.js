@@ -759,23 +759,10 @@ app.post('/api/login', async (req, res) => {
 
         console.log(`[LOGIN ATTEMPT] Value: '${loginId}'`);
 
-        // --- DEBUG BYPASS start ---
-        if (loginId === 'staff@nusa.com' && cleanPassword === '123') {
-            return res.json({ success: true, user: { id: 'demo1', name: 'Demo Staff', role: 'STAFF', email: 'staff@nusa.com', branch: 'Headquarters' } });
-        }
-        if (loginId === 'hr@nusa.com' && cleanPassword === '123') {
-            return res.json({ success: true, user: { id: 'demo3', name: 'Demo HR', role: 'HR', email: 'hr@nusa.com', branch: 'Headquarters' } });
-        }
-        if (loginId === 'spv@nusa.com' && cleanPassword === '123') {
-            return res.json({ success: true, user: { id: 'demo2', name: 'Demo Supervisor', role: 'SUPERVISOR', email: 'spv@nusa.com', branch: 'Headquarters' } });
-        }
-        // --- DEBUG BYPASS end ---
-
         // Domain restriction check for email logins
         if (loginId.includes('@')) {
-            const isDemoBypass = loginId.endsWith('@nusa.com');
             const isCorporate = loginId.endsWith('@nusawork.com') || loginId.endsWith('@nusa.id');
-            if (!isDemoBypass && !isCorporate) {
+            if (!isCorporate) {
                 return res.status(403).json({ success: false, message: 'Access Restricted: Only @nusa.id or @nusawork.com emails are allowed.' });
             }
         }

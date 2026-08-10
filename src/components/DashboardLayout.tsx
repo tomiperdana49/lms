@@ -230,7 +230,6 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { icon: Library, label: t('admin.readingLog'), id: 'admin-dashboard', view: 'logs' },
         { icon: Award, label: t('admin.quizReport'), id: 'admin-dashboard', view: 'quiz-reports' },
         { icon: TrendingUp, label: t('admin.hrReport'), id: 'admin-dashboard', view: 'reports' },
-        ...(config?.moduleIncentive ? [{ icon: Award, label: t('admin.incentives'), id: 'admin-dashboard', view: 'incentives' }] : []),
     ];
 
     const menuItems = [
