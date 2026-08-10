@@ -677,7 +677,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                 <p className="text-blue-100/80 font-medium">{t('stats.journeySubtitle')}</p>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-1 min-w-[520px] max-w-4xl">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-1 md:min-w-[520px] max-w-4xl">
                                 {/* Card 1: Books Count */}
                                 <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all h-full flex flex-col">
                                     <div className="flex items-start gap-3 mb-3">

@@ -156,7 +156,7 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
                     </div>
 
                     {/* Quick Stats Bar */}
-                    <div className="grid grid-cols-2 gap-4 w-full md:w-auto md:mr-12 lg:mr-24 md:min-w-[320px]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full md:w-auto md:mr-12 lg:mr-24 md:min-w-[320px]">
                         <button
                             type="button"
                             onClick={() => setDetailModal('hours')}
