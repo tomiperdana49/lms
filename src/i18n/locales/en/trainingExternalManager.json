@@ -14,10 +14,6 @@
     "title": "External Training Manager",
     "subtitle": "Nusa LMS • Enterprise Request Governance"
   },
-  "viewSwitcher": {
-    "list": "LIST VIEW",
-    "recap": "RECAPITULATION"
-  },
   "stats": {
     "totalInvestment": "Total Investment",
     "pendingApproval": "Pending Approval",
@@ -48,15 +44,6 @@
     "month": "month",
     "certificateOriginal": "Original",
     "certificateRenewed": "Renewed"
-  },
-  "recapTable": {
-    "professionalEntity": "Professional Entity",
-    "requests": "Requests",
-    "approved": "Approved",
-    "totalInvestment": "Total Investment",
-    "actionHub": "Action Hub",
-    "enrollments": "{{count}} Enrollments",
-    "viewDossier": "VIEW DOSSIER"
   },
   "requestModal": {
     "dateRange": "Dates: {{start}} to {{end}}",
@@ -117,17 +104,6 @@
     "reject": "Reject",
     "approveRequest": "Approve Request",
     "updateSettlement": "Update Settlement"
-  },
-  "recapDetailModal": {
-    "archiveTitle": "{{name}} • Training Archive",
-    "date": "Date",
-    "trainingTitle": "Training Title",
-    "vendor": "Vendor",
-    "investment": "Investment",
-    "adjustment": "Adjustment",
-    "netTotal": "Net Total",
-    "status": "Status",
-    "closeArchive": "CLOSE ARCHIVE"
   },
   "settlementModal": {
     "title": "Cost Allocation",

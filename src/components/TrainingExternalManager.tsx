@@ -8,18 +8,21 @@ import {
     Calendar,
     Trash2,
     Filter,
-    TrendingUp,
     Users,
     Clock,
     Briefcase,
     Link,
     Award,
-    AlertTriangle
+    AlertTriangle,
+    Download
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { TrainingRequest } from '../types';
 import ConfirmationModal from './ConfirmationModal';
+
+const INDONESIAN_MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
 const resolveFileUrl = (link?: string | null) => {
     if (!link) return undefined;
@@ -57,7 +60,6 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     const [employees, setEmployees] = useState<any[]>([]);
 
     // --- Filter State ---
-    const [viewMode, setViewMode] = useState<'list' | 'recap'>('list');
     const [selectedYear, setSelectedYear] = useState<number | 'All'>(new Date().getFullYear());
     const [selectedPeriod, setSelectedPeriod] = useState<string>('All Year');
     const [selectedBranch, setSelectedBranch] = useState<string>('All Branches');
@@ -163,7 +165,6 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     const [hrCertificateFile, setHrCertificateFile] = useState<File | null>(null);
     const [hrCertificateExpiryDate, setHrCertificateExpiryDate] = useState('');
     const [hrCertificationResult, setHrCertificationResult] = useState<'Passed' | 'Not Passed'>('Passed');
-    const [recapDetailUser, setRecapDetailUser] = useState<string | null>(null);
 
     // Certificate Renewal State (HR-only: extends an already-processed certificate's expiry date)
     const [renewTarget, setRenewTarget] = useState<TrainingRequest | null>(null);
@@ -570,77 +571,75 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
         } catch (err) { console.error(err); }
     };
 
-    const getUserRecap = () => {
-        const [start, end] = getPeriodDates();
-        const userGroups: Record<string, TrainingRequest[]> = {};
-
-        requests.forEach(req => {
-            const d = new Date(req.date);
-            if (selectedYear !== 'All' && d.getFullYear() !== selectedYear) return;
-            if (d < start || d > end) return;
-
-            const emp = employees.find(e =>
-                (req.employee_id && e.id_employee === req.employee_id) ||
-                (req.employeeName && e.full_name && e.full_name.trim().toLowerCase() === req.employeeName.trim().toLowerCase())
-            );
-
-            // If the logged-in user is a supervisor (and not HR), only include requests of their subordinates
-            if (userRole === 'SUPERVISOR' && user && !user.role.includes('HR')) {
-                if (!emp) return;
-                const supervisorId = user.employee_id || '___INVALID___';
-                const supervisorName = user.name || '___INVALID___';
-                const supervisorEmailPrefix = user.email ? user.email.split('@')[0] : '___INVALID___';
-                const supervisorEmail = user.email || '___INVALID___';
-                const reportsTo = emp.id_report_to;
-                if (!reportsTo) return;
-
-                const isMySubordinate = 
-                    reportsTo === supervisorId || 
-                    reportsTo === supervisorName || 
-                    reportsTo.toLowerCase() === supervisorEmailPrefix.toLowerCase() || 
-                    reportsTo.toLowerCase() === supervisorEmail.toLowerCase();
-
-                if (!isMySubordinate) return;
-            }
-
-            const empBranch = emp?.branch_name || 'Others';
-
-            if (selectedBranch !== 'All Branches' && empBranch !== selectedBranch) return;
-
-            const searchLower = searchQuery.toLowerCase();
-            if (searchQuery &&
-                !req.employeeName.toLowerCase().includes(searchLower) &&
-                !req.title.toLowerCase().includes(searchLower)) return;
-
-            const name = req.employeeName;
-            if (!userGroups[name]) userGroups[name] = [];
-            userGroups[name].push(req);
-        });
-
-        return Object.entries(userGroups).map(([name, items]) => {
-            const totalRequests = items.length;
-            const approvedRequests = items.filter(i => i.status === 'APPROVED').length;
-            const totalCost = items.reduce((sum, i) => {
-                if (i.status !== 'APPROVED') return sum;
-                return sum + (Number(i.cost) || 0) + (Number(i.additionalCost) || 0);
-            }, 0);
-
-            return {
-                name,
-                totalRequests,
-                approvedRequests,
-                totalCost,
-                requests: items
-            };
-        }).sort((a, b) => b.totalCost - a.totalCost);
-    };
-
     // --- Statistics ---
     const stats = {
         totalBudget: filteredRequests.reduce((sum, r) => r.status === 'APPROVED' ? sum + (Number(r.cost) || 0) : sum, 0),
         pendingCount: filteredRequests.filter(r => r.status.startsWith('PENDING')).length,
         approvedCount: filteredRequests.filter(r => r.status === 'APPROVED').length,
         averageCost: filteredRequests.length ? filteredRequests.reduce((sum, r) => sum + (Number(r.cost) || 0), 0) / filteredRequests.length : 0
+    };
+
+    // Export HR-processed ("APPROVED" in this component's vocabulary, i.e. DB status = 'Processed') requests
+    // that are currently visible under the active year/period/branch/search filters.
+    const handleExportProcessed = () => {
+        const processedRequests = filteredRequests.filter(r => r.status === 'APPROVED');
+
+        const formatExportDate = (value?: string | null) => {
+            if (!value) return '';
+            const d = new Date(value);
+            if (isNaN(d.getTime())) return '';
+            return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+        };
+
+        const rows = processedRequests.map(req => {
+            const raw = req._original || {};
+            const startDate = raw.start_date ? new Date(raw.start_date) : null;
+            const endDate = raw.end_date ? new Date(raw.end_date) : null;
+
+            let trainingHours: number | string = '';
+            if (startDate && endDate && !isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+                const dayCount = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                trainingHours = dayCount > 0 ? dayCount * 8 : '';
+            }
+
+            const totalCost = (Number(req.costTraining) || 0) + (Number(req.costTransport) || 0) + (Number(req.costAccommodation) || 0) + (Number(req.costOthers) || 0);
+
+            return {
+                'Periode Bulan': startDate ? INDONESIAN_MONTHS[startDate.getMonth()] : '',
+                'Start Time': formatExportDate(raw.start_date),
+                'End Time': formatExportDate(raw.end_date),
+                'Kategori': raw.category || req.employeeRole || '',
+                'Judul': req.title || '',
+                'Penyelenggara / Vendor': req.vendor || '',
+                'Sertifikat': raw.certificate_link ? resolveFileUrl(raw.certificate_link) : '',
+                'expired sertifikat': formatExportDate(raw.certificate_expiry_date),
+                'Employee ID': req.employee_id || '',
+                'Peserta': req.employeeName || '',
+                'Biaya Training/Trainer': Number(req.costTraining) || 0,
+                'Biaya Transportasi': Number(req.costTransport) || 0,
+                'Biaya Akomodasi': Number(req.costAccommodation) || 0,
+                'Biaya Lain-lain': Number(req.costOthers) || 0,
+                'Total Biaya': totalCost,
+                'Budget Learning per orang': Math.round(totalCost / 2),
+                'Training Type': 'External',
+                'Insentive sertifikat/bulan': req.incentivePaymentType === 'Recurring' ? (Number(req.incentiveReward) || 0) : '',
+                'Training Hours': trainingHours,
+                'Participation Type': raw.participation_type || '',
+                'ESG, HSE, Other': raw.training_gr_type || ''
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws['!cols'] = [
+            { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 24 }, { wch: 24 },
+            { wch: 20 }, { wch: 16 }, { wch: 12 }, { wch: 22 }, { wch: 16 }, { wch: 16 },
+            { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 18 },
+            { wch: 14 }, { wch: 18 }, { wch: 14 }
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'External Training');
+        const periodLabel = selectedYear === 'All' ? 'AllYears' : String(selectedYear);
+        XLSX.writeFile(wb, `External_Training_Processed_${periodLabel}.xlsx`);
     };
 
     return (
@@ -652,18 +651,13 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1">{t('header.subtitle')}</p>
                 </div>
 
-                <div className="flex items-center gap-4 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-3">
                     <button
-                        onClick={() => setViewMode('list')}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all ${viewMode === 'list' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600'}`}
+                        onClick={handleExportProcessed}
+                        title="Export data training yang sudah diproses HR ke Excel"
+                        className="flex items-center gap-2 px-5 py-[15px] rounded-2xl text-xs font-black tracking-widest bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 transition-all"
                     >
-                        <Clock size={16} /> {t('viewSwitcher.list')}
-                    </button>
-                    <button
-                        onClick={() => setViewMode('recap')}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all ${viewMode === 'recap' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                        <TrendingUp size={16} /> {t('viewSwitcher.recap')}
+                        <Download size={16} /> EXPORT
                     </button>
                 </div>
             </div>
@@ -685,7 +679,6 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                             disabled={!isClickable}
                             onClick={() => {
                                 if (!isClickable) return;
-                                setViewMode('list');
                                 setStatusDrilldown(prev => prev === stat.filter ? null : stat.filter);
                             }}
                             className={`bg-white p-6 rounded-[32px] border shadow-sm flex items-center gap-5 group transition-all duration-300 text-left ${
@@ -775,8 +768,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                 </div>
             </div>
 
-            {viewMode === 'list' ? (
-                <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 gap-4">
                     {visibleRequests.length === 0 ? (
                         <div className="bg-white p-20 rounded-[40px] border border-slate-100 flex flex-col items-center gap-3">
                             <div className="w-16 h-16 rounded-3xl bg-slate-50 flex items-center justify-center text-slate-200">
@@ -914,52 +906,6 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                         ))
                     )}
                 </div>
-            ) : (
-                <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden">
-                    <table className="w-full text-left">
-                        <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                            <tr>
-                                <th className="px-10 py-6">{t('recapTable.professionalEntity')}</th>
-                                <th className="px-10 py-6 text-center">{t('recapTable.requests')}</th>
-                                <th className="px-10 py-6 text-center">{t('recapTable.approved')}</th>
-                                <th className="px-10 py-6 text-right">{t('recapTable.totalInvestment')}</th>
-                                <th className="px-10 py-6 text-center">{t('recapTable.actionHub')}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                            {getUserRecap().map((stat, idx) => (
-                                <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-10 py-6">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-[18px] bg-indigo-100 text-indigo-700 flex items-center justify-center font-black text-lg shadow-inner">
-                                                {stat.name.charAt(0)}
-                                            </div>
-                                            <p className="font-black text-slate-800 text-base">{stat.name}</p>
-                                        </div>
-                                    </td>
-                                    <td className="px-10 py-6 text-center font-black text-slate-600">{stat.totalRequests}</td>
-                                    <td className="px-10 py-6 text-center">
-                                        <span className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest">
-                                            {t('recapTable.enrollments', { count: stat.approvedRequests })}
-                                        </span>
-                                    </td>
-                                    <td className="px-10 py-6 text-right font-mono text-slate-900 font-black text-base">
-                                        {formatCurrency(stat.totalCost)}
-                                    </td>
-                                    <td className="px-10 py-6 text-center">
-                                        <button
-                                            onClick={() => setRecapDetailUser(stat.name)}
-                                            className="px-6 py-2.5 bg-white border border-slate-200 text-slate-600 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 rounded-2xl text-[10px] font-black tracking-widest transition-all shadow-sm"
-                                        >
-                                            {t('recapTable.viewDossier')}
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
 
             {/* Modal Components */}
             {selectedRequest && (() => {
@@ -1218,67 +1164,6 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     </div>
                 </div>
                 ); })()}
-
-            {/* Recap Detail Modal */}
-            {recapDetailUser && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[90vh]">
-                        <div className="p-6 sm:p-5 border-b border-slate-50 flex justify-between items-center bg-white">
-                            <div>
-                                <h2 className="font-black text-2xl text-slate-900 tracking-tight flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center"><FileText size={20} /></div>
-                                    {t('recapDetailModal.archiveTitle', { name: recapDetailUser })}
-                                </h2>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 ml-14">{selectedPeriod} • {selectedYear}</p>
-                            </div>
-                            <button onClick={() => setRecapDetailUser(null)} className="p-4 hover:bg-slate-100 rounded-lg text-slate-300 transition-colors"><XCircle size={24} /></button>
-                        </div>
-
-                        <div className="overflow-y-auto p-6 sm:p-5">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                                    <tr>
-                                        <th className="px-6 py-4">{t('recapDetailModal.date')}</th>
-                                        <th className="px-6 py-4">{t('recapDetailModal.trainingTitle')}</th>
-                                        <th className="px-6 py-4">{t('recapDetailModal.vendor')}</th>
-                                        <th className="px-6 py-4 text-right">{t('recapDetailModal.investment')}</th>
-                                        <th className="px-6 py-4 text-right">{t('recapDetailModal.adjustment')}</th>
-                                        <th className="px-6 py-4 text-right">{t('recapDetailModal.netTotal')}</th>
-                                        <th className="px-6 py-4 text-center">{t('recapDetailModal.status')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {getUserRecap().find(u => u.name === recapDetailUser)?.requests.map((r) => (
-                                        <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="px-6 py-4 text-slate-400 text-xs font-bold">{new Date(r.date).toLocaleDateString()}</td>
-                                            <td className="px-6 py-4 font-black text-slate-800">{r.title}</td>
-                                            <td className="px-6 py-4 text-slate-500 font-bold text-xs">{r.vendor}</td>
-                                            <td className="px-6 py-4 text-right font-mono text-slate-400 font-bold text-xs">
-                                                {formatCurrency(Number(r.cost) || 0)}
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-mono text-rose-500 font-bold text-xs">
-                                                {(Number(r.additionalCost) || 0) > 0 ? formatCurrency(Number(r.additionalCost) || 0) : '-'}
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-mono text-slate-900 font-black">
-                                                {formatCurrency((Number(r.cost) || 0) + (Number(r.additionalCost) || 0))}
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <StatusBadge status={r.status} />
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div className="p-6 border-t border-slate-50 bg-slate-50/50 text-right">
-                            <button onClick={() => setRecapDetailUser(null)} className="px-10 py-4 bg-white border border-slate-200 text-slate-600 font-black rounded-lg hover:bg-slate-100 transition-all text-xs tracking-widest shadow-sm">
-                                {t('recapDetailModal.closeArchive')}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Settlement Modal */}
             {isSettlementOpen && (

@@ -14,10 +14,6 @@
     "title": "Manajer Pelatihan Eksternal",
     "subtitle": "Nusa LMS • Tata Kelola Permintaan Enterprise"
   },
-  "viewSwitcher": {
-    "list": "TAMPILAN DAFTAR",
-    "recap": "REKAPITULASI"
-  },
   "stats": {
     "totalInvestment": "Total Investasi",
     "pendingApproval": "Menunggu Persetujuan",
@@ -48,15 +44,6 @@
     "month": "bulan",
     "certificateOriginal": "Asli",
     "certificateRenewed": "Perpanjangan"
-  },
-  "recapTable": {
-    "professionalEntity": "Entitas Profesional",
-    "requests": "Permintaan",
-    "approved": "Disetujui",
-    "totalInvestment": "Total Investasi",
-    "actionHub": "Pusat Aksi",
-    "enrollments": "{{count}} Pendaftaran",
-    "viewDossier": "LIHAT BERKAS"
   },
   "requestModal": {
     "dateRange": "Tanggal: {{start}} sampai {{end}}",
@@ -117,17 +104,6 @@
     "reject": "Tolak",
     "approveRequest": "Setujui Permintaan",
     "updateSettlement": "Perbarui Penyelesaian"
-  },
-  "recapDetailModal": {
-    "archiveTitle": "{{name}} • Arsip Pelatihan",
-    "date": "Tanggal",
-    "trainingTitle": "Judul Pelatihan",
-    "vendor": "Vendor",
-    "investment": "Investasi",
-    "adjustment": "Penyesuaian",
-    "netTotal": "Total Bersih",
-    "status": "Status",
-    "closeArchive": "TUTUP ARSIP"
   },
   "settlementModal": {
     "title": "Alokasi Biaya",
