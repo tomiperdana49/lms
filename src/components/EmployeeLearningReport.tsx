@@ -43,8 +43,8 @@ const EmployeeLearningReport = () => {
         }
         setStatsLoading(true);
         const params = new URLSearchParams();
+        if (selectedEmployee.id_employee) params.set('employee_id', selectedEmployee.id_employee);
         if (selectedEmployee.email) params.set('email', selectedEmployee.email);
-        else params.set('employee_id', selectedEmployee.id_employee);
         if (startDate) params.set('startDate', startDate);
         if (endDate) params.set('endDate', endDate);
         fetch(`${API_BASE_URL}/api/learning-stats?${params.toString()}`)

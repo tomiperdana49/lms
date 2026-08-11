@@ -197,9 +197,9 @@ const LearningReport = ({ userEmail, userName, userEmployeeId, isSupervisor }: L
 
             const fetchMemberStats = async (email?: string, employeeId?: string): Promise<LearningStats> => {
                 const memberParams = new URLSearchParams(rangeParams);
+                if (employeeId) memberParams.set('employee_id', employeeId);
                 if (email) memberParams.set('email', email);
-                else if (employeeId) memberParams.set('employee_id', employeeId);
-                else return EMPTY_STATS;
+                if (!employeeId && !email) return EMPTY_STATS;
                 try {
                     const r = await fetch(`${API_BASE_URL}/api/learning-stats?${memberParams.toString()}`);
                     const data = await r.json();
