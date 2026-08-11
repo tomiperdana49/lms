@@ -25,7 +25,8 @@
     "reportHeader": "LAPORAN",
     "readingLog": "Log Bacaan",
     "quizReport": "Laporan Kuis",
-    "hrReport": "Laporan HR"
+    "hrReport": "Laporan HR",
+    "employeeLearningReport": "Laporan Pembelajaran Karyawan"
   },
   "notifications": {
     "title": "Notifikasi",

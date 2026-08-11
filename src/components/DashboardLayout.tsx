@@ -19,7 +19,8 @@ import {
     CheckCircle,
     AlertCircle,
     FileText,
-    Globe
+    Globe,
+    UsersRound
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Page, Role, User } from '../types';
@@ -230,6 +231,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { icon: Library, label: t('admin.readingLog'), id: 'admin-dashboard', view: 'logs' },
         { icon: Award, label: t('admin.quizReport'), id: 'admin-dashboard', view: 'quiz-reports' },
         { icon: TrendingUp, label: t('admin.hrReport'), id: 'admin-dashboard', view: 'reports' },
+        { icon: UsersRound, label: t('admin.employeeLearningReport'), id: 'admin-dashboard', view: 'employee-learning-report' },
     ];
 
     const menuItems = [

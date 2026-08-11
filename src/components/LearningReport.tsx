@@ -18,7 +18,7 @@ interface LearningStatDetail {
     certificateLink?: string | null;
 }
 
-interface LearningStats {
+export interface LearningStats {
     totalJam: number;
     totalBiaya: number;
     jamTraining: number;
@@ -34,7 +34,7 @@ interface LearningStats {
     bookDetails: LearningStatDetail[];
 }
 
-const EMPTY_STATS: LearningStats = {
+export const EMPTY_STATS: LearningStats = {
     totalJam: 0, totalBiaya: 0,
     jamTraining: 0, jamTrainingExternal: 0, jamOnline: 0, jamBuku: 0,
     biayaTraining: 0, biayaTrainingExternal: 0, biayaBuku: 0,
@@ -50,7 +50,7 @@ const formatHoursMinutes = (value: number, t: (key: string) => string) => {
     return `${m} ${t('minutes')}`;
 };
 
-const formatDate = (dateStr: string) => {
+export const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr || '-';
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -72,13 +72,13 @@ const toDateInputValue = (date: Date) => {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 };
 
-const getDefaultRange = () => {
+export const getDefaultRange = () => {
     const today = new Date();
     const jan1 = new Date(today.getFullYear(), 0, 1);
     return { startDate: toDateInputValue(jan1), endDate: toDateInputValue(today) };
 };
 
-const buildSections = (stats: LearningStats, t: (key: string) => string) => [
+export const buildSections = (stats: LearningStats, t: (key: string) => string) => [
     {
         key: 'trainingExternal',
         label: t('sections.trainingExternal'),
@@ -395,7 +395,7 @@ interface LearningStatsBreakdownProps {
     t: (key: string) => string;
 }
 
-const LearningStatsBreakdown = ({ stats, t }: LearningStatsBreakdownProps) => {
+export const LearningStatsBreakdown = ({ stats, t }: LearningStatsBreakdownProps) => {
     const sections = buildSections(stats, t);
 
     return (

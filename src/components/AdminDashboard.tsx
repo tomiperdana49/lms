@@ -19,6 +19,7 @@ import TrainingExternalManager from './TrainingExternalManager';
 import HRReportGenerator from './HRReportGenerator';
 import LMSCalendar from './LMSCalendar';
 import QuizReportList from './QuizReportList';
+import EmployeeLearningReport from './EmployeeLearningReport';
 
 interface AdminDashboardProps {
     user: User;
@@ -26,7 +27,7 @@ interface AdminDashboardProps {
     initialView?: string;
 }
 
-type AdminView = 'overview' | 'users' | 'logs' | 'training' | 'meetings' | 'courses' | 'reports' | 'calendar' | 'quiz-reports';
+type AdminView = 'overview' | 'users' | 'logs' | 'training' | 'meetings' | 'courses' | 'reports' | 'calendar' | 'quiz-reports' | 'employee-learning-report';
 
 interface StatCardProps {
     label: string;
@@ -140,6 +141,8 @@ const AdminDashboard = ({ user, initialView }: AdminDashboardProps) => {
                 return <QuizReportList onBack={() => setCurrentView('overview')} />;
             case 'reports':
                 return <HRReportGenerator />;
+            case 'employee-learning-report':
+                return <EmployeeLearningReport />;
             case 'calendar':
                 return <LMSCalendar compact={false} userEmail={user.email} userRole={user.role} />;
             case 'overview':

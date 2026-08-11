@@ -55,6 +55,14 @@
     "notSubmitted": "Belum submit",
     "grandTotalRow": "TOTAL KESELURUHAN"
   },
+  "employee": {
+    "title": "Laporan Pembelajaran Karyawan",
+    "subtitle": "Cari dan pilih karyawan untuk melihat ringkasan jam dan biaya pembelajarannya",
+    "selectLabel": "Karyawan",
+    "searchPlaceholder": "Cari nama atau email karyawan...",
+    "notFound": "Karyawan tidak ditemukan",
+    "noSelection": "Pilih karyawan terlebih dahulu untuk melihat laporan pembelajarannya."
+  },
   "team": {
     "title": "Tim Saya",
     "subtitle": "Ringkasan pembelajaran untuk semua yang melapor ke {{name}}",
