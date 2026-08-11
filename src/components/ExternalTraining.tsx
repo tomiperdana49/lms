@@ -254,9 +254,8 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <input required type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" />
  </div>
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.registrationFee')} <span className="text-red-500">*</span></label>
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.registrationFee')}</label>
  <input
- required
  type="text"
  value={regFee}
  onChange={e => {
