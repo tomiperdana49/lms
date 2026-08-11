@@ -1433,7 +1433,7 @@ app.get('/api/learning-stats', async (req, res) => {
 
         const userFeedback = await query(
             `SELECT meeting_id, submitted_at FROM course_feedback
-             WHERE meeting_id IS NOT NULL AND (is_imported IS NULL OR is_imported = 0)
+             WHERE meeting_id IS NOT NULL
                AND (user_id = ? OR (employee_id IS NOT NULL AND employee_id = ?))`,
             [targetUserId, targetEmpId]
         );
