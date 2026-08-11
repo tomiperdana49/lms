@@ -81,7 +81,7 @@ const EmployeeLearningReport = () => {
                 [t('export.costColumn')]: item.cost,
                 [t('export.preTestColumn')]: section.key === 'training' ? (item.preTestScore ?? t('export.notTaken')) : '',
                 [t('export.postTestColumn')]: section.key === 'training' ? (item.postTestScore ?? t('export.notTaken')) : '',
-                [t('export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? t('export.submitted') : t('export.notSubmitted')) : ''
+                [t('export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (item.feedbackScore ?? t('export.submitted')) : t('export.notSubmitted')) : ''
             }))
         );
         rows.push({

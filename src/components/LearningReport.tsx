@@ -13,6 +13,7 @@ interface LearningStatDetail {
     preTestScore?: number | null;
     postTestScore?: number | null;
     feedbackSubmitted?: boolean;
+    feedbackScore?: number | null;
     // Organizer / certificate metadata (availability varies by category)
     organizer?: string | null;
     certificateLink?: string | null;
@@ -247,7 +248,7 @@ const LearningReport = ({ userEmail, userName, userEmployeeId, isSupervisor }: L
                 [t('export.costColumn')]: item.cost,
                 [t('export.preTestColumn')]: section.key === 'training' ? (item.preTestScore ?? t('export.notTaken')) : '',
                 [t('export.postTestColumn')]: section.key === 'training' ? (item.postTestScore ?? t('export.notTaken')) : '',
-                [t('export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? t('export.submitted') : t('export.notSubmitted')) : ''
+                [t('export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (item.feedbackScore ?? t('export.submitted')) : t('export.notSubmitted')) : ''
             }))
         );
         rows.push({
@@ -460,7 +461,7 @@ export const LearningStatsBreakdown = ({ stats, t }: LearningStatsBreakdownProps
                                                 <div className="flex flex-wrap gap-1.5 mt-2">
                                                     <ScoreBadge label={t('assessment.preTest')} score={item.preTestScore} />
                                                     <ScoreBadge label={t('assessment.postTest')} score={item.postTestScore} />
-                                                    <FeedbackBadge submitted={!!item.feedbackSubmitted} t={t} />
+                                                    <FeedbackBadge submitted={!!item.feedbackSubmitted} score={item.feedbackScore} t={t} />
                                                 </div>
                                             )}
                                         </div>
@@ -556,10 +557,10 @@ const ScoreBadge = ({ label, score }: { label: string; score?: number | null }) 
     );
 };
 
-const FeedbackBadge = ({ submitted, t }: { submitted: boolean; t: (key: string) => string }) => (
+const FeedbackBadge = ({ submitted, score, t }: { submitted: boolean; score?: number | null; t: (key: string) => string }) => (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${submitted ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
         {submitted ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
-        {t('assessment.feedback')}{submitted ? '' : `: ${t('assessment.notSubmitted')}`}
+        {t('assessment.feedback')}{submitted ? (score !== undefined && score !== null ? `: ${score}` : '') : `: ${t('assessment.notSubmitted')}`}
     </span>
 );
 

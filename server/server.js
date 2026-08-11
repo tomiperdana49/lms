@@ -1432,14 +1432,19 @@ app.get('/api/learning-stats', async (req, res) => {
         }
 
         const userFeedback = await query(
-            `SELECT meeting_id, submitted_at FROM course_feedback
+            `SELECT meeting_id, submitted_at, feedback_data FROM course_feedback
              WHERE meeting_id IS NOT NULL
                AND (user_id = ? OR (employee_id IS NOT NULL AND employee_id = ?))`,
             [targetUserId, targetEmpId]
         );
         const feedbackByMeeting = {};
         for (const f of userFeedback) {
-            feedbackByMeeting[f.meeting_id] = f.submitted_at;
+            let rating = null;
+            try {
+                const data = typeof f.feedback_data === 'string' ? JSON.parse(f.feedback_data) : f.feedback_data;
+                if (data && data.rating !== undefined) rating = data.rating;
+            } catch (e) { }
+            feedbackByMeeting[f.meeting_id] = { submittedAt: f.submitted_at, rating };
         }
 
         for (const meeting of meetings) {
@@ -1493,7 +1498,7 @@ app.get('/api/learning-stats', async (req, res) => {
                 biayaTraining += itemCost;
 
                 const meetingQuiz = quizByMeeting[meeting.id] || {};
-                const feedbackAt = feedbackByMeeting[meeting.id] || null;
+                const feedbackEntry = feedbackByMeeting[meeting.id] || null;
 
                 trainingDetails.push({
                     title: meeting.title,
@@ -1502,8 +1507,9 @@ app.get('/api/learning-stats', async (req, res) => {
                     cost: Math.round(itemCost),
                     preTestScore: meetingQuiz.PRE ?? null,
                     postTestScore: meetingQuiz.POST ?? null,
-                    feedbackSubmitted: !!feedbackAt,
-                    feedbackDate: feedbackAt,
+                    feedbackSubmitted: !!feedbackEntry,
+                    feedbackScore: feedbackEntry ? feedbackEntry.rating : null,
+                    feedbackDate: feedbackEntry ? feedbackEntry.submittedAt : null,
                     organizer: meeting.host || null
                 });
             }
