@@ -1928,7 +1928,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             );
 
             const isParticipantMatch = (item: any, email: string) => {
-                const itemId = (item.userEmail || item.user_email || item.userId || item.user_id || item.email || item.studentId || item.student_id || item.employee_id || item.id || '').toString().toLowerCase().trim();
+                const itemId = (item.userEmail || item.user_email || item.userId || item.user_id || item.email || item.studentId || item.student_id || item.employeeId || item.employee_id || item.id || '').toString().toLowerCase().trim();
                 const targetId = email.toLowerCase().trim();
                 if (itemId === targetId) return true;
                 if (targetId.includes('@') && itemId === targetId.split('@')[0]) return true;
@@ -2794,7 +2794,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                                                 // Define participant matching logic
                                                                 const isParticipantMatch = (item: any, email: string) => {
-                                                                    const itemId = (item.userEmail || item.user_email || item.userId || item.user_id || item.email || item.studentId || item.student_id || item.employee_id || item.id || '').toString().toLowerCase().trim();
+                                                                    const itemId = (item.userEmail || item.user_email || item.userId || item.user_id || item.email || item.studentId || item.student_id || item.employeeId || item.employee_id || item.id || '').toString().toLowerCase().trim();
                                                                     const targetId = email.toLowerCase().trim();
                                                                     if (itemId === targetId) return true;
                                                                     if (targetId.includes('@') && itemId === targetId.split('@')[0]) return true;
@@ -2811,8 +2811,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                                                 // Identify participants who completed ALL 3 stages
                                                                 const allParticipantIds = Array.from(new Set([
-                                                                    ...meetingResults.map(r => r.userEmail || r.user_email || r.userId || r.user_id || r.email || r.studentId || r.student_id || r.employee_id || r.id).filter(Boolean).map(id => String(id).toLowerCase().trim()),
-                                                                    ...meetingFeedback.map(f => f.userEmail || f.user_email || f.userId || f.user_id || f.email || f.studentId || f.student_id || f.employee_id || f.id).filter(Boolean).map(id => String(id).toLowerCase().trim())
+                                                                    ...meetingResults.map(r => r.userEmail || r.user_email || r.userId || r.user_id || r.email || r.studentId || r.student_id || r.employeeId || r.employee_id || r.id).filter(Boolean).map(id => String(id).toLowerCase().trim()),
+                                                                    ...meetingFeedback.map(f => f.userEmail || f.user_email || f.userId || f.user_id || f.email || f.studentId || f.student_id || f.employeeId || f.employee_id || f.id).filter(Boolean).map(id => String(id).toLowerCase().trim())
                                                                 ])).reduce((acc: string[], id) => {
                                                                     const emp = (employees || []).find(e => e.email?.toLowerCase() === id || String(e.id_employee).toLowerCase() === id || String(e.id).toLowerCase() === id);
                                                                     const primary = (emp?.email || id).toLowerCase();
@@ -2982,8 +2982,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                                     const findById = (item: any, id: string) => {
                                                                                                         const sid = String(id).toLowerCase().trim();
                                                                                                         const itemAllIds = [
-                                                                                                            item.userEmail, item.user_email, item.email, 
-                                                                                                            item.userId, item.user_id, item.studentId, item.student_id, item.employee_id,
+                                                                                                            item.userEmail, item.user_email, item.email,
+                                                                                                            item.userId, item.user_id, item.studentId, item.student_id, item.employeeId, item.employee_id,
                                                                                                             item.id_user, item.id_student, item.id
                                                                                                         ].filter(Boolean).map(v => String(v).toLowerCase().trim());
 
