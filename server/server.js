@@ -1518,14 +1518,16 @@ app.get('/api/learning-stats', async (req, res) => {
         // 2. External Training (external_training_requests)
         if (targetEmpId) {
             const externalTrainings = await query(
-                "SELECT title, vendor, certificate_link, start_date, end_date, registration_fee, travel_flight_cost, accommodation_cost, miscellaneous_cost FROM external_training_requests WHERE employee_id = ? AND status = 'Processed'",
+                "SELECT title, vendor, certificate_link, start_date, end_date, registration_fee, travel_flight_cost, accommodation_cost, miscellaneous_cost, learning_hours FROM external_training_requests WHERE employee_id = ? AND status = 'Processed'",
                 [targetEmpId]
             );
             for (const ext of externalTrainings) {
                 if (!isWithinRange(ext.start_date)) continue;
 
                 let itemHours = 0;
-                if (ext.start_date && ext.end_date) {
+                if (ext.learning_hours != null) {
+                    itemHours = Number(ext.learning_hours) || 0;
+                } else if (ext.start_date && ext.end_date) {
                     const diffMs = new Date(ext.end_date).getTime() - new Date(ext.start_date).getTime();
                     if (diffMs > 0) itemHours = diffMs / (1000 * 60 * 60);
                 }
@@ -3598,7 +3600,7 @@ app.get('/api/external-training/hr', async (req, res) => {
 // 6. HR processes payment
 app.post('/api/external-training/hr-process', async (req, res) => {
     try {
-        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date, title, vendor, location, start_date, end_date, certification_result, incentive_reward, incentive_payment_type, hr_name, training_gr_type, participation_type } = req.body;
+        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date, title, vendor, location, start_date, end_date, certification_result, incentive_reward, incentive_payment_type, hr_name, training_gr_type, participation_type, learning_hours } = req.body;
         // datetime-local inputs send "YYYY-MM-DDTHH:MM"; MySQL DATETIME literals need a space instead of "T"
         const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
 
@@ -3656,6 +3658,10 @@ app.post('/api/external-training/hr-process', async (req, res) => {
         if (participation_type !== undefined) {
             sql += `, participation_type = ?`;
             params.push(participation_type || null);
+        }
+        if (learning_hours !== undefined) {
+            sql += `, learning_hours = ?`;
+            params.push(learning_hours || null);
         }
         sql += ` WHERE id = ?`;
         params.push(id);

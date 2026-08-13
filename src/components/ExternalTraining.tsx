@@ -168,10 +168,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  };
 
  const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(num);
- const formatScheduleDateTime = (value: string) => {
- const d = new Date(value);
- return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
- };
+ const formatScheduleDateTime = (value: string) => new Date(value).toLocaleDateString();
 
  const getFullImageUrl = (path: string) => path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
 
@@ -247,11 +244,11 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  </div>
  <div>
  <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.startDate')} <span className="text-red-500">*</span></label>
- <input required type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" />
+ <input required type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" />
  </div>
  <div>
  <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.endDate')} <span className="text-red-500">*</span></label>
- <input required type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" />
+ <input required type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" />
  </div>
  <div>
  <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.registrationFee')}</label>
@@ -524,7 +521,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/50">
  <p className="text-xs text-slate-500 mb-1 font-medium flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5"/> {t('team.schedule')}</p>
- <p className="text-sm font-semibold text-slate-700">{req.start_date ? new Date(req.start_date).toLocaleString('en-GB', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'}) : '-'} &mdash; {req.end_date ? new Date(req.end_date).toLocaleString('en-GB', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'}) : '-'}</p>
+ <p className="text-sm font-semibold text-slate-700">{req.start_date ? new Date(req.start_date).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}) : '-'} &mdash; {req.end_date ? new Date(req.end_date).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}) : '-'}</p>
  </div>
  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/50">
  <p className="text-xs text-slate-500 mb-1 font-medium flex items-center gap-1.5"><Wallet className="w-3.5 h-3.5"/> {t('team.registrationFee')}</p>

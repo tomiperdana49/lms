@@ -362,6 +362,11 @@ export const initDB = async () => {
             console.log("Added participation_type column to external_training_requests.");
         } catch (e) { /* Ignore if exists */ }
 
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN learning_hours DECIMAL(6,2)");
+            console.log("Added learning_hours column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
         // MIGRATION: Add internal_certificates table (issued internal training certificates)
         try {
             await connection.query(`

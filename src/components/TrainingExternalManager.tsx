@@ -255,13 +255,14 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     const [hrEditEndDate, setHrEditEndDate] = useState('');
     const [hrEditGriType, setHrEditGriType] = useState('');
     const [hrEditParticipationType, setHrEditParticipationType] = useState('');
+    const [hrEditLearningHours, setHrEditLearningHours] = useState('');
 
-    const toDatetimeLocalValue = (v: any) => {
+    const toDateValue = (v: any) => {
         if (!v) return '';
         const d = new Date(v);
         if (isNaN(d.getTime())) return '';
         const pad = (n: number) => String(n).padStart(2, '0');
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     };
 
     useEffect(() => {
@@ -283,10 +284,11 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             setHrEditTitle(selectedRequest.title || '');
             setHrEditVendor(selectedRequest._original?.vendor || '');
             setHrEditLocation(selectedRequest._original?.location || '');
-            setHrEditStartDate(toDatetimeLocalValue(selectedRequest._original?.start_date));
-            setHrEditEndDate(toDatetimeLocalValue(selectedRequest._original?.end_date));
+            setHrEditStartDate(toDateValue(selectedRequest._original?.start_date));
+            setHrEditEndDate(toDateValue(selectedRequest._original?.end_date));
             setHrEditGriType(selectedRequest._original?.training_gr_type || '');
             setHrEditParticipationType(selectedRequest._original?.participation_type || '');
+            setHrEditLearningHours(selectedRequest._original?.learning_hours != null ? String(selectedRequest._original.learning_hours) : '');
         }
     }, [selectedRequest]);
 
@@ -422,6 +424,10 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                 alert(t('alerts.participationTypeRequired'));
                 return;
             }
+            if (!hrEditLearningHours || Number(hrEditLearningHours) <= 0) {
+                alert(t('alerts.learningHoursRequired'));
+                return;
+            }
             let certLink = selectedRequest?._original?.certificate_link;
             const isCertificateCategory = selectedRequest?._original?.category === 'Sertifikat';
             const requiresCertificateProof = isCertificateCategory && hrCertificationResult === 'Passed';
@@ -471,7 +477,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     start_date: hrEditStartDate,
                     end_date: hrEditEndDate,
                     training_gr_type: hrEditGriType || null,
-                    participation_type: hrEditParticipationType || null
+                    participation_type: hrEditParticipationType || null,
+                    learning_hours: hrEditLearningHours ? Number(hrEditLearningHours) : null
                 })
             });
             if (res.ok && requiresCertificateProof && hrGrantIncentive) {
@@ -952,11 +959,11 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.startDate')} <span className="text-red-500">*</span></label>
-                                        <input required type="datetime-local" value={hrEditStartDate} onChange={(e) => setHrEditStartDate(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
+                                        <input required type="date" value={hrEditStartDate} onChange={(e) => setHrEditStartDate(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.endDate')} <span className="text-red-500">*</span></label>
-                                        <input required type="datetime-local" value={hrEditEndDate} onChange={(e) => setHrEditEndDate(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
+                                        <input required type="date" value={hrEditEndDate} onChange={(e) => setHrEditEndDate(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
                                     </div>
                                 </div>
                             ) : (
@@ -985,6 +992,10 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                                 <option value="Self Registered">{t('requestModal.selfRegistered')}</option>
                                                 <option value="Targeted Participants">{t('requestModal.targetedParticipants')}</option>
                                             </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.learningHours')} <span className="text-red-500">*</span></label>
+                                            <input required type="number" min="0" step="0.5" value={hrEditLearningHours} onChange={(e) => setHrEditLearningHours(e.target.value)} placeholder={t('requestModal.learningHoursPlaceholder')} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
                                         </div>
                                     </div>
                                     <div className="pt-4 border-t border-slate-100">
