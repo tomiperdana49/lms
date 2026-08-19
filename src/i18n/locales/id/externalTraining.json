@@ -63,6 +63,8 @@
     "detailLocation": "Lokasi",
     "detailGriType": "Tipe GRI Training",
     "detailParticipationType": "Tipe Partisipasi",
+    "detailLearningHours": "Jam Belajar",
+    "detailLearningHoursValue": "{{count}} jam",
     "detailSchedule": "Jadwal",
     "detailRegistrationFee": "Biaya Pendaftaran",
     "detailTravelCost": "Biaya Transportasi",

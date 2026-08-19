@@ -63,6 +63,8 @@
     "detailLocation": "Location",
     "detailGriType": "Training GRI Type",
     "detailParticipationType": "Participation Type",
+    "detailLearningHours": "Learning Hours",
+    "detailLearningHoursValue": "{{count}} hours",
     "detailSchedule": "Schedule",
     "detailRegistrationFee": "Registration Fee",
     "detailTravelCost": "Transportation Cost",

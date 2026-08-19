@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     Search,
     XCircle,
@@ -14,7 +14,9 @@ import {
     Link,
     Award,
     AlertTriangle,
-    Download
+    Download,
+    UploadCloud,
+    CreditCard
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useTranslation } from 'react-i18next';
@@ -67,6 +69,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     const [searchQuery, setSearchQuery] = useState('');
     const [statusDrilldown, setStatusDrilldown] = useState<'PENDING' | 'APPROVED' | null>(null);
     const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+    const [isImporting, setIsImporting] = useState(false);
+    const importFileInputRef = useRef<HTMLInputElement>(null);
 
     const fetchRequests = async () => {
         try {
@@ -586,6 +590,165 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
         averageCost: filteredRequests.length ? filteredRequests.reduce((sum, r) => sum + (Number(r.cost) || 0), 0) / filteredRequests.length : 0
     };
 
+    // Import already-processed external training records from an Excel file (same header layout as handleExportProcessed
+    // produces, plus Location / Category training / Payment Method). Each row is inserted with status 'Processed'.
+    const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+            try {
+                setIsImporting(true);
+                const bstr = evt.target?.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                const wsname = wb.SheetNames[0];
+                const ws = wb.Sheets[wsname];
+                const rawData = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+                if (rawData.length === 0) throw new Error(t('import.emptyFile'));
+
+                // Find header row by finding the row with the most string elements
+                let headerRowIndex = 0;
+                let maxCols = 0;
+                for (let i = 0; i < Math.min(20, rawData.length); i++) {
+                    const cols = (rawData[i] || []).filter((c: any) => typeof c === 'string' && c.trim() !== '').length;
+                    if (cols > maxCols) { maxCols = cols; headerRowIndex = i; }
+                }
+                const headers = rawData[headerRowIndex].map((h: any) => String(h || '').trim());
+
+                const data: any[] = [];
+                for (let i = headerRowIndex + 1; i < rawData.length; i++) {
+                    const rowArr = rawData[i];
+                    if (!rowArr || rowArr.length === 0 || rowArr.every((x: any) => x === undefined || x === null || x === '')) continue;
+                    const rowObj: any = {};
+                    headers.forEach((h, colIdx) => { if (h) rowObj[h] = rowArr[colIdx]; });
+                    data.push(rowObj);
+                }
+
+                // Both Indonesian and English month names/abbreviations, since exports use English
+                // ("3 January 2026") but users may paste Indonesian-authored sheets too.
+                const monthMap: Record<string, string> = {
+                    januari: '01', februari: '02', maret: '03', april: '04', mei: '05', juni: '06',
+                    juli: '07', agustus: '08', september: '09', oktober: '10', november: '11', desember: '12',
+                    january: '01', february: '02', march: '03', june: '06', july: '07', august: '08', october: '10', december: '12',
+                    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08',
+                    sep: '09', sept: '09', oct: '10', nov: '11', dec: '12'
+                };
+
+                // Resolves to a plain YYYY-MM-DD string without ever going through the Date constructor's
+                // local-timezone interpretation, which previously shifted dates back a day (e.g. "3 January
+                // 2026" -> local midnight -> toISOString() in a negative-UTC-offset timezone -> "2026-01-02").
+                const parseImportDate = (val: any): string | null => {
+                    if (val === undefined || val === null || val === '') return null;
+                    if (typeof val === 'number') {
+                        // Excel serial date: days since 1899-12-30, computed directly in UTC millis.
+                        const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+                        return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+                    }
+                    const str = String(val).trim();
+                    if (!str || str === '-') return null;
+                    const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                    if (slashMatch) {
+                        const [, dd, mm, yyyy] = slashMatch;
+                        return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+                    }
+                    const isoMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+                    if (isoMatch) {
+                        const [, yyyy, mm, dd] = isoMatch;
+                        return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+                    }
+                    const parts = str.toLowerCase().replace(/,/g, '').split(/\s+/);
+                    const dayPart = parts.find(p => /^\d{1,2}$/.test(p));
+                    const yearPart = parts.find(p => /^\d{4}$/.test(p));
+                    const monthPart = parts.find(p => monthMap[p]);
+                    if (dayPart && yearPart && monthPart) {
+                        return `${yearPart}-${monthMap[monthPart]}-${dayPart.padStart(2, '0')}`;
+                    }
+                    return null;
+                };
+
+                const parseImportNumber = (val: any): number => {
+                    if (val === undefined || val === null || val === '' || val === '-') return 0;
+                    if (typeof val === 'number') return val;
+                    const cleaned = String(val).replace(/,/g, '').trim();
+                    const num = parseFloat(cleaned);
+                    return isNaN(num) ? 0 : num;
+                };
+
+                const rows = data.map(row => {
+                    const employeeIdRaw = row['Employee ID'];
+                    const employeeId = (employeeIdRaw !== undefined && employeeIdRaw !== null && String(employeeIdRaw).trim() !== '')
+                        ? String(employeeIdRaw).trim().padStart(7, '0')
+                        : '';
+                    const incentiveReward = parseImportNumber(row['Insentive sertifikat/bulan']);
+                    const learningHoursRaw = row['Training Hours'];
+
+                    return {
+                        employee_id: employeeId,
+                        employee_name: String(row['Peserta'] || '').trim(),
+                        category: String(row['Kategori'] || '').trim(),
+                        title: String(row['Judul'] || '').trim(),
+                        vendor: String(row['Penyelenggara / Vendor'] || '').trim(),
+                        location: String(row['Location'] || '').trim(),
+                        start_date: parseImportDate(row['Start Date'] ?? row['Start Time']),
+                        end_date: parseImportDate(row['End Date'] ?? row['End Time']),
+                        registration_fee: parseImportNumber(row['Biaya Training/Trainer']),
+                        travel_flight_cost: parseImportNumber(row['Biaya Transportasi']),
+                        accommodation_cost: parseImportNumber(row['Biaya Akomodasi']),
+                        miscellaneous_cost: parseImportNumber(row['Biaya Lain-lain']),
+                        payment_method: String(row['Payment Method'] || '').trim() || 'Reimbursement',
+                        certificate_link: row['Sertifikat'] && String(row['Sertifikat']).trim() !== '-' ? String(row['Sertifikat']).trim() : null,
+                        certificate_expiry_date: parseImportDate(row['expired sertifikat']),
+                        incentive_reward: incentiveReward > 0 ? incentiveReward : null,
+                        incentive_payment_type: incentiveReward > 0 ? 'Recurring' : null,
+                        learning_hours: learningHoursRaw !== undefined && learningHoursRaw !== '' ? parseImportNumber(learningHoursRaw) : null,
+                        participation_type: String(row['Participation Type'] || '').trim() || null,
+                        training_gr_type: String(row['ESG, HSE, Other'] || '').trim() || null
+                    };
+                }).filter(r => r.employee_id && r.title);
+
+                if (rows.length === 0) throw new Error(t('import.noValidRows'));
+
+                const res = await fetch(`${API_BASE_URL}/api/external-training/bulk-import`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rows, hr_name: userName })
+                });
+
+                if (res.ok) {
+                    const result = await res.json();
+                    console.log('External training import result:', result);
+
+                    const parts: string[] = [t('import.insertedCount', { count: result.inserted })];
+                    if (result.skipped) {
+                        parts.push(t('import.skippedCount', { count: result.skipped }));
+                        const lines = (result.duplicates || []).map((d: any) =>
+                            t('import.duplicateLine', { row: d.row, name: d.employee_name || d.employee_id, title: d.title })
+                        );
+                        if (lines.length) parts.push('\n' + lines.join('\n'));
+                    }
+                    if (result.errors?.length) {
+                        parts.push(t('import.failedCount', { count: result.errors.length }));
+                        const lines = result.errors.map((e: any) => t('import.errorLine', { row: e.row, message: e.error }));
+                        if (lines.length) parts.push('\n' + lines.join('\n'));
+                    }
+                    alert(parts.join(' '));
+                    fetchRequests();
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error || t('import.backendFailed'));
+                }
+            } catch (err: any) {
+                console.error('External training import error:', err);
+                alert(t('import.failed', { message: err.message }));
+            } finally {
+                setIsImporting(false);
+                if (importFileInputRef.current) importFileInputRef.current.value = '';
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
+
     // Export HR-processed ("APPROVED" in this component's vocabulary, i.e. DB status = 'Processed') requests
     // that are currently visible under the active year/period/branch/search filters.
     const handleExportProcessed = () => {
@@ -659,6 +822,25 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                 </div>
 
                 <div className="flex items-center gap-3">
+                    {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                        <>
+                            <input
+                                type="file"
+                                ref={importFileInputRef}
+                                style={{ display: 'none' }}
+                                accept=".xlsx, .xls, .csv"
+                                onChange={handleImport}
+                            />
+                            <button
+                                onClick={() => importFileInputRef.current?.click()}
+                                disabled={isImporting}
+                                title={t('import.buttonTooltip')}
+                                className="flex items-center gap-2 px-5 py-[15px] rounded-2xl text-xs font-black tracking-widest bg-white border border-slate-200 text-slate-600 shadow-sm hover:border-indigo-500 hover:text-indigo-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <UploadCloud size={16} /> {isImporting ? t('import.importing') : t('import.button')}
+                            </button>
+                        </>
+                    )}
                     <button
                         onClick={handleExportProcessed}
                         title="Export data training yang sudah diproses HR ke Excel"
@@ -970,6 +1152,110 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                 <div>
                                     <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.strategicJustification')}</label>
                                     <textarea readOnly value={selectedRequest.justification} className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 text-slate-700 cursor-not-allowed resize-none" rows={2} />
+                                </div>
+                            )}
+
+                            {/* Read-only dossier detail: full cost breakdown, GRI/participation/learning hours,
+                                approvals and certificate, mirroring what the employee & their supervisor already see. */}
+                            {!isHrEditable && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-slate-50 border border-slate-100 rounded-xl text-sm">
+                                    {selectedRequest._original?.training_gr_type && (
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <Award className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <span>{t('requestModal.griType')}: <span className="font-semibold text-slate-800">{selectedRequest._original.training_gr_type}</span></span>
+                                        </div>
+                                    )}
+                                    {selectedRequest._original?.participation_type && (
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <Users className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <span>{t('requestModal.participationType')}: <span className="font-semibold text-slate-800">{selectedRequest._original.participation_type}</span></span>
+                                        </div>
+                                    )}
+                                    {Number(selectedRequest._original?.learning_hours) > 0 && (
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <span>{t('requestModal.learningHours')}: <span className="font-semibold text-slate-800">{Number(selectedRequest._original.learning_hours)}</span></span>
+                                        </div>
+                                    )}
+                                    {selectedRequest._original?.payment_method && (
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <CreditCard className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <span>{t('requestModal.paymentMethod')}: <span className="font-semibold text-slate-800">{selectedRequest._original.payment_method}</span></span>
+                                        </div>
+                                    )}
+                                    {Number(selectedRequest.costTraining) > 0 && (
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <DollarSign className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <span>{t('requestModal.trainingFee')}: <span className="font-semibold text-slate-800">{formatCurrency(Number(selectedRequest.costTraining))}</span></span>
+                                        </div>
+                                    )}
+                                    {Number(selectedRequest.costTransport) > 0 && (
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <DollarSign className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <span>{t('requestModal.travelCost')}: <span className="font-semibold text-slate-800">{formatCurrency(Number(selectedRequest.costTransport))}</span></span>
+                                        </div>
+                                    )}
+                                    {Number(selectedRequest.costAccommodation) > 0 && (
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <DollarSign className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <span>{t('requestModal.accommodation')}: <span className="font-semibold text-slate-800">{formatCurrency(Number(selectedRequest.costAccommodation))}</span></span>
+                                        </div>
+                                    )}
+                                    {Number(selectedRequest.costOthers) > 0 && (
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <DollarSign className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <span>{t('requestModal.miscellaneous')}: <span className="font-semibold text-slate-800">{formatCurrency(Number(selectedRequest.costOthers))}</span></span>
+                                        </div>
+                                    )}
+                                    {Number(selectedRequest.incentiveReward) > 0 && (
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <Award className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <span>{t('requestModal.incentiveReward')}: <span className="font-semibold text-slate-800">{formatCurrency(Number(selectedRequest.incentiveReward))}{selectedRequest.incentivePaymentType === 'Recurring' ? ` / ${t('list.month')}` : ''}</span></span>
+                                        </div>
+                                    )}
+                                    {selectedRequest.supervisorName && (
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <CheckCircle2 className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <span>{t('list.supervisor')}: <span className="font-semibold text-slate-800">{selectedRequest.supervisorName}</span></span>
+                                        </div>
+                                    )}
+                                    {selectedRequest.hrName && (
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <CheckCircle2 className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <span>{t('list.hrDept')}: <span className="font-semibold text-slate-800">{selectedRequest.hrName}</span></span>
+                                        </div>
+                                    )}
+                                    {(selectedRequest.evidenceUrl || selectedRequest.renewalCertificateUrl) && (
+                                        <div className="sm:col-span-2">
+                                            <span className="flex items-center gap-2 text-slate-600 mb-2">
+                                                <Award className="w-4 h-4 shrink-0 text-slate-400" />
+                                                {t('list.certificateAlt')}
+                                            </span>
+                                            <div className="flex flex-wrap gap-4">
+                                                {[
+                                                    { url: selectedRequest.evidenceUrl, label: t('list.certificateOriginal'), expiry: selectedRequest.originalCertificateExpiryDate || selectedRequest.certificateExpiryDate },
+                                                    { url: selectedRequest.renewalCertificateUrl, label: t('list.certificateRenewed'), expiry: selectedRequest.certificateExpiryDate }
+                                                ].filter((cert): cert is { url: string; label: string; expiry: string | undefined } => !!cert.url).map((cert, idx, arr) => (
+                                                    <div key={idx} className="flex flex-col gap-1">
+                                                        {cert.url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
+                                                            <a href={cert.url} target="_blank" rel="noreferrer" className="block w-32 h-24 rounded-lg overflow-hidden border border-slate-200 hover:opacity-90 transition-opacity">
+                                                                <img src={cert.url} alt={cert.label} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                                                            </a>
+                                                        ) : (
+                                                            <a href={cert.url} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center w-32 h-24 bg-white border border-slate-200 rounded-lg hover:border-indigo-300 transition-colors text-slate-400 hover:text-indigo-600">
+                                                                <FileText size={20} className="mb-1" />
+                                                                <span className="text-[9px] font-black uppercase tracking-widest">{t('list.openDocument')}</span>
+                                                            </a>
+                                                        )}
+                                                        {arr.length > 1 && <span className="text-xs font-semibold text-slate-500">{cert.label}</span>}
+                                                        {cert.expiry && (
+                                                            <span className="text-xs text-slate-500">{new Date(cert.expiry).toLocaleDateString()}</span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

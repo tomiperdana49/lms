@@ -153,5 +153,19 @@
     "notAvailable": "N/A",
     "hrProcessed": "Diproses HR",
     "others": "Lainnya"
+  },
+  "import": {
+    "button": "IMPORT",
+    "importing": "MENGIMPOR...",
+    "buttonTooltip": "Import data training eksternal yang sudah diproses dari file Excel/CSV",
+    "emptyFile": "File Excel kosong.",
+    "noValidRows": "Tidak ada baris data valid ditemukan (Employee ID dan Judul wajib diisi).",
+    "backendFailed": "Import gagal di server.",
+    "insertedCount": "Berhasil mengimpor {{count}} data training eksternal.",
+    "skippedCount": "{{count}} baris dilewati karena sudah pernah diimport sebelumnya (duplikat).",
+    "duplicateLine": "- Baris {{row}}: {{name}} — {{title}}",
+    "failedCount": "{{count}} baris gagal diimport.",
+    "errorLine": "- Baris {{row}}: {{message}}",
+    "failed": "Import gagal: {{message}}"
   }
 }

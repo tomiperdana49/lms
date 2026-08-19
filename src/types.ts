@@ -289,4 +289,5 @@ export interface ExternalTrainingRequest {
     rejection_reason?: string;
     training_gr_type?: string;
     participation_type?: string;
+    learning_hours?: number;
 }

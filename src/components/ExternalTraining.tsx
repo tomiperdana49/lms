@@ -14,7 +14,8 @@ import {
  ChevronDown,
  MapPin,
  Award,
- Gift
+ Gift,
+ Clock
 } from 'lucide-react';
 import PopupNotification from './PopupNotification';
 
@@ -170,6 +171,18 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(num);
  const formatScheduleDateTime = (value: string) => new Date(value).toLocaleDateString();
 
+ // DB status is a 3-stage pipeline (Pending -> Approved -> Processed) but "Approved" only means the
+ // supervisor signed off — HR still has to process it — and "Processed" means HR has fully finished it.
+ // Surface that as "Pending (HR)" / "Approved" respectively so neither reads as still-in-limbo to a
+ // supervisor who already gave their own approval.
+ const getStatusLabel = (status: string | undefined, leaderName?: string) => {
+ if (status === 'Pending') return t('status.pendingWithApprover', { name: leaderName || t('status.defaultSupervisor') });
+ if (status === 'Approved') return t('status.pendingHr');
+ if (status === 'Processed') return t('status.approved');
+ if (status === 'Rejected') return t('status.rejected');
+ return status;
+ };
+
  const getFullImageUrl = (path: string) => path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
 
  // Google Drive "view" links can't be used directly as <img> src; convert to Drive's thumbnail endpoint.
@@ -181,6 +194,153 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  };
 
  const isPdfLink = (path: string) => /\.pdf(\?|$)/i.test(path);
+
+ // Shared "Show Detail" breakdown, used by both the employee's own requests and their
+ // supervisor's Team Approvals view so both sides see the exact same data.
+ const renderRequestDetail = (req: ExternalTrainingRequest) => (
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-gray-50 border border-gray-100 rounded-lg text-sm">
+ {req.vendor && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Briefcase className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailVendor')}: <span className="font-semibold text-gray-800">{req.vendor}</span></span>
+ </div>
+ )}
+ {req.location && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailLocation')}: <span className="font-semibold text-gray-800">{req.location}</span></span>
+ </div>
+ )}
+ {req.training_gr_type && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Award className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailGriType')}: <span className="font-semibold text-gray-800">{t(`form.gri${req.training_gr_type === 'ESG' ? 'Esg' : req.training_gr_type === 'HSE' ? 'Hse' : 'Other'}`)}</span></span>
+ </div>
+ )}
+ {req.participation_type && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Award className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailParticipationType')}: <span className="font-semibold text-gray-800">{req.participation_type}</span></span>
+ </div>
+ )}
+ {Number(req.learning_hours) > 0 && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Clock className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailLearningHours')}: <span className="font-semibold text-gray-800">{t('request.detailLearningHoursValue', { count: Number(req.learning_hours) })}</span></span>
+ </div>
+ )}
+ {req.end_date && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailSchedule')}: <span className="font-semibold text-gray-800">{req.start_date ? formatScheduleDateTime(req.start_date) : '-'} &mdash; {formatScheduleDateTime(req.end_date)}</span></span>
+ </div>
+ )}
+ {Number(req.registration_fee) > 0 && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailRegistrationFee')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.registration_fee))}</span></span>
+ </div>
+ )}
+ {Number(req.travel_flight_cost) > 0 && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailTravelCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.travel_flight_cost))}</span></span>
+ </div>
+ )}
+ {Number(req.accommodation_cost) > 0 && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailAccommodationCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.accommodation_cost))}</span></span>
+ </div>
+ )}
+ {Number(req.miscellaneous_cost) > 0 && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailMiscCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.miscellaneous_cost))}</span></span>
+ </div>
+ )}
+ <div className="flex items-center gap-2 text-gray-600">
+ <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailTotalCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.registration_fee || 0) + Number(req.travel_flight_cost || 0) + Number(req.accommodation_cost || 0) + Number(req.miscellaneous_cost || 0))}</span></span>
+ </div>
+ {Number(req.incentive_reward) > 0 && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Gift className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailIncentive')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.incentive_reward))}{req.incentive_payment_type === 'Recurring' ? ` / ${t('request.detailIncentivePerMonth')}` : ''}</span></span>
+ </div>
+ )}
+ {req.approved_by && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <CheckCircle className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailApprovedBy')}: <span className="font-semibold text-gray-800">{req.approved_by}</span></span>
+ </div>
+ )}
+ {req.hr_name && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <CheckCircle className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailProcessedByHr')}: <span className="font-semibold text-gray-800">{req.hr_name}</span></span>
+ </div>
+ )}
+ {req.attachment_link && (
+ <a href={req.attachment_link} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold">
+ <Link className="w-4 h-4 shrink-0" />
+ {t('request.detailAttachment')}: {t('request.viewLink')}
+ </a>
+ )}
+ {(req.certificate_link || req.renewal_certificate_link) && (
+ <div className="sm:col-span-2">
+ <span className="flex items-center gap-2 text-gray-600 mb-2">
+ <Award className="w-4 h-4 shrink-0 text-gray-400" />
+ {t('request.detailCertificate')}
+ </span>
+ <div className="flex flex-wrap gap-4">
+ {[
+ { url: req.certificate_link, label: t('request.detailCertificateOriginal'), expiry: req.original_certificate_expiry_date },
+ { url: req.renewal_certificate_link, label: t('request.detailCertificateRenewed'), expiry: undefined }
+ ].filter((cert): cert is { url: string; label: string; expiry: string | undefined } => !!cert.url).map((cert, idx, arr) => (
+ <div key={idx} className="flex flex-col gap-1">
+ {isPdfLink(cert.url) ? (
+ <a href={getFullImageUrl(cert.url)} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold w-48">
+ <Link className="w-4 h-4 shrink-0" /> {t('request.viewLink')}
+ </a>
+ ) : (
+ <a href={getFullImageUrl(cert.url)} target="_blank" rel="noreferrer" className="relative block w-48 h-32 rounded-lg overflow-hidden border border-gray-200 hover:opacity-90 transition-opacity bg-gray-50">
+ <img
+ src={getDisplayImageUrl(cert.url)}
+ alt={cert.label}
+ referrerPolicy="no-referrer"
+ className="w-full h-full object-cover"
+ onError={(e) => {
+ // Google Drive's thumbnail endpoint occasionally refuses cross-origin <img> loads
+ // (referrer/rate-limit heuristics on Google's end); fall back to a plain link instead
+ // of leaving a broken-image icon.
+ e.currentTarget.style.display = 'none';
+ const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+ if (fallback) fallback.style.display = 'flex';
+ }}
+ />
+ <div style={{ display: 'none' }} className="absolute inset-0 flex-col items-center justify-center gap-1 text-indigo-600 text-xs font-semibold bg-gray-50">
+ <Link className="w-4 h-4" /> {t('request.viewLink')}
+ </div>
+ </a>
+ )}
+ {arr.length > 1 && <span className="text-xs font-semibold text-gray-500">{cert.label}</span>}
+ {cert.expiry && (
+ <span className="text-xs text-gray-500">{new Date(cert.expiry).toLocaleDateString()}</span>
+ )}
+ </div>
+ ))}
+ </div>
+ </div>
+ )}
+ {req.certificate_expiry_date && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailCertificateExpiry')}: <span className="font-semibold text-gray-800">{new Date(req.certificate_expiry_date).toLocaleDateString()}</span></span>
+ </div>
+ )}
+ </div>
+ );
 
  return (
  <div className="space-y-6 animate-in fade-in">
@@ -313,7 +473,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  req.status === 'Rejected' ? 'bg-red-100 text-red-800' :
  'bg-amber-100 text-amber-800'
  }`}>
- {req.status === 'Pending' ? t('status.pendingWithApprover', { name: req.leader_name || t('status.defaultSupervisor') }) : req.status === 'Approved' ? t('status.pendingHr') : req.status === 'Processed' ? t('status.approved') : req.status === 'Rejected' ? t('status.rejected') : req.status}
+ {getStatusLabel(req.status, req.leader_name)}
  </span>
  </div>
  <h3 className="font-semibold text-gray-800 text-lg">{req.title}</h3>
@@ -339,128 +499,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  {expandedRequestIds.has(req.id) ? t('request.hideDetail') : t('request.showDetail')}
  </button>
 
- {expandedRequestIds.has(req.id) && (
- <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-gray-50 border border-gray-100 rounded-lg text-sm">
- {req.vendor && (
- <div className="flex items-center gap-2 text-gray-600">
- <Briefcase className="w-4 h-4 text-gray-400 shrink-0" />
- <span>{t('request.detailVendor')}: <span className="font-semibold text-gray-800">{req.vendor}</span></span>
- </div>
- )}
- {req.location && (
- <div className="flex items-center gap-2 text-gray-600">
- <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
- <span>{t('request.detailLocation')}: <span className="font-semibold text-gray-800">{req.location}</span></span>
- </div>
- )}
- {req.training_gr_type && (
- <div className="flex items-center gap-2 text-gray-600">
- <Award className="w-4 h-4 text-gray-400 shrink-0" />
- <span>{t('request.detailGriType')}: <span className="font-semibold text-gray-800">{t(`form.gri${req.training_gr_type === 'ESG' ? 'Esg' : req.training_gr_type === 'HSE' ? 'Hse' : 'Other'}`)}</span></span>
- </div>
- )}
- {req.participation_type && (
- <div className="flex items-center gap-2 text-gray-600">
- <Award className="w-4 h-4 text-gray-400 shrink-0" />
- <span>{t('request.detailParticipationType')}: <span className="font-semibold text-gray-800">{req.participation_type}</span></span>
- </div>
- )}
- {req.end_date && (
- <div className="flex items-center gap-2 text-gray-600">
- <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
- <span>{t('request.detailSchedule')}: <span className="font-semibold text-gray-800">{req.start_date ? formatScheduleDateTime(req.start_date) : '-'} &mdash; {formatScheduleDateTime(req.end_date)}</span></span>
- </div>
- )}
- {Number(req.registration_fee) > 0 && (
- <div className="flex items-center gap-2 text-gray-600">
- <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
- <span>{t('request.detailRegistrationFee')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.registration_fee))}</span></span>
- </div>
- )}
- {Number(req.travel_flight_cost) > 0 && (
- <div className="flex items-center gap-2 text-gray-600">
- <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
- <span>{t('request.detailTravelCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.travel_flight_cost))}</span></span>
- </div>
- )}
- {Number(req.accommodation_cost) > 0 && (
- <div className="flex items-center gap-2 text-gray-600">
- <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
- <span>{t('request.detailAccommodationCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.accommodation_cost))}</span></span>
- </div>
- )}
- {Number(req.miscellaneous_cost) > 0 && (
- <div className="flex items-center gap-2 text-gray-600">
- <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
- <span>{t('request.detailMiscCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.miscellaneous_cost))}</span></span>
- </div>
- )}
- <div className="flex items-center gap-2 text-gray-600">
- <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
- <span>{t('request.detailTotalCost')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.registration_fee || 0) + Number(req.travel_flight_cost || 0) + Number(req.accommodation_cost || 0) + Number(req.miscellaneous_cost || 0))}</span></span>
- </div>
- {Number(req.incentive_reward) > 0 && (
- <div className="flex items-center gap-2 text-gray-600">
- <Gift className="w-4 h-4 text-gray-400 shrink-0" />
- <span>{t('request.detailIncentive')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.incentive_reward))}{req.incentive_payment_type === 'Recurring' ? ` / ${t('request.detailIncentivePerMonth')}` : ''}</span></span>
- </div>
- )}
- {req.approved_by && (
- <div className="flex items-center gap-2 text-gray-600">
- <CheckCircle className="w-4 h-4 text-gray-400 shrink-0" />
- <span>{t('request.detailApprovedBy')}: <span className="font-semibold text-gray-800">{req.approved_by}</span></span>
- </div>
- )}
- {req.hr_name && (
- <div className="flex items-center gap-2 text-gray-600">
- <CheckCircle className="w-4 h-4 text-gray-400 shrink-0" />
- <span>{t('request.detailProcessedByHr')}: <span className="font-semibold text-gray-800">{req.hr_name}</span></span>
- </div>
- )}
- {req.attachment_link && (
- <a href={req.attachment_link} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold">
- <Link className="w-4 h-4 shrink-0" />
- {t('request.detailAttachment')}: {t('request.viewLink')}
- </a>
- )}
- {(req.certificate_link || req.renewal_certificate_link) && (
- <div className="sm:col-span-2">
- <span className="flex items-center gap-2 text-gray-600 mb-2">
- <Award className="w-4 h-4 shrink-0 text-gray-400" />
- {t('request.detailCertificate')}
- </span>
- <div className="flex flex-wrap gap-4">
- {[
- { url: req.certificate_link, label: t('request.detailCertificateOriginal'), expiry: req.original_certificate_expiry_date },
- { url: req.renewal_certificate_link, label: t('request.detailCertificateRenewed'), expiry: undefined }
- ].filter((cert): cert is { url: string; label: string; expiry: string | undefined } => !!cert.url).map((cert, idx, arr) => (
- <div key={idx} className="flex flex-col gap-1">
- {isPdfLink(cert.url) ? (
- <a href={getFullImageUrl(cert.url)} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold w-48">
- <Link className="w-4 h-4 shrink-0" /> {t('request.viewLink')}
- </a>
- ) : (
- <a href={getFullImageUrl(cert.url)} target="_blank" rel="noreferrer" className="block w-48 h-32 rounded-lg overflow-hidden border border-gray-200 hover:opacity-90 transition-opacity">
- <img src={getDisplayImageUrl(cert.url)} alt={cert.label} className="w-full h-full object-cover" />
- </a>
- )}
- {arr.length > 1 && <span className="text-xs font-semibold text-gray-500">{cert.label}</span>}
- {cert.expiry && (
- <span className="text-xs text-gray-500">{new Date(cert.expiry).toLocaleDateString()}</span>
- )}
- </div>
- ))}
- </div>
- </div>
- )}
- {req.certificate_expiry_date && (
- <div className="flex items-center gap-2 text-gray-600">
- <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
- <span>{t('request.detailCertificateExpiry')}: <span className="font-semibold text-gray-800">{new Date(req.certificate_expiry_date).toLocaleDateString()}</span></span>
- </div>
- )}
- </div>
- )}
+ {expandedRequestIds.has(req.id) && renderRequestDetail(req)}
 
  {req.status === 'Rejected' && req.rejection_reason && (
  <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-700 w-full">
@@ -508,10 +547,11 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  </span>
  <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
  req.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]' :
+ req.status === 'Approved' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
  req.status === 'Rejected' ? 'bg-rose-50 text-rose-700 border-rose-200' :
  'bg-emerald-50 text-emerald-700 border-emerald-200'
  }`}>
- {t(`statusLabels.${req.status}`, { defaultValue: req.status })}
+ {getStatusLabel(req.status)}
  </span>
  </div>
  </div>
@@ -544,8 +584,19 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  </div>
  )}
  </div>
+
+ <button
+ type="button"
+ onClick={() => toggleRequestDetail(req.id)}
+ className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700 w-fit mt-4"
+ >
+ <ChevronDown className={`w-4 h-4 transition-transform ${expandedRequestIds.has(req.id) ? 'rotate-180' : ''}`} />
+ {expandedRequestIds.has(req.id) ? t('request.hideDetail') : t('request.showDetail')}
+ </button>
+
+ {expandedRequestIds.has(req.id) && renderRequestDetail(req)}
  </div>
- 
+
  <div className="flex flex-row md:flex-col gap-3 md:justify-center items-center md:items-stretch md:pl-6 md:border-l border-slate-100 relative z-10">
  {req.status === 'Pending' ? (
  <>
@@ -559,7 +610,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  ) : (
  <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100 w-full md:w-32">
  <p className="text-xs text-slate-500 font-medium mb-1">{t('team.statusLabel')}</p>
- <p className={`font-bold ${req.status === 'Rejected' ? 'text-rose-600' : 'text-emerald-600'}`}>{t(`statusLabels.${req.status}`, { defaultValue: req.status })}</p>
+ <p className={`font-bold ${req.status === 'Rejected' ? 'text-rose-600' : req.status === 'Approved' ? 'text-indigo-600' : 'text-emerald-600'}`}>{getStatusLabel(req.status)}</p>
  </div>
  )}
  </div>

@@ -153,5 +153,19 @@
     "notAvailable": "N/A",
     "hrProcessed": "HR Processed",
     "others": "Others"
+  },
+  "import": {
+    "button": "IMPORT",
+    "importing": "IMPORTING...",
+    "buttonTooltip": "Import already-processed external training data from an Excel/CSV file",
+    "emptyFile": "Excel file is empty.",
+    "noValidRows": "No valid data rows found (Employee ID and Title are required).",
+    "backendFailed": "Import failed on the server.",
+    "insertedCount": "Successfully imported {{count}} external training record(s).",
+    "skippedCount": "{{count}} row(s) skipped because they were already imported before (duplicate).",
+    "duplicateLine": "- Row {{row}}: {{name}} — {{title}}",
+    "failedCount": "{{count}} row(s) failed to import.",
+    "errorLine": "- Row {{row}}: {{message}}",
+    "failed": "Import failed: {{message}}"
   }
 }

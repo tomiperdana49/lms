@@ -2655,6 +2655,41 @@ const downloadDriveImageToUploads = async (driveUrl) => {
     }
 };
 
+// Same idea as downloadDriveImageToUploads, but for certificates: unlike training photos, certificates are
+// legitimately either images OR PDFs. Google's download endpoint reports both as a generic
+// application/octet-stream, so the real type is read from the Content-Disposition filename instead.
+const downloadDriveCertificateToUploads = async (driveUrl) => {
+    const match = driveUrl.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/) || driveUrl.match(/drive\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/);
+    if (!match) return null;
+    const fileId = match[1];
+
+    try {
+        const response = await fetch(`https://drive.google.com/uc?export=download&id=${fileId}`);
+        if (!response.ok) {
+            console.warn(`[DRIVE IMPORT] Failed to download Drive certificate ${fileId}: status ${response.status}`);
+            return null;
+        }
+        const disposition = response.headers.get('content-disposition') || '';
+        const nameMatch = disposition.match(/filename="?([^";]+)"?/);
+        const nameExt = nameMatch ? path.extname(nameMatch[1]).replace('.', '').toLowerCase() : '';
+        const contentType = response.headers.get('content-type') || '';
+        const ext = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'].includes(nameExt)
+            ? nameExt
+            : (contentType.startsWith('image/') ? contentType.split('/')[1]?.split(';')[0] : contentType === 'application/pdf' ? 'pdf' : null);
+        if (!ext) {
+            console.warn(`[DRIVE IMPORT] Drive certificate ${fileId} is not an image or PDF (content-type: ${contentType}), skipping.`);
+            return null;
+        }
+        const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.${ext}`;
+        const buffer = Buffer.from(await response.arrayBuffer());
+        fs.writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
+        return `/api/uploads/${filename}`;
+    } catch (e) {
+        console.warn(`[DRIVE IMPORT] Error downloading Drive certificate ${fileId}:`, e.message);
+        return null;
+    }
+};
+
 // Runs `worker` over `items` with at most `limit` in flight at once, preserving input order in the result array.
 const runWithConcurrency = async (items, limit, worker) => {
     const results = new Array(items.length);
@@ -3510,6 +3545,92 @@ app.post('/api/external-training/request', async (req, res) => {
         }
 
         res.json({ success: true, id: result.insertId });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 1b. HR bulk-imports historical/already-processed requests from an Excel export (see TrainingExternalManager import).
+// Each row is inserted directly with status 'Processed', bypassing the normal request/approve/hr-process flow.
+app.post('/api/external-training/bulk-import', async (req, res) => {
+    try {
+        const { rows, hr_name } = req.body;
+        if (!Array.isArray(rows) || rows.length === 0) {
+            return res.status(400).json({ error: 'rows must be a non-empty array' });
+        }
+
+        const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
+        const errors = [];
+        const duplicates = [];
+
+        const insertOne = async ({ row, i }) => {
+            try {
+                const {
+                    employee_id, employee_name, category, title, vendor, location,
+                    start_date, end_date, registration_fee, travel_flight_cost, accommodation_cost,
+                    miscellaneous_cost, payment_method, certificate_link, certificate_expiry_date,
+                    incentive_reward, incentive_payment_type, learning_hours, participation_type, training_gr_type
+                } = row;
+
+                if (!employee_id || !title) {
+                    throw new Error('employee_id and title are required');
+                }
+
+                // Re-importing the same source file (accidental double-click, re-upload of an unmodified
+                // sheet, etc.) would otherwise insert duplicate rows every time — there's no unique
+                // constraint on the table. Treat the same employee + title + start date as "already imported".
+                const existing = await query(
+                    `SELECT id FROM external_training_requests WHERE employee_id = ? AND title = ? AND start_date <=> ? LIMIT 1`,
+                    [employee_id, title, toMysqlDatetime(start_date)]
+                );
+                if (existing.length > 0) {
+                    duplicates.push({ row: i + 1, employee_id, employee_name: employee_name || '', title, start_date: start_date || null, existingId: existing[0].id });
+                    return 'duplicate';
+                }
+
+                // Attribute the "Supervisor" side to whoever currently reports-to for this employee in SimAsset,
+                // rather than a hardcoded placeholder, so the dossier reflects the real org chart at import time.
+                const supervisor = await findReportToEmployee(employee_id);
+                const approvedBy = supervisor?.full_name || 'Bulk Import';
+
+                // Re-host the certificate on the LMS itself instead of linking out to Google Drive, whose
+                // unofficial thumbnail endpoint is unreliable for embedding (see downloadDriveImageToUploads).
+                let storedCertificateLink = certificate_link || null;
+                if (certificate_link && certificate_link.includes('drive.google.com')) {
+                    const localPath = await downloadDriveCertificateToUploads(certificate_link);
+                    if (localPath) storedCertificateLink = localPath;
+                }
+
+                await query(`
+                    INSERT INTO external_training_requests
+                    (employee_id, employee_name, category, title, vendor, location, start_date, end_date,
+                     status, registration_fee, travel_flight_cost, accommodation_cost, miscellaneous_cost,
+                     payment_method, approved_by, hr_name, certificate_link, certificate_expiry_date,
+                     original_certificate_expiry_date, incentive_reward, incentive_payment_type,
+                     training_gr_type, participation_type, learning_hours)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Processed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `, [
+                    employee_id, employee_name || '', category || '', title, vendor || '', location || '',
+                    toMysqlDatetime(start_date), toMysqlDatetime(end_date),
+                    registration_fee || 0, travel_flight_cost || 0, accommodation_cost || 0, miscellaneous_cost || 0,
+                    payment_method || 'Reimbursement', approvedBy, hr_name || null,
+                    storedCertificateLink, certificate_expiry_date || null, certificate_expiry_date || null,
+                    incentive_reward || null, incentive_payment_type || null,
+                    training_gr_type || null, participation_type || null, learning_hours || null
+                ]);
+                return 'inserted';
+            } catch (rowErr) {
+                errors.push({ row: i + 1, error: rowErr.message });
+                return 'error';
+            }
+        };
+
+        // Bounded concurrency: downloading certificate images from Drive per row is slow one-at-a-time
+        // and large imports would otherwise risk hitting the proxy's request timeout.
+        const indexedRows = rows.map((row, i) => ({ row, i }));
+        const results = await runWithConcurrency(indexedRows, 5, insertOne);
+        const inserted = results.filter(r => r === 'inserted').length;
+        const skipped = results.filter(r => r === 'duplicate').length;
+
+        res.json({ success: true, inserted, skipped, duplicates, errors });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
