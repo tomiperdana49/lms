@@ -24,8 +24,6 @@ import { API_BASE_URL } from '../config';
 import type { TrainingRequest } from '../types';
 import ConfirmationModal from './ConfirmationModal';
 
-const INDONESIAN_MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-
 const resolveFileUrl = (link?: string | null) => {
     if (!link) return undefined;
     return link.startsWith('/') ? `${API_BASE_URL}${link}` : link;
@@ -604,8 +602,11 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
         averageCost: filteredRequests.length ? filteredRequests.reduce((sum, r) => sum + (Number(r.cost) || 0), 0) / filteredRequests.length : 0
     };
 
-    // Import already-processed external training records from an Excel file (same header layout as handleExportProcessed
-    // produces, plus Location / Category training / Payment Method). Each row is inserted with status 'Processed'.
+    // Import already-processed external training records from an Excel file. Expects the detailed raw-data
+    // header layout (Judul, Penyelenggara / Vendor, Sertifikat, Location, Payment Method, etc.) — a separate,
+    // narrower format than the HR training report handleExportProcessed() now produces, since the report
+    // layout doesn't carry everything needed to reconstruct a record (certificate link, location, payment
+    // method, ...). Each row is inserted with status 'Processed'.
     const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -764,62 +765,91 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     };
 
     // Export HR-processed ("APPROVED" in this component's vocabulary, i.e. DB status = 'Processed') requests
-    // that are currently visible under the active year/period/branch/search filters.
+    // that are currently visible under the active year/period/branch/search filters, in the company-wide
+    // HR training report layout (matches the combined internal+external report template). Columns with no
+    // source in this app (Competencies Type/Detail, Facilitator, PTE/Pre-Test/Post-Test scores used only by
+    // internal training, Action Plan, Detail Participant Type) are left blank for HR to fill in manually.
     const handleExportProcessed = () => {
         const processedRequests = filteredRequests.filter(r => r.status === 'APPROVED');
 
-        const formatExportDate = (value?: string | null) => {
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+        const formatDDMMYYYY = (value?: string | null) => {
             if (!value) return '';
             const d = new Date(value);
             if (isNaN(d.getTime())) return '';
-            return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+            return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
         };
 
-        const rows = processedRequests.map(req => {
+        // e.g. "27 Tahun" -> "20-30 years"
+        const ageGroupFor = (ageLabel?: string) => {
+            const n = parseInt(String(ageLabel || '').replace(/\D/g, ''), 10);
+            if (isNaN(n)) return '';
+            if (n < 20) return '<20 years';
+            if (n <= 30) return '20-30 years';
+            if (n <= 40) return '31-40 years';
+            if (n <= 50) return '41-50 years';
+            if (n <= 60) return '51-60 years';
+            return '>60 years';
+        };
+
+        const header = [
+            '', 'Employee Name', 'ID', 'Training Type', 'Designation', 'Company Group', 'Company', 'Grade', 'Band',
+            'Directorate', 'Division', 'Department', 'LOB', 'Divison Type Mapping', 'Quarter', 'Year', 'Month',
+            'Month by number', 'Start Date', 'End Date', 'Training Hours', 'Competencies Type', 'Competency Detail',
+            'Training Name', 'Attendance', 'Participation Type', 'Vendor', 'Facilitator', 'Total Cost', 'PTE 1 Score',
+            'Pre-Test', 'Post-Test', '%Increment', 'PTE 3', 'Age', 'Age Group', 'Gender', 'ESG, HSE, Other',
+            'Action Plan', 'Detail Participant Type'
+        ];
+
+        const rows = processedRequests.map((req, idx) => {
             const raw = req._original || {};
+            const emp = employees.find((e: any) => e.id_employee === req.employee_id);
             const startDate = raw.start_date ? new Date(raw.start_date) : null;
-            const endDate = raw.end_date ? new Date(raw.end_date) : null;
-
-            let trainingHours: number | string = '';
-            if (startDate && endDate && !isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-                const dayCount = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-                trainingHours = dayCount > 0 ? dayCount * 8 : '';
-            }
-
             const totalCost = (Number(req.costTraining) || 0) + (Number(req.costTransport) || 0) + (Number(req.costAccommodation) || 0) + (Number(req.costOthers) || 0);
 
-            return {
-                'Periode Bulan': startDate ? INDONESIAN_MONTHS[startDate.getMonth()] : '',
-                'Start Time': formatExportDate(raw.start_date),
-                'End Time': formatExportDate(raw.end_date),
-                'Kategori': raw.category || req.employeeRole || '',
-                'Judul': req.title || '',
-                'Penyelenggara / Vendor': req.vendor || '',
-                'Sertifikat': raw.certificate_link ? resolveFileUrl(raw.certificate_link) : '',
-                'expired sertifikat': formatExportDate(raw.certificate_expiry_date),
-                'Employee ID': req.employee_id || '',
-                'Peserta': req.employeeName || '',
-                'Biaya Training/Trainer': Number(req.costTraining) || 0,
-                'Biaya Transportasi': Number(req.costTransport) || 0,
-                'Biaya Akomodasi': Number(req.costAccommodation) || 0,
-                'Biaya Lain-lain': Number(req.costOthers) || 0,
-                'Total Biaya': totalCost,
-                'Budget Learning per orang': Math.round(totalCost / 2),
-                'Training Type': 'External',
-                'Insentive sertifikat/bulan': req.incentivePaymentType === 'Recurring' ? (Number(req.incentiveReward) || 0) : '',
-                'Training Hours': trainingHours,
-                'Participation Type': raw.participation_type || '',
-                'ESG, HSE, Other': raw.training_gr_type || ''
-            };
+            return [
+                idx + 1,
+                req.employeeName || '',
+                req.employee_id || '',
+                'External',
+                emp?.job_position || '',
+                emp?.company_group || '',
+                emp?.company || '',
+                emp?.grade || '',
+                emp?.band || '',
+                emp?.directorate || '',
+                emp?.organization_name || '',
+                emp?.department || '',
+                emp?.lob || '',
+                emp?.division_type_mapping || '',
+                startDate ? Math.ceil((startDate.getMonth() + 1) / 3) : '',
+                startDate ? startDate.getFullYear() : '',
+                startDate ? monthNames[startDate.getMonth()] : '',
+                startDate ? startDate.getMonth() + 1 : '',
+                formatDDMMYYYY(raw.start_date),
+                formatDDMMYYYY(raw.end_date),
+                raw.learning_hours ? Number(raw.learning_hours) : '',
+                '',
+                '',
+                req.title || '',
+                'Present',
+                raw.participation_type || '',
+                req.vendor || '',
+                '',
+                totalCost,
+                '', '', '', '', '',
+                emp?.age || '',
+                ageGroupFor(emp?.age),
+                emp?.gender || '',
+                raw.training_gr_type || '',
+                '',
+                ''
+            ];
         });
 
-        const ws = XLSX.utils.json_to_sheet(rows);
-        ws['!cols'] = [
-            { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 24 }, { wch: 24 },
-            { wch: 20 }, { wch: 16 }, { wch: 12 }, { wch: 22 }, { wch: 16 }, { wch: 16 },
-            { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 18 },
-            { wch: 14 }, { wch: 18 }, { wch: 14 }
-        ];
+        const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+        ws['!cols'] = header.map(() => ({ wch: 16 }));
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'External Training');
         const periodLabel = selectedYear === 'All' ? 'AllYears' : String(selectedYear);
