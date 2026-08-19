@@ -85,7 +85,10 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     vendor: req.vendor || t('common.notAvailable'),
                     location: req.location || t('common.notAvailable'),
                     cost: Number(req.registration_fee || 0) + Number(req.travel_flight_cost || 0) + Number(req.accommodation_cost || 0) + Number(req.miscellaneous_cost || 0),
-                    date: req.created_at || req.start_date || new Date().toISOString(),
+                    // The card badge (and the Year/Period filter) should reflect when the training actually
+                    // happened, not when the record was created — those diverge for bulk-imported historical
+                    // data, which all gets the same created_at ("today") regardless of the real training date.
+                    date: req.start_date || req.created_at || new Date().toISOString(),
                     status: req.status === 'Processed' ? 'APPROVED' : (req.status === 'Approved' ? 'PENDING_HR' : (req.status === 'Pending' ? 'PENDING_SUPERVISOR' : 'REJECTED')),
                     justification: t('requestModal.dateRange', {
                         start: req.start_date ? new Date(req.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
@@ -130,7 +133,10 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     vendor: req.vendor || t('common.notAvailable'),
                     location: req.location || t('common.notAvailable'),
                     cost: Number(req.registration_fee || 0) + Number(req.travel_flight_cost || 0) + Number(req.accommodation_cost || 0) + Number(req.miscellaneous_cost || 0),
-                    date: req.created_at || req.start_date || new Date().toISOString(),
+                    // The card badge (and the Year/Period filter) should reflect when the training actually
+                    // happened, not when the record was created — those diverge for bulk-imported historical
+                    // data, which all gets the same created_at ("today") regardless of the real training date.
+                    date: req.start_date || req.created_at || new Date().toISOString(),
                     status: req.status === 'Processed' ? 'APPROVED' : (req.status === 'Approved' ? 'PENDING_HR' : (req.status === 'Pending' ? 'PENDING_SUPERVISOR' : 'REJECTED')),
                     justification: t('requestModal.dateRange', {
                         start: req.start_date ? new Date(req.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
@@ -315,6 +321,12 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     ];
 
     const getPeriodDates = () => {
+        // "ALL YEARS" + "All Year" period means no date restriction at all — previously this silently
+        // fell back to the current year's range, so anything outside it (e.g. historical imported data)
+        // vanished from the list even with "All Years" selected.
+        if (selectedYear === 'All' && selectedPeriod === 'All Year') {
+            return [new Date(0), new Date(8640000000000000)];
+        }
         const year = selectedYear === 'All' ? new Date().getFullYear() : selectedYear;
         let start = new Date(year, 0, 1);
         let end = new Date(year, 11, 31, 23, 59, 59);
@@ -388,7 +400,9 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
 
     // Own submitted requests are hidden from the actionable list (to avoid self-approval)
     // but must still count toward the aggregate stats above.
-    const visibleRequests = drilldownFiltered.filter(req => req.employeeName !== userName);
+    const visibleRequests = drilldownFiltered
+        .filter(req => req.employeeName !== userName)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const onlyOwnRequestsHidden = statusDrilldown !== null && visibleRequests.length === 0 && drilldownFiltered.length > 0;
 
 
