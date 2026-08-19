@@ -1,0 +1,198 @@
+{
+  "header": {
+    "title": "Help Center",
+    "subtitle": "Guides for using LMS Nusa's features"
+  },
+  "nav": {
+    "readingLog": "Reading Log",
+    "onlineModules": "Online Modules",
+    "trainingInternal": "Training Internal",
+    "trainingExternal": "Training External"
+  },
+  "labels": {
+    "purpose": "What is this feature for?",
+    "steps": "Steps",
+    "tips": "Tips & Things to Watch Out For",
+    "chooseRole": "Choose your role:"
+  },
+  "topics": {
+    "readingLog": {
+      "title": "Reading Log",
+      "purpose": "Track the books you read and claim a reading incentive from HR.",
+      "steps": [
+        {
+          "title": "Choose how you're reading",
+          "description": "Click \"E-Book / Personal Book\" to report a personal/e-book you've already finished, or \"Office Book / SIMAS\" to physically borrow a book from the office (this opens the SIMAS system)."
+        },
+        {
+          "title": "Fill in the report form",
+          "description": "In the \"Report Private Reading\" form, fill in Book Title, Category, Start Date, Review Link (Goodreads/Google Drive), and Cover Photo Evidence, then click \"Save Report\"."
+        },
+        {
+          "title": "Finish a book you're still reading",
+          "description": "A new log starts as \"Draft\". If you started reading and haven't finished, click \"Finish\" once you're done to fill in the review link + evidence photo."
+        },
+        {
+          "title": "Claim the incentive",
+          "description": "If the book's category isn't Fiction/Magazine and you haven't hit the yearly cap, a \"Claim Incentive\" button appears — click it to send the claim to HR (status becomes \"Under Review\")."
+        },
+        {
+          "title": "Wait for HR's decision",
+          "description": "HR will approve or reject your claim. The status will change to \"Approved\" (with the approver's name) or \"Rejected\"."
+        }
+      ],
+      "tips": [
+        "The gap between Start Date and Finish Date must be more than 1 day, otherwise the system will block submission.",
+        "Incentives are capped at 5 approved claims per year.",
+        "Fiction/Magazine categories never earn an incentive.",
+        "An evidence photo is required in every flow.",
+        "A log still in \"Draft\" status can be cancelled (\"Cancel\") if you change your mind."
+      ]
+    },
+    "onlineModules": {
+      "title": "Online Modules",
+      "purpose": "Take self-paced video courses with a quiz per module and a final assessment, then download a certificate.",
+      "steps": [
+        {
+          "title": "Start a course",
+          "description": "In the course list, click \"Start\" to begin, \"Continue\" to resume a course in progress, or \"Review\" once it's at 100%."
+        },
+        {
+          "title": "Enter the player",
+          "description": "On the course overview page (title, duration, module count, description), click \"Process\" to start watching."
+        },
+        {
+          "title": "Watch each module's video",
+          "description": "Watch the video all the way to the end — the next module only unlocks once the current one is finished (sequential, one at a time)."
+        },
+        {
+          "title": "Take the module quiz",
+          "description": "If a module has a quiz, it opens automatically once the video finishes (\"Take Quiz\"). A module quiz requires a 100% score to pass and unlock the next module."
+        },
+        {
+          "title": "Take the final assessment",
+          "description": "Once every module is done, take the \"Final Assessment\" — a minimum score of 80 is required to pass. Below 80, click \"Retry\" to try again."
+        },
+        {
+          "title": "Download your certificate",
+          "description": "After passing the final assessment, a \"Download Certificate (PDF)\" button appears in the course sidebar."
+        }
+      ],
+      "tips": [
+        "Videos can't be skipped/seeked to fake completion — the system only marks a video complete once it actually plays to the end.",
+        "Module quizzes (100% to pass) and the final assessment (80% to pass) have different passing standards — don't mix them up.",
+        "Progress on a course in progress can be reset via the (X) \"Cancel Progress\" button if you want to start over."
+      ]
+    },
+    "trainingInternal": {
+      "title": "Training Internal",
+      "audiences": {
+        "participant": {
+          "label": "As a Participant",
+          "purpose": "View the internal (in-person/online) training sessions you're on, complete the pre-test, post-test, and feedback, then download your certificate.",
+          "steps": [
+            {
+              "title": "Open a session's detail",
+              "description": "Click a training session in your list to open its details: schedule, location or meeting link (for online/hybrid sessions), description, and a presentation material link if provided."
+            },
+            {
+              "title": "Take the Pre-Test",
+              "description": "The \"Pre-Test\" button (evaluation before the material) only becomes active once the session Host opens it."
+            },
+            {
+              "title": "Take the Post-Test",
+              "description": "The \"Post-Test\" button only becomes active once the Host opens it AND your Pre-Test is already completed. A minimum score of 80 is required to pass."
+            },
+            {
+              "title": "Submit Feedback",
+              "description": "The Feedback form only becomes available once the Host opens it, and — if this session has a post-test — once you've passed the Post-Test (score ≥ 80)."
+            },
+            {
+              "title": "Download your certificate",
+              "description": "Once HR closes/finalizes the session's cost report, a \"Download Certificate\" button appears for attendees on the participant list."
+            }
+          ],
+          "tips": [
+            "There's no self-enrollment button for Training Internal sessions — sessions and their participants are set by HR/the Host; you just complete whatever session already shows up on your list.",
+            "If a button still looks greyed out/locked, it's almost always because the Host/HR hasn't opened that step yet — not something you're doing wrong.",
+            "The certificate only becomes downloadable after HR closes the session, not right after you finish submitting feedback."
+          ]
+        },
+        "trainer": {
+          "label": "As a Trainer / Host",
+          "purpose": "Create a training session (HR/HR_ADMIN only), or run a session where you're listed as Host, through to participants — and yourself — getting a certificate.",
+          "steps": [
+            {
+              "title": "Create a new session (HR/HR_ADMIN only)",
+              "description": "In Admin Panel → Internal, click \"Create Session\". Fill in the \"Session Details\" tab: Title, Date, Start/End Time, Host Name, Event Type (Online/In-Person/Hybrid), Competency, GRI Type, Location or Meeting Link, Material Link, and pick the invited participants. In the \"Exam Configuration\" tab, build the Pre-Test and Post-Test question sets. Click \"Send Invitations\" to create the session (or bulk-import via the \"Import Data\" button)."
+            },
+            {
+              "title": "Open Host controls on your session",
+              "description": "If you're listed as a session's Host, a \"HOST CONTROL\" badge appears when you open that session's detail on the regular Training Internal page — you don't need to be HR for this."
+            },
+            {
+              "title": "Open each stage for participants",
+              "description": "There are 3 on/off toggles: Pre-Test Assessment, Post-Test Assessment, and Feedback Form. Switch them on one at a time as participants are ready for each stage — quizzes are auto-scored by the system, no manual grading needed."
+            },
+            {
+              "title": "Monitor participant progress",
+              "description": "A summary panel shows how many participants have completed each stage (\"Completed\"); click a count to see who has and hasn't."
+            },
+            {
+              "title": "Close the session",
+              "description": "Once every stage is done, click \"CLOSE SESSION\". If there's no training-documentation photo yet, you'll be asked to upload one first."
+            },
+            {
+              "title": "Finalize the cost report",
+              "description": "Open \"Finalize Report\": check off who actually attended, upload a documentation photo (if not already set), then fill in Trainer Incentive, Snack Cost, Lunch Cost, and Other Cost — auto-summed into a Total Estimated Cost. This button stays locked (\"Session Still Open\") until the session is closed in the previous step."
+            },
+            {
+              "title": "Mark it paid",
+              "description": "Click \"Mark Paid\" and confirm. After this the report locks (\"Report Paid & Locked\") and can no longer be edited."
+            },
+            {
+              "title": "Certificates unlock automatically",
+              "description": "Once the report is marked paid, attendees on the list can download their certificates, and you as Host get your own \"Download Host Certificate\" button too."
+            }
+          ],
+          "tips": [
+            "You don't need to be HR to run a session — if you're listed as its Host, the controls automatically appear for you on the regular Training Internal page, not just in the Admin Panel.",
+            "Creating new sessions and bulk-importing data both remain HR/HR_ADMIN-only, via the Admin Panel.",
+            "If a session needs reopening after being closed, only HR/HR_ADMIN have a \"REOPEN SESSION\" button.",
+            "The cost report can only be submitted once the session is closed — if the button is still locked with \"Session Still Open\", close the session first."
+          ]
+        }
+      }
+    },
+    "trainingExternal": {
+      "title": "Training External",
+      "purpose": "Submit a request for training outside the company, and — if you have direct reports — approve your team's requests.",
+      "steps": [
+        {
+          "title": "Submit a new request",
+          "description": "On the \"My Requests\" tab, fill in the \"New Request\" form: Category, Title/Course Name, Vendor, Location, Start & End Date, Registration Fee, Payment Method, and an optional Attachment Link, then click \"Submit Request\"."
+        },
+        {
+          "title": "Wait for your supervisor's approval",
+          "description": "Your request shows status \"Pending (Supervisor)\" — your supervisor will see and approve/reject it on their \"Team Approvals\" tab."
+        },
+        {
+          "title": "HR processes it",
+          "description": "Once your supervisor approves, status changes to \"Pending (HR)\" — HR will process the costs and (if this training issues a certificate) upload the certificate."
+        },
+        {
+          "title": "Check the final result",
+          "description": "Once HR finishes processing, status becomes \"Approved\". Click \"Show Detail\" on your request card to see the cost breakdown, learning hours, and certificate (if any)."
+        },
+        {
+          "title": "Approve your team's requests (supervisors only)",
+          "description": "If you have direct reports, a \"Team Approvals\" tab appears where you can approve or reject training requests from your team members."
+        }
+      ],
+      "tips": [
+        "The \"Team Approvals\" tab only appears if you actually have direct reports recorded in the employee data.",
+        "\"Show Detail\" is available on both tabs (My Requests & Team Approvals) to see the full breakdown, including the certificate."
+      ]
+    }
+  }
+}

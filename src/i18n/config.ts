@@ -11,6 +11,7 @@ import enConfirmationModal from './locales/en/confirmationModal.json';
 import enCoursePlayer from './locales/en/coursePlayer.json';
 import enExternalTraining from './locales/en/externalTraining.json';
 import enFeedbackModal from './locales/en/feedbackModal.json';
+import enHelpPage from './locales/en/helpPage.json';
 import enHRReportGenerator from './locales/en/hrReportGenerator.json';
 import enIncentiveManager from './locales/en/incentiveManager.json';
 import enLearningReport from './locales/en/learningReport.json';
@@ -35,6 +36,7 @@ import idConfirmationModal from './locales/id/confirmationModal.json';
 import idCoursePlayer from './locales/id/coursePlayer.json';
 import idExternalTraining from './locales/id/externalTraining.json';
 import idFeedbackModal from './locales/id/feedbackModal.json';
+import idHelpPage from './locales/id/helpPage.json';
 import idHRReportGenerator from './locales/id/hrReportGenerator.json';
 import idIncentiveManager from './locales/id/incentiveManager.json';
 import idLearningReport from './locales/id/learningReport.json';
@@ -68,6 +70,7 @@ i18n
                 coursePlayer: enCoursePlayer,
                 externalTraining: enExternalTraining,
                 feedbackModal: enFeedbackModal,
+                helpPage: enHelpPage,
                 hrReportGenerator: enHRReportGenerator,
                 incentiveManager: enIncentiveManager,
                 learningReport: enLearningReport,
@@ -93,6 +96,7 @@ i18n
                 coursePlayer: idCoursePlayer,
                 externalTraining: idExternalTraining,
                 feedbackModal: idFeedbackModal,
+                helpPage: idHelpPage,
                 hrReportGenerator: idHRReportGenerator,
                 incentiveManager: idIncentiveManager,
                 learningReport: idLearningReport,

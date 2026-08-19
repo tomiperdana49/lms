@@ -20,7 +20,8 @@ import {
     AlertCircle,
     FileText,
     Globe,
-    UsersRound
+    UsersRound,
+    HelpCircle
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Page, Role, User } from '../types';
@@ -407,8 +408,24 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                         )}
                     </nav>
 
-                    {/* Feedback Button */}
-                    <div className="px-4 pt-4 border-t border-slate-800/60">
+                    {/* Help & Feedback Buttons */}
+                    <div className="px-4 pt-4 border-t border-slate-800/60 space-y-1">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onNavigate('help');
+                                setIsSidebarOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left cursor-pointer
+                                ${activePage === 'help'
+                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                }
+                            `}
+                        >
+                            <HelpCircle size={20} />
+                            <span className="font-medium">{t('menu.help')}</span>
+                        </button>
                         <button
                             type="button"
                             onClick={() => setIsFeedbackOpen(true)}

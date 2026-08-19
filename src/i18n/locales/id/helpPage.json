@@ -1,0 +1,198 @@
+{
+  "header": {
+    "title": "Pusat Bantuan",
+    "subtitle": "Panduan penggunaan fitur-fitur LMS Nusa"
+  },
+  "nav": {
+    "readingLog": "Log Bacaan",
+    "onlineModules": "Modul Online",
+    "trainingInternal": "Training Internal",
+    "trainingExternal": "Training Eksternal"
+  },
+  "labels": {
+    "purpose": "Untuk apa fitur ini?",
+    "steps": "Langkah-langkah",
+    "tips": "Tips & Hal yang Perlu Diperhatikan",
+    "chooseRole": "Pilih peranmu:"
+  },
+  "topics": {
+    "readingLog": {
+      "title": "Log Bacaan",
+      "purpose": "Catat buku yang kamu baca dan klaim insentif membaca dari HR.",
+      "steps": [
+        {
+          "title": "Pilih cara membaca",
+          "description": "Klik \"E-Book / Personal Book\" untuk melaporkan buku pribadi/e-book yang sudah selesai dibaca, atau \"Office Book / SIMAS\" untuk pinjam fisik buku kantor (akan diarahkan ke sistem SIMAS)."
+        },
+        {
+          "title": "Isi form pelaporan",
+          "description": "Di form \"Report Private Reading\", isi Judul Buku, Kategori, Tanggal Mulai, Link Review (Goodreads/Google Drive), dan Foto Bukti Cover, lalu klik \"Save Report\"."
+        },
+        {
+          "title": "Lanjutkan buku yang belum selesai",
+          "description": "Log baru berstatus \"Draft\". Kalau kamu baru mulai baca dan belum kelar, klik \"Finish\" saat sudah selesai untuk isi link review + foto bukti."
+        },
+        {
+          "title": "Klaim insentif",
+          "description": "Kalau kategori bukunya bukan Fiksi/Majalah dan kamu belum kena batas tahunan, tombol \"Claim Incentive\" akan muncul — klik untuk kirim ke HR (status berubah jadi \"Under Review\")."
+        },
+        {
+          "title": "Tunggu persetujuan HR",
+          "description": "HR akan menyetujui atau menolak klaimmu. Status akan berubah jadi \"Approved\" (dengan nama yang menyetujui) atau \"Rejected\"."
+        }
+      ],
+      "tips": [
+        "Jarak antara Tanggal Mulai dan Tanggal Selesai harus lebih dari 1 hari, kalau tidak sistem akan menolak.",
+        "Insentif dibatasi maksimal 5 klaim disetujui per tahun.",
+        "Buku kategori Fiksi/Majalah tidak mendapat insentif.",
+        "Foto bukti wajib diisi di semua alur pelaporan.",
+        "Log yang masih berstatus \"Draft\" bisa dibatalkan (\"Cancel\") kalau berubah pikiran."
+      ]
+    },
+    "onlineModules": {
+      "title": "Modul Online",
+      "purpose": "Ikuti kursus video mandiri (self-paced) lengkap dengan kuis tiap modul dan ujian akhir, lalu unduh sertifikat.",
+      "steps": [
+        {
+          "title": "Mulai kursus",
+          "description": "Di daftar kursus, klik \"Start\" untuk mulai, \"Continue\" untuk melanjutkan kursus yang sedang berjalan, atau \"Review\" kalau progress-nya sudah 100%."
+        },
+        {
+          "title": "Masuk ke player",
+          "description": "Di halaman overview kursus (judul, durasi, jumlah modul, deskripsi), klik \"Process\" untuk mulai menonton."
+        },
+        {
+          "title": "Tonton video tiap modul",
+          "description": "Tonton video sampai benar-benar selesai — modul berikutnya baru terbuka setelah modul saat ini selesai ditonton (urut satu per satu)."
+        },
+        {
+          "title": "Kerjakan kuis modul",
+          "description": "Kalau modul punya kuis, setelah video selesai kuis otomatis muncul (\"Take Quiz\"). Kuis modul harus dijawab benar 100% untuk lulus dan lanjut ke modul berikutnya."
+        },
+        {
+          "title": "Kerjakan ujian akhir",
+          "description": "Setelah semua modul selesai, kerjakan \"Final Assessment\" — nilai minimal 80 untuk lulus. Kalau nilainya di bawah 80, klik \"Retry\" untuk mengulang."
+        },
+        {
+          "title": "Unduh sertifikat",
+          "description": "Setelah lulus ujian akhir, tombol \"Download Certificate (PDF)\" akan muncul di sidebar kursus."
+        }
+      ],
+      "tips": [
+        "Video tidak bisa di-skip/lompat untuk pura-pura selesai — sistem menandai selesai saat video benar-benar habis diputar.",
+        "Kuis per modul (standar lulus 100%) dan ujian akhir (standar lulus 80%) punya standar kelulusan yang berbeda — jangan tertukar.",
+        "Progress kursus yang sedang berjalan bisa direset lewat tombol (X) \"Cancel Progress\" kalau mau mulai ulang dari awal."
+      ]
+    },
+    "trainingInternal": {
+      "title": "Training Internal",
+      "audiences": {
+        "participant": {
+          "label": "Sebagai Peserta",
+          "purpose": "Lihat sesi training internal (tatap muka/online) yang kamu ikuti, kerjakan pre-test, post-test, dan feedback, lalu unduh sertifikat.",
+          "steps": [
+            {
+              "title": "Buka detail sesi",
+              "description": "Klik sesi training di daftarmu untuk membuka detailnya: jadwal, lokasi atau link meeting (untuk sesi online/hybrid), deskripsi, dan link materi presentasi kalau ada."
+            },
+            {
+              "title": "Kerjakan Pre-Test",
+              "description": "Tombol \"Pre-Test\" (evaluasi sebelum materi) baru aktif setelah dibuka oleh Host sesi."
+            },
+            {
+              "title": "Kerjakan Post-Test",
+              "description": "Tombol \"Post-Test\" baru aktif setelah dibuka Host DAN Pre-Test kamu sudah selesai lebih dulu. Nilai minimal 80 untuk lulus."
+            },
+            {
+              "title": "Isi Feedback",
+              "description": "Form Feedback baru bisa diisi setelah dibuka Host, dan (kalau sesi ini punya post-test) setelah kamu lulus Post-Test (nilai ≥ 80)."
+            },
+            {
+              "title": "Unduh sertifikat",
+              "description": "Setelah HR menutup/finalisasi laporan biaya sesi (\"Lapor Insentif\"), tombol \"Download Certificate\" akan muncul untuk peserta yang tercatat hadir."
+            }
+          ],
+          "tips": [
+            "Tidak ada tombol daftar sendiri untuk sesi Training Internal — sesi dan pesertanya ditentukan oleh HR/Host, kamu hanya perlu mengerjakan sesi yang sudah muncul di daftarmu.",
+            "Kalau ada tombol yang masih abu-abu/terkunci, biasanya karena Host/HR belum membuka tahap itu — bukan karena kamu salah langkah.",
+            "Sertifikat baru bisa diunduh setelah HR menutup sesi, bukan langsung setelah kamu selesai mengisi feedback."
+          ]
+        },
+        "trainer": {
+          "label": "Sebagai Trainer / Host",
+          "purpose": "Buat sesi training (khusus HR/HR_ADMIN), atau kelola jalannya sesi yang namamu tercatat sebagai Host, sampai peserta dan kamu sendiri dapat sertifikat.",
+          "steps": [
+            {
+              "title": "Buat sesi baru (khusus HR/HR_ADMIN)",
+              "description": "Di Panel Admin → Internal, klik \"Create Session\". Isi tab \"Session Details\": Judul, Tanggal, Jam Mulai/Selesai, Nama Host, Tipe Acara (Online/Tatap Muka/Hybrid), Kompetensi, Tipe GRI, Lokasi atau Link Meeting, Link Materi, dan pilih peserta yang diundang. Di tab \"Exam Configuration\", buat soal Pre-Test dan Post-Test. Klik \"Send Invitations\" untuk membuat sesi (bisa juga import massal lewat tombol \"Import Data\")."
+            },
+            {
+              "title": "Buka kontrol Host di sesimu",
+              "description": "Kalau namamu tercatat sebagai Host suatu sesi, badge \"HOST CONTROL\" akan muncul saat kamu buka detail sesi itu di halaman Training Internal biasa — tidak perlu jadi HR untuk ini."
+            },
+            {
+              "title": "Buka tahapan untuk peserta",
+              "description": "Ada 3 saklar on/off: Pre-Test Assessment, Post-Test Assessment, dan Feedback Form. Nyalakan satu-satu sesuai kapan peserta boleh mulai mengerjakannya — soal dinilai otomatis oleh sistem, tidak perlu koreksi manual."
+            },
+            {
+              "title": "Pantau progress peserta",
+              "description": "Panel ringkasan menampilkan jumlah peserta yang sudah menyelesaikan tiap tahap (\"Completed\"); klik angkanya untuk lihat daftar nama yang sudah/belum."
+            },
+            {
+              "title": "Tutup sesi",
+              "description": "Setelah semua tahap selesai, klik \"CLOSE SESSION\". Kalau belum ada foto dokumentasi training, kamu akan diminta upload dulu."
+            },
+            {
+              "title": "Selesaikan Laporan Insentif",
+              "description": "Buka \"Finalize Report\": centang peserta yang benar-benar hadir, upload foto dokumentasi (kalau belum), lalu isi Insentif Trainer, Biaya Snack, Biaya Lunch, dan Biaya Lain — otomatis dijumlah jadi Total Estimasi Biaya. Tombol ini terkunci (\"Session Still Open\") sampai sesi ditutup di langkah sebelumnya."
+            },
+            {
+              "title": "Tandai lunas",
+              "description": "Klik \"Mark Paid\" lalu konfirmasi. Setelah ini laporan terkunci (\"Report Paid & Locked\") dan tidak bisa diedit lagi."
+            },
+            {
+              "title": "Sertifikat otomatis terbuka",
+              "description": "Begitu laporan ditandai lunas, peserta yang tercatat hadir bisa mengunduh sertifikat mereka, dan kamu sebagai Host juga mendapat tombol \"Download Host Certificate\" milikmu sendiri."
+            }
+          ],
+          "tips": [
+            "Kamu tidak harus jadi HR untuk mengontrol jalannya sesi — kalau namamu tercatat sebagai Host, kontrolnya otomatis muncul untukmu di halaman Training Internal biasa (bukan cuma di Panel Admin).",
+            "Membuat sesi baru dan mengimpor data tetap khusus HR/HR_ADMIN lewat Panel Admin.",
+            "Kalau perlu membuka sesi lagi setelah ditutup, hanya HR/HR_ADMIN yang punya tombol \"REOPEN SESSION\".",
+            "Laporan Insentif baru bisa disubmit setelah sesi ditutup — kalau tombolnya masih terkunci dengan keterangan \"Session Still Open\", tutup dulu sesinya."
+          ]
+        }
+      }
+    },
+    "trainingExternal": {
+      "title": "Training Eksternal",
+      "purpose": "Ajukan permintaan training di luar perusahaan, dan (kalau kamu punya bawahan) setujui pengajuan tim kamu.",
+      "steps": [
+        {
+          "title": "Ajukan permintaan baru",
+          "description": "Di tab \"My Requests\", isi form \"New Request\": Kategori, Judul/Nama Kursus, Vendor, Lokasi, Tanggal Mulai & Selesai, Biaya Pendaftaran, Metode Pembayaran, dan Link Lampiran (opsional), lalu klik \"Submit Request\"."
+        },
+        {
+          "title": "Menunggu persetujuan atasan",
+          "description": "Pengajuanmu berstatus \"Menunggu (Atasan)\" — atasanmu akan melihat dan menyetujui/menolak di tab \"Team Approvals\" mereka."
+        },
+        {
+          "title": "Diproses HR",
+          "description": "Setelah disetujui atasan, status berubah jadi \"Menunggu (HR)\" — HR akan memproses biaya dan (kalau training ini butuh sertifikat) mengunggah sertifikatnya."
+        },
+        {
+          "title": "Lihat hasil akhir",
+          "description": "Setelah HR selesai memproses, status berubah jadi \"Approved\". Klik \"Show Detail\" pada kartu pengajuanmu untuk lihat rincian biaya, jam belajar, dan sertifikat (kalau ada)."
+        },
+        {
+          "title": "Setujui pengajuan tim (khusus atasan)",
+          "description": "Kalau kamu punya bawahan, tab \"Team Approvals\" akan muncul untuk kamu menyetujui atau menolak pengajuan training dari anggota timmu."
+        }
+      ],
+      "tips": [
+        "Tab \"Team Approvals\" hanya muncul kalau kamu memang punya bawahan yang tercatat di data kepegawaian.",
+        "\"Show Detail\" tersedia di kedua tab (My Requests & Team Approvals) untuk melihat rincian lengkap termasuk sertifikat."
+      ]
+    }
+  }
+}
