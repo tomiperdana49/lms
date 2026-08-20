@@ -18,7 +18,8 @@ import {
     UploadCloud,
     CreditCard,
     Tag,
-    ChevronDown
+    ChevronDown,
+    ChevronUp
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useTranslation } from 'react-i18next';
@@ -71,6 +72,14 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     // --- Data State ---
     const [requests, setRequests] = useState<TrainingRequest[]>([]);
     const [employees, setEmployees] = useState<any[]>([]);
+    const [expandedRequestIds, setExpandedRequestIds] = useState<Set<number>>(new Set());
+    const toggleRequestDetail = (id: number) => {
+        setExpandedRequestIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
 
     // --- Filter State ---
     const [selectedYear, setSelectedYear] = useState<number | 'All'>(new Date().getFullYear());
@@ -1054,7 +1063,9 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                             )}
                         </div>
                     ) : (
-                        visibleRequests.map(req => (
+                        visibleRequests.map(req => {
+                            const isExpanded = expandedRequestIds.has(req.id);
+                            return (
                             <div key={req.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group relative">
                                 <div className="flex flex-col md:flex-row md:items-start gap-4">
                                     <div className="space-y-3 flex-1">
@@ -1062,11 +1073,22 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                             <h4 className="text-lg font-black text-slate-900 group-hover:text-indigo-600 transition-colors leading-none">{req.title}</h4>
                                             <StatusBadge status={req.status} />
                                         </div>
-                                        
+
                                         <p className="text-sm font-bold text-slate-500">
                                             {req.employeeName} <span className="mx-2 text-slate-300">—</span> {t(`categoryLabels.${req.employeeRole}`, { defaultValue: req.employeeRole })}
                                         </p>
 
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleRequestDetail(req.id)}
+                                            className="flex items-center gap-1.5 text-xs font-black text-indigo-600 hover:text-indigo-700 uppercase tracking-widest"
+                                        >
+                                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                            {isExpanded ? t('list.hideDetail') : t('list.showDetail')}
+                                        </button>
+
+                                        {isExpanded && (
+                                        <>
                                         <div className="flex flex-wrap items-center gap-2">
                                             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 rounded-lg text-[10px] font-black text-slate-400 border border-slate-100">
                                                 <Calendar size={14} className="text-slate-300" />
@@ -1118,9 +1140,11 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                                 </div>
                                             </div>
                                         </div>
+                                        </>
+                                        )}
                                     </div>
 
-                                    {(req.evidenceUrl || req.renewalCertificateUrl) && (
+                                    {isExpanded && (req.evidenceUrl || req.renewalCertificateUrl) && (
                                         <div className="hidden lg:flex items-center gap-3 mr-4">
                                             {[
                                                 { url: req.evidenceUrl, label: t('list.certificateOriginal'), expiry: req.originalCertificateExpiryDate || req.certificateExpiryDate },
@@ -1177,7 +1201,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                     </div>
                                 </div>
                             </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
 

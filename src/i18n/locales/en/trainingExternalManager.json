@@ -40,6 +40,8 @@
     "viewDossier": "View Dossier",
     "detail": "Detail",
     "delete": "Delete",
+    "showDetail": "Show Detail",
+    "hideDetail": "Hide Detail",
     "certificateExpires": "Expires",
     "certificateExpired": "Expired",
     "incentive": "Incentive",

@@ -40,6 +40,8 @@
     "viewDossier": "Lihat Berkas",
     "detail": "Detail",
     "delete": "Hapus",
+    "showDetail": "Lihat Detail",
+    "hideDetail": "Sembunyikan Detail",
     "certificateExpires": "Berlaku s/d",
     "certificateExpired": "Kedaluwarsa",
     "incentive": "Insentif",
