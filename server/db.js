@@ -435,6 +435,78 @@ export const initDB = async () => {
             console.log("Added branch column to online_certificates.");
         } catch (e) { /* Ignore if exists */ }
 
+        // MIGRATION: Add idp_plans table (Individual Development Plan)
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS idp_plans (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    employee_id VARCHAR(50) NOT NULL,
+                    employee_name VARCHAR(255),
+                    job_position VARCHAR(255),
+                    department VARCHAR(255),
+                    supervisor_name VARCHAR(255),
+                    period_year INT NOT NULL,
+                    join_date_label VARCHAR(255),
+                    achievements TEXT,
+                    career_goal TEXT,
+                    existing_skills TEXT,
+                    development_area TEXT,
+                    status VARCHAR(20) DEFAULT 'Draft',
+                    created_by_date DATE,
+                    approved_date DATE,
+                    approved_by VARCHAR(255),
+                    rejection_reason TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_employee_period (employee_id, period_year)
+                )
+            `);
+            console.log("Verified idp_plans table exists.");
+        } catch (e) {
+            console.error("Error creating idp_plans table:", e);
+        }
+
+        // MIGRATION: Add idp_action_items table (development action checklist rows within an IDP)
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS idp_action_items (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    idp_id INT NOT NULL,
+                    action_description TEXT,
+                    target_time VARCHAR(100),
+                    is_mandatory TINYINT DEFAULT 0,
+                    is_completed TINYINT DEFAULT 0,
+                    notes TEXT,
+                    sort_order INT DEFAULT 0,
+                    FOREIGN KEY (idp_id) REFERENCES idp_plans(id) ON DELETE CASCADE
+                )
+            `);
+            console.log("Verified idp_action_items table exists.");
+        } catch (e) {
+            console.error("Error creating idp_action_items table:", e);
+        }
+
+        // MIGRATION: Add idp_reviews table (periodic 1-on-1 review notes + HR verification, per IDP)
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS idp_reviews (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    idp_id INT NOT NULL,
+                    review_date DATE,
+                    supervisor_note TEXT,
+                    reviewed_by VARCHAR(255),
+                    hr_verification_date DATE,
+                    hr_note TEXT,
+                    hr_verified_by VARCHAR(255),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (idp_id) REFERENCES idp_plans(id) ON DELETE CASCADE
+                )
+            `);
+            console.log("Verified idp_reviews table exists.");
+        } catch (e) {
+            console.error("Error creating idp_reviews table:", e);
+        }
+
         connection.release();
     } catch (err) {
         console.error('Database initialization failed:', err);

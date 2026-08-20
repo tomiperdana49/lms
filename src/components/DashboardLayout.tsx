@@ -21,7 +21,8 @@ import {
     FileText,
     Globe,
     UsersRound,
-    HelpCircle
+    HelpCircle,
+    Target
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Page, Role, User } from '../types';
@@ -38,7 +39,7 @@ interface DashboardLayoutProps {
     onRoleChange: (role: Role) => void; 
     onLogout: () => void;
     adminView?: string;
-    config?: { moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean };
+    config?: { moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean; moduleIDP: boolean };
 }
 
 const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onLogout, adminView, config }: DashboardLayoutProps) => {
@@ -233,6 +234,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { icon: Award, label: t('admin.quizReport'), id: 'admin-dashboard', view: 'quiz-reports' },
         { icon: TrendingUp, label: t('admin.hrReport'), id: 'admin-dashboard', view: 'reports' },
         { icon: UsersRound, label: t('admin.employeeLearningReport'), id: 'admin-dashboard', view: 'employee-learning-report' },
+        ...(config?.moduleIDP ? [{ icon: Target, label: t('admin.idp'), id: 'admin-dashboard', view: 'idp' }] : []),
     ];
 
     const menuItems = [
@@ -241,6 +243,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { icon: BookOpen, label: t('menu.onlineModules'), id: 'courses' },
         { icon: Calendar, label: t('menu.calendar'), id: 'calendar' },
         { icon: TrendingUp, label: t('menu.learningReport'), id: 'learning-report' },
+        ...(config?.moduleIDP ? [{ icon: Target, label: t('menu.idp'), id: 'idp' }] : []),
         ...(config?.moduleIncentive ? [{ icon: Award, label: t('menu.incentives'), id: 'incentives' }] : []),
     ];
 

@@ -59,7 +59,10 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
 
     useEffect(() => {
         if (userEmail) {
-            fetch(`${API_BASE_URL}/api/learning-stats?email=${encodeURIComponent(userEmail)}`)
+            const currentYear = new Date().getFullYear();
+            const startDate = `${currentYear}-01-01`;
+            const endDate = `${currentYear}-12-31`;
+            fetch(`${API_BASE_URL}/api/learning-stats?email=${encodeURIComponent(userEmail)}&startDate=${startDate}&endDate=${endDate}`)
                 .then(res => res.json())
                 .then(data => {
                     if (!data.error) {

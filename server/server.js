@@ -985,7 +985,8 @@ app.get('/api/config', (req, res) => {
     res.json({
         moduleInternal: process.env.module_internal === 'true',
         moduleExternal: process.env.module_external === 'true',
-        moduleIncentive: process.env.module_incentive_certification === 'true'
+        moduleIncentive: process.env.module_incentive_certification === 'true',
+        moduleIDP: process.env.module_IDP !== 'false'
     });
 });
 
@@ -1366,12 +1367,13 @@ app.post('/api/admin/sync-all-nusawork', async (req, res) => {
 });
 
 // --- USER ROUTES ---
-app.get('/api/learning-stats', async (req, res) => {
-    try {
-        const { email, employee_id, startDate, endDate } = req.query;
-        if (!email && !employee_id) return res.status(400).json({ error: 'Email or employee_id required' });
+// Aggregates learning hours/cost across internal training, external training, online modules, and the
+// reading log for one employee, optionally bounded to a date range. Shared by /api/learning-stats and
+// the IDP endpoints (which use it to auto-track the mandatory "48 jam/tahun" development action item).
+const computeLearningStats = async ({ email, employee_id, startDate, endDate }) => {
+    if (!email && !employee_id) throw new Error('Email or employee_id required');
 
-        // Optional date-range filter (inclusive). When omitted, every record is included (unfiltered/all-time).
+    // Optional date-range filter (inclusive). When omitted, every record is included (unfiltered/all-time).
         const rangeStart = startDate ? new Date(startDate) : null;
         const rangeEnd = endDate ? new Date(`${endDate}T23:59:59.999`) : null;
         const isWithinRange = (dateStr) => {
@@ -1653,7 +1655,7 @@ app.get('/api/learning-stats', async (req, res) => {
         onlineDetails.sort(byDateAsc);
         bookDetails.sort(byDateAsc);
 
-        res.json({
+        return {
             jamTraining: Math.round(jamTraining * 100) / 100,
             jamTrainingExternal: Math.round(jamTrainingExternal * 100) / 100,
             jamOnline: Math.round(jamOnline * 100) / 100,
@@ -1667,11 +1669,17 @@ app.get('/api/learning-stats', async (req, res) => {
             trainingExternalDetails,
             onlineDetails,
             bookDetails
-        });
+        };
+};
 
+app.get('/api/learning-stats', async (req, res) => {
+    try {
+        const { email, employee_id, startDate, endDate } = req.query;
+        const stats = await computeLearningStats({ email, employee_id, startDate, endDate });
+        res.json(stats);
     } catch (err) {
         console.error('[API] Error in /api/learning-stats:', err);
-        res.status(500).json({ error: err.message });
+        res.status(err.message === 'Email or employee_id required' ? 400 : 500).json({ error: err.message });
     }
 });
 
@@ -3808,6 +3816,276 @@ app.post('/api/external-training/renew-certificate', async (req, res) => {
 
         const updated = await query('SELECT * FROM external_training_requests WHERE id = ?', [id]);
         res.json(updated[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- INDIVIDUAL DEVELOPMENT PLAN (IDP) ENDPOINTS ---
+
+const IDP_MANDATORY_ACTION = {
+    description: '[WAJIB] Memiliki jam learning 48 jam per tahun (rata-rata 4 jam per bulan)',
+    targetTime: 'Q1-Q4',
+    hoursTarget: 48
+};
+
+// 1. Employee creates a new IDP (Draft) for a given year. Resolves the supervisor from the current
+// org chart (same lookup External Training uses) and seeds the mandatory learning-hours action item.
+app.post('/api/idp', async (req, res) => {
+    try {
+        const {
+            employee_id, employee_name, job_position, department, period_year,
+            join_date_label, achievements, career_goal, existing_skills, development_area,
+            action_items
+        } = req.body;
+
+        if (!employee_id || !period_year) {
+            return res.status(400).json({ error: 'employee_id and period_year are required' });
+        }
+
+        const supervisor = await findReportToEmployee(employee_id);
+
+        const result = await query(`
+            INSERT INTO idp_plans
+            (employee_id, employee_name, job_position, department, supervisor_name, period_year,
+             join_date_label, achievements, career_goal, existing_skills, development_area, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Draft')
+        `, [
+            employee_id, employee_name || '', job_position || '', department || '', supervisor?.full_name || null,
+            period_year, join_date_label || '', achievements || '', career_goal || '',
+            existing_skills || '', development_area || ''
+        ]);
+
+        const idpId = result.insertId;
+        const items = Array.isArray(action_items) ? action_items.filter(i => !i.is_mandatory) : [];
+
+        await query(
+            'INSERT INTO idp_action_items (idp_id, action_description, target_time, is_mandatory, is_completed, notes, sort_order) VALUES (?, ?, ?, 1, 0, ?, 0)',
+            [idpId, IDP_MANDATORY_ACTION.description, IDP_MANDATORY_ACTION.targetTime, '']
+        );
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            await query(
+                'INSERT INTO idp_action_items (idp_id, action_description, target_time, is_mandatory, is_completed, notes, sort_order) VALUES (?, ?, ?, 0, ?, ?, ?)',
+                [idpId, item.action_description || '', item.target_time || '', item.is_completed ? 1 : 0, item.notes || '', i + 1]
+            );
+        }
+
+        res.json({ success: true, id: idpId });
+    } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ error: 'Sudah ada IDP untuk karyawan dan periode ini.' });
+        }
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. Employee's own plans across years.
+app.get('/api/idp/my-plans', async (req, res) => {
+    try {
+        const { employee_id } = req.query;
+        if (!employee_id) return res.json([]);
+        const plans = await query('SELECT * FROM idp_plans WHERE employee_id = ? ORDER BY period_year DESC', [employee_id]);
+        res.json(plans);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 3. Supervisor's team plans (same org-chart resolution as /api/external-training/subordinates).
+app.get('/api/idp/subordinates', async (req, res) => {
+    try {
+        const { leader_id } = req.query;
+        if (!leader_id) return res.json([]);
+
+        const leaderInfo = await querySimAsset('SELECT user_id, full_name, nickname FROM employees WHERE id_employee = ?', [leader_id]);
+        if (leaderInfo.length === 0) return res.json([]);
+        const leader = leaderInfo[0];
+        const leaderUserId = leader.user_id;
+        const leaderFullName = leader.full_name;
+        const leaderNickName = leader.nickname || leaderFullName;
+
+        const subordinatesResult = await querySimAsset(`
+            SELECT id_employee FROM employees
+            WHERE id_report_to_value = ?
+               OR id_report_to = ?
+               OR id_report_to = ?
+               OR id_report_to LIKE ?
+               OR id_report_to LIKE ?
+        `, [leaderUserId, leaderFullName, leaderNickName, `${leaderFullName},%`, `%,${leaderFullName},%`]);
+
+        const subordinateIds = subordinatesResult.map(s => s.id_employee);
+        if (subordinateIds.length === 0) return res.json([]);
+
+        const placeholders = subordinateIds.map(() => '?').join(',');
+        const rows = await query(
+            `SELECT * FROM idp_plans WHERE employee_id IN (${placeholders}) ORDER BY period_year DESC, created_at DESC`,
+            subordinateIds
+        );
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 4. HR/admin: every IDP.
+app.get('/api/idp/all', async (req, res) => {
+    try {
+        const plans = await query('SELECT * FROM idp_plans ORDER BY period_year DESC, created_at DESC');
+        res.json(plans);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 5. Employee edits a Draft/Rejected plan (narrative fields + non-mandatory action rows). Re-submitting
+// after a rejection clears the rejection reason and puts it back in Draft.
+app.put('/api/idp/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const existing = await query('SELECT status FROM idp_plans WHERE id = ?', [id]);
+        if (existing.length === 0) return res.status(404).json({ error: 'IDP not found' });
+        if (!['Draft', 'Rejected'].includes(existing[0].status)) {
+            return res.status(400).json({ error: 'Only Draft or Rejected plans can be edited.' });
+        }
+
+        const {
+            job_position, department, join_date_label, achievements, career_goal,
+            existing_skills, development_area, action_items
+        } = req.body;
+
+        await query(`
+            UPDATE idp_plans SET job_position = ?, department = ?, join_date_label = ?, achievements = ?,
+            career_goal = ?, existing_skills = ?, development_area = ?, status = 'Draft', rejection_reason = NULL
+            WHERE id = ?
+        `, [job_position || '', department || '', join_date_label || '', achievements || '', career_goal || '', existing_skills || '', development_area || '', id]);
+
+        if (Array.isArray(action_items)) {
+            const currentItems = await query('SELECT id, is_mandatory FROM idp_action_items WHERE idp_id = ?', [id]);
+            const hasMandatory = currentItems.some(i => i.is_mandatory);
+            const nonMandatoryIds = currentItems.filter(i => !i.is_mandatory).map(i => i.id);
+            if (nonMandatoryIds.length > 0) {
+                await query(`DELETE FROM idp_action_items WHERE id IN (${nonMandatoryIds.map(() => '?').join(',')})`, nonMandatoryIds);
+            }
+            let sortOrder = 1;
+            for (const item of action_items) {
+                if (item.is_mandatory) continue; // the mandatory row is server-managed, never replaced here
+                await query(
+                    'INSERT INTO idp_action_items (idp_id, action_description, target_time, is_mandatory, is_completed, notes, sort_order) VALUES (?, ?, ?, 0, ?, ?, ?)',
+                    [id, item.action_description || '', item.target_time || '', item.is_completed ? 1 : 0, item.notes || '', sortOrder++]
+                );
+            }
+            if (!hasMandatory) {
+                await query(
+                    'INSERT INTO idp_action_items (idp_id, action_description, target_time, is_mandatory, is_completed, notes, sort_order) VALUES (?, ?, ?, 1, 0, ?, 0)',
+                    [id, IDP_MANDATORY_ACTION.description, IDP_MANDATORY_ACTION.targetTime, '']
+                );
+            }
+        }
+
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 6. Employee submits a Draft/Rejected plan for supervisor approval.
+app.post('/api/idp/:id/submit', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const rows = await query('SELECT status FROM idp_plans WHERE id = ?', [id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'IDP not found' });
+        if (!['Draft', 'Rejected'].includes(rows[0].status)) {
+            return res.status(400).json({ error: 'Only Draft or Rejected plans can be submitted.' });
+        }
+        await query("UPDATE idp_plans SET status = 'Pending', created_by_date = CURDATE() WHERE id = ?", [id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 7. Supervisor approves or rejects a Pending plan.
+app.post('/api/idp/:id/approve', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, approved_by, rejection_reason } = req.body;
+        if (!['Approved', 'Rejected'].includes(status)) {
+            return res.status(400).json({ error: "status must be 'Approved' or 'Rejected'" });
+        }
+        if (status === 'Rejected') {
+            await query('UPDATE idp_plans SET status = ?, rejection_reason = ? WHERE id = ?', [status, rejection_reason || null, id]);
+        } else {
+            await query("UPDATE idp_plans SET status = ?, approved_by = ?, approved_date = CURDATE() WHERE id = ?", [status, approved_by || null, id]);
+        }
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 8. Supervisor logs a periodic 1-on-1 review entry against the plan.
+app.post('/api/idp/:id/review', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { review_date, supervisor_note, reviewed_by } = req.body;
+        if (!review_date || !supervisor_note) {
+            return res.status(400).json({ error: 'review_date and supervisor_note are required' });
+        }
+        const result = await query(
+            'INSERT INTO idp_reviews (idp_id, review_date, supervisor_note, reviewed_by) VALUES (?, ?, ?, ?)',
+            [id, review_date, supervisor_note, reviewed_by || null]
+        );
+        res.json({ success: true, id: result.insertId });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 9. HR verifies a review entry with its own note — never touches idp_plans.status.
+app.post('/api/idp/reviews/:reviewId/verify', async (req, res) => {
+    try {
+        const { reviewId } = req.params;
+        const { hr_note, hr_verified_by } = req.body;
+        await query(
+            'UPDATE idp_reviews SET hr_verification_date = CURDATE(), hr_note = ?, hr_verified_by = ? WHERE id = ?',
+            [hr_note || '', hr_verified_by || null, reviewId]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 10. Toggle/annotate a single action item. The mandatory learning-hours row tracks automatically
+// (via computeLearningStats) and can't have its completion flipped manually.
+app.patch('/api/idp/action-items/:itemId', async (req, res) => {
+    try {
+        const { itemId } = req.params;
+        const { is_completed, notes } = req.body;
+        const rows = await query('SELECT is_mandatory FROM idp_action_items WHERE id = ?', [itemId]);
+        if (rows.length === 0) return res.status(404).json({ error: 'Action item not found' });
+        if (rows[0].is_mandatory && is_completed !== undefined) {
+            return res.status(400).json({ error: 'The mandatory learning-hours item tracks automatically and cannot be checked manually.' });
+        }
+        const fields = [];
+        const params = [];
+        if (is_completed !== undefined) { fields.push('is_completed = ?'); params.push(is_completed ? 1 : 0); }
+        if (notes !== undefined) { fields.push('notes = ?'); params.push(notes); }
+        if (fields.length === 0) return res.json({ success: true });
+        params.push(itemId);
+        await query(`UPDATE idp_action_items SET ${fields.join(', ')} WHERE id = ?`, params);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 11. Full detail: plan + action items + reviews + auto-computed learning-hours progress for the
+// mandatory item, so the frontend never has to make a second call to /api/learning-stats.
+app.get('/api/idp/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const plans = await query('SELECT * FROM idp_plans WHERE id = ?', [id]);
+        if (plans.length === 0) return res.status(404).json({ error: 'IDP not found' });
+        const plan = plans[0];
+
+        const actionItems = await query('SELECT * FROM idp_action_items WHERE idp_id = ? ORDER BY sort_order ASC, id ASC', [id]);
+        const reviews = await query('SELECT * FROM idp_reviews WHERE idp_id = ? ORDER BY review_date ASC, id ASC', [id]);
+
+        let learningProgress = { totalJam: 0, target: IDP_MANDATORY_ACTION.hoursTarget };
+        try {
+            const stats = await computeLearningStats({
+                employee_id: plan.employee_id,
+                startDate: `${plan.period_year}-01-01`,
+                endDate: `${plan.period_year}-12-31`
+            });
+            learningProgress = { totalJam: stats.totalJam, target: IDP_MANDATORY_ACTION.hoursTarget };
+        } catch (e) {
+            console.warn('[IDP] Failed to compute learning progress:', e.message);
+        }
+
+        res.json({ ...plan, action_items: actionItems, reviews, learningProgress });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

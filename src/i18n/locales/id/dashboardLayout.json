@@ -5,6 +5,7 @@
     "onlineModules": "Modul Online",
     "calendar": "Kalender",
     "learningReport": "Laporan Pembelajaran",
+    "idp": "IDP",
     "incentives": "Insentif",
     "training": "Training",
     "internal": "Internal",
@@ -27,7 +28,8 @@
     "readingLog": "Log Bacaan",
     "quizReport": "Laporan Kuis",
     "hrReport": "Laporan HR",
-    "employeeLearningReport": "Laporan Pembelajaran Karyawan"
+    "employeeLearningReport": "Laporan Pembelajaran Karyawan",
+    "idp": "IDP"
   },
   "notifications": {
     "title": "Notifikasi",

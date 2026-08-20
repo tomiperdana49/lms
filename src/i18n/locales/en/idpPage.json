@@ -1,0 +1,85 @@
+{
+  "header": {
+    "title": "Individual Development Plan",
+    "subtitle": "Your development plan for the {{year}} period"
+  },
+  "tabs": {
+    "myIdp": "My IDP",
+    "teamIdp": "Team IDP"
+  },
+  "form": {
+    "employeeName": "Employee Name",
+    "jobPosition": "Job Position",
+    "period": "Period",
+    "rejectionReasonLabel": "Rejection Reason:",
+    "department": "Department",
+    "departmentPlaceholder": "e.g. Technical",
+    "joinDate": "Start Date at Company",
+    "joinDatePlaceholder": "e.g. June 26, 2015",
+    "achievements": "Achievements",
+    "achievementsHint": "What have you achieved over the last 3-12 months?",
+    "careerGoal": "Career Goal",
+    "careerGoalHint": "What's your career goal at this company for the next 1-3 years?",
+    "existingSkills": "Skills You Have",
+    "existingSkillsHint": "List the talents, expertise, and skills that help you reach your career goal.",
+    "developmentArea": "Development Area",
+    "developmentAreaHint": "What competencies do you still need to develop to reach your career goal?",
+    "actionPlan": "Development Action Plan",
+    "actionPlanHint": "Write down the steps you'll take to develop yourself and reach your career goal.",
+    "addRow": "Add Row",
+    "mandatoryRowNote": "The mandatory \"{{hours}} learning hours/year\" item is auto-tracked from your LMS activity (Reading Log, Online Modules, Training) — no manual entry needed.",
+    "actionDescriptionPlaceholder": "Action plan...",
+    "targetTimePlaceholder": "Target time (e.g. Q1-Q4)",
+    "saveDraft": "Save as Draft",
+    "submit": "Submit for Approval",
+    "hours": "hours",
+    "notesPlaceholder": "Notes / progress remarks...",
+    "reviewHistory": "Review History",
+    "pastPlans": "Previous Years' IDPs",
+    "mandatoryProgress": "Learning Hours (Mandatory)",
+    "awaitingHrVerification": "Awaiting HR verification."
+  },
+  "team": {
+    "empty": "No IDPs from your team yet.",
+    "idLabel": "ID: {{id}}",
+    "approve": "Approve",
+    "reject": "Reject",
+    "showDetail": "Show Detail",
+    "hideDetail": "Hide Detail",
+    "addReview": "Add Review",
+    "rejectModalTitle": "Reject IDP",
+    "rejectionReasonPlaceholder": "Enter the reason for rejection...",
+    "cancel": "Cancel",
+    "confirmReject": "Confirm Reject",
+    "addReviewModalTitle": "Add 1-on-1 Review",
+    "reviewDate": "Review Date",
+    "reviewNote": "Is the IDP relevant and on track?",
+    "reviewNotePlaceholder": "Review notes, whether the action plan was carried out on the target time...",
+    "saveReview": "Save Review"
+  },
+  "status": {
+    "Draft": "Draft",
+    "Pending": "Pending Approval",
+    "Approved": "Approved",
+    "Rejected": "Rejected"
+  },
+  "notifications": {
+    "saveFailed": "Failed to save the IDP.",
+    "submitFailed": "Failed to submit the IDP.",
+    "saveSuccess": "IDP saved as draft.",
+    "submitSuccess": "IDP submitted for approval.",
+    "approveSuccess": "IDP approved.",
+    "rejectSuccess": "IDP rejected.",
+    "reviewSuccess": "Review saved."
+  },
+  "admin": {
+    "title": "Individual Development Plan",
+    "subtitle": "Manage and verify every employee's IDP",
+    "searchPlaceholder": "Search employee name or ID...",
+    "allYears": "ALL YEARS",
+    "empty": "No matching IDPs found.",
+    "noReviews": "No reviews yet.",
+    "verifyPlaceholder": "HR verification note...",
+    "verify": "Verify"
+  }
+}

@@ -5,6 +5,7 @@
     "onlineModules": "Online Modules",
     "calendar": "Calendar",
     "learningReport": "Learning Report",
+    "idp": "IDP",
     "incentives": "Incentives",
     "training": "Training",
     "internal": "Internal",
@@ -27,7 +28,8 @@
     "readingLog": "Reading Log",
     "quizReport": "Quiz Report",
     "hrReport": "HR Report",
-    "employeeLearningReport": "Employee Learning Report"
+    "employeeLearningReport": "Employee Learning Report",
+    "idp": "IDP"
   },
   "notifications": {
     "title": "Notifications",

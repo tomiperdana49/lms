@@ -1,0 +1,85 @@
+{
+  "header": {
+    "title": "Individual Development Plan",
+    "subtitle": "Rencana pengembangan diri kamu untuk periode {{year}}"
+  },
+  "tabs": {
+    "myIdp": "IDP Saya",
+    "teamIdp": "IDP Tim"
+  },
+  "form": {
+    "employeeName": "Nama Karyawan",
+    "jobPosition": "Jabatan",
+    "period": "Periode",
+    "rejectionReasonLabel": "Alasan Ditolak:",
+    "department": "Departemen",
+    "departmentPlaceholder": "cth. Technical",
+    "joinDate": "Tanggal Mulai Bekerja",
+    "joinDatePlaceholder": "cth. 26 Juni 2015",
+    "achievements": "Pencapaian / Prestasi Kerja",
+    "achievementsHint": "Apa pencapaian / prestasi kamu selama 3-12 bulan ke belakang?",
+    "careerGoal": "Tujuan / Aspirasi Karir (Goal)",
+    "careerGoalHint": "Apa tujuan karir kamu dalam 1-3 tahun ke depan di perusahaan ini?",
+    "existingSkills": "Skill yang Dimiliki",
+    "existingSkillsHint": "Sebutkan bakat, keahlian, dan keterampilan kamu yang membantu mencapai tujuan karir kamu.",
+    "developmentArea": "Area Pengembangan",
+    "developmentAreaHint": "Kompetensi apa yang masih perlu kamu kembangkan untuk mencapai tujuan karir kamu?",
+    "actionPlan": "Rencana Aksi Pengembangan",
+    "actionPlanHint": "Tuliskan langkah apa saja yang akan kamu lakukan untuk mencapai pengembangan diri dan tujuan karir kamu.",
+    "addRow": "Tambah Baris",
+    "mandatoryRowNote": "Item wajib \"Jam learning {{hours}} jam/tahun\" otomatis dihitung dari aktivitas belajar kamu di LMS (Log Bacaan, Modul Online, Training) — tidak perlu diisi manual.",
+    "actionDescriptionPlaceholder": "Rencana aksi...",
+    "targetTimePlaceholder": "Target waktu (cth. Q1-Q4)",
+    "saveDraft": "Simpan sebagai Draft",
+    "submit": "Ajukan untuk Persetujuan",
+    "hours": "jam",
+    "notesPlaceholder": "Keterangan / catatan progress...",
+    "reviewHistory": "Riwayat Evaluasi",
+    "pastPlans": "IDP Tahun Sebelumnya",
+    "mandatoryProgress": "Jam Learning (Wajib)",
+    "awaitingHrVerification": "Menunggu verifikasi HR."
+  },
+  "team": {
+    "empty": "Belum ada IDP dari anggota tim kamu.",
+    "idLabel": "ID: {{id}}",
+    "approve": "Setujui",
+    "reject": "Tolak",
+    "showDetail": "Lihat Detail",
+    "hideDetail": "Sembunyikan Detail",
+    "addReview": "Tambah Evaluasi",
+    "rejectModalTitle": "Tolak IDP",
+    "rejectionReasonPlaceholder": "Masukkan alasan penolakan...",
+    "cancel": "Batal",
+    "confirmReject": "Konfirmasi Tolak",
+    "addReviewModalTitle": "Tambah Evaluasi 1-on-1",
+    "reviewDate": "Tanggal Review",
+    "reviewNote": "Apakah IDP relevan dan berjalan?",
+    "reviewNotePlaceholder": "Catatan evaluasi, apakah rencana aksi terlaksana sesuai target waktu...",
+    "saveReview": "Simpan Evaluasi"
+  },
+  "status": {
+    "Draft": "Draft",
+    "Pending": "Menunggu Persetujuan",
+    "Approved": "Disetujui",
+    "Rejected": "Ditolak"
+  },
+  "notifications": {
+    "saveFailed": "Gagal menyimpan IDP.",
+    "submitFailed": "Gagal mengajukan IDP.",
+    "saveSuccess": "IDP berhasil disimpan sebagai draft.",
+    "submitSuccess": "IDP berhasil diajukan untuk persetujuan.",
+    "approveSuccess": "IDP berhasil disetujui.",
+    "rejectSuccess": "IDP berhasil ditolak.",
+    "reviewSuccess": "Evaluasi berhasil disimpan."
+  },
+  "admin": {
+    "title": "Individual Development Plan",
+    "subtitle": "Kelola dan verifikasi IDP seluruh karyawan",
+    "searchPlaceholder": "Cari nama atau ID karyawan...",
+    "allYears": "SEMUA TAHUN",
+    "empty": "Tidak ada IDP yang cocok ditemukan.",
+    "noReviews": "Belum ada evaluasi.",
+    "verifyPlaceholder": "Catatan verifikasi HR...",
+    "verify": "Verifikasi"
+  }
+}

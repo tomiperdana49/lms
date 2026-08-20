@@ -15,6 +15,7 @@ import IncentiveManager from './components/IncentiveManager';
 import LearningReport from './components/LearningReport';
 import VerifyCertificate from './components/VerifyCertificate';
 import HelpPage from './components/HelpPage';
+import IDPPage from './components/IDPPage';
 import type { Page, Role, User } from './types';
 
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -62,10 +63,11 @@ function App() {
     return localStorage.getItem('lms_admin_view') || 'overview';
   });
 
-  const [config, setConfig] = useState<{ moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean }>({
+  const [config, setConfig] = useState<{ moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean; moduleIDP: boolean }>({
     moduleInternal: false,
     moduleExternal: false,
-    moduleIncentive: false
+    moduleIncentive: false,
+    moduleIDP: false
   });
 
   useEffect(() => {
@@ -77,7 +79,8 @@ function App() {
           setConfig({
             moduleInternal: !!data.moduleInternal,
             moduleExternal: !!data.moduleExternal,
-            moduleIncentive: !!data.moduleIncentive
+            moduleIncentive: !!data.moduleIncentive,
+            moduleIDP: !!data.moduleIDP
           });
         }
       } catch (err) {
@@ -288,6 +291,7 @@ function App() {
         {activePage === 'courses' && <CoursePlayer user={user!} />}
         {activePage === 'internal' && <TrainingInternalList userRole={userRole} user={user!} isManagementMode={false} />}
         {activePage === 'help' && <HelpPage />}
+        {activePage === 'idp' && <IDPPage currentUser={user} />}
 
 
         {/* External Training (Unified Component) */}

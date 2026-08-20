@@ -28,7 +28,7 @@ export interface ReadingLogEntry {
     claimedAt?: string;
 }
 
-export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'external-approval' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives' | 'learning-report' | 'help';
+export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'external-approval' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives' | 'learning-report' | 'help' | 'idp';
 export type Role = 'STAFF' | 'SUPERVISOR' | 'HR' | 'HR_ADMIN';
 export type AdminView = 'users' | 'logs' | 'approval' | 'meetings' | 'courses' | 'assets' | 'employees';
 
@@ -290,4 +290,58 @@ export interface ExternalTrainingRequest {
     training_gr_type?: string;
     participation_type?: string;
     learning_hours?: number;
+}
+
+export interface IDPActionItem {
+    id: number;
+    idp_id: number;
+    action_description: string;
+    target_time?: string;
+    is_mandatory: number; // 0 | 1
+    is_completed: number; // 0 | 1
+    notes?: string;
+    sort_order: number;
+}
+
+export interface IDPReview {
+    id: number;
+    idp_id: number;
+    review_date: string;
+    supervisor_note: string;
+    reviewed_by?: string;
+    hr_verification_date?: string;
+    hr_note?: string;
+    hr_verified_by?: string;
+    created_at?: string;
+}
+
+export interface IDPLearningProgress {
+    totalJam: number;
+    target: number;
+}
+
+export interface IDPPlan {
+    id: number;
+    employee_id: string;
+    employee_name?: string;
+    job_position?: string;
+    department?: string;
+    supervisor_name?: string;
+    period_year: number;
+    join_date_label?: string;
+    achievements?: string;
+    career_goal?: string;
+    existing_skills?: string;
+    development_area?: string;
+    status: 'Draft' | 'Pending' | 'Approved' | 'Rejected';
+    created_by_date?: string;
+    approved_date?: string;
+    approved_by?: string;
+    rejection_reason?: string;
+    created_at?: string;
+    updated_at?: string;
+    // Present only on the single-plan detail endpoint (GET /api/idp/:id)
+    action_items?: IDPActionItem[];
+    reviews?: IDPReview[];
+    learningProgress?: IDPLearningProgress;
 }
