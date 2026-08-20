@@ -1,8 +1,8 @@
 {
   "categoryLabels": {
-    "Sertifikat": "Sertifikasi",
-    "Training": "Training",
-    "Modul": "Modul"
+    "Sertifikat": "Pelatihan dengan Sertifikasi",
+    "Training": "Pelatihan tanpa Sertifikasi",
+    "Modul": "Video Modul – Pembelajaran Mandiri"
   },
   "statusBadge": {
     "approved": "Disetujui",
@@ -11,19 +11,21 @@
     "reviewSupervisor": "Tinjauan (Atasan)"
   },
   "header": {
-    "title": "Manajer Pelatihan Eksternal",
+    "title": "Pelatihan Eksternal",
     "subtitle": "Nusa LMS • Tata Kelola Permintaan Enterprise"
   },
   "stats": {
-    "totalInvestment": "Total Investasi",
+    "totalInvestment": "Total Biaya Pembelajaran",
     "pendingApproval": "Menunggu Persetujuan",
     "successfulEnrollments": "Pendaftaran Berhasil",
     "averagePerHead": "Rata-rata Per Orang",
+    "totalIncentive": "Total Insentif",
     "clearFilter": "Hapus filter"
   },
   "filters": {
     "searchPlaceholder": "Cari karyawan, judul, atau vendor...",
-    "allYears": "SEMUA TAHUN"
+    "allYears": "SEMUA TAHUN",
+    "allCategories": "SEMUA KATEGORI"
   },
   "list": {
     "empty": "Tidak ada permintaan yang cocok ditemukan",

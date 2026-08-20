@@ -1,8 +1,8 @@
 {
   "categoryLabels": {
-    "Sertifikat": "Certification",
-    "Training": "Training",
-    "Modul": "Module"
+    "Sertifikat": "Training with Certification",
+    "Training": "Training without Certification",
+    "Modul": "Video Module – Self-Paced Learning"
   },
   "statusBadge": {
     "approved": "Approved",
@@ -11,19 +11,21 @@
     "reviewSupervisor": "Review (Spv)"
   },
   "header": {
-    "title": "External Training Manager",
+    "title": "External Training",
     "subtitle": "Nusa LMS • Enterprise Request Governance"
   },
   "stats": {
-    "totalInvestment": "Total Investment",
+    "totalInvestment": "Total Learning Costs",
     "pendingApproval": "Pending Approval",
     "successfulEnrollments": "Successful Enrollments",
     "averagePerHead": "Average Per Head",
+    "totalIncentive": "Total Incentive",
     "clearFilter": "Clear filter"
   },
   "filters": {
     "searchPlaceholder": "Search employee, title, or vendor...",
-    "allYears": "ALL YEARS"
+    "allYears": "ALL YEARS",
+    "allCategories": "ALL CATEGORIES"
   },
   "list": {
     "empty": "No matching requests found",

@@ -4,7 +4,7 @@ import {
     XCircle,
     CheckCircle2,
     FileText,
-    DollarSign,
+    Wallet,
     Calendar,
     Trash2,
     Filter,
@@ -16,7 +16,9 @@ import {
     AlertTriangle,
     Download,
     UploadCloud,
-    CreditCard
+    CreditCard,
+    Tag,
+    ChevronDown
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +38,17 @@ const getStatusColor = (status: string) => {
         case 'PENDING_HR': return 'bg-indigo-50 text-indigo-700 border-indigo-100';
         default: return 'bg-amber-50 text-amber-700 border-amber-100';
     }
+};
+
+// The `category` value in the database is inconsistent: manual "New Request" submissions store the raw
+// key ('Sertifikat'/'Training'/'Modul'), while bulk Excel imports store whatever free-text label was in
+// the spreadsheet's "Kategori" column (e.g. "Training with Certification"). Normalize every known variant
+// down to the 3 canonical keys so filtering and display both work regardless of which path created the row.
+const normalizeCategory = (raw: string | null | undefined): 'Sertifikat' | 'Training' | 'Modul' => {
+    const v = (raw || '').trim().toLowerCase();
+    if (v === 'sertifikat' || v.includes('with certification') || v.includes('dengan sertifikasi')) return 'Sertifikat';
+    if (v === 'modul' || v.includes('modul') || v.includes('module') || v.includes('self-paced') || v.includes('mandiri')) return 'Modul';
+    return 'Training';
 };
 
 const StatusBadge = ({ status }: { status: string }) => {
@@ -64,6 +77,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     const [selectedPeriod, setSelectedPeriod] = useState<string>('All Year');
     const [selectedBranch, setSelectedBranch] = useState<string>('All Branches');
     const [branches, setBranches] = useState<string[]>(['All Branches']);
+    const [selectedCategory, setSelectedCategory] = useState<string>('All Categories');
+    const categoryOptions = ['Sertifikat', 'Training', 'Modul'];
     const [searchQuery, setSearchQuery] = useState('');
     const [statusDrilldown, setStatusDrilldown] = useState<'PENDING' | 'APPROVED' | null>(null);
     const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
@@ -78,7 +93,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                 const mapped = rawData.map((req: any) => ({
                     id: req.id,
                     employeeName: req.employee_name,
-                    employeeRole: req.category,
+                    employeeRole: normalizeCategory(req.category),
                     title: req.title,
                     vendor: req.vendor || t('common.notAvailable'),
                     location: req.location || t('common.notAvailable'),
@@ -126,7 +141,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                 const mapped = rawData.map((req: any) => ({
                     id: req.id,
                     employeeName: req.employee_name,
-                    employeeRole: req.category,
+                    employeeRole: normalizeCategory(req.category),
                     title: req.title,
                     vendor: req.vendor || t('common.notAvailable'),
                     location: req.location || t('common.notAvailable'),
@@ -382,6 +397,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
 
         if (selectedBranch !== 'All Branches' && empBranch !== selectedBranch) return false;
 
+        if (selectedCategory !== 'All Categories' && req.employeeRole !== selectedCategory) return false;
+
         const lowerSearch = searchQuery.toLowerCase();
         return (
             (req.employeeName || '').toLowerCase().includes(lowerSearch) ||
@@ -396,10 +413,11 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
         return true;
     });
 
-    // Own submitted requests are hidden from the actionable list (to avoid self-approval)
-    // but must still count toward the aggregate stats above.
+    // Own PENDING requests are hidden from the actionable list (to avoid self-approval),
+    // but resolved ones (APPROVED/REJECTED) stay visible so HR can still see their own history.
+    // Own requests still count toward the aggregate stats above regardless of status.
     const visibleRequests = drilldownFiltered
-        .filter(req => req.employeeName !== userName)
+        .filter(req => !(req.employeeName === userName && req.status.startsWith('PENDING')))
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const onlyOwnRequestsHidden = statusDrilldown !== null && visibleRequests.length === 0 && drilldownFiltered.length > 0;
 
@@ -445,7 +463,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                 return;
             }
             let certLink = selectedRequest?._original?.certificate_link;
-            const isCertificateCategory = selectedRequest?._original?.category === 'Sertifikat';
+            const isCertificateCategory = selectedRequest?.employeeRole === 'Sertifikat';
             const requiresCertificateProof = isCertificateCategory && hrCertificationResult === 'Passed';
             if (requiresCertificateProof && !certLink && !hrCertificateFile) {
                 alert(t('alerts.certificateEvidenceRequired'));
@@ -599,7 +617,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
         totalBudget: filteredRequests.reduce((sum, r) => r.status === 'APPROVED' ? sum + (Number(r.cost) || 0) : sum, 0),
         pendingCount: filteredRequests.filter(r => r.status.startsWith('PENDING')).length,
         approvedCount: filteredRequests.filter(r => r.status === 'APPROVED').length,
-        averageCost: filteredRequests.length ? filteredRequests.reduce((sum, r) => sum + (Number(r.cost) || 0), 0) / filteredRequests.length : 0
+        averageCost: filteredRequests.length ? filteredRequests.reduce((sum, r) => sum + (Number(r.cost) || 0), 0) / filteredRequests.length : 0,
+        totalIncentive: filteredRequests.reduce((sum, r) => r.status === 'APPROVED' ? sum + (Number(r.incentiveReward) || 0) : sum, 0)
     };
 
     // Import already-processed external training records from an Excel file. Expects the detailed raw-data
@@ -896,12 +915,13 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             </div>
 
             {/* Insight Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-4">
                 {[
-                    { label: t('stats.totalInvestment'), value: formatCurrency(stats.totalBudget), icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50', filter: null },
+                    { label: t('stats.totalInvestment'), value: formatCurrency(stats.totalBudget), icon: Wallet, color: 'text-emerald-600', bg: 'bg-emerald-50', filter: null },
+                    { label: t('stats.totalIncentive'), value: formatCurrency(stats.totalIncentive), icon: Award, color: 'text-rose-600', bg: 'bg-rose-50', filter: null },
+                    { label: t('stats.averagePerHead'), value: formatCurrency(stats.averageCost), icon: Users, color: 'text-amber-600', bg: 'bg-amber-50', filter: null },
                     { label: t('stats.pendingApproval'), value: stats.pendingCount, icon: Clock, color: 'text-indigo-600', bg: 'bg-indigo-50', filter: 'PENDING' as const },
-                    { label: t('stats.successfulEnrollments'), value: stats.approvedCount, icon: CheckCircle2, color: 'text-blue-600', bg: 'bg-blue-50', filter: 'APPROVED' as const },
-                    { label: t('stats.averagePerHead'), value: formatCurrency(stats.averageCost), icon: Users, color: 'text-amber-600', bg: 'bg-amber-50', filter: null }
+                    { label: t('stats.successfulEnrollments'), value: stats.approvedCount, icon: CheckCircle2, color: 'text-blue-600', bg: 'bg-blue-50', filter: 'APPROVED' as const }
                 ].map((stat, i) => {
                     const isActive = stat.filter !== null && statusDrilldown === stat.filter;
                     const isClickable = stat.filter !== null;
@@ -914,16 +934,17 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                 if (!isClickable) return;
                                 setStatusDrilldown(prev => prev === stat.filter ? null : stat.filter);
                             }}
-                            className={`bg-white p-6 rounded-[32px] border shadow-sm flex items-center gap-5 group transition-all duration-300 text-left ${
+                            title={typeof stat.value === 'string' ? stat.value : undefined}
+                            className={`bg-white p-4 lg:p-5 rounded-3xl border shadow-sm flex items-center gap-3 group transition-all duration-300 text-left min-w-0 ${
                                 isClickable ? 'cursor-pointer hover:border-indigo-200 hover:shadow-md' : 'cursor-default'
                             } ${isActive ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-slate-100'}`}
                         >
-                            <div className={`p-4 ${stat.bg} ${stat.color} rounded-2xl group-hover:scale-110 transition-transform duration-500`}>
-                                <stat.icon size={24} strokeWidth={2.5} />
+                            <div className={`shrink-0 p-3 ${stat.bg} ${stat.color} rounded-2xl group-hover:scale-110 transition-transform duration-500`}>
+                                <stat.icon size={20} strokeWidth={2.5} />
                             </div>
-                            <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
-                                <p className="text-xl font-black text-slate-900 leading-none">{stat.value}</p>
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 truncate">{stat.label}</p>
+                                <p className="text-lg font-black text-slate-900 leading-none truncate">{stat.value}</p>
                             </div>
                         </button>
                     );
@@ -942,9 +963,9 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             )}
 
             {/* Global Filter Bar */}
-            <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex flex-row items-center gap-4 overflow-x-auto no-scrollbar">
-                <div className="relative min-w-[300px] lg:w-[400px] flex-shrink-0">
-                    <Search className="absolute left-5 top-4.5 text-slate-300" size={18} />
+            <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex flex-col gap-4">
+                <div className="relative w-full">
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                     <input
                         type="text"
                         placeholder={t('filters.searchPlaceholder')}
@@ -954,49 +975,69 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     />
                 </div>
 
-                <div className="flex items-center gap-3 flex-nowrap min-w-max ml-auto">
-                    <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-2xl border border-slate-100">
-                        <div className="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm text-slate-400">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-2xl border border-slate-100 min-w-0">
+                        <div className="w-10 h-10 shrink-0 flex items-center justify-center bg-white rounded-xl shadow-sm text-slate-400">
                             <Filter size={16} />
                         </div>
                         <select
                             value={selectedBranch}
                             onChange={(e) => setSelectedBranch(e.target.value)}
-                            className="bg-transparent px-3 py-2 rounded-xl font-black text-slate-600 text-[10px] outline-none tracking-widest cursor-pointer min-w-[140px]"
+                            className="appearance-none bg-transparent flex-1 min-w-0 px-2 py-2 rounded-xl font-black text-slate-600 text-[10px] outline-none tracking-widest cursor-pointer truncate"
                         >
                             {branches.map(b => (
                                 <option key={b} value={b}>{b.toUpperCase()}</option>
                             ))}
                         </select>
+                        <ChevronDown size={14} className="shrink-0 text-slate-400 pointer-events-none" />
                     </div>
 
-                    <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-2xl border border-slate-100">
-                        <div className="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm text-slate-400">
+                    <div className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-2xl border border-slate-100 min-w-0">
+                        <div className="w-10 h-10 shrink-0 flex items-center justify-center bg-white rounded-xl shadow-sm text-slate-400">
+                            <Tag size={16} />
+                        </div>
+                        <select
+                            value={selectedCategory}
+                            onChange={(e) => setSelectedCategory(e.target.value)}
+                            className="appearance-none bg-transparent flex-1 min-w-0 px-2 py-2 rounded-xl font-black text-slate-600 text-[10px] outline-none tracking-widest cursor-pointer truncate"
+                        >
+                            <option value="All Categories">{t('filters.allCategories')}</option>
+                            {categoryOptions.map(c => (
+                                <option key={c} value={c}>{t(`categoryLabels.${c}`, { defaultValue: c }).toUpperCase()}</option>
+                            ))}
+                        </select>
+                        <ChevronDown size={14} className="shrink-0 text-slate-400 pointer-events-none" />
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-2xl border border-slate-100 min-w-0">
+                        <div className="w-10 h-10 shrink-0 flex items-center justify-center bg-white rounded-xl shadow-sm text-slate-400">
                             <Calendar size={16} />
                         </div>
                         <select
                             value={selectedYear}
                             onChange={(e) => setSelectedYear(e.target.value === 'All' ? 'All' : parseInt(e.target.value))}
-                            className="bg-transparent px-3 py-2 rounded-xl font-black text-slate-600 text-[10px] outline-none tracking-widest cursor-pointer min-w-[100px]"
+                            className="appearance-none bg-transparent flex-1 min-w-0 px-2 py-2 rounded-xl font-black text-slate-600 text-[10px] outline-none tracking-widest cursor-pointer truncate"
                         >
                             <option value="All">{t('filters.allYears')}</option>
                             {Array.from({ length: Math.max(1, new Date().getFullYear() - 2026 + 1) }, (_, i) => 2026 + i).map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
+                        <ChevronDown size={14} className="shrink-0 text-slate-400 pointer-events-none" />
                     </div>
 
-                    <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-2xl border border-slate-100">
-                        <div className="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm text-slate-400">
+                    <div className="flex items-center gap-2 bg-slate-50 pl-1 pr-3 py-1 rounded-2xl border border-slate-100 min-w-0">
+                        <div className="w-10 h-10 shrink-0 flex items-center justify-center bg-white rounded-xl shadow-sm text-slate-400">
                             <Clock size={16} />
                         </div>
                         <select
                             value={selectedPeriod}
                             onChange={(e) => setSelectedPeriod(e.target.value)}
-                            className="bg-transparent px-3 py-2 rounded-xl font-black text-slate-600 text-[10px] outline-none tracking-widest cursor-pointer min-w-[140px]"
+                            className="appearance-none bg-transparent flex-1 min-w-0 px-2 py-2 rounded-xl font-black text-slate-600 text-[10px] outline-none tracking-widest cursor-pointer truncate"
                         >
                             {periodOptions.map(opt => (
                                 <option key={opt} value={opt}>{opt.toUpperCase()}</option>
                             ))}
                         </select>
+                        <ChevronDown size={14} className="shrink-0 text-slate-400 pointer-events-none" />
                     </div>
                 </div>
             </div>
@@ -1032,7 +1073,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                                 {new Date(req.date).toLocaleDateString('en-GB')}
                                             </div>
                                             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 rounded-lg text-[10px] font-black text-slate-400 border border-slate-100">
-                                                <DollarSign size={14} className="text-slate-300" />
+                                                <Wallet size={14} className="text-slate-300" />
                                                 {formatCurrency(req.cost || 0)}
                                             </div>
                                             <div className="px-3 py-1.5 bg-slate-50 rounded-lg text-[10px] font-black text-slate-400 border border-slate-100 uppercase tracking-wider">
@@ -1229,25 +1270,25 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                     )}
                                     {Number(selectedRequest.costTraining) > 0 && (
                                         <div className="flex items-center gap-2 text-slate-600">
-                                            <DollarSign className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <Wallet className="w-4 h-4 text-slate-400 shrink-0" />
                                             <span>{t('requestModal.trainingFee')}: <span className="font-semibold text-slate-800">{formatCurrency(Number(selectedRequest.costTraining))}</span></span>
                                         </div>
                                     )}
                                     {Number(selectedRequest.costTransport) > 0 && (
                                         <div className="flex items-center gap-2 text-slate-600">
-                                            <DollarSign className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <Wallet className="w-4 h-4 text-slate-400 shrink-0" />
                                             <span>{t('requestModal.travelCost')}: <span className="font-semibold text-slate-800">{formatCurrency(Number(selectedRequest.costTransport))}</span></span>
                                         </div>
                                     )}
                                     {Number(selectedRequest.costAccommodation) > 0 && (
                                         <div className="flex items-center gap-2 text-slate-600">
-                                            <DollarSign className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <Wallet className="w-4 h-4 text-slate-400 shrink-0" />
                                             <span>{t('requestModal.accommodation')}: <span className="font-semibold text-slate-800">{formatCurrency(Number(selectedRequest.costAccommodation))}</span></span>
                                         </div>
                                     )}
                                     {Number(selectedRequest.costOthers) > 0 && (
                                         <div className="flex items-center gap-2 text-slate-600">
-                                            <DollarSign className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <Wallet className="w-4 h-4 text-slate-400 shrink-0" />
                                             <span>{t('requestModal.miscellaneous')}: <span className="font-semibold text-slate-800">{formatCurrency(Number(selectedRequest.costOthers))}</span></span>
                                         </div>
                                     )}
@@ -1374,7 +1415,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                             ))}
                                         </div>
                                     </div>
-                                    {selectedRequest._original?.category === 'Sertifikat' && (
+                                    {selectedRequest.employeeRole === 'Sertifikat' && (
                                         <div className="mt-4 space-y-4">
                                             <div>
                                                 <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.certificationResult')}</label>
@@ -1496,7 +1537,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                             {selectedRequest.status === 'APPROVED' && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
                                 <button onClick={() => handleOpenSettlement(selectedRequest)} className="flex-[2] py-2 bg-emerald-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-emerald-700 transition-colors">{t('requestModal.updateSettlement')}</button>
                             )}
-                            {selectedRequest.status === 'APPROVED' && selectedRequest._original?.category === 'Sertifikat' && selectedRequest.certificateExpiryDate && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                            {selectedRequest.status === 'APPROVED' && selectedRequest.employeeRole === 'Sertifikat' && selectedRequest.certificateExpiryDate && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
                                 <button onClick={() => openRenewModal(selectedRequest)} className="flex-[2] py-2 bg-amber-500 text-white font-bold rounded-xl text-sm shadow-md hover:bg-amber-600 transition-colors flex items-center justify-center gap-1.5">
                                     <Award size={16} /> {t('requestModal.renewCertificate')}
                                 </button>
@@ -1553,7 +1594,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                 </div>
                             </div>
 
-                            {selectedRequest?._original?.category === 'Sertifikat' && (
+                            {selectedRequest?.employeeRole === 'Sertifikat' && (
                                 <div>
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{t('settlementModal.uploadCertificateEvidenceOptional')}</label>
                                     <input
