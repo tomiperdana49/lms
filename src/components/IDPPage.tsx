@@ -13,7 +13,8 @@ import {
     MessageSquare,
     Lock,
     Pencil,
-    Download
+    Download,
+    Search
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { User, IDPPlan, Employee } from '../types';
@@ -62,6 +63,19 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
     const [teamPlans, setTeamPlans] = useState<IDPPlan[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [notification, setNotification] = useState<{ show: boolean; type: 'success' | 'error'; message: string }>({ show: false, type: 'success', message: '' });
+
+    // --- Team IDP: search + period filter, so a leader with many reports can find someone quickly ---
+    const [teamSearchQuery, setTeamSearchQuery] = useState('');
+    const [teamSelectedYear, setTeamSelectedYear] = useState<number | 'All'>(CURRENT_YEAR);
+    const teamYears = Array.from(new Set(teamPlans.map(p => p.period_year))).sort((a, b) => b - a);
+    const filteredTeamPlans = teamPlans.filter(p => {
+        if (teamSelectedYear !== 'All' && p.period_year !== teamSelectedYear) return false;
+        if (teamSearchQuery) {
+            const q = teamSearchQuery.toLowerCase();
+            if (!p.employee_name?.toLowerCase().includes(q) && !p.employee_id?.toLowerCase().includes(q)) return false;
+        }
+        return true;
+    });
 
     const fetchMyPlans = async () => {
         if (!currentUser?.employee_id) return;
@@ -562,12 +576,25 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
             {/* ===== TEAM IDP (supervisors only — reviewing is their role here, not their own IDP) ===== */}
             {isSupervisor && (
                 <div className="space-y-4">
-                    {teamPlans.length === 0 ? (
+                    {teamPlans.length > 0 && (
+                        <div className="flex flex-wrap gap-3">
+                            <div className="flex-1 min-w-[240px] relative">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                                <input value={teamSearchQuery} onChange={e => setTeamSearchQuery(e.target.value)} placeholder={t('team.searchPlaceholder')} className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:border-indigo-300 outline-none" />
+                            </div>
+                            <select value={teamSelectedYear} onChange={e => setTeamSelectedYear(e.target.value === 'All' ? 'All' : Number(e.target.value))} className="px-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-semibold focus:border-indigo-300 outline-none">
+                                <option value="All">{t('admin.allYears')}</option>
+                                {teamYears.map(y => <option key={y} value={y}>{y}</option>)}
+                            </select>
+                        </div>
+                    )}
+
+                    {filteredTeamPlans.length === 0 ? (
                         <div className="text-center py-16 bg-gradient-to-b from-slate-50 to-white rounded-3xl border border-dashed border-slate-300">
                             <Users className="w-8 h-8 text-emerald-500 mx-auto mb-3" />
-                            <p className="text-slate-500">{t('team.empty')}</p>
+                            <p className="text-slate-500">{teamPlans.length === 0 ? t('team.empty') : t('admin.empty')}</p>
                         </div>
-                    ) : teamPlans.map(plan => (
+                    ) : filteredTeamPlans.map(plan => (
                         <div key={plan.id} className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
                             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                                 <div>

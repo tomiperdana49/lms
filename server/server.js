@@ -3943,7 +3943,16 @@ app.get('/api/idp/subordinates', async (req, res) => {
 // 4. HR/admin: every IDP.
 app.get('/api/idp/all', async (req, res) => {
     try {
-        const plans = await query('SELECT * FROM idp_plans ORDER BY period_year DESC, created_at DESC');
+        // reviewed_year_months lets HR see, month by month since the plan was created, which months
+        // the supervisor actually logged a review for — without expanding every plan individually.
+        const plans = await query(`
+            SELECT p.*, (
+                SELECT GROUP_CONCAT(DISTINCT DATE_FORMAT(r.review_date, '%Y-%m') ORDER BY r.review_date)
+                FROM idp_reviews r WHERE r.idp_id = p.id
+            ) AS reviewed_year_months
+            FROM idp_plans p
+            ORDER BY p.period_year DESC, p.created_at DESC
+        `);
         res.json(plans);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });

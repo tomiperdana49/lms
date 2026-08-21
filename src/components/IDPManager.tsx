@@ -13,11 +13,48 @@ interface IDPManagerProps {
 
 const MANDATORY_TARGET_HOURS = 48;
 
+// Builds the monthly review strip: one entry per calendar month from when the employee created the
+// IDP through the current month (or through December if the plan's period year has already fully
+// elapsed), marking whether a supervisor review landed in that month.
+const reviewMonthStrip = (plan: IDPPlan): { index: number; reviewed: boolean }[] => {
+    if (!plan.created_by_date) return [];
+    const start = new Date(plan.created_by_date);
+    if (isNaN(start.getTime())) return [];
+
+    const now = new Date();
+    const startY = start.getFullYear();
+    const startM = start.getMonth();
+    const endY = plan.period_year < now.getFullYear() ? plan.period_year : now.getFullYear();
+    const endM = plan.period_year < now.getFullYear() ? 11 : now.getMonth();
+
+    const reviewedSet = new Set((plan.reviewed_year_months || '').split(',').filter(Boolean));
+
+    const months: { index: number; reviewed: boolean }[] = [];
+    let y = startY, m = startM, index = 1;
+    while ((y < endY || (y === endY && m <= endM)) && index <= 36) {
+        const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+        months.push({ index, reviewed: reviewedSet.has(key) });
+        index++;
+        m++;
+        if (m > 11) { m = 0; y++; }
+    }
+    return months;
+};
+
+// Whether the plan already has a supervisor review logged for the current calendar month.
+const isReviewedThisMonth = (plan: IDPPlan): boolean => {
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return (plan.reviewed_year_months || '').split(',').includes(currentKey);
+};
+
 export default function IDPManager({ userName }: IDPManagerProps) {
     const { t } = useTranslation('idpPage');
     const [plans, setPlans] = useState<IDPPlan[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedYear, setSelectedYear] = useState<number | 'All'>(new Date().getFullYear());
+    const [onlyNotReviewedThisMonth, setOnlyNotReviewedThisMonth] = useState(false);
+    const [onlyPendingHrApproval, setOnlyPendingHrApproval] = useState(false);
 
     const fetchPlans = async () => {
         try {
@@ -36,6 +73,8 @@ export default function IDPManager({ userName }: IDPManagerProps) {
             const q = searchQuery.toLowerCase();
             if (!p.employee_name?.toLowerCase().includes(q) && !p.employee_id?.toLowerCase().includes(q)) return false;
         }
+        if (onlyNotReviewedThisMonth && (p.status !== 'Approved' || isReviewedThisMonth(p))) return false;
+        if (onlyPendingHrApproval && p.status !== 'Pending') return false;
         return true;
     });
 
@@ -203,6 +242,18 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                     <option value="All">{t('admin.allYears')}</option>
                     {years.map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
+                <button
+                    onClick={() => setOnlyPendingHrApproval(v => !v)}
+                    className={`px-4 py-3 rounded-2xl text-sm font-semibold border transition-colors ${onlyPendingHrApproval ? 'bg-amber-600 border-amber-600 text-white' : 'bg-white border-gray-100 text-gray-600 hover:border-amber-200'}`}
+                >
+                    {t('admin.pendingHrApprovalFilter')}
+                </button>
+                <button
+                    onClick={() => setOnlyNotReviewedThisMonth(v => !v)}
+                    className={`px-4 py-3 rounded-2xl text-sm font-semibold border transition-colors ${onlyNotReviewedThisMonth ? 'bg-rose-600 border-rose-600 text-white' : 'bg-white border-gray-100 text-gray-600 hover:border-rose-200'}`}
+                >
+                    {t('admin.notReviewedThisMonthFilter')}
+                </button>
             </div>
 
             <div className="space-y-3">
@@ -227,6 +278,25 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                                 )}
                             </div>
                         </div>
+
+                        {plan.status === 'Approved' && (() => {
+                            const strip = reviewMonthStrip(plan);
+                            return strip.length > 0 && (
+                                <div className="mt-3 flex items-center flex-wrap gap-2">
+                                    <span className="text-xs font-semibold text-gray-400">{t('admin.reviewStripLabel')}</span>
+                                    {strip.map(({ index, reviewed }) => (
+                                        <span
+                                            key={index}
+                                            title={reviewed ? t('admin.reviewedThisMonth') : t('admin.notReviewedThisMonth')}
+                                            className={`w-6 h-6 flex items-center justify-center rounded-full text-[11px] font-bold text-white shrink-0 ${reviewed ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                                        >
+                                            {index}
+                                        </span>
+                                    ))}
+                                </div>
+                            );
+                        })()}
+
                         <button onClick={() => toggleExpand(plan.id)} className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700">
                             <ChevronDown className={`w-4 h-4 transition-transform ${expandedId === plan.id ? 'rotate-180' : ''}`} />
                             {expandedId === plan.id ? t('team.hideDetail') : t('team.showDetail')}

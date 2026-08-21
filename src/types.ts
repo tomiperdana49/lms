@@ -342,6 +342,9 @@ export interface IDPPlan {
     hr_note?: string;
     supervisor_approved_by?: string;
     supervisor_approved_date?: string;
+    // Present only on the HR list endpoint (GET /api/idp/all) — comma-separated "YYYY-MM" values for
+    // every calendar month that has at least one supervisor review logged against this plan.
+    reviewed_year_months?: string;
     created_at?: string;
     updated_at?: string;
     // Present only on the single-plan detail endpoint (GET /api/idp/:id)
