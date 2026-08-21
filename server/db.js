@@ -507,6 +507,25 @@ export const initDB = async () => {
             console.error("Error creating idp_reviews table:", e);
         }
 
+        // MIGRATION: Add hr_note to idp_plans — general HR feedback on what's missing/needs adding,
+        // independent of the approve/reject decision.
+        try {
+            await connection.query("ALTER TABLE idp_plans ADD COLUMN hr_note TEXT");
+            console.log("Added hr_note column to idp_plans.");
+        } catch (e) { /* Ignore if exists */ }
+
+        // MIGRATION: Add the supervisor's final approval columns to idp_plans — the closing step of
+        // the IDP cycle, done by the direct supervisor after HR's initial approval and the year's
+        // monthly reviews. Separate from approved_by/approved_date, which record HR's approval.
+        try {
+            await connection.query("ALTER TABLE idp_plans ADD COLUMN supervisor_approved_by VARCHAR(255)");
+            console.log("Added supervisor_approved_by column to idp_plans.");
+        } catch (e) { /* Ignore if exists */ }
+        try {
+            await connection.query("ALTER TABLE idp_plans ADD COLUMN supervisor_approved_date DATE");
+            console.log("Added supervisor_approved_date column to idp_plans.");
+        } catch (e) { /* Ignore if exists */ }
+
         connection.release();
     } catch (err) {
         console.error('Database initialization failed:', err);

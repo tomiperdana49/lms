@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Target, Search, ChevronDown, ShieldCheck, Download, Clock } from 'lucide-react';
+import { Target, Search, ChevronDown, Download, Clock, CheckCircle, XCircle, MessageSquare } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { API_BASE_URL } from '../config';
 import type { IDPPlan } from '../types';
+import IDPDetailInfoTable from './IDPDetailInfoTable';
 
 interface IDPManagerProps {
     userRole: string;
@@ -40,30 +41,66 @@ export default function IDPManager({ userName }: IDPManagerProps) {
 
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [detail, setDetail] = useState<IDPPlan | null>(null);
-    const [verifyDrafts, setVerifyDrafts] = useState<Record<number, string>>({});
+    const [hrNoteDraft, setHrNoteDraft] = useState('');
+    const [savingHrNote, setSavingHrNote] = useState(false);
 
     const toggleExpand = async (id: number) => {
         if (expandedId === id) { setExpandedId(null); setDetail(null); return; }
         setExpandedId(id);
         try {
             const res = await fetch(`${API_BASE_URL}/api/idp/${id}`);
-            if (res.ok) setDetail(await res.json());
+            if (res.ok) {
+                const data = await res.json();
+                setDetail(data);
+                setHrNoteDraft(data.hr_note || '');
+            }
         } catch (err) { console.error(err); }
     };
 
-    const submitVerification = async (reviewId: number) => {
-        const note = verifyDrafts[reviewId];
-        if (!note?.trim()) return;
+    // --- HR feedback note: general guidance on what's missing/needs adding, independent of approve/reject ---
+    const saveHrNote = async (id: number) => {
+        setSavingHrNote(true);
         try {
-            await fetch(`${API_BASE_URL}/api/idp/reviews/${reviewId}/verify`, {
+            await fetch(`${API_BASE_URL}/api/idp/${id}/hr-note`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ hr_note: note, hr_verified_by: userName })
+                body: JSON.stringify({ hr_note: hrNoteDraft })
             });
-            if (expandedId) {
-                const res = await fetch(`${API_BASE_URL}/api/idp/${expandedId}`);
+            setDetail(d => d ? { ...d, hr_note: hrNoteDraft } : d);
+            fetchPlans();
+        } catch (err) { console.error(err); } finally { setSavingHrNote(false); }
+    };
+
+    // --- HR approval: the first approval step on a submitted (Pending) IDP. Only after this does
+    // the employee's supervisor gain the ability to log monthly 1-on-1 reviews (see IDPPage.tsx).
+    const [rejectModalOpen, setRejectModalOpen] = useState(false);
+    const [rejectTargetId, setRejectTargetId] = useState<number | null>(null);
+    const [rejectionReason, setRejectionReason] = useState('');
+
+    const approvePlan = async (id: number) => {
+        try {
+            await fetch(`${API_BASE_URL}/api/idp/${id}/approve`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'Approved', approved_by: userName })
+            });
+            fetchPlans();
+            if (expandedId === id) {
+                const res = await fetch(`${API_BASE_URL}/api/idp/${id}`);
                 if (res.ok) setDetail(await res.json());
             }
-            setVerifyDrafts(d => { const next = { ...d }; delete next[reviewId]; return next; });
+        } catch (err) { console.error(err); }
+    };
+
+    const confirmReject = async () => {
+        if (!rejectTargetId || !rejectionReason.trim()) return;
+        try {
+            await fetch(`${API_BASE_URL}/api/idp/${rejectTargetId}/approve`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'Rejected', rejection_reason: rejectionReason })
+            });
+            setRejectModalOpen(false);
+            setRejectionReason('');
+            setRejectTargetId(null);
+            fetchPlans();
         } catch (err) { console.error(err); }
     };
 
@@ -115,16 +152,14 @@ export default function IDPManager({ userName }: IDPManagerProps) {
             }
 
             rows.push([]);
-            rows.push(['Tanggal IDP Dibuat oleh Karyawan:', full.created_by_date ? new Date(full.created_by_date).toLocaleDateString('id-ID') : '', '', 'Tanggal IDP Disetujui oleh Atasan:', full.approved_date ? new Date(full.approved_date).toLocaleDateString('id-ID') : '']);
+            rows.push(['Tanggal IDP Dibuat oleh Karyawan:', full.created_by_date ? new Date(full.created_by_date).toLocaleDateString('id-ID') : '', '', 'Tanggal IDP Disetujui oleh HR:', full.approved_date ? new Date(full.approved_date).toLocaleDateString('id-ID') : '']);
+            rows.push(['Tanggal IDP Disetujui oleh Atasan Langsung:', full.supervisor_approved_date ? new Date(full.supervisor_approved_date).toLocaleDateString('id-ID') : '']);
             rows.push([]);
-            rows.push(['Tanggal Review', 'Evaluasi IDP (diisi oleh atasan langsung)', '', 'Tanggal Verifikasi', 'Verifikasi IDP (diisi oleh HR)']);
+            rows.push(['Tanggal Review', 'Evaluasi IDP (diisi oleh atasan langsung)']);
             for (const review of full.reviews || []) {
                 rows.push([
                     new Date(review.review_date).toLocaleDateString('id-ID'),
-                    review.supervisor_note,
-                    '',
-                    review.hr_verification_date ? new Date(review.hr_verification_date).toLocaleDateString('id-ID') : '',
-                    review.hr_note || ''
+                    review.supervisor_note
                 ]);
             }
 
@@ -180,9 +215,17 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <p className="font-bold text-gray-800">{plan.employee_name}</p>
-                                <p className="text-xs text-gray-400">{t('team.idLabel', { id: plan.employee_id })} &middot; {plan.department || '-'} &middot; {t('form.period')} {plan.period_year}</p>
+                                <p className="text-xs text-gray-400">{t('team.idLabel', { id: plan.employee_id })} &middot; {plan.department || '-'} &middot; {t('form.period')} {plan.period_year} &middot; {t('form.supervisor')}: {plan.supervisor_name || '-'}</p>
                             </div>
-                            {statusBadge(plan.status)}
+                            <div className="flex items-center gap-3">
+                                {statusBadge(plan.status)}
+                                {plan.status === 'Pending' && (
+                                    <>
+                                        <button onClick={() => approvePlan(plan.id)} className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors"><CheckCircle size={14} /> {t('team.approve')}</button>
+                                        <button onClick={() => { setRejectTargetId(plan.id); setRejectModalOpen(true); }} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-rose-200 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-50 transition-colors"><XCircle size={14} /> {t('team.reject')}</button>
+                                    </>
+                                )}
+                            </div>
                         </div>
                         <button onClick={() => toggleExpand(plan.id)} className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700">
                             <ChevronDown className={`w-4 h-4 transition-transform ${expandedId === plan.id ? 'rotate-180' : ''}`} />
@@ -191,6 +234,8 @@ export default function IDPManager({ userName }: IDPManagerProps) {
 
                         {expandedId === plan.id && detail && (
                             <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
+                                <IDPDetailInfoTable plan={detail} />
+
                                 {detail.learningProgress && (
                                     <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center justify-between text-sm">
                                         <span className="font-semibold text-indigo-900 flex items-center gap-2"><Clock size={14} /> {t('form.mandatoryProgress')}</span>
@@ -198,9 +243,25 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                                     </div>
                                 )}
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                                    <div><p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">{t('form.achievements')}</p><p className="text-gray-700 whitespace-pre-wrap">{detail.achievements || '-'}</p></div>
-                                    <div><p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">{t('form.careerGoal')}</p><p className="text-gray-700 whitespace-pre-wrap">{detail.career_goal || '-'}</p></div>
+                                <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl space-y-2">
+                                    <label className="flex items-center gap-1.5 text-sm font-semibold text-amber-900">
+                                        <MessageSquare size={14} /> {t('admin.hrNoteLabel')}
+                                    </label>
+                                    <p className="text-xs text-amber-700">{t('admin.hrNoteHint')}</p>
+                                    <textarea
+                                        value={hrNoteDraft}
+                                        onChange={e => setHrNoteDraft(e.target.value)}
+                                        rows={3}
+                                        placeholder={t('admin.hrNotePlaceholder')}
+                                        className="w-full px-3 py-2 text-sm border border-amber-200 rounded-lg focus:border-amber-500 outline-none resize-none bg-white"
+                                    />
+                                    <button
+                                        onClick={() => saveHrNote(plan.id)}
+                                        disabled={savingHrNote || hrNoteDraft === (detail.hr_note || '')}
+                                        className="px-4 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-bold hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        {t('admin.saveHrNote')}
+                                    </button>
                                 </div>
 
                                 <div>
@@ -212,28 +273,7 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                                             {detail.reviews!.map(review => (
                                                 <div key={review.id} className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-sm">
                                                     <p className="text-xs font-bold text-gray-400 mb-1">{new Date(review.review_date).toLocaleDateString()} &middot; {review.reviewed_by}</p>
-                                                    <p className="text-gray-700 mb-2">{review.supervisor_note}</p>
-                                                    {review.hr_note ? (
-                                                        <div className="pt-2 border-t border-gray-200 flex items-start gap-2">
-                                                            <ShieldCheck size={14} className="text-emerald-600 mt-0.5 shrink-0" />
-                                                            <div>
-                                                                <p className="text-xs text-emerald-700">{review.hr_note}</p>
-                                                                <p className="text-[10px] text-gray-400 mt-0.5">{review.hr_verified_by} &middot; {review.hr_verification_date && new Date(review.hr_verification_date).toLocaleDateString()}</p>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="pt-2 border-t border-gray-200 flex gap-2">
-                                                            <input
-                                                                value={verifyDrafts[review.id] || ''}
-                                                                onChange={e => setVerifyDrafts(d => ({ ...d, [review.id]: e.target.value }))}
-                                                                placeholder={t('admin.verifyPlaceholder')}
-                                                                className="flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:border-indigo-500 outline-none"
-                                                            />
-                                                            <button onClick={() => submitVerification(review.id)} disabled={!verifyDrafts[review.id]?.trim()} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                                                                {t('admin.verify')}
-                                                            </button>
-                                                        </div>
-                                                    )}
+                                                    <p className="text-gray-700">{review.supervisor_note}</p>
                                                 </div>
                                             ))}
                                         </div>
@@ -244,6 +284,26 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                     </div>
                 ))}
             </div>
+
+            {/* Reject Modal */}
+            {rejectModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+                        <h3 className="text-xl font-bold text-slate-800 mb-2">{t('team.rejectModalTitle')}</h3>
+                        <textarea
+                            className="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none resize-none"
+                            rows={4}
+                            placeholder={t('team.rejectionReasonPlaceholder')}
+                            value={rejectionReason}
+                            onChange={e => setRejectionReason(e.target.value)}
+                        />
+                        <div className="flex gap-3 mt-6">
+                            <button onClick={() => { setRejectModalOpen(false); setRejectionReason(''); setRejectTargetId(null); }} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-colors">{t('team.cancel')}</button>
+                            <button onClick={confirmReject} disabled={!rejectionReason.trim()} className="flex-1 px-4 py-2.5 rounded-xl bg-rose-600 text-white font-medium hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">{t('team.confirmReject')}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

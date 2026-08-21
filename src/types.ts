@@ -223,6 +223,7 @@ export interface Employee {
     job_level: string;
     organization_name: string;
     status_join: string;
+    join_date?: string;
     branch_name?: string;
     active_status?: string;
 
@@ -338,6 +339,9 @@ export interface IDPPlan {
     approved_date?: string;
     approved_by?: string;
     rejection_reason?: string;
+    hr_note?: string;
+    supervisor_approved_by?: string;
+    supervisor_approved_date?: string;
     created_at?: string;
     updated_at?: string;
     // Present only on the single-plan detail endpoint (GET /api/idp/:id)

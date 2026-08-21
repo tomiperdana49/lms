@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import {
     LayoutDashboard,
     Library,
@@ -49,6 +49,10 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
     const [isTrainingOpen, setIsTrainingOpen] = useState(() => {
         return activePage === 'internal' || activePage === 'external' || activePage === 'external-approval';
     });
+    const trainingRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (isTrainingOpen) trainingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, [isTrainingOpen]);
     const [isAdminOpen, setIsAdminOpen] = useState(() => {
         const saved = localStorage.getItem('lms_admin_sidebar_open');
         if (saved !== null) return saved === 'true';
@@ -321,7 +325,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
 
                         {/* Training Dropdown */}
                         {(config?.moduleInternal || config?.moduleExternal) && (
-                            <div className="pt-1">
+                            <div className="pt-1" ref={trainingRef}>
                                 <button
                                     onClick={() => setIsTrainingOpen(!isTrainingOpen)}
                                     className={`

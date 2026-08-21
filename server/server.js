@@ -3827,13 +3827,30 @@ const IDP_MANDATORY_ACTION = {
     hoursTarget: 48
 };
 
+const INDO_MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const formatIndoDate = (dateVal) => {
+    if (!dateVal) return '';
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '';
+    return `${d.getDate()} ${INDO_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+// Looks up an employee's department (organization_name) and formatted join date from the org-chart
+// master data, so the IDP always reflects HR's source of truth instead of free-text entry.
+const findEmployeeIdpFields = async (employeeId) => {
+    if (!employeeId) return { department: '', join_date_label: '' };
+    const rows = await querySimAsset('SELECT organization_name, join_date FROM employees WHERE id_employee = ?', [employeeId]);
+    if (rows.length === 0) return { department: '', join_date_label: '' };
+    return { department: rows[0].organization_name || '', join_date_label: formatIndoDate(rows[0].join_date) };
+};
+
 // 1. Employee creates a new IDP (Draft) for a given year. Resolves the supervisor from the current
 // org chart (same lookup External Training uses) and seeds the mandatory learning-hours action item.
 app.post('/api/idp', async (req, res) => {
     try {
         const {
-            employee_id, employee_name, job_position, department, period_year,
-            join_date_label, achievements, career_goal, existing_skills, development_area,
+            employee_id, employee_name, job_position, period_year,
+            achievements, career_goal, existing_skills, development_area,
             action_items
         } = req.body;
 
@@ -3842,6 +3859,7 @@ app.post('/api/idp', async (req, res) => {
         }
 
         const supervisor = await findReportToEmployee(employee_id);
+        const { department, join_date_label } = await findEmployeeIdpFields(employee_id);
 
         const result = await query(`
             INSERT INTO idp_plans
@@ -3849,8 +3867,8 @@ app.post('/api/idp', async (req, res) => {
              join_date_label, achievements, career_goal, existing_skills, development_area, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Draft')
         `, [
-            employee_id, employee_name || '', job_position || '', department || '', supervisor?.full_name || null,
-            period_year, join_date_label || '', achievements || '', career_goal || '',
+            employee_id, employee_name || '', job_position || '', department, supervisor?.full_name || null,
+            period_year, join_date_label, achievements || '', career_goal || '',
             existing_skills || '', development_area || ''
         ]);
 
@@ -3935,22 +3953,26 @@ app.get('/api/idp/all', async (req, res) => {
 app.put('/api/idp/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const existing = await query('SELECT status FROM idp_plans WHERE id = ?', [id]);
+        const existing = await query('SELECT status, employee_id FROM idp_plans WHERE id = ?', [id]);
         if (existing.length === 0) return res.status(404).json({ error: 'IDP not found' });
-        if (!['Draft', 'Rejected'].includes(existing[0].status)) {
-            return res.status(400).json({ error: 'Only Draft or Rejected plans can be edited.' });
-        }
+        const currentStatus = existing[0].status;
 
         const {
-            job_position, department, join_date_label, achievements, career_goal,
+            job_position, achievements, career_goal,
             existing_skills, development_area, action_items
         } = req.body;
 
+        const { department, join_date_label } = await findEmployeeIdpFields(existing[0].employee_id);
+
+        // Draft/Rejected edits stay in the (re-)submit flow — status resets to Draft. Editing an
+        // already Pending/Approved plan saves the changes in place without requiring re-approval.
+        const nextStatus = ['Draft', 'Rejected'].includes(currentStatus) ? 'Draft' : currentStatus;
+
         await query(`
             UPDATE idp_plans SET job_position = ?, department = ?, join_date_label = ?, achievements = ?,
-            career_goal = ?, existing_skills = ?, development_area = ?, status = 'Draft', rejection_reason = NULL
+            career_goal = ?, existing_skills = ?, development_area = ?, status = ?, rejection_reason = NULL
             WHERE id = ?
-        `, [job_position || '', department || '', join_date_label || '', achievements || '', career_goal || '', existing_skills || '', development_area || '', id]);
+        `, [job_position || '', department, join_date_label, achievements || '', career_goal || '', existing_skills || '', development_area || '', nextStatus, id]);
 
         if (Array.isArray(action_items)) {
             const currentItems = await query('SELECT id, is_mandatory FROM idp_action_items WHERE idp_id = ?', [id]);
@@ -3993,7 +4015,8 @@ app.post('/api/idp/:id/submit', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 7. Supervisor approves or rejects a Pending plan.
+// 7. HR approves or rejects a Pending plan — the first approval step. Only after HR approval can
+// the employee's supervisor log monthly 1-on-1 reviews against the plan (see endpoint 8 below).
 app.post('/api/idp/:id/approve', async (req, res) => {
     try {
         const { id } = req.params;
@@ -4006,6 +4029,17 @@ app.post('/api/idp/:id/approve', async (req, res) => {
         } else {
             await query("UPDATE idp_plans SET status = ?, approved_by = ?, approved_date = CURDATE() WHERE id = ?", [status, approved_by || null, id]);
         }
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 7b. HR adds/updates a general feedback note on the plan — what's missing or needs to be added.
+// Independent of the approve/reject decision, so HR can leave guidance without changing the status.
+app.post('/api/idp/:id/hr-note', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { hr_note } = req.body;
+        await query('UPDATE idp_plans SET hr_note = ? WHERE id = ?', [hr_note || null, id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -4026,20 +4060,23 @@ app.post('/api/idp/:id/review', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 9. HR verifies a review entry with its own note — never touches idp_plans.status.
-app.post('/api/idp/reviews/:reviewId/verify', async (req, res) => {
+// 8b. Direct supervisor gives the final sign-off closing the IDP cycle — only available once HR has
+// approved the plan. Separate from HR's approved_by/approved_date, and doesn't touch plan status.
+app.post('/api/idp/:id/final-approve', async (req, res) => {
     try {
-        const { reviewId } = req.params;
-        const { hr_note, hr_verified_by } = req.body;
-        await query(
-            'UPDATE idp_reviews SET hr_verification_date = CURDATE(), hr_note = ?, hr_verified_by = ? WHERE id = ?',
-            [hr_note || '', hr_verified_by || null, reviewId]
-        );
+        const { id } = req.params;
+        const { approved_by } = req.body;
+        const rows = await query('SELECT status FROM idp_plans WHERE id = ?', [id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'IDP not found' });
+        if (rows[0].status !== 'Approved') {
+            return res.status(400).json({ error: 'Only plans already approved by HR can receive the final approval.' });
+        }
+        await query('UPDATE idp_plans SET supervisor_approved_by = ?, supervisor_approved_date = CURDATE() WHERE id = ?', [approved_by || null, id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 10. Toggle/annotate a single action item. The mandatory learning-hours row tracks automatically
+// 9. Toggle/annotate a single action item. The mandatory learning-hours row tracks automatically
 // (via computeLearningStats) and can't have its completion flipped manually.
 app.patch('/api/idp/action-items/:itemId', async (req, res) => {
     try {
@@ -4061,7 +4098,7 @@ app.patch('/api/idp/action-items/:itemId', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 11. Full detail: plan + action items + reviews + auto-computed learning-hours progress for the
+// 10. Full detail: plan + action items + reviews + auto-computed learning-hours progress for the
 // mandatory item, so the frontend never has to make a second call to /api/learning-stats.
 app.get('/api/idp/:id', async (req, res) => {
     try {

@@ -1,23 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import {
     Target,
     Users,
     CheckCircle,
-    XCircle,
     Plus,
     Trash2,
     ChevronDown,
     Clock,
     MessageSquare,
-    ShieldCheck,
-    Lock
+    Lock,
+    Pencil,
+    Download
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
-import type { User, IDPPlan, IDPActionItem, Employee } from '../types';
+import type { User, IDPPlan, Employee } from '../types';
 import PopupNotification from './PopupNotification';
-
-type TabType = 'my_idp' | 'team_idp';
+import IDPDetailInfoTable from './IDPDetailInfoTable';
+import { idpLabelCell, idpValueCell, idpSectionHeaderCell, idpHintCell, idpContentCell } from './idpTableStyles';
 
 interface IDPPageProps {
     currentUser: User | null;
@@ -35,9 +37,15 @@ interface ActionItemDraft {
 const CURRENT_YEAR = new Date().getFullYear();
 const MANDATORY_TARGET_HOURS = 48;
 
+const INDO_MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const formatIndoDate = (dateVal?: string) => {
+    if (!dateVal) return '';
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '';
+    return `${d.getDate()} ${INDO_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+};
+
 const emptyDraft = () => ({
-    department: '',
-    join_date_label: '',
     achievements: '',
     career_goal: '',
     existing_skills: '',
@@ -47,12 +55,8 @@ const emptyDraft = () => ({
 
 export default function IDPPage({ currentUser }: IDPPageProps) {
     const { t } = useTranslation('idpPage');
+    // A supervisor's own development is out of scope here — they only review their team's IDPs.
     const isSupervisor = !!currentUser?.isSupervisor;
-    const [activeTab, setActiveTab] = useState<TabType>('my_idp');
-
-    useEffect(() => {
-        if (activeTab === 'team_idp' && !isSupervisor) setActiveTab('my_idp');
-    }, [activeTab, isSupervisor]);
 
     const [myPlans, setMyPlans] = useState<IDPPlan[]>([]);
     const [teamPlans, setTeamPlans] = useState<IDPPlan[]>([]);
@@ -77,9 +81,8 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
 
     useEffect(() => {
         if (!currentUser) return;
-        if (activeTab === 'my_idp') fetchMyPlans();
-        if (activeTab === 'team_idp') fetchTeamPlans();
-    }, [activeTab, currentUser]);
+        if (isSupervisor) fetchTeamPlans(); else fetchMyPlans();
+    }, [isSupervisor, currentUser]);
 
     useEffect(() => {
         fetch(`${API_BASE_URL}/api/employees`).then(r => r.json()).then(setEmployees).catch(() => {});
@@ -103,11 +106,57 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
         else setDetail(null);
     }, [currentYearPlan?.id]);
 
+    // --- Past years' plans: read-only, expandable on demand (same detail table as the current year) ---
+    const [pastExpandedId, setPastExpandedId] = useState<number | null>(null);
+    const [pastDetail, setPastDetail] = useState<IDPPlan | null>(null);
+    const togglePastPlan = async (id: number) => {
+        if (pastExpandedId === id) { setPastExpandedId(null); setPastDetail(null); return; }
+        setPastExpandedId(id);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/idp/${id}`);
+            if (res.ok) setPastDetail(await res.json());
+        } catch (err) { console.error(err); }
+    };
+
+    // --- Download a period's IDP as a PDF that matches the on-screen detail table exactly (captures
+    // the rendered DOM via html2canvas, then paginates it across A4 pages in jsPDF). ---
+    const currentDetailRef = useRef<HTMLDivElement>(null);
+    const pastDetailRef = useRef<HTMLDivElement>(null);
+    const [downloadingPeriod, setDownloadingPeriod] = useState<number | null>(null);
+    const downloadIdpPdf = async (element: HTMLDivElement | null, periodYear: number) => {
+        if (!element) return;
+        setDownloadingPeriod(periodYear);
+        try {
+            const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+            const pdf = new jsPDF('p', 'pt', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const imgWidth = pageWidth;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            const imgData = canvas.toDataURL('image/png');
+            let heightLeft = imgHeight;
+            let position = 0;
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+            while (heightLeft > 0) {
+                position -= pageHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+            pdf.save(`IDP_${(currentUser?.name || '').replace(/\s+/g, '_')}_${periodYear}.pdf`);
+        } catch (err) { console.error(err); } finally { setDownloadingPeriod(null); }
+    };
+
     // --- Create/Edit form (Draft/Rejected, or brand-new plan) ---
     const [draft, setDraft] = useState(emptyDraft());
     const [isEditingForm, setIsEditingForm] = useState(false);
+    // Lets an employee re-open the form for an already Pending/Approved plan to update it in place
+    // (no re-submission/re-approval needed — see the PUT /api/idp/:id handler).
+    const [manualEditMode, setManualEditMode] = useState(false);
 
     useEffect(() => {
+        setManualEditMode(false);
         if (!currentYearPlan) {
             setDraft(emptyDraft());
             setIsEditingForm(true);
@@ -115,8 +164,6 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
         }
         if (['Draft', 'Rejected'].includes(currentYearPlan.status) && detail) {
             setDraft({
-                department: detail.department || '',
-                join_date_label: detail.join_date_label || '',
                 achievements: detail.achievements || '',
                 career_goal: detail.career_goal || '',
                 existing_skills: detail.existing_skills || '',
@@ -138,14 +185,27 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
         ...d, actionItems: d.actionItems.map((item, i) => i === idx ? { ...item, ...patch } : item)
     }));
 
+    const startManualEdit = () => {
+        if (!detail) return;
+        setDraft({
+            achievements: detail.achievements || '',
+            career_goal: detail.career_goal || '',
+            existing_skills: detail.existing_skills || '',
+            development_area: detail.development_area || '',
+            actionItems: (detail.action_items || []).filter(i => !i.is_mandatory).map(i => ({
+                id: i.id, action_description: i.action_description, target_time: i.target_time || '',
+                is_completed: !!i.is_completed, notes: i.notes || ''
+            }))
+        });
+        setManualEditMode(true);
+    };
+
     const savePlan = async (submit: boolean) => {
         const payload = {
             employee_id: currentUser?.employee_id,
             employee_name: currentUser?.name,
             job_position: myEmployee?.job_position || '',
-            department: draft.department,
             period_year: CURRENT_YEAR,
-            join_date_label: draft.join_date_label,
             achievements: draft.achievements,
             career_goal: draft.career_goal,
             existing_skills: draft.existing_skills,
@@ -172,62 +232,19 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                 const res = await fetch(`${API_BASE_URL}/api/idp/${planId}/submit`, { method: 'POST' });
                 if (!res.ok) throw new Error((await res.json()).error || t('notifications.submitFailed'));
             }
-            setNotification({ show: true, type: 'success', message: submit ? t('notifications.submitSuccess') : t('notifications.saveSuccess') });
+            const successMessage = submit ? t('notifications.submitSuccess') : manualEditMode ? t('notifications.updateSuccess') : t('notifications.saveSuccess');
+            setNotification({ show: true, type: 'success', message: successMessage });
+            if (manualEditMode) {
+                setManualEditMode(false);
+                if (planId) fetchDetail(planId);
+            }
             fetchMyPlans();
         } catch (err: any) {
             setNotification({ show: true, type: 'error', message: err.message });
         }
     };
 
-    // --- Action item quick-toggle (available on Pending/Approved plans, and on the mandatory row's display) ---
-    const toggleActionItem = async (item: IDPActionItem, isCompleted: boolean) => {
-        try {
-            await fetch(`${API_BASE_URL}/api/idp/action-items/${item.id}`, {
-                method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_completed: isCompleted })
-            });
-            if (currentYearPlan?.id) fetchDetail(currentYearPlan.id);
-        } catch (err) { console.error(err); }
-    };
-
-    const updateActionItemNotes = async (item: IDPActionItem, notes: string) => {
-        try {
-            await fetch(`${API_BASE_URL}/api/idp/action-items/${item.id}`, {
-                method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes })
-            });
-        } catch (err) { console.error(err); }
-    };
-
-    // --- Team IDP: approve/reject + add review ---
-    const [rejectModalOpen, setRejectModalOpen] = useState(false);
-    const [rejectTargetId, setRejectTargetId] = useState<number | null>(null);
-    const [rejectionReason, setRejectionReason] = useState('');
-
-    const approvePlan = async (id: number) => {
-        try {
-            await fetch(`${API_BASE_URL}/api/idp/${id}/approve`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'Approved', approved_by: currentUser?.name })
-            });
-            setNotification({ show: true, type: 'success', message: t('notifications.approveSuccess') });
-            fetchTeamPlans();
-            if (teamDetailId === id) fetchTeamDetail(id);
-        } catch (err) { console.error(err); }
-    };
-
-    const confirmReject = async () => {
-        if (!rejectTargetId || !rejectionReason.trim()) return;
-        try {
-            await fetch(`${API_BASE_URL}/api/idp/${rejectTargetId}/approve`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'Rejected', rejection_reason: rejectionReason })
-            });
-            setNotification({ show: true, type: 'success', message: t('notifications.rejectSuccess') });
-            setRejectModalOpen(false);
-            setRejectionReason('');
-            fetchTeamPlans();
-        } catch (err) { console.error(err); }
-    };
-
+    // --- Team IDP: add review (first approval is handled by HR in IDPManager, not the supervisor) ---
     const [teamDetailId, setTeamDetailId] = useState<number | null>(null);
     const [teamDetail, setTeamDetail] = useState<IDPPlan | null>(null);
     const fetchTeamDetail = async (id: number) => {
@@ -260,6 +277,20 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
         } catch (err) { console.error(err); }
     };
 
+    // Closes the yearly IDP cycle: the supervisor's own final sign-off, only available once HR has
+    // approved the plan. Distinct from HR's approval — see the /api/idp/:id/final-approve endpoint.
+    const finalApprovePlan = async (id: number) => {
+        try {
+            await fetch(`${API_BASE_URL}/api/idp/${id}/final-approve`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ approved_by: currentUser?.name })
+            });
+            setNotification({ show: true, type: 'success', message: t('notifications.finalApproveSuccess') });
+            fetchTeamPlans();
+            fetchTeamDetail(id);
+        } catch (err) { console.error(err); }
+    };
+
     const statusBadge = (status: string) => {
         const map: Record<string, string> = {
             Draft: 'bg-slate-100 text-slate-600 border-slate-200',
@@ -289,33 +320,15 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                     <Target className="w-6 h-6 text-indigo-600" />
                 </div>
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-800">{t('header.title')}</h1>
-                    <p className="text-gray-500 text-sm">{t('header.subtitle', { year: CURRENT_YEAR })}</p>
+                    <h1 className="text-2xl font-bold text-gray-800">{isSupervisor ? t('header.titleTeam') : t('header.title')}</h1>
+                    <p className="text-gray-500 text-sm">{isSupervisor ? t('header.subtitleTeam') : t('header.subtitle', { year: CURRENT_YEAR })}</p>
                 </div>
             </div>
 
-            <div className="flex gap-2 border-b border-gray-200">
-                <button onClick={() => setActiveTab('my_idp')} className={`px-4 py-2.5 font-semibold text-sm border-b-2 transition-colors ${activeTab === 'my_idp' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-                    {t('tabs.myIdp')}
-                </button>
-                {isSupervisor && (
-                    <button onClick={() => setActiveTab('team_idp')} className={`px-4 py-2.5 font-semibold text-sm border-b-2 transition-colors ${activeTab === 'team_idp' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-                        {t('tabs.teamIdp')}
-                    </button>
-                )}
-            </div>
-
-            {/* ===== MY IDP ===== */}
-            {activeTab === 'my_idp' && (
+            {/* ===== MY IDP (staff without direct reports) ===== */}
+            {!isSupervisor && (
                 <div className="space-y-6">
                     <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-6">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                            <div><p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">{t('form.employeeName')}</p><p className="font-semibold text-gray-800">{currentUser?.name}</p></div>
-                            <div><p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">{t('form.jobPosition')}</p><p className="font-semibold text-gray-800">{myEmployee?.job_position || '-'}</p></div>
-                            <div><p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">{t('form.period')}</p><p className="font-semibold text-gray-800">{CURRENT_YEAR}</p></div>
-                            {currentYearPlan && <div>{statusBadge(currentYearPlan.status)}</div>}
-                        </div>
-
                         {currentYearPlan?.status === 'Rejected' && currentYearPlan.rejection_reason && (
                             <div className="p-3 bg-rose-50 border border-rose-100 rounded-lg text-sm text-rose-700">
                                 <span className="font-semibold block mb-1">{t('form.rejectionReasonLabel')}</span>
@@ -323,76 +336,164 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                             </div>
                         )}
 
-                        {isEditingForm ? (
-                            <>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-1">{t('form.department')}</label>
-                                        <input value={draft.department} onChange={e => setDraft(d => ({ ...d, department: e.target.value }))} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-indigo-500 outline-none" placeholder={t('form.departmentPlaceholder')} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-1">{t('form.joinDate')}</label>
-                                        <input value={draft.join_date_label} onChange={e => setDraft(d => ({ ...d, join_date_label: e.target.value }))} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-indigo-500 outline-none" placeholder={t('form.joinDatePlaceholder')} />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1">{t('form.achievements')}</label>
-                                    <p className="text-xs text-gray-400 mb-1">{t('form.achievementsHint')}</p>
-                                    <textarea value={draft.achievements} onChange={e => setDraft(d => ({ ...d, achievements: e.target.value }))} rows={4} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-indigo-500 outline-none resize-none" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1">{t('form.careerGoal')}</label>
-                                    <p className="text-xs text-gray-400 mb-1">{t('form.careerGoalHint')}</p>
-                                    <textarea value={draft.career_goal} onChange={e => setDraft(d => ({ ...d, career_goal: e.target.value }))} rows={4} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-indigo-500 outline-none resize-none" />
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-1">{t('form.existingSkills')}</label>
-                                        <p className="text-xs text-gray-400 mb-1">{t('form.existingSkillsHint')}</p>
-                                        <textarea value={draft.existing_skills} onChange={e => setDraft(d => ({ ...d, existing_skills: e.target.value }))} rows={4} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-indigo-500 outline-none resize-none" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-1">{t('form.developmentArea')}</label>
-                                        <p className="text-xs text-gray-400 mb-1">{t('form.developmentAreaHint')}</p>
-                                        <textarea value={draft.development_area} onChange={e => setDraft(d => ({ ...d, development_area: e.target.value }))} rows={4} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-indigo-500 outline-none resize-none" />
-                                    </div>
-                                </div>
+                        {currentYearPlan?.hr_note && (
+                            <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-sm text-amber-800">
+                                <span className="font-semibold block mb-1">{t('form.hrNoteLabel')}</span>
+                                <p className="whitespace-pre-wrap">{currentYearPlan.hr_note}</p>
+                            </div>
+                        )}
 
-                                <div>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <label className="block text-sm font-semibold text-gray-700">{t('form.actionPlan')}</label>
-                                        <button type="button" onClick={addActionRow} className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-700"><Plus size={14} /> {t('form.addRow')}</button>
-                                    </div>
-                                    <p className="text-xs text-gray-400 mb-3">{t('form.actionPlanHint')}</p>
-                                    <div className="flex items-center gap-2 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-sm text-indigo-700 mb-3">
-                                        <Lock size={14} className="shrink-0" />
-                                        {t('form.mandatoryRowNote', { hours: MANDATORY_TARGET_HOURS })}
-                                    </div>
-                                    <div className="space-y-3">
-                                        {draft.actionItems.map((item, idx) => (
-                                            <div key={idx} className="flex gap-2 items-start p-3 bg-gray-50 border border-gray-100 rounded-xl">
-                                                <div className="flex-1 grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-2">
-                                                    <input value={item.action_description} onChange={e => updateActionRow(idx, { action_description: e.target.value })} placeholder={t('form.actionDescriptionPlaceholder')} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-500 outline-none" />
-                                                    <input value={item.target_time} onChange={e => updateActionRow(idx, { target_time: e.target.value })} placeholder={t('form.targetTimePlaceholder')} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-indigo-500 outline-none" />
-                                                </div>
-                                                <button type="button" onClick={() => removeActionRow(idx)} className="p-2 text-gray-400 hover:text-rose-600 transition-colors"><Trash2 size={16} /></button>
-                                            </div>
-                                        ))}
-                                    </div>
+                        {(isEditingForm || manualEditMode) ? (
+                            <>
+                                {currentYearPlan && <div className="flex justify-end">{statusBadge(currentYearPlan.status)}</div>}
+
+                                <div className="overflow-x-auto rounded-xl border border-slate-300">
+                                    <table className="w-full border-collapse table-fixed min-w-[780px]">
+                                        <colgroup>
+                                            <col className="w-[13%]" /><col className="w-[20%]" />
+                                            <col className="w-[13%]" /><col className="w-[20%]" />
+                                            <col className="w-[13%]" /><col className="w-[20%]" />
+                                        </colgroup>
+                                        <tbody>
+                                            <tr>
+                                                <td className={idpLabelCell}>{t('form.employeeName')}:</td>
+                                                <td className={idpValueCell}>{currentUser?.name}</td>
+                                                <td className={idpLabelCell}>{t('form.jobPosition')}:</td>
+                                                <td className={idpValueCell}>{myEmployee?.job_position || '-'}</td>
+                                                <td className={idpLabelCell}>{t('form.supervisor')}:</td>
+                                                <td className={idpValueCell}>{currentYearPlan?.supervisor_name || myEmployee?.id_report_to || '-'}</td>
+                                            </tr>
+                                            <tr>
+                                                <td className={idpLabelCell}>{t('form.period')}:</td>
+                                                <td className={idpValueCell}>{CURRENT_YEAR}</td>
+                                                <td className={idpLabelCell}>{t('form.department')}:</td>
+                                                <td className={idpValueCell}>{currentYearPlan?.department || myEmployee?.organization_name || '-'}</td>
+                                                <td className={idpLabelCell}>{t('form.joinDate')}:</td>
+                                                <td className={idpValueCell}>{currentYearPlan?.join_date_label || formatIndoDate(myEmployee?.join_date) || '-'}</td>
+                                            </tr>
+
+                                            <tr><td colSpan={6} className={idpSectionHeaderCell}>{t('form.achievements')}</td></tr>
+                                            <tr><td colSpan={6} className={idpHintCell}>{t('form.achievementsHint')}</td></tr>
+                                            <tr><td colSpan={6} className={idpContentCell}>
+                                                <textarea value={draft.achievements} onChange={e => setDraft(d => ({ ...d, achievements: e.target.value }))} rows={3} className="w-full bg-transparent outline-none resize-none" />
+                                            </td></tr>
+
+                                            <tr><td colSpan={6} className={idpSectionHeaderCell}>{t('form.careerGoal')}</td></tr>
+                                            <tr><td colSpan={6} className={idpHintCell}>{t('form.careerGoalHint')}</td></tr>
+                                            <tr><td colSpan={6} className={idpContentCell}>
+                                                <textarea value={draft.career_goal} onChange={e => setDraft(d => ({ ...d, career_goal: e.target.value }))} rows={3} className="w-full bg-transparent outline-none resize-none" />
+                                            </td></tr>
+
+                                            <tr>
+                                                <td colSpan={3} className={idpSectionHeaderCell}>{t('form.existingSkills')}</td>
+                                                <td colSpan={3} className={idpSectionHeaderCell}>{t('form.developmentArea')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td colSpan={3} className={idpHintCell}>{t('form.existingSkillsHint')}</td>
+                                                <td colSpan={3} className={idpHintCell}>{t('form.developmentAreaHint')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td colSpan={3} className={idpContentCell}>
+                                                    <textarea value={draft.existing_skills} onChange={e => setDraft(d => ({ ...d, existing_skills: e.target.value }))} rows={3} className="w-full bg-transparent outline-none resize-none" />
+                                                </td>
+                                                <td colSpan={3} className={idpContentCell}>
+                                                    <textarea value={draft.development_area} onChange={e => setDraft(d => ({ ...d, development_area: e.target.value }))} rows={3} className="w-full bg-transparent outline-none resize-none" />
+                                                </td>
+                                            </tr>
+
+                                            <tr>
+                                                <td colSpan={2} className={idpSectionHeaderCell}>{t('form.actionPlan')}</td>
+                                                <td className={idpSectionHeaderCell}>{t('form.targetTime')}</td>
+                                                <td className={idpSectionHeaderCell}>{t('form.checklistProgress')}</td>
+                                                <td colSpan={2} className={idpSectionHeaderCell}>
+                                                    <div className="flex items-center justify-between">
+                                                        <span>{t('form.notes')}</span>
+                                                        <button type="button" onClick={addActionRow} className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-700"><Plus size={14} /> {t('form.addRow')}</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td colSpan={2} className={idpHintCell}>{t('form.actionPlanHint')}</td>
+                                                <td className={idpHintCell}>{t('form.targetTimeHint')}</td>
+                                                <td className={idpHintCell}>{t('form.checklistProgressHint')}</td>
+                                                <td colSpan={2} className={idpHintCell}>{t('form.notesHint')}</td>
+                                            </tr>
+
+                                            {mandatoryItem ? (
+                                                <tr>
+                                                    <td colSpan={2} className={idpContentCell}>
+                                                        <div className="flex items-center gap-2 text-indigo-700">
+                                                            <Lock size={14} className="shrink-0" />
+                                                            <span>{mandatoryItem.action_description}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className={idpValueCell}>{mandatoryItem.target_time}</td>
+                                                    <td className={`${idpValueCell} text-center`}>
+                                                        <input type="checkbox" disabled readOnly checked={!!detail?.learningProgress && detail.learningProgress.totalJam >= detail.learningProgress.target} className="w-4 h-4 accent-indigo-600" />
+                                                    </td>
+                                                    <td colSpan={2} className={idpValueCell}>{t('form.mandatoryRowNote', { hours: MANDATORY_TARGET_HOURS })}</td>
+                                                </tr>
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan={6} className={idpContentCell}>
+                                                        <div className="flex items-center gap-2 text-indigo-700">
+                                                            <Lock size={14} className="shrink-0" />
+                                                            <span>{t('form.mandatoryRowNote', { hours: MANDATORY_TARGET_HOURS })}</span>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+
+                                            {draft.actionItems.map((item, idx) => (
+                                                <tr key={idx}>
+                                                    <td colSpan={2} className={idpContentCell}>
+                                                        <input value={item.action_description} onChange={e => updateActionRow(idx, { action_description: e.target.value })} placeholder={t('form.actionDescriptionPlaceholder')} className="w-full bg-transparent outline-none" />
+                                                    </td>
+                                                    <td className={idpValueCell}>
+                                                        <input value={item.target_time} onChange={e => updateActionRow(idx, { target_time: e.target.value })} placeholder={t('form.targetTimePlaceholder')} className="w-full bg-transparent outline-none" />
+                                                    </td>
+                                                    <td className={`${idpValueCell} text-center`}>
+                                                        <input type="checkbox" checked={!!item.is_completed} onChange={e => updateActionRow(idx, { is_completed: e.target.checked })} className="w-4 h-4 accent-indigo-600" />
+                                                    </td>
+                                                    <td colSpan={2} className={idpValueCell}>
+                                                        <div className="flex items-center gap-2">
+                                                            <input value={item.notes} onChange={e => updateActionRow(idx, { notes: e.target.value })} placeholder={t('form.notesPlaceholder')} className="flex-1 bg-transparent outline-none" />
+                                                            <button type="button" onClick={() => removeActionRow(idx)} className="text-gray-400 hover:text-rose-600 transition-colors shrink-0"><Trash2 size={14} /></button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
 
                                 <div className="flex gap-3 pt-2">
-                                    <button onClick={() => savePlan(false)} className="px-6 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-colors">{t('form.saveDraft')}</button>
-                                    <button onClick={() => savePlan(true)} className="px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 transition-colors">{t('form.submit')}</button>
+                                    {manualEditMode ? (
+                                        <>
+                                            <button onClick={() => setManualEditMode(false)} className="px-6 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-colors">{t('form.cancel')}</button>
+                                            <button onClick={() => savePlan(false)} className="px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 transition-colors">{t('form.saveChanges')}</button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button onClick={() => savePlan(false)} className="px-6 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-colors">{t('form.saveDraft')}</button>
+                                            <button onClick={() => savePlan(true)} className="px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 transition-colors">{t('form.submit')}</button>
+                                        </>
+                                    )}
                                 </div>
                             </>
                         ) : detail && (
                             <div className="space-y-6">
-                                <ReadonlyField label={t('form.achievements')} value={detail.achievements} />
-                                <ReadonlyField label={t('form.careerGoal')} value={detail.career_goal} />
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <ReadonlyField label={t('form.existingSkills')} value={detail.existing_skills} />
-                                    <ReadonlyField label={t('form.developmentArea')} value={detail.development_area} />
+                                <div className="flex items-center justify-end gap-3">
+                                    <button onClick={() => downloadIdpPdf(currentDetailRef.current, detail.period_year)} disabled={downloadingPeriod === detail.period_year} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 disabled:opacity-50">
+                                        <Download size={14} /> {downloadingPeriod === detail.period_year ? t('form.downloading') : t('form.download')}
+                                    </button>
+                                    <button onClick={startManualEdit} className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700">
+                                        <Pencil size={14} /> {t('form.editIdp')}
+                                    </button>
+                                    {statusBadge(detail.status)}
+                                </div>
+                                <div ref={currentDetailRef}>
+                                    <IDPDetailInfoTable plan={detail} />
                                 </div>
 
                                 {mandatoryItem && (
@@ -407,27 +508,6 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                                     </div>
                                 )}
 
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t('form.actionPlan')}</label>
-                                    <div className="space-y-2">
-                                        {(detail.action_items || []).filter(i => !i.is_mandatory).map(item => (
-                                            <div key={item.id} className="flex items-start gap-3 p-3 bg-gray-50 border border-gray-100 rounded-xl">
-                                                <input type="checkbox" checked={!!item.is_completed} onChange={e => toggleActionItem(item, e.target.checked)} className="mt-1 w-4 h-4 rounded border-gray-300 text-indigo-600" />
-                                                <div className="flex-1">
-                                                    <p className={`text-sm font-medium ${item.is_completed ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{item.action_description}</p>
-                                                    {item.target_time && <p className="text-xs text-gray-400">{item.target_time}</p>}
-                                                    <input
-                                                        defaultValue={item.notes || ''}
-                                                        onBlur={e => updateActionItemNotes(item, e.target.value)}
-                                                        placeholder={t('form.notesPlaceholder')}
-                                                        className="mt-1.5 w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:border-indigo-500 outline-none"
-                                                    />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
                                 {(detail.reviews || []).length > 0 && (
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-2">{t('form.reviewHistory')}</label>
@@ -436,12 +516,6 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                                                 <div key={review.id} className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-sm">
                                                     <p className="text-xs font-bold text-gray-400 mb-1">{new Date(review.review_date).toLocaleDateString()}</p>
                                                     <p className="text-gray-700">{review.supervisor_note}</p>
-                                                    {review.hr_note && (
-                                                        <div className="mt-2 pt-2 border-t border-gray-200 flex items-start gap-2">
-                                                            <ShieldCheck size={14} className="text-emerald-600 mt-0.5 shrink-0" />
-                                                            <p className="text-xs text-emerald-700">{review.hr_note}</p>
-                                                        </div>
-                                                    )}
                                                 </div>
                                             ))}
                                         </div>
@@ -456,9 +530,27 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                             <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-3">{t('form.pastPlans')}</h3>
                             <div className="space-y-2">
                                 {pastPlans.map(p => (
-                                    <div key={p.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl">
-                                        <span className="font-semibold text-gray-700">{t('form.period')} {p.period_year}</span>
-                                        {statusBadge(p.status)}
+                                    <div key={p.id} className="bg-white border border-gray-100 rounded-2xl p-4">
+                                        <button onClick={() => togglePastPlan(p.id)} className="w-full flex items-center justify-between text-left">
+                                            <span className="flex items-center gap-2 font-semibold text-gray-700">
+                                                <ChevronDown className={`w-4 h-4 text-indigo-600 transition-transform ${pastExpandedId === p.id ? 'rotate-180' : ''}`} />
+                                                {t('form.period')} {p.period_year}
+                                            </span>
+                                            {statusBadge(p.status)}
+                                        </button>
+
+                                        {pastExpandedId === p.id && pastDetail && (
+                                            <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                                                <div className="flex justify-end">
+                                                    <button onClick={() => downloadIdpPdf(pastDetailRef.current, p.period_year)} disabled={downloadingPeriod === p.period_year} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 disabled:opacity-50">
+                                                        <Download size={14} /> {downloadingPeriod === p.period_year ? t('form.downloading') : t('form.download')}
+                                                    </button>
+                                                </div>
+                                                <div ref={pastDetailRef}>
+                                                    <IDPDetailInfoTable plan={pastDetail} />
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -467,8 +559,8 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                 </div>
             )}
 
-            {/* ===== TEAM IDP ===== */}
-            {activeTab === 'team_idp' && (
+            {/* ===== TEAM IDP (supervisors only — reviewing is their role here, not their own IDP) ===== */}
+            {isSupervisor && (
                 <div className="space-y-4">
                     {teamPlans.length === 0 ? (
                         <div className="text-center py-16 bg-gradient-to-b from-slate-50 to-white rounded-3xl border border-dashed border-slate-300">
@@ -484,12 +576,6 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                                 </div>
                                 <div className="flex items-center gap-3">
                                     {statusBadge(plan.status)}
-                                    {plan.status === 'Pending' && (
-                                        <>
-                                            <button onClick={() => approvePlan(plan.id)} className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors"><CheckCircle size={14} /> {t('team.approve')}</button>
-                                            <button onClick={() => { setRejectTargetId(plan.id); setRejectModalOpen(true); }} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-rose-200 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-50 transition-colors"><XCircle size={14} /> {t('team.reject')}</button>
-                                        </>
-                                    )}
                                 </div>
                             </div>
                             <button onClick={() => toggleTeamDetail(plan.id)} className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700">
@@ -499,12 +585,14 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
 
                             {teamDetailId === plan.id && teamDetail && (
                                 <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
-                                    <ReadonlyField label={t('form.achievements')} value={teamDetail.achievements} />
-                                    <ReadonlyField label={t('form.careerGoal')} value={teamDetail.career_goal} />
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <ReadonlyField label={t('form.existingSkills')} value={teamDetail.existing_skills} />
-                                        <ReadonlyField label={t('form.developmentArea')} value={teamDetail.development_area} />
-                                    </div>
+                                    <IDPDetailInfoTable plan={teamDetail} />
+
+                                    {teamDetail.hr_note && (
+                                        <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-sm text-amber-800">
+                                            <span className="font-semibold block mb-1">{t('form.hrNoteLabel')}</span>
+                                            <p className="whitespace-pre-wrap">{teamDetail.hr_note}</p>
+                                        </div>
+                                    )}
 
                                     {teamDetail.learningProgress && (
                                         <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center justify-between text-sm">
@@ -513,22 +601,23 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                                         </div>
                                     )}
 
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2">{t('form.actionPlan')}</label>
-                                        <div className="space-y-1.5">
-                                            {(teamDetail.action_items || []).filter(i => !i.is_mandatory).map(item => (
-                                                <div key={item.id} className="flex items-center gap-2 text-sm text-gray-700">
-                                                    <span className={item.is_completed ? 'text-emerald-600' : 'text-gray-300'}>{item.is_completed ? '✓' : '○'}</span>
-                                                    {item.action_description}
-                                                </div>
-                                            ))}
+                                    {plan.status === 'Approved' ? (
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <button onClick={() => { setReviewDate(new Date().toISOString().split('T')[0]); setReviewNote(''); setReviewModalOpen(true); }} className="flex items-center gap-1.5 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-colors">
+                                                <MessageSquare size={14} /> {t('team.addReview')}
+                                            </button>
+                                            {teamDetail.supervisor_approved_date ? (
+                                                <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                                                    <CheckCircle size={14} /> {t('team.finalApprovedOn', { date: new Date(teamDetail.supervisor_approved_date).toLocaleDateString('id-ID') })}
+                                                </span>
+                                            ) : (
+                                                <button onClick={() => finalApprovePlan(plan.id)} className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors">
+                                                    <CheckCircle size={14} /> {t('team.finalApprove')}
+                                                </button>
+                                            )}
                                         </div>
-                                    </div>
-
-                                    {plan.status === 'Approved' && (
-                                        <button onClick={() => { setReviewDate(new Date().toISOString().split('T')[0]); setReviewNote(''); setReviewModalOpen(true); }} className="flex items-center gap-1.5 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-colors">
-                                            <MessageSquare size={14} /> {t('team.addReview')}
-                                        </button>
+                                    ) : plan.status === 'Pending' && (
+                                        <p className="text-xs text-amber-600">{t('team.awaitingHrApproval')}</p>
                                     )}
 
                                     {(teamDetail.reviews || []).length > 0 && (
@@ -538,14 +627,6 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                                                 <div key={review.id} className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-sm">
                                                     <p className="text-xs font-bold text-gray-400 mb-1">{new Date(review.review_date).toLocaleDateString()}</p>
                                                     <p className="text-gray-700">{review.supervisor_note}</p>
-                                                    {review.hr_note ? (
-                                                        <div className="mt-2 pt-2 border-t border-gray-200 flex items-start gap-2">
-                                                            <ShieldCheck size={14} className="text-emerald-600 mt-0.5 shrink-0" />
-                                                            <p className="text-xs text-emerald-700">{review.hr_note}</p>
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-xs text-gray-400 mt-1.5">{t('form.awaitingHrVerification')}</p>
-                                                    )}
                                                 </div>
                                             ))}
                                         </div>
@@ -554,26 +635,6 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                             )}
                         </div>
                     ))}
-                </div>
-            )}
-
-            {/* Reject Modal */}
-            {rejectModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-                        <h3 className="text-xl font-bold text-slate-800 mb-2">{t('team.rejectModalTitle')}</h3>
-                        <textarea
-                            className="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none resize-none"
-                            rows={4}
-                            placeholder={t('team.rejectionReasonPlaceholder')}
-                            value={rejectionReason}
-                            onChange={e => setRejectionReason(e.target.value)}
-                        />
-                        <div className="flex gap-3 mt-6">
-                            <button onClick={() => { setRejectModalOpen(false); setRejectionReason(''); }} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-colors">{t('team.cancel')}</button>
-                            <button onClick={confirmReject} disabled={!rejectionReason.trim()} className="flex-1 px-4 py-2.5 rounded-xl bg-rose-600 text-white font-medium hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">{t('team.confirmReject')}</button>
-                        </div>
-                    </div>
                 </div>
             )}
 
@@ -602,10 +663,3 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
         </div>
     );
 }
-
-const ReadonlyField = ({ label, value }: { label: string; value?: string }) => (
-    <div>
-        <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">{label}</p>
-        <p className="text-gray-700 text-sm whitespace-pre-wrap">{value || '-'}</p>
-    </div>
-);
