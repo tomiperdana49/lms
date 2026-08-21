@@ -1,7 +1,7 @@
 {
   "header": {
-    "title": "Individual Development Plan",
-    "titleTeam": "Development Plan Tim",
+    "title": "Rencana Pengembangan Individu",
+    "titleTeam": "Rencana Pengembangan Tim",
     "subtitle": "Rencana pengembangan diri kamu untuk periode {{year}}",
     "subtitleTeam": "Kelola dan evaluasi IDP anggota tim kamu"
   },
@@ -91,7 +91,7 @@
     "reviewSuccess": "Evaluasi berhasil disimpan."
   },
   "admin": {
-    "title": "Individual Development Plan",
+    "title": "Rencana Pengembangan Individu",
     "subtitle": "Kelola IDP seluruh karyawan",
     "searchPlaceholder": "Cari nama atau ID karyawan...",
     "allYears": "SEMUA TAHUN",
