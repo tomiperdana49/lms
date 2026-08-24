@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { Search, Download, Loader2, CalendarRange, UsersRound, Building2, Check, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -28,6 +28,8 @@ const EmployeeLearningReport = () => {
     const [selectedOrg, setSelectedOrg] = useState('');
     const [orgQuery, setOrgQuery] = useState('');
     const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
+    const selectedOrgRef = useRef(selectedOrg);
+    selectedOrgRef.current = selectedOrg;
     const [selectedEmployees, setSelectedEmployees] = useState<EmployeeOption[]>([]);
     const [stats, setStats] = useState<LearningStats>(EMPTY_STATS);
     const [statsLoading, setStatsLoading] = useState(false);
@@ -187,7 +189,11 @@ const EmployeeLearningReport = () => {
                             </span>
                         ))}
                         <button
-                            onClick={() => setSelectedEmployees([])}
+                            onClick={() => {
+                                setSelectedEmployees([]);
+                                setSelectedOrg('');
+                                setOrgQuery('');
+                            }}
                             className="text-xs font-bold text-slate-400 hover:text-red-600 px-2 py-1.5"
                         >
                             {t('employee.clearAll')}
@@ -203,7 +209,7 @@ const EmployeeLearningReport = () => {
                             value={search}
                             onFocus={() => setEmployeeDropdownOpen(true)}
                             onBlur={() => setTimeout(() => setEmployeeDropdownOpen(false), 150)}
-                            onChange={e => setSearch(e.target.value)}
+                            onChange={e => { setSearch(e.target.value); setEmployeeDropdownOpen(true); }}
                             placeholder={t('employee.searchPlaceholder')}
                             className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
@@ -231,8 +237,8 @@ const EmployeeLearningReport = () => {
                             type="text"
                             value={orgQuery}
                             onFocus={() => setOrgDropdownOpen(true)}
-                            onBlur={() => setTimeout(() => { setOrgDropdownOpen(false); setOrgQuery(selectedOrg); }, 150)}
-                            onChange={e => setOrgQuery(e.target.value)}
+                            onBlur={() => setTimeout(() => { setOrgDropdownOpen(false); setOrgQuery(selectedOrgRef.current); }, 150)}
+                            onChange={e => { setOrgQuery(e.target.value); setOrgDropdownOpen(true); }}
                             placeholder={t('employee.allOrganizations')}
                             className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
