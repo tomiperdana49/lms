@@ -192,7 +192,6 @@ export default function IDPManager({ userName }: IDPManagerProps) {
 
             rows.push([]);
             rows.push(['Tanggal IDP Dibuat oleh Karyawan:', full.created_by_date ? new Date(full.created_by_date).toLocaleDateString('id-ID') : '', '', 'Tanggal IDP Disetujui oleh HR:', full.approved_date ? new Date(full.approved_date).toLocaleDateString('id-ID') : '']);
-            rows.push(['Tanggal IDP Disetujui oleh Atasan Langsung:', full.supervisor_approved_date ? new Date(full.supervisor_approved_date).toLocaleDateString('id-ID') : '']);
             rows.push([]);
             rows.push(['Tanggal Review', 'Evaluasi IDP (diisi oleh atasan langsung)']);
             for (const review of full.reviews || []) {

@@ -5,7 +5,6 @@ import { jsPDF } from 'jspdf';
 import {
     Target,
     Users,
-    CheckCircle,
     Plus,
     Trash2,
     ChevronDown,
@@ -288,20 +287,6 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
             setReviewModalOpen(false);
             setReviewNote('');
             fetchTeamDetail(teamDetailId);
-        } catch (err) { console.error(err); }
-    };
-
-    // Closes the yearly IDP cycle: the supervisor's own final sign-off, only available once HR has
-    // approved the plan. Distinct from HR's approval — see the /api/idp/:id/final-approve endpoint.
-    const finalApprovePlan = async (id: number) => {
-        try {
-            await fetch(`${API_BASE_URL}/api/idp/${id}/final-approve`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ approved_by: currentUser?.name })
-            });
-            setNotification({ show: true, type: 'success', message: t('notifications.finalApproveSuccess') });
-            fetchTeamPlans();
-            fetchTeamDetail(id);
         } catch (err) { console.error(err); }
     };
 
@@ -633,15 +618,6 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                                             <button onClick={() => { setReviewDate(new Date().toISOString().split('T')[0]); setReviewNote(''); setReviewModalOpen(true); }} className="flex items-center gap-1.5 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-colors">
                                                 <MessageSquare size={14} /> {t('team.addReview')}
                                             </button>
-                                            {teamDetail.supervisor_approved_date ? (
-                                                <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
-                                                    <CheckCircle size={14} /> {t('team.finalApprovedOn', { date: new Date(teamDetail.supervisor_approved_date).toLocaleDateString('id-ID') })}
-                                                </span>
-                                            ) : (
-                                                <button onClick={() => finalApprovePlan(plan.id)} className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors">
-                                                    <CheckCircle size={14} /> {t('team.finalApprove')}
-                                                </button>
-                                            )}
                                         </div>
                                     ) : plan.status === 'Pending' && (
                                         <p className="text-xs text-amber-600">{t('team.awaitingHrApproval')}</p>

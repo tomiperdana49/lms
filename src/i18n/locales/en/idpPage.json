@@ -18,7 +18,6 @@
     "joinDatePlaceholder": "e.g. June 26, 2015",
     "createdByDate": "IDP Created by Employee on",
     "approvedDate": "IDP Approved by HR on",
-    "finalApprovedDate": "IDP Approved by Direct Supervisor on",
     "achievements": "Achievements",
     "achievementsHint": "What have you achieved over the last 3-12 months?",
     "careerGoal": "Career Goal",
@@ -62,8 +61,6 @@
     "showDetail": "Show Detail",
     "hideDetail": "Hide Detail",
     "addReview": "Add Review",
-    "finalApprove": "Final Approval",
-    "finalApprovedOn": "Finally approved on {{date}}",
     "rejectModalTitle": "Reject IDP",
     "rejectionReasonPlaceholder": "Enter the reason for rejection...",
     "cancel": "Cancel",
@@ -88,7 +85,6 @@
     "submitSuccess": "IDP submitted for approval.",
     "approveSuccess": "IDP approved.",
     "rejectSuccess": "IDP rejected.",
-    "finalApproveSuccess": "Final approval saved.",
     "reviewSuccess": "Review saved."
   },
   "admin": {

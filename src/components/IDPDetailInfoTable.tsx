@@ -99,19 +99,14 @@ export default function IDPDetailInfoTable({ plan }: Props) {
                         </>
                     )}
 
-                    {(plan.created_by_date || plan.approved_date || plan.supervisor_approved_date) && (
+                    {(plan.created_by_date || plan.approved_date) && (
                         <tr>
                             <td className={labelCell}>{t('form.createdByDate')}:</td>
                             <td className={valueCell}>{formatDate(plan.created_by_date)}</td>
                             <td className={labelCell}>{t('form.approvedDate')}:</td>
-                            <td className={valueCell}>
+                            <td colSpan={3} className={valueCell}>
                                 {formatDate(plan.approved_date)}
                                 {plan.approved_by && <span className="block text-xs text-slate-500">{plan.approved_by}</span>}
-                            </td>
-                            <td className={labelCell}>{t('form.finalApprovedDate')}:</td>
-                            <td className={valueCell}>
-                                {formatDate(plan.supervisor_approved_date)}
-                                {plan.supervisor_approved_by && <span className="block text-xs text-slate-500">{plan.supervisor_approved_by}</span>}
                             </td>
                         </tr>
                     )}

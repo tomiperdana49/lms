@@ -18,7 +18,6 @@
     "joinDatePlaceholder": "cth. 26 Juni 2015",
     "createdByDate": "Tanggal IDP Dibuat oleh Karyawan",
     "approvedDate": "Tanggal IDP Disetujui oleh HR",
-    "finalApprovedDate": "Tanggal IDP Disetujui oleh Atasan Langsung",
     "achievements": "Pencapaian / Prestasi Kerja",
     "achievementsHint": "Apa pencapaian / prestasi kamu selama 3-12 bulan ke belakang?",
     "careerGoal": "Tujuan / Aspirasi Karir (Goal)",
@@ -62,8 +61,6 @@
     "showDetail": "Lihat Detail",
     "hideDetail": "Sembunyikan Detail",
     "addReview": "Tambah Evaluasi",
-    "finalApprove": "Persetujuan Akhir",
-    "finalApprovedOn": "Disetujui akhir pada {{date}}",
     "rejectModalTitle": "Tolak IDP",
     "rejectionReasonPlaceholder": "Masukkan alasan penolakan...",
     "cancel": "Batal",
@@ -88,7 +85,6 @@
     "submitSuccess": "IDP berhasil diajukan untuk persetujuan.",
     "approveSuccess": "IDP berhasil disetujui.",
     "rejectSuccess": "IDP berhasil ditolak.",
-    "finalApproveSuccess": "Persetujuan akhir berhasil disimpan.",
     "reviewSuccess": "Evaluasi berhasil disimpan."
   },
   "admin": {

@@ -4129,22 +4129,6 @@ app.post('/api/idp/:id/review', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 8b. Direct supervisor gives the final sign-off closing the IDP cycle — only available once HR has
-// approved the plan. Separate from HR's approved_by/approved_date, and doesn't touch plan status.
-app.post('/api/idp/:id/final-approve', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { approved_by } = req.body;
-        const rows = await query('SELECT status FROM idp_plans WHERE id = ?', [id]);
-        if (rows.length === 0) return res.status(404).json({ error: 'IDP not found' });
-        if (rows[0].status !== 'Approved') {
-            return res.status(400).json({ error: 'Only plans already approved by HR can receive the final approval.' });
-        }
-        await query('UPDATE idp_plans SET supervisor_approved_by = ?, supervisor_approved_date = CURDATE() WHERE id = ?', [approved_by || null, id]);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 // 9. Toggle/annotate a single action item. The mandatory learning-hours row tracks automatically
 // (via computeLearningStats) and can't have its completion flipped manually.
 app.patch('/api/idp/action-items/:itemId', async (req, res) => {
