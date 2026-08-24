@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { Search, Download, Loader2, CalendarRange, UsersRound, Building2 } from 'lucide-react';
+import { Search, Download, Loader2, CalendarRange, UsersRound, Building2, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import {
@@ -25,6 +25,8 @@ const EmployeeLearningReport = () => {
     const [employeesLoading, setEmployeesLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [selectedOrg, setSelectedOrg] = useState('');
+    const [orgQuery, setOrgQuery] = useState('');
+    const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState<EmployeeOption | null>(null);
     const [stats, setStats] = useState<LearningStats>(EMPTY_STATS);
     const [statsLoading, setStatsLoading] = useState(false);
@@ -61,6 +63,12 @@ const EmployeeLearningReport = () => {
         return [...names].sort((a, b) => a.localeCompare(b));
     }, [employees]);
 
+    const filteredOrganizations = useMemo(() => {
+        const q = orgQuery.trim().toLowerCase();
+        if (!q) return organizations;
+        return organizations.filter(org => org.toLowerCase().includes(q));
+    }, [organizations, orgQuery]);
+
     const filteredEmployees = useMemo(() => {
         const q = search.trim().toLowerCase();
         const sorted = [...employees].sort((a, b) => a.full_name.localeCompare(b.full_name));
@@ -78,8 +86,10 @@ const EmployeeLearningReport = () => {
         setSearch(emp.full_name);
     };
 
-    const handleOrgChange = (org: string) => {
+    const handleOrgSelect = (org: string) => {
         setSelectedOrg(org);
+        setOrgQuery(org);
+        setOrgDropdownOpen(false);
         if (selectedEmployee && org && selectedEmployee.organization_name !== org) {
             setSelectedEmployee(null);
             setSearch('');
@@ -158,16 +168,40 @@ const EmployeeLearningReport = () => {
                     </div>
                     <div className="relative sm:w-64">
                         <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                        <select
-                            value={selectedOrg}
-                            onChange={e => handleOrgChange(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
-                        >
-                            <option value="">{t('employee.allOrganizations')}</option>
-                            {organizations.map(org => (
-                                <option key={org} value={org}>{org}</option>
-                            ))}
-                        </select>
+                        <input
+                            type="text"
+                            value={orgQuery}
+                            onFocus={() => setOrgDropdownOpen(true)}
+                            onBlur={() => setTimeout(() => { setOrgDropdownOpen(false); setOrgQuery(selectedOrg); }, 150)}
+                            onChange={e => setOrgQuery(e.target.value)}
+                            placeholder={t('employee.allOrganizations')}
+                            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        {orgDropdownOpen && (
+                            <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-slate-100 rounded-lg shadow-lg divide-y divide-slate-50">
+                                <button
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => handleOrgSelect('')}
+                                    className="w-full flex items-center justify-between text-left px-4 py-2 hover:bg-slate-50 transition-colors text-sm font-semibold text-slate-700"
+                                >
+                                    {t('employee.allOrganizations')}
+                                    {!selectedOrg && <Check size={14} className="text-blue-600" />}
+                                </button>
+                                {filteredOrganizations.length === 0 ? (
+                                    <p className="text-sm text-slate-400 italic px-4 py-3">{t('employee.notFound')}</p>
+                                ) : filteredOrganizations.map(org => (
+                                    <button
+                                        key={org}
+                                        onMouseDown={e => e.preventDefault()}
+                                        onClick={() => handleOrgSelect(org)}
+                                        className="w-full flex items-center justify-between text-left px-4 py-2 hover:bg-slate-50 transition-colors text-sm text-slate-700"
+                                    >
+                                        {org}
+                                        {selectedOrg === org && <Check size={14} className="text-blue-600" />}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
                 {!employeesLoading && (search.trim() || selectedOrg) && !selectedEmployee && (
