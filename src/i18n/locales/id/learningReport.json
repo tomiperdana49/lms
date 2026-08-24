@@ -62,7 +62,6 @@
     "selectLabel": "Karyawan",
     "searchPlaceholder": "Cari nama atau email karyawan...",
     "allOrganizations": "Semua Organisasi",
-    "selectAllInOrg": "Pilih semua di {{org}} ({{count}})",
     "clearAll": "Hapus semua",
     "combinedFor": "Laporan gabungan untuk {{count}} karyawan",
     "notFound": "Karyawan tidak ditemukan",

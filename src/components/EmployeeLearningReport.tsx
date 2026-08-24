@@ -86,11 +86,6 @@ const EmployeeLearningReport = () => {
         });
     }, [employees, search, selectedOrg, selectedIds]);
 
-    const orgCandidates = useMemo(() => {
-        if (!selectedOrg) return [];
-        return employees.filter(emp => emp.organization_name === selectedOrg && !selectedIds.has(emp.id_employee));
-    }, [employees, selectedOrg, selectedIds]);
-
     const sections = useMemo(() => buildSections(stats, t), [stats, t]);
     const includeEmployeeColumn = selectedEmployees.length > 1;
 
@@ -103,14 +98,16 @@ const EmployeeLearningReport = () => {
         setSelectedEmployees(prev => prev.filter(emp => emp.id_employee !== id));
     };
 
-    const handleSelectAllInOrg = () => {
-        setSelectedEmployees(prev => [...prev, ...orgCandidates]);
-    };
-
     const handleOrgSelect = (org: string) => {
         setSelectedOrg(org);
         setOrgQuery(org);
         setOrgDropdownOpen(false);
+        if (org) {
+            const candidates = employees.filter(emp => emp.organization_name === org && !selectedIds.has(emp.id_employee));
+            if (candidates.length > 0) {
+                setSelectedEmployees(prev => [...prev, ...candidates]);
+            }
+        }
     };
 
     const handleExport = () => {
@@ -269,15 +266,6 @@ const EmployeeLearningReport = () => {
                         )}
                     </div>
                 </div>
-
-                {selectedOrg && orgCandidates.length > 0 && (
-                    <button
-                        onClick={handleSelectAllInOrg}
-                        className="text-xs font-bold text-blue-600 hover:text-blue-700"
-                    >
-                        {t('employee.selectAllInOrg', { org: selectedOrg, count: orgCandidates.length })}
-                    </button>
-                )}
 
                 <div className="flex items-center gap-2 text-slate-400 pt-2 border-t border-slate-100">
                     <CalendarRange size={16} />
