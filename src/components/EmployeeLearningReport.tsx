@@ -103,10 +103,7 @@ const EmployeeLearningReport = () => {
         setOrgQuery(org);
         setOrgDropdownOpen(false);
         if (org) {
-            const candidates = employees.filter(emp => emp.organization_name === org && !selectedIds.has(emp.id_employee));
-            if (candidates.length > 0) {
-                setSelectedEmployees(prev => [...prev, ...candidates]);
-            }
+            setSelectedEmployees(employees.filter(emp => emp.organization_name === org));
         }
     };
 
