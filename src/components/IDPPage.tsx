@@ -16,7 +16,7 @@ import {
     Search
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
-import type { User, IDPPlan, Employee } from '../types';
+import type { User, IDPPlan, Employee, IDPActionItem } from '../types';
 import PopupNotification from './PopupNotification';
 import IDPDetailInfoTable from './IDPDetailInfoTable';
 import { idpLabelCell, idpValueCell, idpSectionHeaderCell, idpHintCell, idpContentCell } from './idpTableStyles';
@@ -272,6 +272,41 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
         fetchTeamDetail(id);
     };
 
+    // Checklist progress + notes are updated by the direct supervisor only (see IDPDetailInfoTable's
+    // editableProgress prop). Notes are debounced to avoid a PATCH per keystroke.
+    const notesSaveTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+
+    const handleToggleTeamActionItem = async (item: IDPActionItem) => {
+        if (item.is_mandatory) return;
+        const nextCompleted = item.is_completed ? 0 : 1;
+        setTeamDetail(prev => prev ? {
+            ...prev,
+            action_items: (prev.action_items || []).map(i => i.id === item.id ? { ...i, is_completed: nextCompleted } : i)
+        } : prev);
+        try {
+            await fetch(`${API_BASE_URL}/api/idp/action-items/${item.id}`, {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_completed: !!nextCompleted })
+            });
+        } catch (err) { console.error(err); }
+    };
+
+    const handleTeamActionNotesChange = (item: IDPActionItem, notes: string) => {
+        setTeamDetail(prev => prev ? {
+            ...prev,
+            action_items: (prev.action_items || []).map(i => i.id === item.id ? { ...i, notes } : i)
+        } : prev);
+        clearTimeout(notesSaveTimers.current[item.id]);
+        notesSaveTimers.current[item.id] = setTimeout(async () => {
+            try {
+                await fetch(`${API_BASE_URL}/api/idp/action-items/${item.id}`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notes })
+                });
+            } catch (err) { console.error(err); }
+        }, 600);
+    };
+
     const [reviewModalOpen, setReviewModalOpen] = useState(false);
     const [reviewDate, setReviewDate] = useState(new Date().toISOString().split('T')[0]);
     const [reviewNote, setReviewNote] = useState('');
@@ -452,11 +487,11 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                                                         <input value={item.target_time} onChange={e => updateActionRow(idx, { target_time: e.target.value })} placeholder={t('form.targetTimePlaceholder')} className="w-full bg-transparent outline-none" />
                                                     </td>
                                                     <td className={`${idpValueCell} text-center`}>
-                                                        <input type="checkbox" checked={!!item.is_completed} onChange={e => updateActionRow(idx, { is_completed: e.target.checked })} className="w-4 h-4 accent-indigo-600" />
+                                                        <input type="checkbox" checked={!!item.is_completed} disabled readOnly title={t('form.checklistProgressLeaderOnly')} className="w-4 h-4 accent-indigo-600" />
                                                     </td>
                                                     <td colSpan={2} className={idpValueCell}>
                                                         <div className="flex items-center gap-2">
-                                                            <input value={item.notes} onChange={e => updateActionRow(idx, { notes: e.target.value })} placeholder={t('form.notesPlaceholder')} className="flex-1 bg-transparent outline-none" />
+                                                            <span className="flex-1 text-gray-400 italic">{item.notes || t('form.checklistProgressLeaderOnly')}</span>
                                                             <button type="button" onClick={() => removeActionRow(idx)} className="text-gray-400 hover:text-rose-600 transition-colors shrink-0"><Trash2 size={14} /></button>
                                                         </div>
                                                     </td>
@@ -597,7 +632,12 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
 
                             {teamDetailId === plan.id && teamDetail && (
                                 <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
-                                    <IDPDetailInfoTable plan={teamDetail} />
+                                    <IDPDetailInfoTable
+                                        plan={teamDetail}
+                                        editableProgress
+                                        onToggleCompleted={handleToggleTeamActionItem}
+                                        onNotesChange={handleTeamActionNotesChange}
+                                    />
 
                                     {teamDetail.hr_note && (
                                         <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-sm text-amber-800">
