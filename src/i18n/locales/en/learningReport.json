@@ -60,6 +60,7 @@
     "subtitle": "Search and select an employee to view their learning hours and cost summary",
     "selectLabel": "Employee",
     "searchPlaceholder": "Search employee name or email...",
+    "allOrganizations": "All Organizations",
     "notFound": "No employees found",
     "noSelection": "Select an employee to view their learning report."
   },

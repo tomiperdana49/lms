@@ -60,6 +60,7 @@
     "subtitle": "Cari dan pilih karyawan untuk melihat ringkasan jam dan biaya pembelajarannya",
     "selectLabel": "Karyawan",
     "searchPlaceholder": "Cari nama atau email karyawan...",
+    "allOrganizations": "Semua Organisasi",
     "notFound": "Karyawan tidak ditemukan",
     "noSelection": "Pilih karyawan terlebih dahulu untuk melihat laporan pembelajarannya."
   },

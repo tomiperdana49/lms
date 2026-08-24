@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { Search, Download, Loader2, CalendarRange, UsersRound } from 'lucide-react';
+import { Search, Download, Loader2, CalendarRange, UsersRound, Building2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import {
@@ -16,6 +16,7 @@ interface EmployeeOption {
     id_employee: string;
     full_name: string;
     email?: string;
+    organization_name?: string;
 }
 
 const EmployeeLearningReport = () => {
@@ -23,6 +24,7 @@ const EmployeeLearningReport = () => {
     const [employees, setEmployees] = useState<EmployeeOption[]>([]);
     const [employeesLoading, setEmployeesLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [selectedOrg, setSelectedOrg] = useState('');
     const [selectedEmployee, setSelectedEmployee] = useState<EmployeeOption | null>(null);
     const [stats, setStats] = useState<LearningStats>(EMPTY_STATS);
     const [statsLoading, setStatsLoading] = useState(false);
@@ -54,20 +56,34 @@ const EmployeeLearningReport = () => {
             .finally(() => setStatsLoading(false));
     }, [selectedEmployee, startDate, endDate]);
 
+    const organizations = useMemo(() => {
+        const names = new Set(employees.map(emp => emp.organization_name).filter(Boolean) as string[]);
+        return [...names].sort((a, b) => a.localeCompare(b));
+    }, [employees]);
+
     const filteredEmployees = useMemo(() => {
         const q = search.trim().toLowerCase();
         const sorted = [...employees].sort((a, b) => a.full_name.localeCompare(b.full_name));
-        if (!q) return sorted;
-        return sorted.filter(emp =>
-            emp.full_name?.toLowerCase().includes(q) || emp.email?.toLowerCase().includes(q)
-        );
-    }, [employees, search]);
+        return sorted.filter(emp => {
+            const matchesOrg = !selectedOrg || emp.organization_name === selectedOrg;
+            const matchesSearch = !q || emp.full_name?.toLowerCase().includes(q) || emp.email?.toLowerCase().includes(q);
+            return matchesOrg && matchesSearch;
+        });
+    }, [employees, search, selectedOrg]);
 
     const sections = useMemo(() => buildSections(stats, t), [stats, t]);
 
     const handleSelectEmployee = (emp: EmployeeOption) => {
         setSelectedEmployee(emp);
         setSearch(emp.full_name);
+    };
+
+    const handleOrgChange = (org: string) => {
+        setSelectedOrg(org);
+        if (selectedEmployee && org && selectedEmployee.organization_name !== org) {
+            setSelectedEmployee(null);
+            setSearch('');
+        }
     };
 
     const handleExport = () => {
@@ -124,22 +140,37 @@ const EmployeeLearningReport = () => {
                     <UsersRound size={16} />
                     <span className="text-xs font-black uppercase tracking-widest">{t('employee.selectLabel')}</span>
                 </div>
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={e => {
-                            setSearch(e.target.value);
-                            if (selectedEmployee && e.target.value !== selectedEmployee.full_name) {
-                                setSelectedEmployee(null);
-                            }
-                        }}
-                        placeholder={t('employee.searchPlaceholder')}
-                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={e => {
+                                setSearch(e.target.value);
+                                if (selectedEmployee && e.target.value !== selectedEmployee.full_name) {
+                                    setSelectedEmployee(null);
+                                }
+                            }}
+                            placeholder={t('employee.searchPlaceholder')}
+                            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+                    <div className="relative sm:w-64">
+                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        <select
+                            value={selectedOrg}
+                            onChange={e => handleOrgChange(e.target.value)}
+                            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                        >
+                            <option value="">{t('employee.allOrganizations')}</option>
+                            {organizations.map(org => (
+                                <option key={org} value={org}>{org}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
-                {!employeesLoading && search.trim() && !selectedEmployee && (
+                {!employeesLoading && (search.trim() || selectedOrg) && !selectedEmployee && (
                     <div className="max-h-56 overflow-y-auto border border-slate-100 rounded-lg divide-y divide-slate-50">
                         {filteredEmployees.length === 0 ? (
                             <p className="text-sm text-slate-400 italic px-4 py-3">{t('employee.notFound')}</p>
