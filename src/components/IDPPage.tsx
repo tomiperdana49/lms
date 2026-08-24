@@ -36,6 +36,8 @@ interface ActionItemDraft {
 
 const CURRENT_YEAR = new Date().getFullYear();
 const MANDATORY_TARGET_HOURS = 48;
+// Mandatory learning-hours row counts as 1 of the 4, so employees must add at least 3 more.
+const MIN_ACTION_PLAN_ITEMS = 4;
 
 const INDO_MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const formatIndoDate = (dateVal?: string) => {
@@ -214,6 +216,17 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
     };
 
     const savePlan = async (submit: boolean) => {
+        if (submit) {
+            const filledCount = draft.actionItems.filter(i => i.action_description.trim()).length + 1; // +1 for the always-present mandatory row
+            if (filledCount < MIN_ACTION_PLAN_ITEMS) {
+                setNotification({
+                    show: true, type: 'error',
+                    message: t('notifications.minActionPlanItems', { count: MIN_ACTION_PLAN_ITEMS - filledCount })
+                });
+                return;
+            }
+        }
+
         const payload = {
             employee_id: currentUser?.employee_id,
             employee_name: currentUser?.name,

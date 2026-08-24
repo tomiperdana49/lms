@@ -27,7 +27,7 @@
     "developmentArea": "Area Pengembangan",
     "developmentAreaHint": "Kompetensi apa yang masih perlu kamu kembangkan untuk mencapai tujuan karir kamu?",
     "actionPlan": "Rencana Aksi Pengembangan",
-    "actionPlanHint": "Tuliskan langkah apa saja yang akan kamu lakukan untuk mencapai pengembangan diri dan tujuan karir kamu.",
+    "actionPlanHint": "Tuliskan langkah apa saja yang akan kamu lakukan untuk mencapai pengembangan diri dan tujuan karir kamu. Minimal 4 baris (termasuk item wajib Jam Learning).",
     "targetTime": "Target Waktu",
     "targetTimeHint": "Tetapkan target waktu kamu melaksanakan rencana aksi.",
     "checklistProgress": "Checklist Progress",
@@ -79,6 +79,7 @@
     "Rejected": "Ditolak"
   },
   "notifications": {
+    "minActionPlanItems": "Rencana Aksi Pengembangan minimal harus memiliki 4 baris (termasuk item wajib Jam Learning). Tambahkan {{count}} baris lagi.",
     "saveFailed": "Gagal menyimpan IDP.",
     "submitFailed": "Gagal mengajukan IDP.",
     "saveSuccess": "IDP berhasil disimpan sebagai draft.",

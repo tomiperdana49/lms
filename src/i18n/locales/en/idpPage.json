@@ -27,7 +27,7 @@
     "developmentArea": "Development Area",
     "developmentAreaHint": "What competencies do you still need to develop to reach your career goal?",
     "actionPlan": "Development Action Plan",
-    "actionPlanHint": "Write down the steps you'll take to develop yourself and reach your career goal.",
+    "actionPlanHint": "Write down the steps you'll take to develop yourself and reach your career goal. At least 4 rows (including the mandatory Learning Hours item).",
     "targetTime": "Target Time",
     "targetTimeHint": "Set the target time for carrying out the action plan.",
     "checklistProgress": "Checklist Progress",
@@ -79,6 +79,7 @@
     "Rejected": "Rejected"
   },
   "notifications": {
+    "minActionPlanItems": "The Development Action Plan needs at least 4 rows (including the mandatory Learning Hours item). Add {{count}} more row(s).",
     "saveFailed": "Failed to save the IDP.",
     "submitFailed": "Failed to submit the IDP.",
     "saveSuccess": "IDP saved as draft.",

@@ -3886,6 +3886,8 @@ const IDP_MANDATORY_ACTION = {
     targetTime: 'Q1-Q4',
     hoursTarget: 48
 };
+// The mandatory learning-hours row counts as 1 of the 4, so at least 3 more must have content.
+const IDP_MIN_ACTION_PLAN_ITEMS = 4;
 
 const INDO_MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const formatIndoDate = (dateVal) => {
@@ -4079,6 +4081,13 @@ app.post('/api/idp/:id/submit', async (req, res) => {
         if (!['Draft', 'Rejected'].includes(rows[0].status)) {
             return res.status(400).json({ error: 'Only Draft or Rejected plans can be submitted.' });
         }
+
+        const items = await query('SELECT action_description FROM idp_action_items WHERE idp_id = ?', [id]);
+        const filledCount = items.filter(i => (i.action_description || '').trim()).length;
+        if (filledCount < IDP_MIN_ACTION_PLAN_ITEMS) {
+            return res.status(400).json({ error: `The Development Action Plan needs at least ${IDP_MIN_ACTION_PLAN_ITEMS} rows (including the mandatory Learning Hours item).` });
+        }
+
         await query("UPDATE idp_plans SET status = 'Pending', created_by_date = CURDATE() WHERE id = ?", [id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
