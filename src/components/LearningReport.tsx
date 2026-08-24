@@ -17,6 +17,8 @@ interface LearningStatDetail {
     // Organizer / certificate metadata (availability varies by category)
     organizer?: string | null;
     certificateLink?: string | null;
+    // Set only when a report combines multiple employees, to distinguish whose record this is
+    employeeName?: string;
 }
 
 export interface LearningStats {
@@ -456,7 +458,10 @@ export const LearningStatsBreakdown = ({ stats, t }: LearningStatsBreakdownProps
                                     <div key={idx} className="flex items-center justify-between gap-4 px-6 py-3">
                                         <div className="min-w-0 flex-1">
                                             <p className="font-semibold text-slate-700 text-sm truncate">{item.title}</p>
-                                            <p className="text-[11px] text-slate-400">{formatDate(item.date)}</p>
+                                            <p className="text-[11px] text-slate-400">
+                                                {formatDate(item.date)}
+                                                {item.employeeName && <span className="text-slate-300"> · {item.employeeName}</span>}
+                                            </p>
                                             {section.key === 'training' && (
                                                 <div className="flex flex-wrap gap-1.5 mt-2">
                                                     <ScoreBadge label={t('assessment.preTest')} score={item.preTestScore} />

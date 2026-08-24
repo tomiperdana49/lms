@@ -53,16 +53,20 @@
     "notTaken": "Belum diikuti",
     "submitted": "Sudah submit",
     "notSubmitted": "Belum submit",
-    "grandTotalRow": "TOTAL KESELURUHAN"
+    "grandTotalRow": "TOTAL KESELURUHAN",
+    "employeeColumn": "Karyawan"
   },
   "employee": {
     "title": "Laporan Pembelajaran Karyawan",
-    "subtitle": "Cari dan pilih karyawan untuk melihat ringkasan jam dan biaya pembelajarannya",
+    "subtitle": "Cari dan pilih satu atau beberapa karyawan untuk melihat ringkasan jam dan biaya pembelajarannya",
     "selectLabel": "Karyawan",
     "searchPlaceholder": "Cari nama atau email karyawan...",
     "allOrganizations": "Semua Organisasi",
+    "selectAllInOrg": "Pilih semua di {{org}} ({{count}})",
+    "clearAll": "Hapus semua",
+    "combinedFor": "Laporan gabungan untuk {{count}} karyawan",
     "notFound": "Karyawan tidak ditemukan",
-    "noSelection": "Pilih karyawan terlebih dahulu untuk melihat laporan pembelajarannya."
+    "noSelection": "Pilih satu atau beberapa karyawan untuk melihat laporan pembelajarannya."
   },
   "team": {
     "title": "Tim Saya",

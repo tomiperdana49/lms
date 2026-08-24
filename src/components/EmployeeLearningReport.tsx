@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { Search, Download, Loader2, CalendarRange, UsersRound, Building2, Check } from 'lucide-react';
+import { Search, Download, Loader2, CalendarRange, UsersRound, Building2, Check, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import {
@@ -24,10 +24,11 @@ const EmployeeLearningReport = () => {
     const [employees, setEmployees] = useState<EmployeeOption[]>([]);
     const [employeesLoading, setEmployeesLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [employeeDropdownOpen, setEmployeeDropdownOpen] = useState(false);
     const [selectedOrg, setSelectedOrg] = useState('');
     const [orgQuery, setOrgQuery] = useState('');
     const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
-    const [selectedEmployee, setSelectedEmployee] = useState<EmployeeOption | null>(null);
+    const [selectedEmployees, setSelectedEmployees] = useState<EmployeeOption[]>([]);
     const [stats, setStats] = useState<LearningStats>(EMPTY_STATS);
     const [statsLoading, setStatsLoading] = useState(false);
     const [{ startDate, endDate }, setRange] = useState(getDefaultRange);
@@ -41,22 +42,27 @@ const EmployeeLearningReport = () => {
     }, []);
 
     useEffect(() => {
-        if (!selectedEmployee) {
+        if (selectedEmployees.length === 0) {
             setStats(EMPTY_STATS);
             return;
         }
         setStatsLoading(true);
-        const params = new URLSearchParams();
-        if (selectedEmployee.id_employee) params.set('employee_id', selectedEmployee.id_employee);
-        if (selectedEmployee.email) params.set('email', selectedEmployee.email);
-        if (startDate) params.set('startDate', startDate);
-        if (endDate) params.set('endDate', endDate);
-        fetch(`${API_BASE_URL}/api/learning-stats?${params.toString()}`)
+        fetch(`${API_BASE_URL}/api/learning-stats/bulk`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                employees: selectedEmployees.map(emp => ({ employee_id: emp.id_employee, email: emp.email, name: emp.full_name })),
+                startDate,
+                endDate
+            })
+        })
             .then(res => res.json())
             .then(data => { if (!data.error) setStats(data); })
             .catch(err => console.error('Error fetching learning stats:', err))
             .finally(() => setStatsLoading(false));
-    }, [selectedEmployee, startDate, endDate]);
+    }, [selectedEmployees, startDate, endDate]);
+
+    const selectedIds = useMemo(() => new Set(selectedEmployees.map(emp => emp.id_employee)), [selectedEmployees]);
 
     const organizations = useMemo(() => {
         const names = new Set(employees.map(emp => emp.organization_name).filter(Boolean) as string[]);
@@ -73,33 +79,45 @@ const EmployeeLearningReport = () => {
         const q = search.trim().toLowerCase();
         const sorted = [...employees].sort((a, b) => a.full_name.localeCompare(b.full_name));
         return sorted.filter(emp => {
+            if (selectedIds.has(emp.id_employee)) return false;
             const matchesOrg = !selectedOrg || emp.organization_name === selectedOrg;
             const matchesSearch = !q || emp.full_name?.toLowerCase().includes(q) || emp.email?.toLowerCase().includes(q);
             return matchesOrg && matchesSearch;
         });
-    }, [employees, search, selectedOrg]);
+    }, [employees, search, selectedOrg, selectedIds]);
+
+    const orgCandidates = useMemo(() => {
+        if (!selectedOrg) return [];
+        return employees.filter(emp => emp.organization_name === selectedOrg && !selectedIds.has(emp.id_employee));
+    }, [employees, selectedOrg, selectedIds]);
 
     const sections = useMemo(() => buildSections(stats, t), [stats, t]);
+    const includeEmployeeColumn = selectedEmployees.length > 1;
 
-    const handleSelectEmployee = (emp: EmployeeOption) => {
-        setSelectedEmployee(emp);
-        setSearch(emp.full_name);
+    const handleAddEmployee = (emp: EmployeeOption) => {
+        setSelectedEmployees(prev => [...prev, emp]);
+        setSearch('');
+    };
+
+    const handleRemoveEmployee = (id: string) => {
+        setSelectedEmployees(prev => prev.filter(emp => emp.id_employee !== id));
+    };
+
+    const handleSelectAllInOrg = () => {
+        setSelectedEmployees(prev => [...prev, ...orgCandidates]);
     };
 
     const handleOrgSelect = (org: string) => {
         setSelectedOrg(org);
         setOrgQuery(org);
         setOrgDropdownOpen(false);
-        if (selectedEmployee && org && selectedEmployee.organization_name !== org) {
-            setSelectedEmployee(null);
-            setSearch('');
-        }
     };
 
     const handleExport = () => {
-        if (!selectedEmployee) return;
+        if (selectedEmployees.length === 0) return;
         const rows = sections.flatMap(section =>
             section.items.map(item => ({
+                ...(includeEmployeeColumn ? { [t('export.employeeColumn')]: item.employeeName || '' } : {}),
                 [t('export.categoryColumn')]: section.label,
                 [t('export.titleColumn')]: item.title,
                 [t('export.dateColumn')]: formatDate(item.date),
@@ -111,6 +129,7 @@ const EmployeeLearningReport = () => {
             }))
         );
         rows.push({
+            ...(includeEmployeeColumn ? { [t('export.employeeColumn')]: '' } : {}),
             [t('export.categoryColumn')]: t('export.grandTotalRow'),
             [t('export.titleColumn')]: '',
             [t('export.dateColumn')]: '',
@@ -122,10 +141,16 @@ const EmployeeLearningReport = () => {
         });
 
         const ws = XLSX.utils.json_to_sheet(rows);
-        ws['!cols'] = [{ wch: 20 }, { wch: 45 }, { wch: 14 }, { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 14 }];
+        ws['!cols'] = [
+            ...(includeEmployeeColumn ? [{ wch: 24 }] : []),
+            { wch: 20 }, { wch: 45 }, { wch: 14 }, { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 14 }
+        ];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, t('export.sheetName'));
-        XLSX.writeFile(wb, `Learning_Report_${selectedEmployee.full_name.replace(/\s+/g, '_')}_${startDate}_to_${endDate}.xlsx`);
+        const fileLabel = selectedEmployees.length === 1
+            ? selectedEmployees[0].full_name.replace(/\s+/g, '_')
+            : `${selectedEmployees.length}_Employees`;
+        XLSX.writeFile(wb, `Learning_Report_${fileLabel}_${startDate}_to_${endDate}.xlsx`);
     };
 
     return (
@@ -137,7 +162,7 @@ const EmployeeLearningReport = () => {
                 </div>
                 <button
                     onClick={handleExport}
-                    disabled={!selectedEmployee || statsLoading}
+                    disabled={selectedEmployees.length === 0 || statsLoading}
                     className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-3 rounded-xl shadow-lg shadow-blue-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                 >
                     <Download size={18} /> {t('exportButton')}
@@ -150,21 +175,61 @@ const EmployeeLearningReport = () => {
                     <UsersRound size={16} />
                     <span className="text-xs font-black uppercase tracking-widest">{t('employee.selectLabel')}</span>
                 </div>
+
+                {selectedEmployees.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2">
+                        {selectedEmployees.map(emp => (
+                            <span
+                                key={emp.id_employee}
+                                className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs font-semibold pl-3 pr-1.5 py-1.5 rounded-full"
+                            >
+                                {emp.full_name}
+                                <button
+                                    onClick={() => handleRemoveEmployee(emp.id_employee)}
+                                    className="hover:bg-blue-100 rounded-full p-0.5 transition-colors"
+                                >
+                                    <X size={12} />
+                                </button>
+                            </span>
+                        ))}
+                        <button
+                            onClick={() => setSelectedEmployees([])}
+                            className="text-xs font-bold text-slate-400 hover:text-red-600 px-2 py-1.5"
+                        >
+                            {t('employee.clearAll')}
+                        </button>
+                    </div>
+                )}
+
                 <div className="flex flex-col sm:flex-row gap-2">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <input
                             type="text"
                             value={search}
-                            onChange={e => {
-                                setSearch(e.target.value);
-                                if (selectedEmployee && e.target.value !== selectedEmployee.full_name) {
-                                    setSelectedEmployee(null);
-                                }
-                            }}
+                            onFocus={() => setEmployeeDropdownOpen(true)}
+                            onBlur={() => setTimeout(() => setEmployeeDropdownOpen(false), 150)}
+                            onChange={e => setSearch(e.target.value)}
                             placeholder={t('employee.searchPlaceholder')}
                             className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
+                        {employeeDropdownOpen && !employeesLoading && (search.trim() || selectedOrg) && (
+                            <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-slate-100 rounded-lg shadow-lg divide-y divide-slate-50">
+                                {filteredEmployees.length === 0 ? (
+                                    <p className="text-sm text-slate-400 italic px-4 py-3">{t('employee.notFound')}</p>
+                                ) : filteredEmployees.slice(0, 20).map(emp => (
+                                    <button
+                                        key={emp.id_employee}
+                                        onMouseDown={e => e.preventDefault()}
+                                        onClick={() => handleAddEmployee(emp)}
+                                        className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors"
+                                    >
+                                        <p className="text-sm font-semibold text-slate-700">{emp.full_name}</p>
+                                        {emp.email && <p className="text-[11px] text-slate-400">{emp.email}</p>}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <div className="relative sm:w-64">
                         <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -204,21 +269,14 @@ const EmployeeLearningReport = () => {
                         )}
                     </div>
                 </div>
-                {!employeesLoading && (search.trim() || selectedOrg) && !selectedEmployee && (
-                    <div className="max-h-56 overflow-y-auto border border-slate-100 rounded-lg divide-y divide-slate-50">
-                        {filteredEmployees.length === 0 ? (
-                            <p className="text-sm text-slate-400 italic px-4 py-3">{t('employee.notFound')}</p>
-                        ) : filteredEmployees.slice(0, 20).map(emp => (
-                            <button
-                                key={emp.id_employee}
-                                onClick={() => handleSelectEmployee(emp)}
-                                className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors"
-                            >
-                                <p className="text-sm font-semibold text-slate-700">{emp.full_name}</p>
-                                {emp.email && <p className="text-[11px] text-slate-400">{emp.email}</p>}
-                            </button>
-                        ))}
-                    </div>
+
+                {selectedOrg && orgCandidates.length > 0 && (
+                    <button
+                        onClick={handleSelectAllInOrg}
+                        className="text-xs font-bold text-blue-600 hover:text-blue-700"
+                    >
+                        {t('employee.selectAllInOrg', { org: selectedOrg, count: orgCandidates.length })}
+                    </button>
                 )}
 
                 <div className="flex items-center gap-2 text-slate-400 pt-2 border-t border-slate-100">
@@ -250,7 +308,7 @@ const EmployeeLearningReport = () => {
                 </div>
             </div>
 
-            {!selectedEmployee ? (
+            {selectedEmployees.length === 0 ? (
                 <div className="bg-white border border-slate-100 rounded-3xl p-16 text-center text-slate-400">
                     <UsersRound size={40} className="mx-auto mb-3 opacity-40" />
                     <p>{t('employee.noSelection')}</p>
@@ -261,7 +319,14 @@ const EmployeeLearningReport = () => {
                     <p>{t('loading')}</p>
                 </div>
             ) : (
-                <LearningStatsBreakdown stats={stats} t={t} />
+                <>
+                    {selectedEmployees.length > 1 && (
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                            {t('employee.combinedFor', { count: selectedEmployees.length })}
+                        </p>
+                    )}
+                    <LearningStatsBreakdown stats={stats} t={t} />
+                </>
             )}
         </div>
     );

@@ -1683,6 +1683,66 @@ app.get('/api/learning-stats', async (req, res) => {
     }
 });
 
+// Combined learning stats for multiple employees at once (e.g. the Employee Learning Report's
+// multi-select), so the picked group's hours/costs/details are summed into a single report
+// instead of the caller stitching together N separate /api/learning-stats calls.
+app.post('/api/learning-stats/bulk', async (req, res) => {
+    try {
+        const { employees, startDate, endDate } = req.body;
+        if (!Array.isArray(employees) || employees.length === 0) {
+            return res.status(400).json({ error: 'employees array required' });
+        }
+
+        const perEmployee = await Promise.all(employees.map(async (emp) => ({
+            name: emp.name,
+            stats: await computeLearningStats({ email: emp.email, employee_id: emp.employee_id, startDate, endDate })
+        })));
+
+        const tag = (items, name) => items.map(item => ({ ...item, employeeName: name }));
+
+        const merged = {
+            jamTraining: 0, jamTrainingExternal: 0, jamOnline: 0, jamBuku: 0,
+            biayaTraining: 0, biayaTrainingExternal: 0, biayaBuku: 0,
+            trainingDetails: [], trainingExternalDetails: [], onlineDetails: [], bookDetails: []
+        };
+
+        for (const { name, stats } of perEmployee) {
+            merged.jamTraining += stats.jamTraining;
+            merged.jamTrainingExternal += stats.jamTrainingExternal;
+            merged.jamOnline += stats.jamOnline;
+            merged.jamBuku += stats.jamBuku;
+            merged.biayaTraining += stats.biayaTraining;
+            merged.biayaTrainingExternal += stats.biayaTrainingExternal;
+            merged.biayaBuku += stats.biayaBuku;
+            merged.trainingDetails.push(...tag(stats.trainingDetails, name));
+            merged.trainingExternalDetails.push(...tag(stats.trainingExternalDetails, name));
+            merged.onlineDetails.push(...tag(stats.onlineDetails, name));
+            merged.bookDetails.push(...tag(stats.bookDetails, name));
+        }
+
+        const byDateAsc = (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime();
+        merged.trainingDetails.sort(byDateAsc);
+        merged.trainingExternalDetails.sort(byDateAsc);
+        merged.onlineDetails.sort(byDateAsc);
+        merged.bookDetails.sort(byDateAsc);
+
+        merged.jamTraining = Math.round(merged.jamTraining * 100) / 100;
+        merged.jamTrainingExternal = Math.round(merged.jamTrainingExternal * 100) / 100;
+        merged.jamOnline = Math.round(merged.jamOnline * 100) / 100;
+        merged.jamBuku = Math.round(merged.jamBuku * 100) / 100;
+        merged.biayaTraining = Math.round(merged.biayaTraining);
+        merged.biayaTrainingExternal = Math.round(merged.biayaTrainingExternal);
+        merged.biayaBuku = Math.round(merged.biayaBuku);
+        merged.totalJam = Math.round((merged.jamTraining + merged.jamTrainingExternal + merged.jamOnline + merged.jamBuku) * 100) / 100;
+        merged.totalBiaya = Math.round(merged.biayaTraining + merged.biayaTrainingExternal + merged.biayaBuku);
+
+        res.json(merged);
+    } catch (err) {
+        console.error('[API] Error in /api/learning-stats/bulk:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Issue (or fetch existing) internal training certificate for an attendee.
 // Server-side validates the meeting is paid and the employee actually attended,
 // so this cannot be used to mint certificates for arbitrary meetings/employees.
