@@ -3369,6 +3369,20 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 value={hostSearch}
                                                 onFocus={() => setShowHostDropdown(true)}
                                                 onChange={(e) => setHostSearch(e.target.value)}
+                                                onBlur={() => {
+                                                    // Delayed so a click on a suggestion (which sets formData.host itself and
+                                                    // clears hostSearch) resolves first — this only fires when the user typed
+                                                    // a name that matched no employee and clicked away without picking the
+                                                    // "use as external host" option, so the typed name would otherwise be lost.
+                                                    const typed = hostSearch.trim();
+                                                    setTimeout(() => {
+                                                        setShowHostDropdown(false);
+                                                        if (typed) {
+                                                            setFormData(fd => fd.host ? fd : { ...fd, host_id: '', host: typed });
+                                                            setHostSearch('');
+                                                        }
+                                                    }, 150);
+                                                }}
                                             />
                                             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
                                                 <Users size={16} />
