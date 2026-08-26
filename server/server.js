@@ -2660,6 +2660,12 @@ app.post('/api/meetings', async (req, res) => {
         const d = new Date(m.date);
         const localDate = new Date(d.getTime() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+        // A session with no pre-test/post-test has nothing left to gate the feedback form on, so it
+        // opens right away instead of sitting locked until the host remembers to flip it on manually.
+        const hasPreTest = Array.isArray(m.pre_test_data?.questions) && m.pre_test_data.questions.length > 0;
+        const hasPostTest = Array.isArray(m.post_test_data?.questions) && m.post_test_data.questions.length > 0;
+        const feedbackStartsActive = !hasPreTest && !hasPostTest;
+
         const result = await query(
             'INSERT INTO meetings (title, date, time, host, location, type, meetLink, agenda, guests_json, cost_report_json, employee_id, competency_type, competency_name, training_gr_type, pre_test_link, material_link, post_test_link, feedback_link, pre_test_data, post_test_data, feedback_data, is_pre_test_active, is_post_test_active, is_feedback_active, is_closed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
@@ -2686,7 +2692,7 @@ app.post('/api/meetings', async (req, res) => {
                 m.feedback_data ? JSON.stringify(m.feedback_data) : null,
                 0,
                 0,
-                0,
+                feedbackStartsActive ? 1 : 0,
                 0,
                 0
             ]
