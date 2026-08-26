@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { Search, Download, Loader2, CalendarRange, UsersRound, Building2, Check, X } from 'lucide-react';
+import { Search, Download, Loader2, CalendarRange, UsersRound, Building2, MapPin, Check, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import {
@@ -17,6 +17,7 @@ interface EmployeeOption {
     full_name: string;
     email?: string;
     organization_name?: string;
+    branch_name?: string;
 }
 
 const EmployeeLearningReport = () => {
@@ -29,7 +30,12 @@ const EmployeeLearningReport = () => {
     const [orgQuery, setOrgQuery] = useState('');
     const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
     const selectedOrgRef = useRef(selectedOrg);
-    selectedOrgRef.current = selectedOrg;
+    useEffect(() => { selectedOrgRef.current = selectedOrg; }, [selectedOrg]);
+    const [selectedBranch, setSelectedBranch] = useState('');
+    const [branchQuery, setBranchQuery] = useState('');
+    const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
+    const selectedBranchRef = useRef(selectedBranch);
+    useEffect(() => { selectedBranchRef.current = selectedBranch; }, [selectedBranch]);
     const [selectedEmployees, setSelectedEmployees] = useState<EmployeeOption[]>([]);
     const [stats, setStats] = useState<LearningStats>(EMPTY_STATS);
     const [statsLoading, setStatsLoading] = useState(false);
@@ -77,16 +83,28 @@ const EmployeeLearningReport = () => {
         return organizations.filter(org => org.toLowerCase().includes(q));
     }, [organizations, orgQuery]);
 
+    const branches = useMemo(() => {
+        const names = new Set(employees.map(emp => emp.branch_name).filter(Boolean) as string[]);
+        return [...names].sort((a, b) => a.localeCompare(b));
+    }, [employees]);
+
+    const filteredBranches = useMemo(() => {
+        const q = branchQuery.trim().toLowerCase();
+        if (!q) return branches;
+        return branches.filter(branch => branch.toLowerCase().includes(q));
+    }, [branches, branchQuery]);
+
     const filteredEmployees = useMemo(() => {
         const q = search.trim().toLowerCase();
         const sorted = [...employees].sort((a, b) => a.full_name.localeCompare(b.full_name));
         return sorted.filter(emp => {
             if (selectedIds.has(emp.id_employee)) return false;
             const matchesOrg = !selectedOrg || emp.organization_name === selectedOrg;
+            const matchesBranch = !selectedBranch || emp.branch_name === selectedBranch;
             const matchesSearch = !q || emp.full_name?.toLowerCase().includes(q) || emp.email?.toLowerCase().includes(q);
-            return matchesOrg && matchesSearch;
+            return matchesOrg && matchesBranch && matchesSearch;
         });
-    }, [employees, search, selectedOrg, selectedIds]);
+    }, [employees, search, selectedOrg, selectedBranch, selectedIds]);
 
     const sections = useMemo(() => buildSections(stats, t), [stats, t]);
     const includeEmployeeColumn = selectedEmployees.length > 1;
@@ -100,13 +118,27 @@ const EmployeeLearningReport = () => {
         setSelectedEmployees(prev => prev.filter(emp => emp.id_employee !== id));
     };
 
+    // Recomputes the employee roster from whichever of org/branch is currently active, so the two
+    // filters combine (AND) instead of one silently overriding the other's selection.
+    const applyRosterFilter = (org: string, branch: string) => {
+        if (!org && !branch) return;
+        setSelectedEmployees(employees.filter(emp =>
+            (!org || emp.organization_name === org) && (!branch || emp.branch_name === branch)
+        ));
+    };
+
     const handleOrgSelect = (org: string) => {
         setSelectedOrg(org);
         setOrgQuery(org);
         setOrgDropdownOpen(false);
-        if (org) {
-            setSelectedEmployees(employees.filter(emp => emp.organization_name === org));
-        }
+        applyRosterFilter(org, selectedBranchRef.current);
+    };
+
+    const handleBranchSelect = (branch: string) => {
+        setSelectedBranch(branch);
+        setBranchQuery(branch);
+        setBranchDropdownOpen(false);
+        applyRosterFilter(selectedOrgRef.current, branch);
     };
 
     const handleExport = () => {
@@ -193,6 +225,8 @@ const EmployeeLearningReport = () => {
                                 setSelectedEmployees([]);
                                 setSelectedOrg('');
                                 setOrgQuery('');
+                                setSelectedBranch('');
+                                setBranchQuery('');
                             }}
                             className="text-xs font-bold text-slate-400 hover:text-red-600 px-2 py-1.5"
                         >
@@ -201,7 +235,7 @@ const EmployeeLearningReport = () => {
                     </div>
                 )}
 
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <input
@@ -213,7 +247,7 @@ const EmployeeLearningReport = () => {
                             placeholder={t('employee.searchPlaceholder')}
                             className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        {employeeDropdownOpen && !employeesLoading && (search.trim() || selectedOrg) && (
+                        {employeeDropdownOpen && !employeesLoading && (search.trim() || selectedOrg || selectedBranch) && (
                             <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-slate-100 rounded-lg shadow-lg divide-y divide-slate-50">
                                 {filteredEmployees.length === 0 ? (
                                     <p className="text-sm text-slate-400 italic px-4 py-3">{t('employee.notFound')}</p>
@@ -263,6 +297,43 @@ const EmployeeLearningReport = () => {
                                     >
                                         {org}
                                         {selectedOrg === org && <Check size={14} className="text-blue-600" />}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <div className="relative sm:w-64">
+                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        <input
+                            type="text"
+                            value={branchQuery}
+                            onFocus={() => setBranchDropdownOpen(true)}
+                            onBlur={() => setTimeout(() => { setBranchDropdownOpen(false); setBranchQuery(selectedBranchRef.current); }, 150)}
+                            onChange={e => { setBranchQuery(e.target.value); setBranchDropdownOpen(true); }}
+                            placeholder={t('employee.allBranches')}
+                            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        {branchDropdownOpen && (
+                            <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-slate-100 rounded-lg shadow-lg divide-y divide-slate-50">
+                                <button
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => handleBranchSelect('')}
+                                    className="w-full flex items-center justify-between text-left px-4 py-2 hover:bg-slate-50 transition-colors text-sm font-semibold text-slate-700"
+                                >
+                                    {t('employee.allBranches')}
+                                    {!selectedBranch && <Check size={14} className="text-blue-600" />}
+                                </button>
+                                {filteredBranches.length === 0 ? (
+                                    <p className="text-sm text-slate-400 italic px-4 py-3">{t('employee.notFound')}</p>
+                                ) : filteredBranches.map(branch => (
+                                    <button
+                                        key={branch}
+                                        onMouseDown={e => e.preventDefault()}
+                                        onClick={() => handleBranchSelect(branch)}
+                                        className="w-full flex items-center justify-between text-left px-4 py-2 hover:bg-slate-50 transition-colors text-sm text-slate-700"
+                                    >
+                                        {branch}
+                                        {selectedBranch === branch && <Check size={14} className="text-blue-600" />}
                                     </button>
                                 ))}
                             </div>

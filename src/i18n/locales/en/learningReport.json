@@ -62,6 +62,7 @@
     "selectLabel": "Employee",
     "searchPlaceholder": "Search employee name or email...",
     "allOrganizations": "All Organizations",
+    "allBranches": "All Branches",
     "clearAll": "Clear all",
     "combinedFor": "Combined report for {{count}} employees",
     "notFound": "No employees found",
