@@ -659,7 +659,11 @@ const syncEmployeeFromNusawork = async (identifier, token) => {
 
         const fullName = employee.full_name || employee.name || identifier.split('@')[0].replace('.', ' ');
         const employeeId = employee.id_employee || employee.employee_id || null;
-        const branchName = employee.organization_name || employee.branch_name || (employee.branch ? employee.branch.name : 'Headquarters');
+        // Must prefer the actual branch fields over organization_name — organization_name is the
+        // department (e.g. "Technical"), which never matches a row in `branches`, so putting it first
+        // silently defaulted branch_id to HQ ('020') for every employee whose department name didn't
+        // coincidentally collide with a branch name.
+        const branchName = employee.branch_name || (employee.branch ? employee.branch.name : null) || employee.organization_name || 'Headquarters';
         const photoProfile = employee.photo_profile || employee.photo || `https://ui-avatars.com/api/?name=${fullName}&background=random`;
         const email = employee.email || identifier;
 
@@ -1275,7 +1279,11 @@ app.post('/api/admin/sync-all-nusawork', async (req, res) => {
                     // Extract and normalize values
                     const fullName = employee.full_name || employee.name || user.email.split('@')[0].replace('.', ' ');
                     const employeeId = employee.id_employee || employee.employee_id || null;
-                    const branchName = employee.organization_name || employee.branch_name || (employee.branch ? employee.branch.name : 'Headquarters');
+                    // Must prefer the actual branch fields over organization_name — organization_name is the
+                    // department (e.g. "Technical"), which never matches a row in `branches`, so putting it
+                    // first silently defaulted branch_id to HQ ('020') for every employee whose department
+                    // name didn't coincidentally collide with a branch name.
+                    const branchName = employee.branch_name || (employee.branch ? employee.branch.name : null) || employee.organization_name || 'Headquarters';
                     const photoProfile = employee.photo_profile || employee.photo || `https://ui-avatars.com/api/?name=${fullName}&background=random`;
                     const email = employee.email || user.email;
 
