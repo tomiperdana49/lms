@@ -3958,6 +3958,105 @@ app.post('/api/idp', async (req, res) => {
     }
 });
 
+// 1b. HR bulk-imports IDP plans parsed from the standard IDP Excel template (one sheet per employee).
+// Employees are matched to the org-chart master data by full name since the sheet carries no employee_id.
+// Existing (employee_id, period_year) plans are left untouched and reported as skipped — this endpoint
+// only backfills plans that don't exist yet, never overwrites live data.
+app.post('/api/idp/bulk-import', async (req, res) => {
+    const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
+    const result = { inserted: 0, skipped: 0, duplicates: [], errors: [] };
+
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const rowLabel = row.sheet_name || row.employee_name || `#${i + 1}`;
+        try {
+            if (!row.employee_name || !row.period_year) {
+                result.errors.push({ row: rowLabel, error: 'Nama karyawan atau periode IDP tidak ditemukan di sheet.' });
+                continue;
+            }
+
+            const nameMatches = await querySimAsset(
+                'SELECT id_employee, organization_name, join_date FROM employees WHERE full_name = ? LIMIT 1',
+                [row.employee_name.trim()]
+            );
+            const employee = nameMatches[0] || (await querySimAsset(
+                'SELECT id_employee, organization_name, join_date FROM employees WHERE full_name LIKE ? LIMIT 1',
+                [`%${row.employee_name.trim()}%`]
+            ))[0];
+
+            if (!employee) {
+                result.errors.push({ row: rowLabel, error: `Karyawan "${row.employee_name}" tidak ditemukan di data organisasi.` });
+                continue;
+            }
+            const employeeId = employee.id_employee;
+
+            const existing = await query('SELECT id FROM idp_plans WHERE employee_id = ? AND period_year = ?', [employeeId, row.period_year]);
+            if (existing.length > 0) {
+                result.skipped++;
+                result.duplicates.push({ row: rowLabel, employee_name: row.employee_name, period_year: row.period_year });
+                continue;
+            }
+
+            let supervisorName = row.supervisor_name || null;
+            if (!supervisorName) {
+                const supervisor = await findReportToEmployee(employeeId);
+                supervisorName = supervisor?.full_name || null;
+            }
+            const department = row.department || employee.organization_name || '';
+            const joinDateLabel = row.join_date_label || formatIndoDate(employee.join_date);
+
+            const reviews = Array.isArray(row.reviews) ? row.reviews.filter(r => r.review_date) : [];
+            const status = row.approved_date || reviews.length > 0 ? 'Approved' : (row.created_by_date ? 'Pending' : 'Draft');
+
+            const planResult = await query(`
+                INSERT INTO idp_plans
+                (employee_id, employee_name, job_position, department, supervisor_name, period_year,
+                 join_date_label, achievements, career_goal, existing_skills, development_area, status,
+                 created_by_date, approved_date, hr_note, hr_note_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                employeeId, row.employee_name.trim(), row.job_position || '', department, supervisorName,
+                row.period_year, joinDateLabel, row.achievements || '', row.career_goal || '',
+                row.existing_skills || '', row.development_area || '', status,
+                row.created_by_date || null, row.approved_date || null, row.hr_note || null, row.hr_note_by || null
+            ]);
+            const idpId = planResult.insertId;
+
+            const actionItems = Array.isArray(row.action_items) ? row.action_items : [];
+            const hasMandatory = actionItems.some(a => a.is_mandatory);
+            if (!hasMandatory) {
+                await query(
+                    'INSERT INTO idp_action_items (idp_id, action_description, target_time, is_mandatory, is_completed, notes, sort_order) VALUES (?, ?, ?, 1, 0, ?, 0)',
+                    [idpId, IDP_MANDATORY_ACTION.description, IDP_MANDATORY_ACTION.targetTime, '']
+                );
+            }
+            let sortOrder = hasMandatory ? 0 : 1;
+            for (const item of actionItems) {
+                if (!item.action_description || !item.action_description.trim()) continue;
+                await query(
+                    'INSERT INTO idp_action_items (idp_id, action_description, target_time, is_mandatory, is_completed, notes, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [idpId, item.action_description.trim(), item.target_time || '', item.is_mandatory ? 1 : 0, item.is_completed ? 1 : 0, item.notes || '', sortOrder++]
+                );
+            }
+
+            for (const review of reviews) {
+                await query(
+                    `INSERT INTO idp_reviews (idp_id, review_date, supervisor_note, reviewed_by, hr_verification_date, hr_note, hr_verified_by)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [idpId, review.review_date, review.supervisor_note || '', review.reviewed_by || supervisorName,
+                     review.hr_verification_date || null, review.hr_note || null, review.hr_verified_by || null]
+                );
+            }
+
+            result.inserted++;
+        } catch (err) {
+            result.errors.push({ row: rowLabel, error: err.message });
+        }
+    }
+
+    res.json(result);
+});
+
 // 2. Employee's own plans across years.
 app.get('/api/idp/my-plans', async (req, res) => {
     try {
@@ -4116,8 +4215,8 @@ app.post('/api/idp/:id/approve', async (req, res) => {
 app.post('/api/idp/:id/hr-note', async (req, res) => {
     try {
         const { id } = req.params;
-        const { hr_note } = req.body;
-        await query('UPDATE idp_plans SET hr_note = ? WHERE id = ?', [hr_note || null, id]);
+        const { hr_note, hr_note_by } = req.body;
+        await query('UPDATE idp_plans SET hr_note = ?, hr_note_by = ? WHERE id = ?', [hr_note || null, hr_note_by || null, id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -4185,6 +4284,17 @@ app.get('/api/idp/:id', async (req, res) => {
         }
 
         res.json({ ...plan, action_items: actionItems, reviews, learningProgress });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 11. HR permanently deletes an IDP plan (e.g. one created in error, or bad import data). Action items
+// and reviews cascade-delete with it via the FK constraints on idp_action_items/idp_reviews.
+app.delete('/api/idp/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await query('DELETE FROM idp_plans WHERE id = ?', [id]);
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'IDP not found' });
+        res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

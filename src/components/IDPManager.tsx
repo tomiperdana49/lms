@@ -1,10 +1,204 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Target, Search, ChevronDown, Download, Clock, CheckCircle, XCircle, MessageSquare } from 'lucide-react';
+import { Target, Search, ChevronDown, Download, Upload, Clock, CheckCircle, XCircle, MessageSquare, Trash2, Pencil, Plus, Lock } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { API_BASE_URL } from '../config';
-import type { IDPPlan } from '../types';
+import type { IDPPlan, IDPActionItem } from '../types';
 import IDPDetailInfoTable from './IDPDetailInfoTable';
+import { idpLabelCell, idpValueCell, idpSectionHeaderCell, idpContentCell } from './idpTableStyles';
+
+type IdpImportCell = string | number | boolean | null | undefined;
+type IdpImportGrid = IdpImportCell[][];
+
+interface IdpImportRow {
+    sheet_name: string;
+    employee_name: string;
+    job_position: string;
+    department: string;
+    supervisor_name: string;
+    period_year: number | null;
+    join_date_label: string;
+    achievements: string;
+    career_goal: string;
+    existing_skills: string;
+    development_area: string;
+    created_by_date: string | null;
+    approved_date: string | null;
+    hr_note: string | null;
+    hr_note_by: string | null;
+    action_items: { action_description: string; target_time: string; is_completed: boolean; notes: string; is_mandatory: boolean }[];
+    reviews: { review_date: string; supervisor_note: string }[];
+}
+
+const IDP_INDO_MONTHS: Record<string, string> = {
+    januari: '01', februari: '02', maret: '03', april: '04', mei: '05', juni: '06',
+    juli: '07', agustus: '08', september: '09', oktober: '10', november: '11', desember: '12'
+};
+
+// Parses dates as written in the IDP template ("29 Januari 2026"), Excel serials, or ISO/slash strings.
+const parseIdpImportDate = (val: IdpImportCell): string | null => {
+    if (val === undefined || val === null || val === '') return null;
+    if (typeof val === 'number') {
+        const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+        return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+    }
+    const str = String(val).trim();
+    if (!str) return null;
+    const isoMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoMatch) { const [, y, m, d] = isoMatch; return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`; }
+    const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (slashMatch) { const [, dd, mm, yyyy] = slashMatch; return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`; }
+    const parts = str.toLowerCase().replace(/,/g, '').split(/\s+/);
+    const dayPart = parts.find(p => /^\d{1,2}$/.test(p));
+    const yearPart = parts.find(p => /^\d{4}$/.test(p));
+    const monthPart = parts.find(p => IDP_INDO_MONTHS[p]);
+    if (dayPart && yearPart && monthPart) return `${yearPart}-${IDP_INDO_MONTHS[monthPart]}-${dayPart.padStart(2, '0')}`;
+    return null;
+};
+
+const idpCellStr = (v: IdpImportCell): string => (v === undefined || v === null) ? '' : String(v).trim();
+
+const idpFindCell = (grid: IdpImportGrid, pattern: RegExp, startRow = 0): { r: number; c: number } | null => {
+    for (let r = startRow; r < grid.length; r++) {
+        const row = grid[r] || [];
+        for (let c = 0; c < row.length; c++) {
+            if (pattern.test(idpCellStr(row[c]))) return { r, c };
+        }
+    }
+    return null;
+};
+
+const idpValueRightOf = (grid: IdpImportGrid, r: number, c: number): string => {
+    const row = grid[r] || [];
+    for (let cc = c + 1; cc < row.length; cc++) {
+        const v = idpCellStr(row[cc]);
+        if (v) return v;
+    }
+    return '';
+};
+
+// Reads the free-form answer under a section header (e.g. "Pencapaian / Prestasi Kerja"), skipping the
+// guiding question row ("Apa pencapaian kamu...?") so the actual multi-line answer cell is returned.
+const idpFindSectionText = (grid: IdpImportGrid, headerPattern: RegExp, stopPattern: RegExp): string => {
+    const pos = idpFindCell(grid, headerPattern);
+    if (!pos) return '';
+    for (let r = pos.r + 1; r < Math.min(pos.r + 8, grid.length); r++) {
+        const row = grid[r] || [];
+        if (row.some(cell => stopPattern.test(idpCellStr(cell)))) break;
+        for (const cell of row) {
+            const v = idpCellStr(cell);
+            if (!v || v.includes('?') || /^tuliskan/i.test(v)) continue;
+            return v;
+        }
+    }
+    return '';
+};
+
+// Parses one sheet of the standard IDP Excel template into a structured import row. Field positions are
+// located by label text rather than fixed cell indices, so minor column drift between real-world sheets
+// doesn't break parsing.
+const parseIdpSheet = (grid: IdpImportGrid, sheetName: string): IdpImportRow => {
+    const namePos = idpFindCell(grid, /nama karyawan/i);
+    const jobPos = idpFindCell(grid, /jabatan/i);
+    const supervisorPos = idpFindCell(grid, /atasan langsung/i);
+    const periodPos = idpFindCell(grid, /periode idp/i);
+    const deptPos = idpFindCell(grid, /departemen/i);
+    const joinDatePos = idpFindCell(grid, /tanggal mulai bekerja/i);
+
+    const periodRaw = periodPos ? idpValueRightOf(grid, periodPos.r, periodPos.c) : '';
+    const period_year = periodRaw ? parseInt(periodRaw.replace(/\D/g, ''), 10) || null : null;
+
+    const achievements = idpFindSectionText(grid, /pencapaian/i, /tujuan.*karir|aspirasi/i);
+    const career_goal = idpFindSectionText(grid, /tujuan.*karir|aspirasi/i, /skill yang dimiliki/i);
+
+    const skillPos = idpFindCell(grid, /skill yang dimiliki/i);
+    const devPos = idpFindCell(grid, /area pengembangan/i);
+    let existing_skills = '', development_area = '';
+    if (skillPos) {
+        for (let r = skillPos.r + 1; r < Math.min(skillPos.r + 6, grid.length); r++) {
+            const row = grid[r] || [];
+            if (/rencana aksi pengembangan/i.test(row.map(idpCellStr).join(' '))) break;
+            const skillVal = idpCellStr(row[skillPos.c]);
+            const devVal = devPos ? idpCellStr(row[devPos.c]) : '';
+            if (skillVal && !skillVal.includes('?') && !existing_skills) existing_skills = skillVal;
+            if (devVal && !devVal.includes('?') && !development_area) development_area = devVal;
+            if (existing_skills && development_area) break;
+        }
+    }
+
+    const action_items: IdpImportRow['action_items'] = [];
+    const actionHeaderPos = idpFindCell(grid, /rencana aksi pengembangan/i);
+    if (actionHeaderPos) {
+        const headerRow = grid[actionHeaderPos.r] || [];
+        const findColInRow = (row: IdpImportCell[], pattern: RegExp) => row.findIndex(cell => pattern.test(idpCellStr(cell)));
+        const targetCol = findColInRow(headerRow, /target waktu/i);
+        const checklistCol = findColInRow(headerRow, /checklist/i);
+        const notesCol = findColInRow(headerRow, /keterangan/i);
+        const descCol = actionHeaderPos.c;
+
+        for (let r = actionHeaderPos.r + 1; r < Math.min(actionHeaderPos.r + 40, grid.length); r++) {
+            const row = grid[r] || [];
+            const rowStr = row.map(idpCellStr).join(' ');
+            if (/tanggal idp dibuat/i.test(rowStr) || /evaluasi idp/i.test(rowStr) || /tanggal review/i.test(rowStr)) break;
+            const desc = idpCellStr(row[descCol]);
+            if (!desc || desc.includes('?') || /^tuliskan/i.test(desc)) continue;
+            const checklistRaw = checklistCol >= 0 ? idpCellStr(row[checklistCol]) : '';
+            action_items.push({
+                action_description: desc,
+                target_time: targetCol >= 0 ? idpCellStr(row[targetCol]) : '',
+                is_completed: /^(true|ya|yes|selesai|done|1)$/i.test(checklistRaw),
+                notes: notesCol >= 0 ? idpCellStr(row[notesCol]) : '',
+                is_mandatory: /wajib/i.test(desc)
+            });
+        }
+    }
+
+    const createdPos = idpFindCell(grid, /tanggal idp dibuat/i);
+    const created_by_date = createdPos ? parseIdpImportDate(idpValueRightOf(grid, createdPos.r, createdPos.c)) : null;
+    const approvedPos = idpFindCell(grid, /disetujui/i);
+    const approved_date = approvedPos ? parseIdpImportDate(idpValueRightOf(grid, approvedPos.r, approvedPos.c)) : null;
+
+    const reviews: IdpImportRow['reviews'] = [];
+    const reviewHeaderPos = idpFindCell(grid, /tanggal review/i);
+    if (reviewHeaderPos) {
+        for (let r = reviewHeaderPos.r + 1; r < Math.min(reviewHeaderPos.r + 60, grid.length); r++) {
+            const row = grid[r] || [];
+            const iso = parseIdpImportDate(row[reviewHeaderPos.c]);
+            if (!iso) continue;
+            reviews.push({ review_date: iso, supervisor_note: idpCellStr(row[reviewHeaderPos.c + 1]) });
+        }
+    }
+
+    // The "Verifikasi IDP (diisi oleh HR)" column sits to the right of the review table and holds a
+    // single HR note (often a merged cell) plus the verifier's name — one note per plan, not per review
+    // row, so it's read as free text across that column rather than being matched to a specific date.
+    let hr_note: string | null = null;
+    let hr_note_by: string | null = null;
+    const hrColPos = idpFindCell(grid, /verifikasi idp/i);
+    if (hrColPos && reviewHeaderPos) {
+        for (let r = reviewHeaderPos.r; r < Math.min(reviewHeaderPos.r + 60, grid.length); r++) {
+            const v = idpCellStr((grid[r] || [])[hrColPos.c]);
+            if (!v || /tanggal verifikasi/i.test(v)) continue;
+            if (v.split(/\s+/).length <= 4 && v.length <= 40 && !/[.?!]/.test(v)) {
+                hr_note_by = hr_note_by || v;
+            } else {
+                hr_note = hr_note || v;
+            }
+        }
+    }
+
+    return {
+        sheet_name: sheetName,
+        employee_name: namePos ? idpValueRightOf(grid, namePos.r, namePos.c) : '',
+        job_position: jobPos ? idpValueRightOf(grid, jobPos.r, jobPos.c) : '',
+        department: deptPos ? idpValueRightOf(grid, deptPos.r, deptPos.c) : '',
+        supervisor_name: supervisorPos ? idpValueRightOf(grid, supervisorPos.r, supervisorPos.c) : '',
+        period_year,
+        join_date_label: joinDatePos ? idpValueRightOf(grid, joinDatePos.r, joinDatePos.c) : '',
+        achievements, career_goal, existing_skills, development_area,
+        created_by_date, approved_date, hr_note, hr_note_by, action_items, reviews
+    };
+};
 
 interface IDPManagerProps {
     userRole: string;
@@ -96,15 +290,72 @@ export default function IDPManager({ userName }: IDPManagerProps) {
         } catch (err) { console.error(err); }
     };
 
+    // --- HR edit: lets HR correct/update any employee's IDP narrative fields and action plan directly
+    // (e.g. fixing bad import data), reusing the same PUT /api/idp/:id the employee's own edit form uses.
+    // The mandatory learning-hours row is never editable here — it stays locked, same as elsewhere.
+    interface EditActionRow { id?: number; action_description: string; target_time: string; is_completed: boolean; notes: string }
+    interface EditDraft { job_position: string; achievements: string; career_goal: string; existing_skills: string; development_area: string; actionItems: EditActionRow[] }
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
+    const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+    const startEdit = (plan: IDPPlan) => {
+        setEditingId(plan.id);
+        setEditDraft({
+            job_position: plan.job_position || '',
+            achievements: plan.achievements || '',
+            career_goal: plan.career_goal || '',
+            existing_skills: plan.existing_skills || '',
+            development_area: plan.development_area || '',
+            actionItems: (plan.action_items || []).filter(i => !i.is_mandatory).map(i => ({
+                id: i.id, action_description: i.action_description, target_time: i.target_time || '',
+                is_completed: !!i.is_completed, notes: i.notes || ''
+            }))
+        });
+    };
+    const cancelEdit = () => { setEditingId(null); setEditDraft(null); };
+    const addEditActionRow = () => setEditDraft(d => d ? { ...d, actionItems: [...d.actionItems, { action_description: '', target_time: '', is_completed: false, notes: '' }] } : d);
+    const removeEditActionRow = (idx: number) => setEditDraft(d => d ? { ...d, actionItems: d.actionItems.filter((_, i) => i !== idx) } : d);
+    const updateEditActionRow = (idx: number, patch: Partial<EditActionRow>) => setEditDraft(d => d ? {
+        ...d, actionItems: d.actionItems.map((item, i) => i === idx ? { ...item, ...patch } : item)
+    } : d);
+
+    const saveEdit = async (id: number) => {
+        if (!editDraft) return;
+        setIsSavingEdit(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/idp/${id}`, {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    job_position: editDraft.job_position,
+                    achievements: editDraft.achievements,
+                    career_goal: editDraft.career_goal,
+                    existing_skills: editDraft.existing_skills,
+                    development_area: editDraft.development_area,
+                    action_items: editDraft.actionItems
+                })
+            });
+            if (!res.ok) throw new Error((await res.json()).error || 'Gagal menyimpan perubahan.');
+            cancelEdit();
+            fetchPlans();
+            const detailRes = await fetch(`${API_BASE_URL}/api/idp/${id}`);
+            if (detailRes.ok) setDetail(await detailRes.json());
+        } catch (err) {
+            setInfoModal({ title: 'Gagal Menyimpan', message: err instanceof Error ? err.message : String(err) });
+        } finally {
+            setIsSavingEdit(false);
+        }
+    };
+
     // --- HR feedback note: general guidance on what's missing/needs adding, independent of approve/reject ---
     const saveHrNote = async (id: number) => {
         setSavingHrNote(true);
         try {
             await fetch(`${API_BASE_URL}/api/idp/${id}/hr-note`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ hr_note: hrNoteDraft })
+                body: JSON.stringify({ hr_note: hrNoteDraft, hr_note_by: userName })
             });
-            setDetail(d => d ? { ...d, hr_note: hrNoteDraft } : d);
+            setDetail(d => d ? { ...d, hr_note: hrNoteDraft, hr_note_by: userName } : d);
             fetchPlans();
         } catch (err) { console.error(err); } finally { setSavingHrNote(false); }
     };
@@ -141,6 +392,22 @@ export default function IDPManager({ userName }: IDPManagerProps) {
             setRejectTargetId(null);
             fetchPlans();
         } catch (err) { console.error(err); }
+    };
+
+    // --- HR-only permanent delete: for IDPs created by mistake or bad import data. Irreversible —
+    // cascades to the plan's action items and review history in the database.
+    const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const confirmDeletePlan = async () => {
+        if (!deleteTargetId) return;
+        setIsDeleting(true);
+        try {
+            await fetch(`${API_BASE_URL}/api/idp/${deleteTargetId}`, { method: 'DELETE' });
+            if (expandedId === deleteTargetId) { setExpandedId(null); setDetail(null); }
+            setDeleteTargetId(null);
+            fetchPlans();
+        } catch (err) { console.error(err); } finally { setIsDeleting(false); }
     };
 
     const statusBadge = (status: string) => {
@@ -215,6 +482,65 @@ export default function IDPManager({ userName }: IDPManagerProps) {
         XLSX.writeFile(wb, `IDP_${periodLabel}.xlsx`);
     };
 
+    // --- Bulk import: reads an .xlsx with one sheet per employee (the standard IDP template) and shows
+    // a preview before writing anything, since employee matching and HR-note placement are best-effort. ---
+    const idpImportInputRef = useRef<HTMLInputElement>(null);
+    const [importPreview, setImportPreview] = useState<IdpImportRow[] | null>(null);
+    const [isImportingIdp, setIsImportingIdp] = useState(false);
+    // In-page replacement for window.alert() — browser-native alerts block automation/testing and look
+    // out of place next to the app's own modals, so every user-facing message in the import flow goes here.
+    const [infoModal, setInfoModal] = useState<{ title: string; message: string } | null>(null);
+
+    const handleIdpFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const bstr = evt.target?.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                const parsed = wb.SheetNames
+                    .map(name => parseIdpSheet(XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' }) as IdpImportGrid, name))
+                    .filter(p => p.employee_name && p.period_year);
+                if (parsed.length === 0) {
+                    setInfoModal({ title: 'Tidak Ada Data', message: 'Tidak ada data IDP yang valid ditemukan di file ini. Pastikan formatnya sesuai template IDP.' });
+                    return;
+                }
+                setImportPreview(parsed);
+            } catch (err) {
+                console.error('IDP import parse error:', err);
+                setInfoModal({ title: 'Gagal Membaca File', message: err instanceof Error ? err.message : String(err) });
+            } finally {
+                if (idpImportInputRef.current) idpImportInputRef.current.value = '';
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
+
+    const confirmIdpImport = async () => {
+        if (!importPreview) return;
+        setIsImportingIdp(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/idp/bulk-import`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rows: importPreview })
+            });
+            const data = await res.json();
+            const parts = [`${data.inserted} IDP berhasil diimpor.`];
+            if (data.skipped) parts.push(`${data.skipped} dilewati karena sudah ada IDP untuk karyawan & periode tersebut.`);
+            if (data.errors?.length) {
+                parts.push(`${data.errors.length} gagal:\n` + data.errors.map((e: { row: string; error: string }) => `- ${e.row}: ${e.error}`).join('\n'));
+            }
+            setImportPreview(null);
+            setInfoModal({ title: 'Hasil Import', message: parts.join('\n') });
+            fetchPlans();
+        } catch (err) {
+            setInfoModal({ title: 'Import Gagal', message: err instanceof Error ? err.message : String(err) });
+        } finally {
+            setIsImportingIdp(false);
+        }
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in max-w-6xl mx-auto">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -227,9 +553,15 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                         <p className="text-gray-500 text-sm">{t('admin.subtitle')}</p>
                     </div>
                 </div>
-                <button onClick={exportExcel} className="flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-black tracking-widest bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 transition-all">
-                    <Download size={16} /> EXPORT
-                </button>
+                <div className="flex items-center gap-3">
+                    <input ref={idpImportInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleIdpFileSelected} />
+                    <button onClick={() => idpImportInputRef.current?.click()} className="flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-black tracking-widest bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 transition-all">
+                        <Upload size={16} /> IMPORT
+                    </button>
+                    <button onClick={exportExcel} className="flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-black tracking-widest bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 transition-all">
+                        <Download size={16} /> EXPORT
+                    </button>
+                </div>
             </div>
 
             <div className="flex flex-wrap gap-3">
@@ -275,6 +607,13 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                                         <button onClick={() => { setRejectTargetId(plan.id); setRejectModalOpen(true); }} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-rose-200 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-50 transition-colors"><XCircle size={14} /> {t('team.reject')}</button>
                                     </>
                                 )}
+                                <button
+                                    onClick={() => setDeleteTargetId(plan.id)}
+                                    title="Hapus IDP secara permanen"
+                                    className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 text-gray-400 rounded-xl text-xs font-bold hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 transition-colors"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
                             </div>
                         </div>
 
@@ -303,7 +642,125 @@ export default function IDPManager({ userName }: IDPManagerProps) {
 
                         {expandedId === plan.id && detail && (
                             <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
-                                <IDPDetailInfoTable plan={detail} />
+                                {editingId === plan.id && editDraft ? (
+                                    <div className="space-y-4">
+                                        <div className="overflow-x-auto rounded-xl border border-slate-300">
+                                            <table className="w-full border-collapse table-fixed min-w-[780px]">
+                                                <colgroup>
+                                                    <col className="w-[13%]" /><col className="w-[20%]" />
+                                                    <col className="w-[13%]" /><col className="w-[20%]" />
+                                                    <col className="w-[13%]" /><col className="w-[20%]" />
+                                                </colgroup>
+                                                <tbody>
+                                                    <tr>
+                                                        <td className={idpLabelCell}>{t('form.employeeName')}:</td>
+                                                        <td className={idpValueCell}>{detail.employee_name || '-'}</td>
+                                                        <td className={idpLabelCell}>{t('form.jobPosition')}:</td>
+                                                        <td className={idpValueCell}>
+                                                            <input value={editDraft.job_position} onChange={e => setEditDraft(d => d ? { ...d, job_position: e.target.value } : d)} className="w-full bg-transparent outline-none" />
+                                                        </td>
+                                                        <td className={idpLabelCell}>{t('form.supervisor')}:</td>
+                                                        <td className={idpValueCell}>{detail.supervisor_name || '-'}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className={idpLabelCell}>{t('form.period')}:</td>
+                                                        <td className={idpValueCell}>{detail.period_year}</td>
+                                                        <td className={idpLabelCell}>{t('form.department')}:</td>
+                                                        <td className={idpValueCell}>{detail.department || '-'}</td>
+                                                        <td className={idpLabelCell}>{t('form.joinDate')}:</td>
+                                                        <td className={idpValueCell}>{detail.join_date_label || '-'}</td>
+                                                    </tr>
+
+                                                    <tr><td colSpan={6} className={idpSectionHeaderCell}>{t('form.achievements')}</td></tr>
+                                                    <tr><td colSpan={6} className={idpContentCell}>
+                                                        <textarea value={editDraft.achievements} onChange={e => setEditDraft(d => d ? { ...d, achievements: e.target.value } : d)} rows={3} className="w-full bg-transparent outline-none resize-none" />
+                                                    </td></tr>
+
+                                                    <tr><td colSpan={6} className={idpSectionHeaderCell}>{t('form.careerGoal')}</td></tr>
+                                                    <tr><td colSpan={6} className={idpContentCell}>
+                                                        <textarea value={editDraft.career_goal} onChange={e => setEditDraft(d => d ? { ...d, career_goal: e.target.value } : d)} rows={3} className="w-full bg-transparent outline-none resize-none" />
+                                                    </td></tr>
+
+                                                    <tr>
+                                                        <td colSpan={3} className={idpSectionHeaderCell}>{t('form.existingSkills')}</td>
+                                                        <td colSpan={3} className={idpSectionHeaderCell}>{t('form.developmentArea')}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td colSpan={3} className={idpContentCell}>
+                                                            <textarea value={editDraft.existing_skills} onChange={e => setEditDraft(d => d ? { ...d, existing_skills: e.target.value } : d)} rows={3} className="w-full bg-transparent outline-none resize-none" />
+                                                        </td>
+                                                        <td colSpan={3} className={idpContentCell}>
+                                                            <textarea value={editDraft.development_area} onChange={e => setEditDraft(d => d ? { ...d, development_area: e.target.value } : d)} rows={3} className="w-full bg-transparent outline-none resize-none" />
+                                                        </td>
+                                                    </tr>
+
+                                                    <tr>
+                                                        <td colSpan={2} className={idpSectionHeaderCell}>{t('form.actionPlan')}</td>
+                                                        <td className={idpSectionHeaderCell}>{t('form.targetTime')}</td>
+                                                        <td className={idpSectionHeaderCell}>{t('form.checklistProgress')}</td>
+                                                        <td colSpan={2} className={idpSectionHeaderCell}>
+                                                            <div className="flex items-center justify-between">
+                                                                <span>{t('form.notes')}</span>
+                                                                <button type="button" onClick={addEditActionRow} className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-700"><Plus size={14} /> {t('form.addRow')}</button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+
+                                                    {(detail.action_items || []).filter(i => i.is_mandatory).map((item: IDPActionItem) => (
+                                                        <tr key={item.id}>
+                                                            <td colSpan={2} className={idpContentCell}>
+                                                                <div className="flex items-center gap-2 text-indigo-700">
+                                                                    <Lock size={14} className="shrink-0" />
+                                                                    <span>{item.action_description}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className={idpValueCell}>{item.target_time}</td>
+                                                            <td className={`${idpValueCell} text-center`}>
+                                                                <input type="checkbox" disabled readOnly checked={!!detail.learningProgress && detail.learningProgress.totalJam >= detail.learningProgress.target} className="w-4 h-4 accent-indigo-600" />
+                                                            </td>
+                                                            <td colSpan={2} className={idpValueCell}>{t('form.mandatoryRowNote', { hours: MANDATORY_TARGET_HOURS })}</td>
+                                                        </tr>
+                                                    ))}
+
+                                                    {editDraft.actionItems.map((item, idx) => (
+                                                        <tr key={idx}>
+                                                            <td colSpan={2} className={idpContentCell}>
+                                                                <input value={item.action_description} onChange={e => updateEditActionRow(idx, { action_description: e.target.value })} placeholder={t('form.actionDescriptionPlaceholder')} className="w-full bg-transparent outline-none" />
+                                                            </td>
+                                                            <td className={idpValueCell}>
+                                                                <input value={item.target_time} onChange={e => updateEditActionRow(idx, { target_time: e.target.value })} placeholder={t('form.targetTimePlaceholder')} className="w-full bg-transparent outline-none" />
+                                                            </td>
+                                                            <td className={`${idpValueCell} text-center`}>
+                                                                <input type="checkbox" checked={item.is_completed} onChange={e => updateEditActionRow(idx, { is_completed: e.target.checked })} className="w-4 h-4 accent-indigo-600" />
+                                                            </td>
+                                                            <td colSpan={2} className={idpValueCell}>
+                                                                <div className="flex items-center gap-2">
+                                                                    <input value={item.notes} onChange={e => updateEditActionRow(idx, { notes: e.target.value })} placeholder={t('form.notesPlaceholder')} className="flex-1 bg-transparent outline-none" />
+                                                                    <button type="button" onClick={() => removeEditActionRow(idx)} className="text-gray-400 hover:text-rose-600 transition-colors shrink-0"><Trash2 size={14} /></button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <button onClick={cancelEdit} disabled={isSavingEdit} className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 disabled:opacity-50 transition-colors">{t('form.cancel')}</button>
+                                            <button onClick={() => saveEdit(plan.id)} disabled={isSavingEdit} className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                                                {isSavingEdit ? 'Menyimpan...' : t('form.saveChanges')}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="flex justify-end">
+                                            <button onClick={() => startEdit(detail)} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-indigo-200 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-50 transition-colors">
+                                                <Pencil size={14} /> Edit IDP
+                                            </button>
+                                        </div>
+                                        <IDPDetailInfoTable plan={detail} />
+                                    </>
+                                )}
 
                                 {detail.learningProgress && (
                                     <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center justify-between text-sm">
@@ -317,6 +774,9 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                                         <MessageSquare size={14} /> {t('admin.hrNoteLabel')}
                                     </label>
                                     <p className="text-xs text-amber-700">{t('admin.hrNoteHint')}</p>
+                                    {detail.hr_note_by && (
+                                        <p className="text-xs text-amber-600 font-semibold">— {detail.hr_note_by}</p>
+                                    )}
                                     <textarea
                                         value={hrNoteDraft}
                                         onChange={e => setHrNoteDraft(e.target.value)}
@@ -354,6 +814,42 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                 ))}
             </div>
 
+            {/* Import Preview Modal */}
+            {importPreview && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 max-h-[85vh] overflow-y-auto">
+                        <h3 className="text-xl font-bold text-slate-800 mb-1">Konfirmasi Import IDP</h3>
+                        <p className="text-sm text-gray-500 mb-4">
+                            {importPreview.length} sheet terbaca dari file. IDP yang sudah ada (karyawan &amp; periode yang sama) akan otomatis dilewati, tidak ditimpa.
+                        </p>
+                        <div className="space-y-2 mb-6">
+                            {importPreview.map((p, idx) => (
+                                <div key={idx} className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm">
+                                    <p className="font-bold text-slate-700">
+                                        {p.employee_name || <span className="text-rose-500">Nama tidak terbaca ({p.sheet_name})</span>} &middot; Periode {p.period_year || '-'}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-0.5">{p.job_position || '-'} &middot; {p.department || '-'} &middot; Atasan: {p.supervisor_name || '-'}</p>
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        {p.action_items.length} rencana aksi &middot; {p.reviews.length} riwayat evaluasi &middot; {p.achievements ? 'ada' : 'tanpa'} pencapaian &middot; {p.career_goal ? 'ada' : 'tanpa'} tujuan karir
+                                    </p>
+                                    {p.hr_note && (
+                                        <p className="text-xs text-amber-600 mt-1">Catatan HR: "{p.hr_note.slice(0, 80)}{p.hr_note.length > 80 ? '…' : ''}"{p.hr_note_by ? ` — ${p.hr_note_by}` : ''}</p>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => setImportPreview(null)} disabled={isImportingIdp} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors">
+                                Batal
+                            </button>
+                            <button onClick={confirmIdpImport} disabled={isImportingIdp} className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                {isImportingIdp ? 'Mengimpor...' : `Impor ${importPreview.length} IDP`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Reject Modal */}
             {rejectModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -369,6 +865,42 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                         <div className="flex gap-3 mt-6">
                             <button onClick={() => { setRejectModalOpen(false); setRejectionReason(''); setRejectTargetId(null); }} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-colors">{t('team.cancel')}</button>
                             <button onClick={confirmReject} disabled={!rejectionReason.trim()} className="flex-1 px-4 py-2.5 rounded-xl bg-rose-600 text-white font-medium hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">{t('team.confirmReject')}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {deleteTargetId !== null && (() => {
+                const target = plans.find(p => p.id === deleteTargetId);
+                return (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+                            <h3 className="text-xl font-bold text-slate-800 mb-2">Hapus IDP Permanen</h3>
+                            <p className="text-sm text-slate-600">
+                                Yakin ingin menghapus IDP {target ? <span className="font-semibold">{target.employee_name} &middot; Periode {target.period_year}</span> : 'ini'}? Seluruh rencana aksi dan riwayat evaluasi ikut terhapus. Tindakan ini <span className="font-semibold text-rose-600">tidak bisa dibatalkan</span>.
+                            </p>
+                            <div className="flex gap-3 mt-6">
+                                <button onClick={() => setDeleteTargetId(null)} disabled={isDeleting} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors">Batal</button>
+                                <button onClick={confirmDeletePlan} disabled={isDeleting} className="flex-1 px-4 py-2.5 rounded-xl bg-rose-600 text-white font-medium hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                    {isDeleting ? 'Menghapus...' : 'Hapus Permanen'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* Info/Result Modal — in-page stand-in for window.alert() */}
+            {infoModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+                        <h3 className="text-xl font-bold text-slate-800 mb-2">{infoModal.title}</h3>
+                        <p className="text-sm text-slate-600 whitespace-pre-line">{infoModal.message}</p>
+                        <div className="flex justify-end mt-6">
+                            <button onClick={() => setInfoModal(null)} className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors">
+                                OK
+                            </button>
                         </div>
                     </div>
                 </div>

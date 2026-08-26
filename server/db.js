@@ -514,6 +514,13 @@ export const initDB = async () => {
             console.log("Added hr_note column to idp_plans.");
         } catch (e) { /* Ignore if exists */ }
 
+        // MIGRATION: Add hr_note_by — the name of the HR person who left hr_note, so the note shown
+        // to the employee/supervisor is attributed instead of appearing to come from "HR" anonymously.
+        try {
+            await connection.query("ALTER TABLE idp_plans ADD COLUMN hr_note_by VARCHAR(255)");
+            console.log("Added hr_note_by column to idp_plans.");
+        } catch (e) { /* Ignore if exists */ }
+
         // MIGRATION: Add the supervisor's final approval columns to idp_plans — the closing step of
         // the IDP cycle, done by the direct supervisor after HR's initial approval and the year's
         // monthly reviews. Separate from approved_by/approved_date, which record HR's approval.
