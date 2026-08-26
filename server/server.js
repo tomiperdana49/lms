@@ -865,19 +865,22 @@ app.post('/api/login', async (req, res) => {
                 let user = await findLocalUserByEmailOrId(loginId, employeeId);
 
                 if (!user) {
+                    if (!employeeHelper) {
+                        // No matching employee record found in Nusawork/SIMAS -> refuse to create a ghost account
+                        console.warn(`[NUSANET AUTH] No employee record found for ${loginId}. Refusing to auto-create local user.`);
+                        return res.status(404).json({ success: false, message: 'Account not linked to any employee record. Please contact HR/Admin to verify your corporate email.' });
+                    }
+
                     // Fallback create if somehow syncEmployeeFromNusawork failed to insert
                     console.log(`[NUSANET AUTH] Fallback create local user for ${loginId}`);
                     const id = Date.now().toString();
-                    const fullName = loginId.split('@')[0].replace('.', ' ');
-                    const avatar = employeeHelper?.photo_profile || `https://ui-avatars.com/api/?name=${fullName}&background=random`;
-
-                    let initialRole = 'STAFF';
-                    if (employeeHelper) {
-                        initialRole = determineInitialRole(employeeHelper);
-                    }
+                    const fullName = employeeHelper.full_name;
+                    const avatar = employeeHelper.photo_profile || `https://ui-avatars.com/api/?name=${fullName}&background=random`;
+                    const branch = employeeHelper.organization_name || 'Headquarters';
+                    const initialRole = determineInitialRole(employeeHelper);
 
                     await query('INSERT INTO users (id, email, password, name, role, avatar, branch, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                        [id, loginId, 'nusanet-oauth-placeholder', fullName, initialRole, avatar, 'Headquarters', employeeId]);
+                        [id, loginId, 'nusanet-oauth-placeholder', fullName, initialRole, avatar, branch, employeeId]);
 
                     const newUsers = await query('SELECT * FROM users WHERE email = ?', [loginId]);
                     user = newUsers[0];
@@ -937,11 +940,17 @@ app.post('/api/auth/google', async (req, res) => {
         let user = await findLocalUserByEmailOrId(email, employeeId);
 
         if (!user) {
+            if (!employeeHelper) {
+                // No matching employee record found in Nusawork/SIMAS -> refuse to create a ghost account
+                console.warn(`[GOOGLE AUTH] No employee record found for ${email}. Refusing to auto-create local user.`);
+                return res.status(404).json({ success: false, message: 'Account not linked to any employee record. Please contact HR/Admin to verify your corporate email.' });
+            }
+
             // New User: Create with linked data
             const id = Date.now().toString();
-            const name = employeeHelper ? employeeHelper.full_name : email.split('@')[0].replace('.', ' ');
-            const avatar = employeeHelper?.photo_profile || `https://ui-avatars.com/api/?name=${name}&background=random`;
-            const branch = employeeHelper?.organization_name || 'Headquarters';
+            const name = employeeHelper.full_name;
+            const avatar = employeeHelper.photo_profile || `https://ui-avatars.com/api/?name=${name}&background=random`;
+            const branch = employeeHelper.organization_name || 'Headquarters';
 
             const initialRole = determineInitialRole(employeeHelper);
 
