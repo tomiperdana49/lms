@@ -58,6 +58,10 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         if (saved !== null) return saved === 'true';
         return activePage === 'admin-dashboard';
     });
+    const adminRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (isAdminOpen) adminRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, [isAdminOpen]);
 
     // Sync admin sidebar state to localStorage
     useEffect(() => {
@@ -369,7 +373,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
 
                         {/* Admin Panel Expandable */}
                         {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
-                            <div className="pt-2">
+                            <div className="pt-2" ref={adminRef}>
                                 <button
                                     onClick={() => setIsAdminOpen(!isAdminOpen)}
                                     className={`
