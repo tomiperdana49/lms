@@ -1219,9 +1219,17 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const handleSave = async (e: FormEvent) => {
         e.preventDefault();
 
-        // Validation
-        if (!formData.title || !formData.date || !formData.startTime || !formData.endTime || !formData.host || !formData.type) {
-            setNotification({ show: true, type: 'error', message: t('notifications.fillRequiredFields') });
+        // Validation — names the actually-missing fields instead of always listing every required
+        // field, since that made it look like a filled-in field (e.g. Host) was still the problem.
+        const missingFields = [
+            !formData.title && t('createModal.eventTitleLabel'),
+            !formData.date && t('createModal.dateLabel'),
+            (!formData.startTime || !formData.endTime) && t('notifications.timeFieldLabel'),
+            !formData.host && t('createModal.hostNameLabel'),
+            !formData.type && t('createModal.eventTypeLabel'),
+        ].filter(Boolean);
+        if (missingFields.length > 0) {
+            setNotification({ show: true, type: 'error', message: t('notifications.fillRequiredFields', { fields: missingFields.join(', ') }) });
             return;
         }
 
