@@ -47,12 +47,14 @@
     "incentive": "Incentive",
     "month": "month",
     "certificateOriginal": "Original",
-    "certificateRenewed": "Renewed"
+    "certificateRenewed": "Renewed",
+    "attachment": "Attachment"
   },
   "requestModal": {
     "dateRange": "Dates: {{start}} to {{end}}",
     "processTitle": "Process Training Request",
     "ltrId": "LTR-ID: {{id}} • {{name}}",
+    "category": "Category",
     "trainingTitle": "Training Title",
     "titleLabel": "Title / Course Name",
     "vendorLocation": "Vendor & Location",
@@ -109,6 +111,8 @@
     "print": "Print",
     "reject": "Reject",
     "approveRequest": "Approve Request",
+    "save": "Save",
+    "saving": "Saving...",
     "updateSettlement": "Update Settlement"
   },
   "settlementModal": {
@@ -138,6 +142,10 @@
     "certificateEvidenceRequired": "Please upload the certificate evidence before processing this request.",
     "certificateExpiryRequired": "Please fill in the certificate expiry date before processing this request.",
     "incentiveRewardRequired": "Please fill in the incentive reward amount before processing this request.",
+    "detailsSaved": "Changes saved successfully.",
+    "detailsSaveFailed": "Failed to save changes. Please try again.",
+    "confirmApproveTitle": "Approve Training Request?",
+    "confirmApproveMessage": "Are you sure you want to approve this external training request \"{{title}}\"?",
     "confirmDeleteRequest": "This will permanently delete all data for this training request, including any uploaded certificate file. Incentives already granted from this request (if any) will not be removed. This action cannot be undone.",
     "confirmDeleteTitle": "Delete Training Request"
   },

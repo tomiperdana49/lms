@@ -131,6 +131,7 @@ export interface TrainingRequest {
     incentiveReward?: number;
     incentivePaymentType?: string;
     renewalCertificateUrl?: string;
+    attachmentUrl?: string;
     _original?: any;
 }
 

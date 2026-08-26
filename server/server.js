@@ -3812,7 +3812,7 @@ app.get('/api/external-training/hr', async (req, res) => {
 // 6. HR processes payment
 app.post('/api/external-training/hr-process', async (req, res) => {
     try {
-        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date, title, vendor, location, start_date, end_date, certification_result, incentive_reward, incentive_payment_type, hr_name, training_gr_type, participation_type, learning_hours } = req.body;
+        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date, category, title, vendor, location, start_date, end_date, certification_result, incentive_reward, incentive_payment_type, hr_name, training_gr_type, participation_type, learning_hours } = req.body;
         // datetime-local inputs send "YYYY-MM-DDTHH:MM"; MySQL DATETIME literals need a space instead of "T"
         const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
 
@@ -3830,6 +3830,10 @@ app.post('/api/external-training/hr-process', async (req, res) => {
         if (certificate_expiry_date !== undefined) {
             sql += `, certificate_expiry_date = ?, original_certificate_expiry_date = COALESCE(original_certificate_expiry_date, ?)`;
             params.push(certificate_expiry_date || null, certificate_expiry_date || null);
+        }
+        if (category !== undefined) {
+            sql += `, category = ?`;
+            params.push(category);
         }
         if (title !== undefined) {
             sql += `, title = ?`;
@@ -3875,6 +3879,41 @@ app.post('/api/external-training/hr-process', async (req, res) => {
             sql += `, learning_hours = ?`;
             params.push(learning_hours || null);
         }
+        sql += ` WHERE id = ?`;
+        params.push(id);
+
+        await query(sql, params);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Lets HR save corrections to a request's details (category, title, vendor, dates, etc.) without
+// running the full approval flow — status and cost/incentive fields are left untouched.
+app.post('/api/external-training/hr-update-details', async (req, res) => {
+    try {
+        const { id, category, title, vendor, location, start_date, end_date, training_gr_type, participation_type, learning_hours } = req.body;
+        if (!id) return res.status(400).json({ error: 'id is required' });
+        const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
+
+        let sql = `UPDATE external_training_requests SET`;
+        let params = [];
+        const set = (fragment, value) => {
+            sql += `${params.length ? ',' : ''} ${fragment}`;
+            params.push(value);
+        };
+
+        if (category !== undefined) set('category = ?', category);
+        if (title !== undefined) set('title = ?', title);
+        if (vendor !== undefined) set('vendor = ?', vendor);
+        if (location !== undefined) set('location = ?', location);
+        if (start_date !== undefined) set('start_date = ?', toMysqlDatetime(start_date));
+        if (end_date !== undefined) set('end_date = ?', toMysqlDatetime(end_date));
+        if (training_gr_type !== undefined) set('training_gr_type = ?', training_gr_type || null);
+        if (participation_type !== undefined) set('participation_type = ?', participation_type || null);
+        if (learning_hours !== undefined) set('learning_hours = ?', learning_hours ? Number(learning_hours) : null);
+
+        if (params.length === 0) return res.json({ success: true });
+
         sql += ` WHERE id = ?`;
         params.push(id);
 

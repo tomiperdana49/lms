@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { TrainingRequest } from '../types';
 import ConfirmationModal from './ConfirmationModal';
+import PopupNotification from './PopupNotification';
 
 const resolveFileUrl = (link?: string | null) => {
     if (!link) return undefined;
@@ -91,6 +92,11 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     const [searchQuery, setSearchQuery] = useState('');
     const [statusDrilldown, setStatusDrilldown] = useState<'PENDING' | 'APPROVED' | null>(null);
     const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+    const [isApproveConfirmOpen, setIsApproveConfirmOpen] = useState(false);
+    const [notification, setNotification] = useState<{ show: boolean; type: 'success' | 'error' | 'info'; message: string }>({ show: false, type: 'error', message: '' });
+    const showNotif = (type: 'success' | 'error' | 'info', message: string) => {
+        setNotification({ show: true, type, message });
+    };
     const [isImporting, setIsImporting] = useState(false);
     const importFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -122,6 +128,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     costOthers: req.miscellaneous_cost || 0,
                     evidenceUrl: resolveFileUrl(req.certificate_link || req.attachment_link),
                     renewalCertificateUrl: resolveFileUrl(req.renewal_certificate_link),
+                    attachmentUrl: resolveFileUrl(req.attachment_link),
                     hrName: req.status === 'Processed' ? (req.hr_name || t('common.hrProcessed')) : '',
                     supervisorName: req.approved_by,
                     employee_id: req.employee_id,
@@ -170,6 +177,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     costOthers: req.miscellaneous_cost || 0,
                     evidenceUrl: resolveFileUrl(req.certificate_link || req.attachment_link),
                     renewalCertificateUrl: resolveFileUrl(req.renewal_certificate_link),
+                    attachmentUrl: resolveFileUrl(req.attachment_link),
                     hrName: req.status === 'Processed' ? (req.hr_name || t('common.hrProcessed')) : '',
                     supervisorName: req.approved_by,
                     employee_id: req.employee_id,
@@ -280,6 +288,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
     const [hrIncentivePaymentType, setHrIncentivePaymentType] = useState<'One-Time' | 'Recurring'>('One-Time');
 
     // HR correction fields - lets HR fix data submitted by the employee before processing
+    const [hrEditCategory, setHrEditCategory] = useState('');
     const [hrEditTitle, setHrEditTitle] = useState('');
     const [hrEditVendor, setHrEditVendor] = useState('');
     const [hrEditLocation, setHrEditLocation] = useState('');
@@ -313,6 +322,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             setHrGrantIncentive(false);
             setHrIncentiveReward('');
             setHrIncentivePaymentType('One-Time');
+            setHrEditCategory(selectedRequest.employeeRole || 'Training');
             setHrEditTitle(selectedRequest.title || '');
             setHrEditVendor(selectedRequest._original?.vendor || '');
             setHrEditLocation(selectedRequest._original?.location || '');
@@ -435,55 +445,113 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
         return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount);
     };
 
+    const [isSavingDetails, setIsSavingDetails] = useState(false);
+
+    // Lets HR fix up a request's details (category, title, vendor, dates, ...) and persist them
+    // without running the full approval flow — status and cost/incentive fields stay untouched.
+    const handleSaveDetails = async () => {
+        if (!selectedRequest) return;
+        if (!hrEditTitle.trim()) {
+            showNotif('error', t('alerts.titleRequired'));
+            return;
+        }
+        if (!hrEditVendor.trim()) {
+            showNotif('error', t('alerts.vendorRequired'));
+            return;
+        }
+        if (!hrEditLocation.trim()) {
+            showNotif('error', t('alerts.locationRequired'));
+            return;
+        }
+        if (!hrEditStartDate) {
+            showNotif('error', t('alerts.startDateRequired'));
+            return;
+        }
+        if (!hrEditEndDate) {
+            showNotif('error', t('alerts.endDateRequired'));
+            return;
+        }
+        setIsSavingDetails(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/external-training/hr-update-details`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: selectedRequest.id,
+                    category: hrEditCategory,
+                    title: hrEditTitle,
+                    vendor: hrEditVendor,
+                    location: hrEditLocation,
+                    start_date: hrEditStartDate,
+                    end_date: hrEditEndDate,
+                    training_gr_type: hrEditGriType || null,
+                    participation_type: hrEditParticipationType || null,
+                    learning_hours: hrEditLearningHours ? Number(hrEditLearningHours) : null
+                })
+            });
+            if (res.ok) {
+                await fetchRequests();
+                showNotif('success', t('alerts.detailsSaved'));
+            } else {
+                showNotif('error', t('alerts.detailsSaveFailed'));
+            }
+        } catch (err) {
+            console.error("Save details failed", err);
+            showNotif('error', t('alerts.detailsSaveFailed'));
+        } finally {
+            setIsSavingDetails(false);
+        }
+    };
+
     const handleApprove = async () => {
         if (!selectedRequest) return;
 
         try {
             if (!hrEditTitle.trim()) {
-                alert(t('alerts.titleRequired'));
+                showNotif('error', t('alerts.titleRequired'));
                 return;
             }
             if (!hrEditVendor.trim()) {
-                alert(t('alerts.vendorRequired'));
+                showNotif('error', t('alerts.vendorRequired'));
                 return;
             }
             if (!hrEditLocation.trim()) {
-                alert(t('alerts.locationRequired'));
+                showNotif('error', t('alerts.locationRequired'));
                 return;
             }
             if (!hrEditStartDate) {
-                alert(t('alerts.startDateRequired'));
+                showNotif('error', t('alerts.startDateRequired'));
                 return;
             }
             if (!hrEditEndDate) {
-                alert(t('alerts.endDateRequired'));
+                showNotif('error', t('alerts.endDateRequired'));
                 return;
             }
             if (!hrEditGriType) {
-                alert(t('alerts.griTypeRequired'));
+                showNotif('error', t('alerts.griTypeRequired'));
                 return;
             }
             if (!hrEditParticipationType) {
-                alert(t('alerts.participationTypeRequired'));
+                showNotif('error', t('alerts.participationTypeRequired'));
                 return;
             }
             if (!hrEditLearningHours || Number(hrEditLearningHours) <= 0) {
-                alert(t('alerts.learningHoursRequired'));
+                showNotif('error', t('alerts.learningHoursRequired'));
                 return;
             }
             let certLink = selectedRequest?._original?.certificate_link;
-            const isCertificateCategory = selectedRequest?.employeeRole === 'Sertifikat';
+            const isCertificateCategory = hrEditCategory === 'Sertifikat';
             const requiresCertificateProof = isCertificateCategory && hrCertificationResult === 'Passed';
             if (requiresCertificateProof && !certLink && !hrCertificateFile) {
-                alert(t('alerts.certificateEvidenceRequired'));
+                showNotif('error', t('alerts.certificateEvidenceRequired'));
                 return;
             }
             if (requiresCertificateProof && !hrCertificateExpiryDate) {
-                alert(t('alerts.certificateExpiryRequired'));
+                showNotif('error', t('alerts.certificateExpiryRequired'));
                 return;
             }
             if (requiresCertificateProof && hrGrantIncentive && !hrIncentiveReward) {
-                alert(t('alerts.incentiveRewardRequired'));
+                showNotif('error', t('alerts.incentiveRewardRequired'));
                 return;
             }
             if (hrCertificateFile) {
@@ -514,6 +582,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                     certification_result: isCertificateCategory ? hrCertificationResult : undefined,
                     incentive_reward: (requiresCertificateProof && hrGrantIncentive) ? hrIncentiveReward : undefined,
                     incentive_payment_type: (requiresCertificateProof && hrGrantIncentive) ? hrIncentivePaymentType : undefined,
+                    category: hrEditCategory,
                     title: hrEditTitle,
                     vendor: hrEditVendor,
                     location: hrEditLocation,
@@ -775,7 +844,8 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                         const lines = result.errors.map((e: any) => t('import.errorLine', { row: e.row, message: e.error }));
                         if (lines.length) parts.push('\n' + lines.join('\n'));
                     }
-                    alert(parts.join(' '));
+                    const notifType = result.errors?.length ? 'error' : (result.skipped ? 'info' : 'success');
+                    showNotif(notifType, parts.join('\n'));
                     fetchRequests();
                 } else {
                     const errData = await res.json().catch(() => ({}));
@@ -783,7 +853,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                 }
             } catch (err: any) {
                 console.error('External training import error:', err);
-                alert(t('import.failed', { message: err.message }));
+                showNotif('error', t('import.failed', { message: err.message }));
             } finally {
                 setIsImporting(false);
                 if (importFileInputRef.current) importFileInputRef.current.value = '';
@@ -1144,11 +1214,15 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                         )}
                                     </div>
 
-                                    {isExpanded && (req.evidenceUrl || req.renewalCertificateUrl) && (
+                                    {isExpanded && (req.evidenceUrl || req.renewalCertificateUrl || req.attachmentUrl) && (
                                         <div className="hidden lg:flex items-center gap-3 mr-4">
                                             {[
                                                 { url: req.evidenceUrl, label: t('list.certificateOriginal'), expiry: req.originalCertificateExpiryDate || req.certificateExpiryDate },
-                                                { url: req.renewalCertificateUrl, label: t('list.certificateRenewed'), expiry: req.certificateExpiryDate }
+                                                { url: req.renewalCertificateUrl, label: t('list.certificateRenewed'), expiry: req.certificateExpiryDate },
+                                                // Only shown as its own thumbnail when it's a different file than what's already
+                                                // displayed above — evidenceUrl falls back to the same attachment when no
+                                                // certificate was ever uploaded, which would otherwise duplicate the thumbnail.
+                                                ...(req.attachmentUrl && req.attachmentUrl !== req.evidenceUrl ? [{ url: req.attachmentUrl, label: t('list.attachment'), expiry: undefined as string | undefined }] : [])
                                             ].filter(cert => cert.url).map((cert, idx) => (
                                                 <div key={idx} className="flex flex-col items-center gap-1">
                                                     {cert.url!.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
@@ -1222,6 +1296,16 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                             <button onClick={() => setSelectedRequest(null)} className="text-slate-400 hover:text-slate-600"><XCircle size={24} /></button>
                         </div>
                         <div className="p-6 space-y-4 overflow-y-auto">
+                            {isHrEditable && (
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.category')} <span className="text-red-500">*</span></label>
+                                    <select value={hrEditCategory} onChange={(e) => setHrEditCategory(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none bg-white">
+                                        {categoryOptions.map(c => (
+                                            <option key={c} value={c}>{t(`categoryLabels.${c}`, { defaultValue: c })}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-1">{isHrEditable ? t('requestModal.titleLabel') : t('requestModal.trainingTitle')} {isHrEditable && <span className="text-red-500">*</span>}</label>
                                 {isHrEditable ? (
@@ -1335,7 +1419,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                             <span>{t('list.hrDept')}: <span className="font-semibold text-slate-800">{selectedRequest.hrName}</span></span>
                                         </div>
                                     )}
-                                    {(selectedRequest.evidenceUrl || selectedRequest.renewalCertificateUrl) && (
+                                    {(selectedRequest.evidenceUrl || selectedRequest.renewalCertificateUrl || selectedRequest.attachmentUrl) && (
                                         <div className="sm:col-span-2">
                                             <span className="flex items-center gap-2 text-slate-600 mb-2">
                                                 <Award className="w-4 h-4 shrink-0 text-slate-400" />
@@ -1344,7 +1428,9 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                             <div className="flex flex-wrap gap-4">
                                                 {[
                                                     { url: selectedRequest.evidenceUrl, label: t('list.certificateOriginal'), expiry: selectedRequest.originalCertificateExpiryDate || selectedRequest.certificateExpiryDate },
-                                                    { url: selectedRequest.renewalCertificateUrl, label: t('list.certificateRenewed'), expiry: selectedRequest.certificateExpiryDate }
+                                                    { url: selectedRequest.renewalCertificateUrl, label: t('list.certificateRenewed'), expiry: selectedRequest.certificateExpiryDate },
+                                                    // See the equivalent list-card thumbnails above — same dedup rule.
+                                                    ...(selectedRequest.attachmentUrl && selectedRequest.attachmentUrl !== selectedRequest.evidenceUrl ? [{ url: selectedRequest.attachmentUrl, label: t('list.attachment'), expiry: undefined as string | undefined }] : [])
                                                 ].filter((cert): cert is { url: string; label: string; expiry: string | undefined } => !!cert.url).map((cert, idx, arr) => (
                                                     <div key={idx} className="flex flex-col gap-1">
                                                         {cert.url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
@@ -1555,8 +1641,17 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                         </div>
 
                         <div className="p-6 border-t border-slate-100 bg-slate-50 flex flex-wrap gap-3 rounded-b-2xl">
-                            {((userRole === 'SUPERVISOR' && selectedRequest.status === 'PENDING_SUPERVISOR') || (userRole === 'HR' && selectedRequest.status === 'PENDING_HR')) && (
-                                <button onClick={handleApprove} className="flex-[2] py-2 bg-indigo-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-indigo-700 transition-colors">{t('requestModal.approveRequest')}</button>
+                            {isHrEditable && (
+                                <button
+                                    onClick={handleSaveDetails}
+                                    disabled={isSavingDetails}
+                                    className="flex-1 py-2 bg-white text-indigo-600 font-bold rounded-xl text-sm border border-indigo-200 shadow-sm hover:bg-indigo-50 transition-colors disabled:opacity-60"
+                                >
+                                    {isSavingDetails ? t('requestModal.saving') : t('requestModal.save')}
+                                </button>
+                            )}
+                            {((userRole === 'SUPERVISOR' && selectedRequest.status === 'PENDING_SUPERVISOR') || ((userRole === 'HR' || userRole === 'HR_ADMIN') && selectedRequest.status === 'PENDING_HR')) && (
+                                <button onClick={() => setIsApproveConfirmOpen(true)} className="flex-[2] py-2 bg-indigo-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-indigo-700 transition-colors">{t('requestModal.approveRequest')}</button>
                             )}
 
                             {selectedRequest.status === 'APPROVED' && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
@@ -1754,6 +1849,23 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                 title={t('alerts.confirmDeleteTitle')}
                 message={t('alerts.confirmDeleteRequest')}
                 variant="danger"
+            />
+
+            <ConfirmationModal
+                isOpen={isApproveConfirmOpen}
+                onClose={() => setIsApproveConfirmOpen(false)}
+                onConfirm={handleApprove}
+                title={t('alerts.confirmApproveTitle')}
+                message={t('alerts.confirmApproveMessage', { title: hrEditTitle })}
+                confirmText={t('requestModal.approveRequest')}
+                variant="success"
+            />
+
+            <PopupNotification
+                isOpen={notification.show}
+                type={notification.type}
+                message={notification.message}
+                onClose={() => setNotification(n => ({ ...n, show: false }))}
             />
         </div>
     );

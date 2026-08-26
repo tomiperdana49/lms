@@ -47,12 +47,14 @@
     "incentive": "Insentif",
     "month": "bulan",
     "certificateOriginal": "Asli",
-    "certificateRenewed": "Perpanjangan"
+    "certificateRenewed": "Perpanjangan",
+    "attachment": "Lampiran"
   },
   "requestModal": {
     "dateRange": "Tanggal: {{start}} sampai {{end}}",
     "processTitle": "Proses Permintaan Pelatihan",
     "ltrId": "LTR-ID: {{id}} • {{name}}",
+    "category": "Kategori",
     "trainingTitle": "Judul Pelatihan",
     "titleLabel": "Judul / Nama Kursus",
     "vendorLocation": "Vendor & Lokasi",
@@ -109,6 +111,8 @@
     "print": "Cetak",
     "reject": "Tolak",
     "approveRequest": "Setujui Permintaan",
+    "save": "Simpan",
+    "saving": "Menyimpan...",
     "updateSettlement": "Perbarui Penyelesaian"
   },
   "settlementModal": {
@@ -138,6 +142,10 @@
     "certificateEvidenceRequired": "Silakan unggah bukti sertifikat sebelum memproses permintaan ini.",
     "certificateExpiryRequired": "Silakan isi tanggal kedaluwarsa sertifikat sebelum memproses permintaan ini.",
     "incentiveRewardRequired": "Silakan isi nominal insentif sebelum memproses permintaan ini.",
+    "detailsSaved": "Perubahan berhasil disimpan.",
+    "detailsSaveFailed": "Gagal menyimpan perubahan. Silakan coba lagi.",
+    "confirmApproveTitle": "Setujui Permintaan Training?",
+    "confirmApproveMessage": "Apakah Anda yakin ingin menyetujui permintaan training eksternal \"{{title}}\" ini?",
     "confirmDeleteRequest": "Tindakan ini akan menghapus permanen seluruh data permintaan pelatihan ini beserta file sertifikat yang sudah diupload. Data insentif yang sudah pernah diberikan (jika ada) tidak akan ikut terhapus. Aksi ini tidak dapat dibatalkan.",
     "confirmDeleteTitle": "Hapus Permintaan Training"
   },

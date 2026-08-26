@@ -37,7 +37,7 @@ const PopupNotification = ({ type, message, isOpen, onClose }: PopupNotification
                             <h3 className={`text-xl font-bold mb-1 ${isSuccess ? 'text-slate-800' : isError ? 'text-red-600' : 'text-slate-800'}`}>
                                 {isSuccess ? t('success') : isError ? t('error') : t('information')}
                             </h3>
-                            <p className="text-slate-500 text-sm leading-relaxed">
+                            <p className="text-slate-500 text-sm leading-relaxed whitespace-pre-line">
                                 {message}
                             </p>
                         </div>
