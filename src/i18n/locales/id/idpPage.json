@@ -42,6 +42,7 @@
     "saveDraft": "Simpan sebagai Draft",
     "submit": "Ajukan untuk Persetujuan",
     "editIdp": "Edit IDP",
+    "importFromExcel": "Import dari Excel",
     "cancel": "Batal",
     "saveChanges": "Simpan Perubahan",
     "hours": "jam",
@@ -87,7 +88,10 @@
     "submitSuccess": "IDP berhasil diajukan untuk persetujuan.",
     "approveSuccess": "IDP berhasil disetujui.",
     "rejectSuccess": "IDP berhasil ditolak.",
-    "reviewSuccess": "Evaluasi berhasil disimpan."
+    "reviewSuccess": "Evaluasi berhasil disimpan.",
+    "importSuccess": "Data berhasil diisi dari file. Periksa kembali sebelum menyimpan.",
+    "importNoData": "Tidak ada data IDP yang valid ditemukan di file ini. Pastikan formatnya sesuai template IDP.",
+    "importFailed": "Gagal membaca file: {{message}}"
   },
   "admin": {
     "title": "Rencana Pengembangan Individu",

@@ -13,8 +13,12 @@ import {
     Lock,
     Pencil,
     Download,
+    Upload,
     Search
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { parseIdpSheet } from './idpImportParser';
+import type { IdpImportGrid } from './idpImportParser';
 import { API_BASE_URL } from '../config';
 import type { User, IDPPlan, Employee, IDPActionItem } from '../types';
 import PopupNotification from './PopupNotification';
@@ -199,6 +203,54 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
     const updateActionRow = (idx: number, patch: Partial<ActionItemDraft>) => setDraft(d => ({
         ...d, actionItems: d.actionItems.map((item, i) => i === idx ? { ...item, ...patch } : item)
     }));
+
+    // --- Import from Excel: lets an employee prefill the form from the standard IDP template instead of
+    // typing everything by hand (e.g. if they already filled it out offline). Only fills the narrative
+    // fields and action plan the employee actually edits here — it never touches status, reviews, or HR
+    // notes, so the normal save/submit/approval flow still applies to whatever gets imported. ---
+    const idpImportInputRef = useRef<HTMLInputElement>(null);
+    const handleIdpImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const bstr = evt.target?.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                const parsedSheets = wb.SheetNames
+                    .map(name => parseIdpSheet(XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' }) as IdpImportGrid, name))
+                    .filter(p => p.employee_name);
+
+                if (parsedSheets.length === 0) {
+                    setNotification({ show: true, type: 'error', message: t('notifications.importNoData') });
+                    return;
+                }
+
+                // If the workbook has multiple sheets (e.g. a company-wide file), prefer the one matching
+                // this employee's own name; otherwise fall back to the first sheet with data.
+                const ownName = (currentUser?.name || '').trim().toLowerCase();
+                const parsed = parsedSheets.find(p => p.employee_name.trim().toLowerCase() === ownName) || parsedSheets[0];
+
+                setDraft({
+                    achievements: parsed.achievements,
+                    career_goal: parsed.career_goal,
+                    existing_skills: parsed.existing_skills,
+                    development_area: parsed.development_area,
+                    actionItems: parsed.action_items.filter(i => !i.is_mandatory).map(i => ({
+                        action_description: i.action_description, target_time: i.target_time,
+                        is_completed: i.is_completed, notes: i.notes
+                    }))
+                });
+                setNotification({ show: true, type: 'success', message: t('notifications.importSuccess') });
+            } catch (err) {
+                console.error('IDP import parse error:', err);
+                setNotification({ show: true, type: 'error', message: t('notifications.importFailed', { message: err instanceof Error ? err.message : String(err) }) });
+            } finally {
+                if (idpImportInputRef.current) idpImportInputRef.current.value = '';
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
 
     const startManualEdit = () => {
         if (!detail) return;
@@ -392,7 +444,17 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
 
                         {(isEditingForm || manualEditMode) ? (
                             <>
-                                {currentYearPlan && <div className="flex justify-end">{statusBadge(currentYearPlan.status)}</div>}
+                                <div className="flex items-center justify-end gap-3">
+                                    <input ref={idpImportInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleIdpImport} />
+                                    <button
+                                        type="button"
+                                        onClick={() => idpImportInputRef.current?.click()}
+                                        className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700"
+                                    >
+                                        <Upload size={14} /> {t('form.importFromExcel')}
+                                    </button>
+                                    {currentYearPlan && statusBadge(currentYearPlan.status)}
+                                </div>
 
                                 <div className="overflow-x-auto rounded-xl border border-slate-300">
                                     <table className="w-full border-collapse table-fixed min-w-[780px]">

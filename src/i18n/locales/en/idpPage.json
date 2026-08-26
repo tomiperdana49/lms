@@ -42,6 +42,7 @@
     "saveDraft": "Save as Draft",
     "submit": "Submit for Approval",
     "editIdp": "Edit IDP",
+    "importFromExcel": "Import from Excel",
     "cancel": "Cancel",
     "saveChanges": "Save Changes",
     "hours": "hours",
@@ -87,7 +88,10 @@
     "submitSuccess": "IDP submitted for approval.",
     "approveSuccess": "IDP approved.",
     "rejectSuccess": "IDP rejected.",
-    "reviewSuccess": "Review saved."
+    "reviewSuccess": "Review saved.",
+    "importSuccess": "Fields filled in from the file. Review them before saving.",
+    "importNoData": "No valid IDP data found in this file. Make sure it matches the IDP template.",
+    "importFailed": "Failed to read file: {{message}}"
   },
   "admin": {
     "title": "Individual Development Plan",
