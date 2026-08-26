@@ -66,7 +66,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  const [startDate, setStartDate] = useState('');
  const [endDate, setEndDate] = useState('');
  const [regFee, setRegFee] = useState('');
- const [attachment, setAttachment] = useState('');
+ const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
  const [paymentMethod, setPaymentMethod] = useState<'Reimbursement' | 'Direct Payment'>('Direct Payment');
 
 
@@ -100,6 +100,19 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  if (!currentUser) return;
  setIsLoading(true);
  try {
+ let attachmentLink = '';
+ if (attachmentFile) {
+ const formData = new FormData();
+ formData.append('file', attachmentFile);
+ const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
+ method: 'POST',
+ body: formData
+ });
+ if (uploadRes.ok) {
+ const uploadData = await uploadRes.json();
+ attachmentLink = uploadData.fileUrl;
+ }
+ }
  const res = await fetch(`${API_BASE_URL}/api/external-training/request`, {
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
@@ -111,7 +124,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  start_date: startDate,
  end_date: endDate,
  registration_fee: Number(regFee.replace(/\./g, '')) || 0,
- attachment_link: attachment,
+ attachment_link: attachmentLink,
  vendor,
  location,
  payment_method: paymentMethod
@@ -119,7 +132,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  });
  if (res.ok) {
  showNotif('success', t('notifications.submitSuccess'));
- setTitle(''); setVendor(''); setLocation(''); setRegFee(''); setAttachment(''); setStartDate(''); setEndDate(''); setPaymentMethod('Direct Payment');
+ setTitle(''); setVendor(''); setLocation(''); setRegFee(''); setAttachmentFile(null); setStartDate(''); setEndDate(''); setPaymentMethod('Direct Payment');
  fetchMyRequests();
  } else {
  throw new Error(t('notifications.submitFailed'));
@@ -445,7 +458,12 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  </div>
  <div>
  <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.attachmentLink')}</label>
- <input type="url" value={attachment} onChange={e => setAttachment(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" placeholder={t('form.attachmentPlaceholder')} />
+ <input
+ type="file"
+ accept="image/*,.pdf"
+ onChange={e => setAttachmentFile(e.target.files ? e.target.files[0] : null)}
+ className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+ />
  </div>
  <button disabled={isLoading} type="submit" className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
  {isLoading ? t('form.submitting') : t('form.submitRequest')}

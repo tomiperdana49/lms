@@ -22,7 +22,7 @@
     "startDate": "Tanggal Mulai",
     "endDate": "Tanggal Selesai",
     "registrationFee": "Biaya Pendaftaran (Rp)",
-    "attachmentLink": "Tautan Lampiran (Opsional)",
+    "attachmentLink": "Lampiran (Opsional)",
     "attachmentPlaceholder": "Tautan Google Drive, dll.",
     "paymentMethod": "Metode Pembayaran",
     "paymentMethodReimbursement": "Reimbursement",

@@ -17,6 +17,11 @@ export default defineConfig({
                 proxyReq.setHeader('x-api-key', 'k0fipxf232vbm0q4fcszt81975s2qptsxwyr7hi3f9l1gdclfl77p28zuu3l0jd9');
             });
         }
+      },
+      // Forward everything else under /api (including /api/uploads) to the local backend
+      '/api': {
+        target: 'http://localhost:8036',
+        changeOrigin: true
       }
     }
   }

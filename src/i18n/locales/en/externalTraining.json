@@ -22,7 +22,7 @@
     "startDate": "Start Date",
     "endDate": "End Date",
     "registrationFee": "Registration Fee (Rp)",
-    "attachmentLink": "Attachment Link (Optional)",
+    "attachmentLink": "Lampiran (Opsional)",
     "attachmentPlaceholder": "Google Drive link, etc.",
     "paymentMethod": "Payment Method",
     "paymentMethodReimbursement": "Reimbursement",
