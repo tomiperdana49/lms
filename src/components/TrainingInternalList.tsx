@@ -3376,7 +3376,24 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         ).slice(0, 50);
 
                                                         if (filtered.length === 0) {
-                                                            return <div className="p-4 text-center text-xs text-slate-400 italic">{t('createModal.noMatchingHosts')}</div>;
+                                                            return (
+                                                                <div>
+                                                                    <div className="p-4 text-center text-xs text-slate-400 italic">{t('createModal.noMatchingHosts')}</div>
+                                                                    {hostSearch.trim() && (
+                                                                        <button
+                                                                            type="button"
+                                                                            className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm border-t border-slate-100 text-indigo-600 font-semibold"
+                                                                            onClick={() => {
+                                                                                setFormData({ ...formData, host_id: '', host: hostSearch.trim() });
+                                                                                setHostSearch("");
+                                                                                setShowHostDropdown(false);
+                                                                            }}
+                                                                        >
+                                                                            {t('createModal.useExternalHost', { name: hostSearch.trim() })}
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            );
                                                         }
 
                                                         return filtered.map(emp => (

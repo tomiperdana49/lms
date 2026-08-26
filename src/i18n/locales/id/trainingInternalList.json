@@ -130,6 +130,7 @@
     "hostNameLabel": "Nama Host",
     "hostSearchPlaceholder": "Cari Host...",
     "noMatchingHosts": "Tidak ada host yang cocok ditemukan.",
+    "useExternalHost": "Gunakan \"{{name}}\" sebagai host eksternal",
     "eventTypeLabel": "Tipe Acara",
     "typeOnlineVideo": "Video Online",
     "typeInPerson": "Tatap Muka",

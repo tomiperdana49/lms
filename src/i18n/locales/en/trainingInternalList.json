@@ -130,6 +130,7 @@
     "hostNameLabel": "Host Name",
     "hostSearchPlaceholder": "Search Host...",
     "noMatchingHosts": "No matching hosts found.",
+    "useExternalHost": "Use \"{{name}}\" as an external host",
     "eventTypeLabel": "Event Type",
     "typeOnlineVideo": "Online Video",
     "typeInPerson": "In-Person",
