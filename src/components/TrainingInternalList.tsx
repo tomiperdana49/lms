@@ -56,13 +56,15 @@ interface TrainingInternalListProps {
 
 type ExtendedMeeting = Meeting & { shortDate?: string };
 
-const AvatarStack = ({ count }: { count: number }) => (
+// Shows each invited guest's real initial (with their full name as a hover tooltip) instead of a
+// decorative A/B/C/D sequence that had nothing to do with who was actually invited.
+const AvatarStack = ({ names, count }: { names: string[]; count: number }) => (
     <div className="flex -space-x-2 overflow-hidden">
-        {[...Array(Math.min(count, 4))].map((_, i) => (
-            <div key={i} className={`inline-block h-6 w-6 rounded-full ring-2 ring-white flex items-center justify-center text-[8px] font-bold text-white
+        {names.slice(0, 4).map((name, i) => (
+            <div key={i} title={name} className={`inline-block h-6 w-6 rounded-full ring-2 ring-white flex items-center justify-center text-[8px] font-bold text-white
                 ${['bg-red-400', 'bg-blue-400', 'bg-green-400', 'bg-purple-400'][i % 4]}
             `}>
-                {String.fromCharCode(65 + i)}
+                {name.trim().charAt(0).toUpperCase() || '?'}
             </div>
         ))}
         {count > 4 && (
@@ -779,6 +781,23 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const toggleView = (view: 'list' | 'recap') => setViewMode(view);
 
     // --- Filtered Data ---
+    // Resolves invited guests' display names for the AUDIENCE avatar stack — by employee_id first
+    // (looked up against the loaded employee directory), falling back to the email's local part for
+    // guests without a matching employee record, up to the 4 shown on the card.
+    const getGuestNames = (m: ExtendedMeeting): string[] => {
+        const ids = m.guests?.employee_ids || [];
+        const emails = m.guests?.emails || [];
+        const total = Math.max(ids.length, emails.length);
+        const names: string[] = [];
+        for (let i = 0; i < total && names.length < 4; i++) {
+            const id = ids[i];
+            const email = emails[i];
+            const emp = id ? employees.find(e => e.id_employee === id) : undefined;
+            names.push(emp?.full_name || (email ? email.split('@')[0] : '') || id || '?');
+        }
+        return names;
+    };
+
     const filteredMeetings = meetings.filter(m => {
 
         // PERMISSION CHECK: Non-HR can ONLY see meetings they are invited to OR if they are the Host
@@ -3234,7 +3253,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                     <div className="flex items-center justify-between border-t border-slate-100 pt-6 mt-auto">
                                         <div className="space-y-1">
                                             <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('listView.audience')}</div>
-                                            <AvatarStack count={meeting.guests?.count || 0} />
+                                            <AvatarStack names={getGuestNames(meeting)} count={meeting.guests?.count || 0} />
                                         </div>
 
                                         <div className="flex items-center gap-3">
