@@ -7,7 +7,8 @@
     "readingLog": "Log Bacaan",
     "onlineModules": "Modul Online",
     "trainingInternal": "Training Internal",
-    "trainingExternal": "Training Eksternal"
+    "trainingExternal": "Training Eksternal",
+    "idp": "IDP"
   },
   "labels": {
     "purpose": "Untuk apa fitur ini?",
@@ -124,7 +125,7 @@
           "steps": [
             {
               "title": "Buat sesi baru (khusus HR/HR_ADMIN)",
-              "description": "Di Panel Admin → Internal, klik \"Create Session\". Isi tab \"Session Details\": Judul, Tanggal, Jam Mulai/Selesai, Nama Host, Tipe Acara (Online/Tatap Muka/Hybrid), Kompetensi, Tipe GRI, Lokasi atau Link Meeting, Link Materi, dan pilih peserta yang diundang. Di tab \"Exam Configuration\", buat soal Pre-Test dan Post-Test. Klik \"Send Invitations\" untuk membuat sesi (bisa juga import massal lewat tombol \"Import Data\")."
+              "description": "Di Panel Admin → Internal, klik \"Create Session\". Isi tab \"Session Details\": Judul, Tanggal, Jam Mulai/Selesai, Nama Host (cari dari daftar karyawan; kalau host-nya vendor/pembicara dari luar perusahaan dan tidak ditemukan, ketik namanya lalu pilih opsi \"Use ... as an external host\" yang muncul), Tipe Acara (Online/Tatap Muka/Hybrid), Kompetensi, Tipe GRI, Lokasi atau Link Meeting, Link Materi, dan pilih peserta yang diundang. Di tab \"Exam Configuration\", buat soal Pre-Test dan Post-Test. Klik \"Send Invitations\" untuk membuat sesi (bisa juga import massal lewat tombol \"Import Data\")."
             },
             {
               "title": "Buka kontrol Host di sesimu",
@@ -159,7 +160,8 @@
             "Kamu tidak harus jadi HR untuk mengontrol jalannya sesi — kalau namamu tercatat sebagai Host, kontrolnya otomatis muncul untukmu di halaman Training Internal biasa (bukan cuma di Panel Admin).",
             "Membuat sesi baru dan mengimpor data tetap khusus HR/HR_ADMIN lewat Panel Admin.",
             "Kalau perlu membuka sesi lagi setelah ditutup, hanya HR/HR_ADMIN yang punya tombol \"REOPEN SESSION\".",
-            "Laporan Insentif baru bisa disubmit setelah sesi ditutup — kalau tombolnya masih terkunci dengan keterangan \"Session Still Open\", tutup dulu sesinya."
+            "Laporan Insentif baru bisa disubmit setelah sesi ditutup — kalau tombolnya masih terkunci dengan keterangan \"Session Still Open\", tutup dulu sesinya.",
+            "Kalau sesi tidak dibuatkan Pre-Test maupun Post-Test sama sekali, Feedback Form otomatis aktif sejak sesi dibuat — kamu tidak perlu menyalakan saklarnya secara manual."
           ]
         }
       }
@@ -193,6 +195,99 @@
         "Tab \"Team Approvals\" hanya muncul kalau kamu memang punya bawahan yang tercatat di data kepegawaian.",
         "\"Show Detail\" tersedia di kedua tab (My Requests & Team Approvals) untuk melihat rincian lengkap termasuk sertifikat."
       ]
+    },
+    "idp": {
+      "title": "IDP",
+      "audiences": {
+        "employee": {
+          "label": "Sebagai Karyawan",
+          "purpose": "Buat dan kelola Rencana Pengembangan Individu (IDP) tahunanmu, lalu ajukan untuk disetujui HR.",
+          "steps": [
+            {
+              "title": "Buka menu IDP",
+              "description": "Menu IDP di sidebar menampilkan IDP kamu untuk tahun berjalan. Kalau belum ada, form kosong akan langsung terbuka untuk diisi."
+            },
+            {
+              "title": "Isi narasi IDP",
+              "description": "Isi Pencapaian/Prestasi, Tujuan/Aspirasi Karir, Skill yang Dimiliki, dan Area Pengembangan. Kalau datanya sudah kamu siapkan di file Excel dengan format template IDP, klik \"Import from Excel\" untuk mengisi field-field ini secara otomatis."
+            },
+            {
+              "title": "Lengkapi Rencana Aksi Pengembangan",
+              "description": "Item \"[WAJIB] Jam Learning\" sudah otomatis ada dan terhitung dari aktivitas belajarmu di LMS. Tambahkan minimal 3 baris lagi lewat \"Tambah Baris\" — total minimal 4 baris (termasuk item wajib) untuk bisa diajukan."
+            },
+            {
+              "title": "Simpan atau ajukan",
+              "description": "Klik \"Simpan sebagai Draft\" kalau belum lengkap, atau \"Ajukan untuk Persetujuan\" kalau sudah siap dikirim ke HR."
+            },
+            {
+              "title": "Edit kapan saja",
+              "description": "IDP yang sudah diajukan atau disetujui tetap bisa diedit lewat \"Edit IDP\" — perubahan langsung tersimpan tanpa perlu persetujuan ulang."
+            }
+          ],
+          "tips": [
+            "Jam learning wajib (48 jam/tahun) dihitung otomatis dari Log Bacaan, Modul Online, dan Training — jangan diisi manual.",
+            "Kalau HR meninggalkan \"Catatan HR\", perbaiki IDP sesuai catatan itu sebelum mengajukan ulang.",
+            "Riwayat evaluasi bulanan dari atasan akan muncul di halaman IDP-mu begitu atasan mengisinya."
+          ]
+        },
+        "supervisor": {
+          "label": "Sebagai Atasan Langsung",
+          "purpose": "Tinjau IDP anggota tim yang report langsung ke kamu, dan catat evaluasi 1-on-1 bulanan atas progres mereka.",
+          "steps": [
+            {
+              "title": "Buka daftar tim",
+              "description": "Di menu IDP, bagian \"Tim Saya\" menampilkan IDP setiap anggota tim yang tercatat report langsung ke kamu di data kepegawaian."
+            },
+            {
+              "title": "Lihat detail IDP anggota tim",
+              "description": "Klik salah satu untuk melihat pencapaian, tujuan karir, skill, dan rencana aksi pengembangan mereka."
+            },
+            {
+              "title": "Tambah Evaluasi 1-on-1",
+              "description": "Isi tanggal review dan catatan (apakah IDP masih relevan dan berjalan, apakah rencana aksi terlaksana sesuai target waktu), lalu simpan."
+            },
+            {
+              "title": "Perbarui checklist progress",
+              "description": "Untuk rencana aksi non-wajib milik anggota tim, kamu bisa mencentang status selesai dan mengisi keterangan progresnya."
+            }
+          ],
+          "tips": [
+            "Lakukan evaluasi 1-on-1 minimal sebulan sekali; HR bisa melihat status \"Belum direview bulan ini\" untuk IDP yang tertinggal.",
+            "Checklist progress & keterangan rencana aksi cuma bisa diubah oleh atasan langsung — bukan oleh karyawan sendiri atau HR."
+          ]
+        },
+        "hr": {
+          "label": "Sebagai HR",
+          "purpose": "Kelola seluruh IDP karyawan perusahaan — setujui, beri catatan, import massal, edit, atau hapus.",
+          "steps": [
+            {
+              "title": "Buka IDP Karyawan",
+              "description": "Di Panel Admin → IDP Karyawan, semua IDP dari seluruh karyawan ditampilkan dengan filter tahun, pencarian nama/ID, dan status."
+            },
+            {
+              "title": "Setujui atau tolak pengajuan",
+              "description": "IDP berstatus \"Pending\" bisa langsung disetujui, atau ditolak dengan mengisi alasan penolakan."
+            },
+            {
+              "title": "Import data lewat Excel",
+              "description": "Klik \"IMPORT\", lalu unggah file dengan format template IDP (satu sheet per karyawan). Sistem mencocokkan nama karyawan secara otomatis dan menampilkan preview sebelum benar-benar disimpan; IDP yang sudah ada untuk kombinasi karyawan + periode yang sama otomatis dilewati."
+            },
+            {
+              "title": "Edit atau hapus IDP",
+              "description": "Klik \"Edit IDP\" pada detail untuk mengoreksi data (termasuk rencana aksi), atau klik ikon tempat sampah untuk menghapus permanen beserta seluruh riwayat evaluasinya."
+            },
+            {
+              "title": "Tinggalkan Catatan HR",
+              "description": "Isi \"Catatan HR untuk Karyawan\" untuk memberi tahu apa yang masih kurang atau perlu ditambahkan — catatan ini akan terlihat oleh karyawan dan atasannya."
+            }
+          ],
+          "tips": [
+            "Import tidak pernah menimpa IDP yang sudah ada — hanya mengisi kombinasi karyawan + periode yang belum punya IDP.",
+            "Menghapus IDP bersifat permanen dan tidak bisa dibatalkan — rencana aksi & riwayat evaluasinya ikut terhapus.",
+            "Nama atasan dan riwayat evaluasi bersifat catatan historis tetap — kalau atasan seorang karyawan berganti di kemudian hari, data lama tidak ikut berubah."
+          ]
+        }
+      }
     }
   }
 }

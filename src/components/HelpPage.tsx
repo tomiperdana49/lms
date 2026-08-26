@@ -1,29 +1,34 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { HelpCircle, Library, BookOpen, Users, Globe, Lightbulb, ListChecks, GraduationCap, UserCheck } from 'lucide-react';
+import { HelpCircle, Library, BookOpen, Users, Globe, Lightbulb, ListChecks, GraduationCap, UserCheck, Target, Shield } from 'lucide-react';
 
-type TopicKey = 'readingLog' | 'onlineModules' | 'trainingInternal' | 'trainingExternal';
-type AudienceKey = 'participant' | 'trainer';
+type TopicKey = 'readingLog' | 'onlineModules' | 'trainingInternal' | 'trainingExternal' | 'idp';
+type AudienceKey = 'participant' | 'trainer' | 'employee' | 'supervisor' | 'hr';
 
 const TOPIC_ICONS: Record<TopicKey, typeof Library> = {
     readingLog: Library,
     onlineModules: BookOpen,
     trainingInternal: Users,
-    trainingExternal: Globe
+    trainingExternal: Globe,
+    idp: Target
 };
 
 const AUDIENCE_ICONS: Record<AudienceKey, typeof Users> = {
     participant: UserCheck,
-    trainer: GraduationCap
+    trainer: GraduationCap,
+    employee: UserCheck,
+    supervisor: Users,
+    hr: Shield
 };
 
-const TOPIC_ORDER: TopicKey[] = ['readingLog', 'onlineModules', 'trainingInternal', 'trainingExternal'];
-const AUDIENCE_ORDER: AudienceKey[] = ['participant', 'trainer'];
+const TOPIC_ORDER: TopicKey[] = ['readingLog', 'onlineModules', 'trainingInternal', 'trainingExternal', 'idp'];
 
 // Topics whose guide differs depending on who's using the feature (e.g. a training session's
-// participant vs. its trainer/host) render a role sub-selector; everything else is a single guide.
-const TOPICS_WITH_AUDIENCES: Partial<Record<TopicKey, true>> = {
-    trainingInternal: true
+// participant vs. its trainer/host, or IDP's employee/supervisor/HR) render a role sub-selector,
+// listing that topic's audiences in display order; everything else is a single guide.
+const TOPIC_AUDIENCES: Partial<Record<TopicKey, AudienceKey[]>> = {
+    trainingInternal: ['participant', 'trainer'],
+    idp: ['employee', 'supervisor', 'hr']
 };
 
 interface Step {
@@ -42,7 +47,8 @@ export default function HelpPage() {
     const [activeTopic, setActiveTopic] = useState<TopicKey>('readingLog');
     const [activeAudience, setActiveAudience] = useState<AudienceKey>('participant');
 
-    const hasAudiences = !!TOPICS_WITH_AUDIENCES[activeTopic];
+    const audienceList = TOPIC_AUDIENCES[activeTopic];
+    const hasAudiences = !!audienceList;
     const topicTitle = t(`topics.${activeTopic}.title`);
     const guide = (hasAudiences
         ? t(`topics.${activeTopic}.audiences.${activeAudience}`, { returnObjects: true })
@@ -77,7 +83,8 @@ export default function HelpPage() {
                                 type="button"
                                 onClick={() => {
                                     setActiveTopic(key);
-                                    setActiveAudience('participant');
+                                    const audiences = TOPIC_AUDIENCES[key];
+                                    if (audiences) setActiveAudience(audiences[0]);
                                 }}
                                 className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left whitespace-nowrap lg:whitespace-normal transition-all shrink-0 ${
                                     isActive
@@ -110,7 +117,7 @@ export default function HelpPage() {
                             <div className="w-full sm:w-auto">
                                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">{t('labels.chooseRole')}</p>
                                 <div className="inline-flex rounded-xl bg-gray-100 p-1 gap-1">
-                                    {AUDIENCE_ORDER.map((key) => {
+                                    {audienceList!.map((key) => {
                                         const isActive = key === activeAudience;
                                         return (
                                             <button

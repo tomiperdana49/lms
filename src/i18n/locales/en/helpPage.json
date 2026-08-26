@@ -7,7 +7,8 @@
     "readingLog": "Reading Log",
     "onlineModules": "Online Modules",
     "trainingInternal": "Training Internal",
-    "trainingExternal": "Training External"
+    "trainingExternal": "Training External",
+    "idp": "IDP"
   },
   "labels": {
     "purpose": "What is this feature for?",
@@ -124,7 +125,7 @@
           "steps": [
             {
               "title": "Create a new session (HR/HR_ADMIN only)",
-              "description": "In Admin Panel → Internal, click \"Create Session\". Fill in the \"Session Details\" tab: Title, Date, Start/End Time, Host Name, Event Type (Online/In-Person/Hybrid), Competency, GRI Type, Location or Meeting Link, Material Link, and pick the invited participants. In the \"Exam Configuration\" tab, build the Pre-Test and Post-Test question sets. Click \"Send Invitations\" to create the session (or bulk-import via the \"Import Data\" button)."
+              "description": "In Admin Panel → Internal, click \"Create Session\". Fill in the \"Session Details\" tab: Title, Date, Start/End Time, Host Name (search the employee list; if the host is an outside vendor/speaker and isn't found, type their name and pick the \"Use ... as an external host\" option that appears), Event Type (Online/In-Person/Hybrid), Competency, GRI Type, Location or Meeting Link, Material Link, and pick the invited participants. In the \"Exam Configuration\" tab, build the Pre-Test and Post-Test question sets. Click \"Send Invitations\" to create the session (or bulk-import via the \"Import Data\" button)."
             },
             {
               "title": "Open Host controls on your session",
@@ -159,7 +160,8 @@
             "You don't need to be HR to run a session — if you're listed as its Host, the controls automatically appear for you on the regular Training Internal page, not just in the Admin Panel.",
             "Creating new sessions and bulk-importing data both remain HR/HR_ADMIN-only, via the Admin Panel.",
             "If a session needs reopening after being closed, only HR/HR_ADMIN have a \"REOPEN SESSION\" button.",
-            "The cost report can only be submitted once the session is closed — if the button is still locked with \"Session Still Open\", close the session first."
+            "The cost report can only be submitted once the session is closed — if the button is still locked with \"Session Still Open\", close the session first.",
+            "If a session has neither a pre-test nor a post-test, the Feedback Form activates automatically as soon as the session is created — you don't need to flip its toggle on manually."
           ]
         }
       }
@@ -193,6 +195,99 @@
         "The \"Team Approvals\" tab only appears if you actually have direct reports recorded in the employee data.",
         "\"Show Detail\" is available on both tabs (My Requests & Team Approvals) to see the full breakdown, including the certificate."
       ]
+    },
+    "idp": {
+      "title": "IDP",
+      "audiences": {
+        "employee": {
+          "label": "As an Employee",
+          "purpose": "Create and manage your yearly Individual Development Plan (IDP), then submit it for HR's approval.",
+          "steps": [
+            {
+              "title": "Open the IDP menu",
+              "description": "The IDP menu in the sidebar shows your IDP for the current year. If you don't have one yet, a blank form opens right away for you to fill in."
+            },
+            {
+              "title": "Fill in the IDP narrative",
+              "description": "Fill in Achievements, Career Goal, Existing Skills, and Development Area. If you've already prepared this in an Excel file using the IDP template format, click \"Import from Excel\" to fill these fields in automatically."
+            },
+            {
+              "title": "Complete the Development Action Plan",
+              "description": "The \"[MANDATORY] Learning Hours\" item is already there automatically, tracked from your learning activity in the LMS. Add at least 3 more rows via \"Add Row\" — at least 4 rows total (including the mandatory item) are needed before you can submit."
+            },
+            {
+              "title": "Save or submit",
+              "description": "Click \"Save as Draft\" if it's not complete yet, or \"Submit for Approval\" once it's ready to send to HR."
+            },
+            {
+              "title": "Edit it anytime",
+              "description": "An already-submitted or approved IDP can still be edited via \"Edit IDP\" — changes save immediately without needing re-approval."
+            }
+          ],
+          "tips": [
+            "The mandatory learning hours item (48 hours/year) is tracked automatically from Reading Log, Online Modules, and Training — don't fill it in manually.",
+            "If HR leaves an \"HR Note\", address it before resubmitting your IDP.",
+            "Your supervisor's monthly review history shows up on your IDP page as soon as they log one."
+          ]
+        },
+        "supervisor": {
+          "label": "As a Direct Supervisor",
+          "purpose": "Review the IDPs of team members who report directly to you, and log a monthly 1-on-1 evaluation of their progress.",
+          "steps": [
+            {
+              "title": "Open your team list",
+              "description": "In the IDP menu, the \"My Team\" section shows the IDP of every team member recorded as reporting directly to you in the employee data."
+            },
+            {
+              "title": "View a team member's IDP detail",
+              "description": "Click one to see their achievements, career goal, skills, and development action plan."
+            },
+            {
+              "title": "Add a 1-on-1 Evaluation",
+              "description": "Fill in the review date and a note (whether the IDP is still relevant and on track, whether action items are being completed on schedule), then save."
+            },
+            {
+              "title": "Update checklist progress",
+              "description": "For a team member's non-mandatory action items, you can check them off as completed and fill in a progress note."
+            }
+          ],
+          "tips": [
+            "Log a 1-on-1 evaluation at least once a month; HR can see a \"Not reviewed this month\" status for IDPs that have fallen behind.",
+            "Checklist progress and notes on action items can only be changed by the direct supervisor — not by the employee themselves or by HR."
+          ]
+        },
+        "hr": {
+          "label": "As HR",
+          "purpose": "Manage every employee's IDP company-wide — approve, leave notes, bulk-import, edit, or delete.",
+          "steps": [
+            {
+              "title": "Open Employee IDP",
+              "description": "In Admin Panel → Employee IDP, every employee's IDP is listed with filters for year, name/ID search, and status."
+            },
+            {
+              "title": "Approve or reject a submission",
+              "description": "An IDP with \"Pending\" status can be approved directly, or rejected by filling in a rejection reason."
+            },
+            {
+              "title": "Import data from Excel",
+              "description": "Click \"IMPORT\", then upload a file in the IDP template format (one sheet per employee). The system matches employee names automatically and shows a preview before anything is actually saved; an IDP that already exists for the same employee + period combination is skipped automatically."
+            },
+            {
+              "title": "Edit or delete an IDP",
+              "description": "Click \"Edit IDP\" on a detail to correct its data (including the action plan), or click the trash icon to permanently delete it along with its entire review history."
+            },
+            {
+              "title": "Leave an HR Note",
+              "description": "Fill in \"HR Note for Employee\" to let them know what's missing or needs adding — this note is visible to the employee and their supervisor."
+            }
+          ],
+          "tips": [
+            "Import never overwrites an existing IDP — it only fills in employee + period combinations that don't have one yet.",
+            "Deleting an IDP is permanent and can't be undone — its action plan and review history are deleted with it.",
+            "The supervisor name and review history are a fixed historical record — if an employee's supervisor changes later on, past data doesn't change to match."
+          ]
+        }
+      }
     }
   }
 }
