@@ -40,6 +40,10 @@ const EmployeeLearningReport = () => {
     const selectedBranchRef = useRef(selectedBranch);
     useEffect(() => { selectedBranchRef.current = selectedBranch; }, [selectedBranch]);
     const [selectedEmployees, setSelectedEmployees] = useState<EmployeeOption[]>([]);
+    // Once employees load, default the report to everyone (All Organizations + All Branches) instead
+    // of an empty "select employees" state. Only fires once - after that, an explicit "Clear all" is
+    // respected instead of being immediately overridden back to everyone.
+    const [hasAutoSelectedAll, setHasAutoSelectedAll] = useState(false);
     const [stats, setStats] = useState<LearningStats>(EMPTY_STATS);
     const [perEmployeeStats, setPerEmployeeStats] = useState<TeamMemberSummary[]>([]);
     const [expandedEmployeeIds, setExpandedEmployeeIds] = useState<Set<string>>(new Set());
@@ -72,6 +76,13 @@ const EmployeeLearningReport = () => {
             .catch(err => console.error('Error fetching employees:', err))
             .finally(() => setEmployeesLoading(false));
     }, []);
+
+    useEffect(() => {
+        if (!hasAutoSelectedAll && !employeesLoading && employees.length > 0) {
+            setSelectedEmployees(employees);
+            setHasAutoSelectedAll(true);
+        }
+    }, [hasAutoSelectedAll, employeesLoading, employees]);
 
     useEffect(() => {
         if (selectedEmployees.length === 0) {
@@ -245,7 +256,7 @@ const EmployeeLearningReport = () => {
                 </div>
 
                 {selectedEmployees.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 max-h-[88px] overflow-y-auto pr-1">
                         {selectedEmployees.map(emp => (
                             <span
                                 key={emp.id_employee}
