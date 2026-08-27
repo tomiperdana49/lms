@@ -241,6 +241,11 @@ export const initDB = async () => {
         } catch (e) { /* Ignore if exists */ }
 
         try {
+            await connection.query("ALTER TABLE meetings ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+            console.log("Added deleted_at column to meetings.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
             await connection.query("ALTER TABLE reading_logs ADD COLUMN location VARCHAR(100)");
             console.log("Added location column to reading_logs.");
         } catch (e) { /* Ignore if exists */ }
@@ -365,6 +370,11 @@ export const initDB = async () => {
         try {
             await connection.query("ALTER TABLE external_training_requests ADD COLUMN learning_hours DECIMAL(6,2)");
             console.log("Added learning_hours column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+            console.log("Added deleted_at column to external_training_requests.");
         } catch (e) { /* Ignore if exists */ }
 
         // MIGRATION: Add internal_certificates table (issued internal training certificates)

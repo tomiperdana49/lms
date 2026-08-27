@@ -1431,7 +1431,7 @@ const computeLearningStats = async ({ email, employee_id, startDate, endDate }) 
         const bookDetails = [];
 
         // 1. Internal Training (meetings)
-        const meetings = await query("SELECT id, title, date, time, guests_json, cost_report_json, host, employee_id FROM meetings WHERE type IN ('Offline', 'Online', 'Hybrid', 'Internal')");
+        const meetings = await query("SELECT id, title, date, time, guests_json, cost_report_json, host, employee_id FROM meetings WHERE type IN ('Offline', 'Online', 'Hybrid', 'Internal') AND deleted_at IS NULL");
 
         // Fetch this user's pre/post-test scores and feedback submissions across all meetings up front
         // (avoids N+1 queries inside the loop below).
@@ -1537,7 +1537,7 @@ const computeLearningStats = async ({ email, employee_id, startDate, endDate }) 
         // 2. External Training (external_training_requests)
         if (targetEmpId) {
             const externalTrainings = await query(
-                "SELECT title, vendor, certificate_link, start_date, end_date, registration_fee, travel_flight_cost, accommodation_cost, miscellaneous_cost, learning_hours FROM external_training_requests WHERE employee_id = ? AND status = 'Processed'",
+                "SELECT title, vendor, certificate_link, start_date, end_date, registration_fee, travel_flight_cost, accommodation_cost, miscellaneous_cost, learning_hours FROM external_training_requests WHERE employee_id = ? AND status = 'Processed' AND deleted_at IS NULL",
                 [targetEmpId]
             );
             for (const ext of externalTrainings) {
@@ -2644,7 +2644,7 @@ app.post('/api/training/:id/approve', async (req, res) => {
 // --- MEETINGS ---
 app.get('/api/meetings', async (req, res) => {
     try {
-        const meetings = await query('SELECT * FROM meetings');
+        const meetings = await query('SELECT * FROM meetings WHERE deleted_at IS NULL');
         const mapped = meetings.map(m => ({
             ...m,
             description: m.agenda, // Map agenda to description for frontend
@@ -2655,6 +2655,14 @@ app.get('/api/meetings', async (req, res) => {
             feedback_data: m.feedback_data ? (typeof m.feedback_data === 'string' ? JSON.parse(m.feedback_data) : m.feedback_data) : undefined
         }));
         res.json(mapped);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Recently deleted meetings, used only to notify the host that their session was removed.
+app.get('/api/meetings/deleted', async (req, res) => {
+    try {
+        const meetings = await query('SELECT id, title, date, host, employee_id, deleted_at FROM meetings WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC');
+        res.json(meetings);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -3013,7 +3021,9 @@ app.delete('/api/meetings/:id', async (req, res) => {
         await query('DELETE FROM quiz_results WHERE meeting_id = ?', [meetingId]);
         await query('DELETE FROM course_feedback WHERE meeting_id = ?', [meetingId]);
         await query('DELETE FROM internal_certificates WHERE meeting_id = ?', [meetingId]);
-        await query('DELETE FROM meetings WHERE id = ?', [meetingId]);
+        // Soft delete: keep the row (hidden from every listing via deleted_at IS NULL filters)
+        // so the host can still be notified about the removal.
+        await query('UPDATE meetings SET deleted_at = ? WHERE id = ?', [new Date(), meetingId]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3730,10 +3740,10 @@ app.get('/api/external-training/my-requests', async (req, res) => {
     try {
         const { employee_id } = req.query;
         const queryStr = `
-            SELECT r.*, e.id_report_to as leader_name 
+            SELECT r.*, e.id_report_to as leader_name
             FROM external_training_requests r
             LEFT JOIN employees e ON r.employee_id = e.id_employee
-            WHERE r.employee_id = ? 
+            WHERE r.employee_id = ? AND r.deleted_at IS NULL
             ORDER BY r.created_at DESC
         `;
         const rows = await query(queryStr, [employee_id]);
@@ -3770,8 +3780,8 @@ app.get('/api/external-training/subordinates', async (req, res) => {
 
         const placeholders = subordinateIds.map(() => '?').join(',');
         const rows = await query(`
-            SELECT * FROM external_training_requests 
-            WHERE employee_id IN (${placeholders}) 
+            SELECT * FROM external_training_requests
+            WHERE employee_id IN (${placeholders}) AND deleted_at IS NULL
             ORDER BY created_at DESC
         `, subordinateIds);
 
@@ -3795,7 +3805,7 @@ app.post('/api/external-training/approve', async (req, res) => {
 // 5. Admin views all requests
 app.get('/api/external-training/all', async (req, res) => {
     try {
-        const rows = await query(`SELECT * FROM external_training_requests ORDER BY created_at DESC`);
+        const rows = await query(`SELECT * FROM external_training_requests WHERE deleted_at IS NULL ORDER BY created_at DESC`);
         res.json(rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3804,7 +3814,19 @@ app.get('/api/external-training/all', async (req, res) => {
 app.get('/api/external-training/hr', async (req, res) => {
     try {
         // HR usually wants to see Approved (needs action) or Processed (done)
-        const rows = await query(`SELECT * FROM external_training_requests WHERE status IN ('Approved', 'Processed') ORDER BY updated_at DESC`);
+        const rows = await query(`SELECT * FROM external_training_requests WHERE status IN ('Approved', 'Processed') AND deleted_at IS NULL ORDER BY updated_at DESC`);
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Recently deleted requests, used only to notify the employee that their request was removed.
+app.get('/api/external-training/deleted', async (req, res) => {
+    try {
+        const { employee_id } = req.query;
+        const rows = await query(
+            'SELECT id, title, employee_id, deleted_at FROM external_training_requests WHERE employee_id = ? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC',
+            [employee_id]
+        );
         res.json(rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -4655,7 +4677,9 @@ app.delete('/api/external-training/:id', async (req, res) => {
             deleteLocalUpload(rows[0].certificate_link);
             deleteLocalUpload(rows[0].renewal_certificate_link);
         }
-        await query('DELETE FROM external_training_requests WHERE id = ?', [id]);
+        // Soft delete: keep the row (hidden from every listing via deleted_at IS NULL filters)
+        // so the employee can still be notified about the removal.
+        await query('UPDATE external_training_requests SET deleted_at = ? WHERE id = ?', [new Date(), id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });

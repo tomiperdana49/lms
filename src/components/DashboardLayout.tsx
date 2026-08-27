@@ -84,17 +84,28 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
             if (!user?.email || !user?.name) return;
 
             try {
-                const [meetingsRes, trainingRes, logsRes] = await Promise.all([
+                const [meetingsRes, trainingRes, logsRes, myExternalTrainingRes, subordinateExternalTrainingRes, deletedMeetingsRes, deletedExternalTrainingRes, myIdpPlansRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/api/meetings`),
                     fetch(`${API_BASE_URL}/api/training`),
-                    fetch(`${API_BASE_URL}/api/logs`)
+                    fetch(`${API_BASE_URL}/api/logs`),
+                    fetch(`${API_BASE_URL}/api/external-training/my-requests?employee_id=${user.employee_id || ''}`),
+                    fetch(`${API_BASE_URL}/api/external-training/subordinates?leader_id=${user.employee_id || ''}`),
+                    fetch(`${API_BASE_URL}/api/meetings/deleted`),
+                    fetch(`${API_BASE_URL}/api/external-training/deleted?employee_id=${user.employee_id || ''}`),
+                    fetch(`${API_BASE_URL}/api/idp/my-plans?employee_id=${user.employee_id || ''}`)
                 ]);
 
-                if (!meetingsRes.ok || !trainingRes.ok || !logsRes.ok) return;
+                if (!meetingsRes.ok || !trainingRes.ok || !logsRes.ok || !myExternalTrainingRes.ok || !subordinateExternalTrainingRes.ok
+                    || !deletedMeetingsRes.ok || !deletedExternalTrainingRes.ok || !myIdpPlansRes.ok) return;
 
                 const meetings = await meetingsRes.json();
                 const training = await trainingRes.json();
                 const logs = await logsRes.json();
+                const myExternalTraining = await myExternalTrainingRes.json();
+                const subordinateExternalTraining = await subordinateExternalTrainingRes.json();
+                const deletedMeetings = await deletedMeetingsRes.json();
+                const deletedExternalTraining = await deletedExternalTrainingRes.json();
+                const myIdpPlans = await myIdpPlansRes.json();
 
                 // Get already read notification IDs from LocalStorage
                 let readIds: number[] = [];
@@ -173,8 +184,121 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                         };
                     });
 
+                // 4. Internal Training Payment (notify the host once HR marks the session as paid)
+                const hostPaymentNotifs = meetings
+                    .filter((m: any) => {
+                        const isHost = (m.employee_id && user.employee_id && m.employee_id === user.employee_id) ||
+                                       (m.host && user.name && m.host.trim().toLowerCase() === user.name.trim().toLowerCase());
+                        return isHost && m.costReport?.isPaid;
+                    })
+                    .map((m: any) => {
+                        const notifId = m.id + 200000;
+                        return {
+                            id: notifId,
+                            title: t('notifications.internalTrainingApprovedTitle'),
+                            message: t('notifications.internalTrainingApprovedMessage', { title: m.title }),
+                            time: new Date(m.date).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            type: 'SUCCESS',
+                            isRead: readIds.includes(notifId)
+                        };
+                    });
+
+                // 5. External Training: notify the LEADER when a subordinate submits a new request
+                const externalTrainingLeaderNotifs = subordinateExternalTraining
+                    .filter((r: any) => r.status === 'Pending')
+                    .map((r: any) => {
+                        const notifId = r.id + 300000;
+                        return {
+                            id: notifId,
+                            title: t('notifications.externalTrainingNewRequestTitle'),
+                            message: t('notifications.externalTrainingNewRequestMessage', { name: r.employee_name, title: r.title }),
+                            time: new Date(r.created_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            type: 'INFO',
+                            isRead: readIds.includes(notifId)
+                        };
+                    });
+
+                // 6. External Training: notify the EMPLOYEE when their leader or HR decides on their request
+                const externalTrainingStatusNotifs = myExternalTraining
+                    .filter((r: any) => ['Approved', 'Rejected', 'Processed'].includes(r.status))
+                    .map((r: any) => {
+                        // Include the status in the id so each stage (leader approval vs HR approval)
+                        // gets its own read/unread tracking instead of collapsing into one notification.
+                        const stageCode = r.status === 'Approved' ? 1 : r.status === 'Rejected' ? 2 : 3;
+                        const notifId = 400000 + r.id * 10 + stageCode;
+                        let statusLabel = '';
+                        let type = 'INFO';
+
+                        if (r.status === 'Approved') {
+                            statusLabel = t('notifications.externalTrainingApprovedBySupervisor');
+                            type = 'SUCCESS';
+                        } else if (r.status === 'Rejected') {
+                            statusLabel = r.rejection_reason
+                                ? t('notifications.externalTrainingRejectedWithReason', { reason: r.rejection_reason })
+                                : t('notifications.externalTrainingRejected');
+                            type = 'WARNING';
+                        } else if (r.status === 'Processed') {
+                            statusLabel = t('notifications.externalTrainingApprovedByHR');
+                            type = 'SUCCESS';
+                        }
+
+                        return {
+                            id: notifId,
+                            title: t('notifications.externalTrainingStatusTitle', { status: r.status }),
+                            message: t('notifications.externalTrainingStatusMessage', { title: r.title, statusLabel }),
+                            time: new Date(r.updated_at || r.created_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            type,
+                            isRead: readIds.includes(notifId)
+                        };
+                    });
+
+                // 7. Internal Training: notify the HOST when their session is deleted by HR
+                const internalTrainingDeletedNotifs = deletedMeetings
+                    .filter((m: any) => (m.employee_id && user.employee_id && m.employee_id === user.employee_id) ||
+                                         (m.host && user.name && m.host.trim().toLowerCase() === user.name.trim().toLowerCase()))
+                    .map((m: any) => {
+                        const notifId = m.id + 500000;
+                        return {
+                            id: notifId,
+                            title: t('notifications.internalTrainingDeletedTitle'),
+                            message: t('notifications.internalTrainingDeletedMessage', { title: m.title }),
+                            time: new Date(m.deleted_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            type: 'WARNING',
+                            isRead: readIds.includes(notifId)
+                        };
+                    });
+
+                // 8. External Training: notify the EMPLOYEE when their request is deleted by HR
+                const externalTrainingDeletedNotifs = deletedExternalTraining
+                    .map((r: any) => {
+                        const notifId = r.id + 600000;
+                        return {
+                            id: notifId,
+                            title: t('notifications.externalTrainingDeletedTitle'),
+                            message: t('notifications.externalTrainingDeletedMessage', { title: r.title }),
+                            time: new Date(r.deleted_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            type: 'WARNING',
+                            isRead: readIds.includes(notifId)
+                        };
+                    });
+
+                // 9. IDP: notify the EMPLOYEE when their plan is approved by HR
+                const idpApprovedNotifs = myIdpPlans
+                    .filter((p: any) => p.status === 'Approved')
+                    .map((p: any) => {
+                        const notifId = p.id + 700000;
+                        return {
+                            id: notifId,
+                            title: t('notifications.idpApprovedTitle'),
+                            message: t('notifications.idpApprovedMessage', { year: p.period_year }),
+                            time: new Date(p.approved_date || p.updated_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            type: 'SUCCESS',
+                            isRead: readIds.includes(notifId)
+                        };
+                    });
+
                 // Combine and Sort by latest (higher id means more recent)
-                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs].sort((a, b) => b.id - a.id);
+                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpApprovedNotifs].sort((a, b) => b.id - a.id);
                 setNotifications(all);
             } catch (error) {
                 console.error("Failed to fetch header notifications", error);
@@ -186,7 +310,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         // Refresh notifications every 60 seconds
         const interval = setInterval(fetchNotifications, 60000);
         return () => clearInterval(interval);
-    }, [user, userRole]);
+    }, [user, userRole, i18n.language]);
 
     useEffect(() => {
         if (!isNotificationsOpen) return;

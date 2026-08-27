@@ -895,22 +895,13 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
             .catch(err => console.error(err));
     };
 
-    const handleDeleteLog = async (id: number | string) => {
-        if (!window.confirm(t('alerts.confirmCancelReport'))) return;
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/logs/${id}`, { method: 'DELETE' });
-            if (res.ok) {
-                setAllLogs(allLogs.map(log => String(log.id) === String(id) ? { ...log, status: 'Cancelled', hrApprovalStatus: 'Cancelled' as 'Cancelled' } : log));
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            } else {
-                alert(t('alerts.failedToCancelReport'));
-            }
-        } catch (error) {
-            console.error(error);
-            alert(t('alerts.errorWhileCancellingReport'));
-        }
+    const handleDeleteFromEditModal = () => {
+        const log = editLogModal.log;
+        if (!log) return;
+        setEditLogModal({ open: false, log: null, formData: {} });
+        setEditEvidenceFile(null);
+        setEditReturnEvidenceFile(null);
+        handleCancelClick(log);
     };
 
 
@@ -1899,7 +1890,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                             </div>
                         </div>
                         <div className="mt-6 flex justify-between gap-3">
-                            <button onClick={() => handleDeleteLog(editLogModal.log!.id)} className="px-4 py-2 text-red-600 font-bold hover:bg-red-50 rounded-xl border border-red-200 flex items-center"><Trash2 size={16} className="mr-2" /> {t('editModal.delete')}</button>
+                            <button onClick={handleDeleteFromEditModal} className="px-4 py-2 text-red-600 font-bold hover:bg-red-50 rounded-xl border border-red-200 flex items-center"><Trash2 size={16} className="mr-2" /> {t('editModal.delete')}</button>
                             <div className="flex gap-2">
                                 <button onClick={() => { setEditLogModal({ open: false, log: null, formData: {} }); setEditEvidenceFile(null); setEditReturnEvidenceFile(null); }} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">{t('editModal.cancel')}</button>
                                 <button onClick={handleEditLogSubmit} disabled={isUploadingEvidence} className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{isUploadingEvidence ? t('editModal.uploadingPhoto') : t('editModal.saveChanges')}</button>
