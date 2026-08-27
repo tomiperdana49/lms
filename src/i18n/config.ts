@@ -17,7 +17,6 @@ import enIDPPage from './locales/en/idpPage.json';
 import enIncentiveManager from './locales/en/incentiveManager.json';
 import enLearningReport from './locales/en/learningReport.json';
 import enLMSCalendar from './locales/en/lmsCalendar.json';
-import enNotificationPanel from './locales/en/notificationPanel.json';
 import enOnlineModulesManager from './locales/en/onlineModulesManager.json';
 import enPopupNotification from './locales/en/popupNotification.json';
 import enQuizReportList from './locales/en/quizReportList.json';
@@ -43,7 +42,6 @@ import idIDPPage from './locales/id/idpPage.json';
 import idIncentiveManager from './locales/id/incentiveManager.json';
 import idLearningReport from './locales/id/learningReport.json';
 import idLMSCalendar from './locales/id/lmsCalendar.json';
-import idNotificationPanel from './locales/id/notificationPanel.json';
 import idOnlineModulesManager from './locales/id/onlineModulesManager.json';
 import idPopupNotification from './locales/id/popupNotification.json';
 import idQuizReportList from './locales/id/quizReportList.json';
@@ -78,7 +76,6 @@ i18n
                 incentiveManager: enIncentiveManager,
                 learningReport: enLearningReport,
                 lmsCalendar: enLMSCalendar,
-                notificationPanel: enNotificationPanel,
                 onlineModulesManager: enOnlineModulesManager,
                 popupNotification: enPopupNotification,
                 quizReportList: enQuizReportList,
@@ -105,7 +102,6 @@ i18n
                 incentiveManager: idIncentiveManager,
                 learningReport: idLearningReport,
                 lmsCalendar: idLMSCalendar,
-                notificationPanel: idNotificationPanel,
                 onlineModulesManager: idOnlineModulesManager,
                 popupNotification: idPopupNotification,
                 quizReportList: idQuizReportList,

@@ -45,8 +45,6 @@ interface DashboardHomeProps {
     config?: { moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean };
 }
 
-import NotificationPanel from './NotificationPanel';
-
 const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: DashboardHomeProps) => {
     const { t } = useTranslation('dashboardHome');
     const [learningStats, setLearningStats] = useState<LearningStats>({
@@ -212,8 +210,8 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
                     <LMSCalendar compact={true} userEmail={userEmail} userRole={userRole} />
                 </div>
 
-                {/* --- Center Column: Features Menu (6 cols) --- */}
-                <div className="lg:col-span-6 h-full overflow-y-auto custom-scrollbar px-1">
+                {/* --- Center Column: Features Menu (9 cols) --- */}
+                <div className="lg:col-span-9 h-full overflow-y-auto custom-scrollbar px-1">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {menuItems.map((item, index) => (
                             <div
@@ -259,11 +257,6 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
                         <div className="text-[10px] font-black uppercase tracking-widest">{t('footer')}</div>
                         <div className="h-px w-12 bg-slate-100"></div>
                     </div>
-                </div>
-
-                {/* --- Right Column: Notifications (3 cols) --- */}
-                <div className="lg:col-span-3 h-full overflow-hidden bg-white rounded-3xl border border-slate-100 shadow-sm">
-                    <NotificationPanel userEmail={userEmail} userName={userName} userRole={userRole} />
                 </div>
 
             </div>
