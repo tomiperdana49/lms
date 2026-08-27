@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { Search, Download, Loader2, CalendarRange, UsersRound, Building2, MapPin, Check, X, ChevronDown, Trophy, Crown } from 'lucide-react';
+import { Search, Download, Loader2, CalendarRange, UsersRound, Building2, MapPin, Check, X, ChevronDown, Trophy, Crown, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import {
@@ -20,6 +20,7 @@ interface EmployeeOption {
     email?: string;
     organization_name?: string;
     branch_name?: string;
+    photo_profile?: string;
 }
 
 const EmployeeLearningReport = () => {
@@ -140,7 +141,13 @@ const EmployeeLearningReport = () => {
     const sections = useMemo(() => buildSections(stats, t), [stats, t]);
     const includeEmployeeColumn = selectedEmployees.length > 1;
     // perEmployeeStats is already sorted descending by totalJam, so this is just the top slice.
-    const topThreeByHours = useMemo(() => perEmployeeStats.slice(0, 3), [perEmployeeStats]);
+    const topThreeByHours = useMemo(
+        () => perEmployeeStats.slice(0, 3).map(member => ({
+            ...member,
+            photoUrl: employees.find(emp => emp.id_employee === member.employeeId)?.photo_profile
+        })),
+        [perEmployeeStats, employees]
+    );
 
     const handleAddEmployee = (emp: EmployeeOption) => {
         setSelectedEmployees(prev => [...prev, emp]);
@@ -480,7 +487,7 @@ const EmployeeRoster = ({ members, expandedIds, onToggle, t }: EmployeeRosterPro
 
 interface PodiumRankingProps {
     // Pre-sorted descending by stats.totalJam and already capped to the top 3 (>= 2 entries).
-    members: TeamMemberSummary[];
+    members: (TeamMemberSummary & { photoUrl?: string })[];
     onSelect: (employeeId: string) => void;
     t: (key: string, options?: Record<string, unknown>) => string;
 }
@@ -491,11 +498,25 @@ const PODIUM_STYLES = [
     { avatar: 'from-orange-300 to-orange-500', badge: 'bg-orange-500', platform: 'bg-orange-400' } // #3 bronze
 ];
 
-const getInitials = (name: string) => {
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return '?';
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return (parts[0][0] + parts[1][0]).toUpperCase();
+// Shows the employee's real photo when available; falls back to a generic person icon
+// (rather than initials) so a missing photo doesn't need a name to render sensibly.
+const PodiumAvatar = ({ photoUrl, gradientClass }: { photoUrl?: string; gradientClass: string }) => {
+    const [failed, setFailed] = useState(false);
+    if (photoUrl && !failed) {
+        return (
+            <img
+                src={photoUrl}
+                alt=""
+                onError={() => setFailed(true)}
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover shadow-md ring-4 ring-white group-hover:scale-105 transition-transform"
+            />
+        );
+    }
+    return (
+        <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br ${gradientClass} flex items-center justify-center text-white shadow-md ring-4 ring-white group-hover:scale-105 transition-transform`}>
+            <User size={24} strokeWidth={2.25} />
+        </div>
+    );
 };
 
 const PodiumRanking = ({ members, onSelect, t }: PodiumRankingProps) => {
@@ -533,9 +554,7 @@ const PodiumRanking = ({ members, onSelect, t }: PodiumRankingProps) => {
                         >
                             {i === 0 && <Crown size={20} className="text-amber-400" />}
                             <div className="relative">
-                                <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br ${style.avatar} flex items-center justify-center text-white font-black text-lg shadow-md ring-4 ring-white group-hover:scale-105 transition-transform`}>
-                                    {getInitials(member.name)}
-                                </div>
+                                <PodiumAvatar photoUrl={member.photoUrl} gradientClass={style.avatar} />
                                 <span className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full ${style.badge} text-white text-[10px] font-black flex items-center justify-center ring-2 ring-white`}>
                                     {i + 1}
                                 </span>
