@@ -18,19 +18,31 @@ const MANDATORY_TARGET_HOURS = 48;
 
 // Builds the monthly review strip: one entry per calendar month from when the employee created the
 // IDP through the current month (or through December if the plan's period year has already fully
-// elapsed), marking whether a supervisor review landed in that month.
+// elapsed), marking whether a supervisor review landed in that month. Index N is calendar month N of
+// the strip (e.g. index 1 is the creation month), so a missing review shows up at its actual month -
+// not just "N months into tracking" - which only holds while created_by_date reflects when the plan
+// was really created (bulk-import now keeps it in sync with the source sheet on re-import; see
+// /api/idp/bulk-import). Falls back to the earliest logged review's month on the rare plan that has
+// reviews but no created_by_date at all, so the strip still renders something rather than nothing.
 const reviewMonthStrip = (plan: IDPPlan): { index: number; reviewed: boolean }[] => {
-    if (!plan.created_by_date) return [];
-    const start = new Date(plan.created_by_date);
-    if (isNaN(start.getTime())) return [];
+    const reviewedSet = new Set((plan.reviewed_year_months || '').split(',').filter(Boolean));
+
+    let startY: number, startM: number;
+    if (plan.created_by_date && !isNaN(new Date(plan.created_by_date).getTime())) {
+        const start = new Date(plan.created_by_date);
+        startY = start.getFullYear();
+        startM = start.getMonth();
+    } else {
+        const earliestReviewedMonth = [...reviewedSet].sort()[0];
+        if (!earliestReviewedMonth) return [];
+        const [y, m] = earliestReviewedMonth.split('-').map(Number);
+        startY = y;
+        startM = m - 1;
+    }
 
     const now = new Date();
-    const startY = start.getFullYear();
-    const startM = start.getMonth();
     const endY = plan.period_year < now.getFullYear() ? plan.period_year : now.getFullYear();
     const endM = plan.period_year < now.getFullYear() ? 11 : now.getMonth();
-
-    const reviewedSet = new Set((plan.reviewed_year_months || '').split(',').filter(Boolean));
 
     const months: { index: number; reviewed: boolean }[] = [];
     let y = startY, m = startM, index = 1;
@@ -336,7 +348,19 @@ export default function IDPManager({ userName }: IDPManagerProps) {
             });
             const data = await res.json();
             const parts = [`${data.inserted} IDP berhasil diimpor.`];
-            if (data.skipped) parts.push(`${data.skipped} dilewati karena sudah ada IDP untuk karyawan & periode tersebut.`);
+            if (data.skipped) {
+                // For duplicates, the plan itself is left untouched, but any review-log rows or an HR
+                // note the file has that the existing plan is missing get backfilled — surface that here
+                // so it's clear the duplicate wasn't a total no-op.
+                const totalReviewsAdded = (data.duplicates || []).reduce((sum: number, d: { reviewsAdded?: number }) => sum + (d.reviewsAdded || 0), 0);
+                const totalNotesAdded = (data.duplicates || []).filter((d: { noteAdded?: boolean }) => d.noteAdded).length;
+                let skippedMsg = `${data.skipped} dilewati karena sudah ada IDP untuk karyawan & periode tersebut`;
+                const mergedParts: string[] = [];
+                if (totalReviewsAdded) mergedParts.push(`${totalReviewsAdded} riwayat review ditambahkan`);
+                if (totalNotesAdded) mergedParts.push(`${totalNotesAdded} catatan HR ditambahkan`);
+                if (mergedParts.length) skippedMsg += ` (${mergedParts.join(', ')} ke plan yang sudah ada)`;
+                parts.push(`${skippedMsg}.`);
+            }
             if (data.errors?.length) {
                 parts.push(`${data.errors.length} gagal:\n` + data.errors.map((e: { row: string; error: string }) => `- ${e.row}: ${e.error}`).join('\n'));
             }

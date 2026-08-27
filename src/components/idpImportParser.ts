@@ -169,8 +169,12 @@ export const parseIdpSheet = (grid: IdpImportGrid, sheetName: string): IdpImport
     let hr_note: string | null = null;
     let hr_note_by: string | null = null;
     const hrColPos = idpFindCell(grid, /verifikasi idp/i);
-    if (hrColPos && reviewHeaderPos) {
-        for (let r = reviewHeaderPos.r; r < Math.min(reviewHeaderPos.r + 60, grid.length); r++) {
+    if (hrColPos) {
+        // Prefer starting from the review table's row (the two columns are laid out side by side),
+        // but fall back to the HR-verification header's own row so a missing/differently-worded
+        // review section doesn't also block the HR note from being read.
+        const startRow = reviewHeaderPos ? reviewHeaderPos.r : hrColPos.r;
+        for (let r = startRow; r < Math.min(startRow + 60, grid.length); r++) {
             const v = idpCellStr((grid[r] || [])[hrColPos.c]);
             if (!v || /tanggal verifikasi/i.test(v)) continue;
             if (v.split(/\s+/).length <= 4 && v.length <= 40 && !/[.?!]/.test(v)) {

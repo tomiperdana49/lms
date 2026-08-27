@@ -486,6 +486,20 @@ const findReportToEmployee = async (employeeId) => {
     return leaderRows[0] || null;
 };
 
+// Best-effort match of a free-text name (as typed in an imported spreadsheet, often shortened -
+// e.g. "Indah R") against a real employee's full name. Returns the canonical full_name only when
+// exactly one employee matches; returns null (caller falls back to the raw text) when there's no
+// match or the match is ambiguous, so a shortened name is never silently attributed to the wrong person.
+const matchEmployeeFullName = async (rawName) => {
+    if (!rawName || !rawName.trim()) return null;
+    const trimmed = rawName.trim();
+    const exact = await querySimAsset('SELECT full_name FROM employees WHERE full_name = ? LIMIT 2', [trimmed]);
+    if (exact.length === 1) return exact[0].full_name;
+    if (exact.length > 1) return null;
+    const partial = await querySimAsset('SELECT full_name FROM employees WHERE full_name LIKE ? LIMIT 2', [`%${trimmed}%`]);
+    return partial.length === 1 ? partial[0].full_name : null;
+};
+
 // Normalizes a local ID phone number to the "62..." format expected by the WhatsApp API.
 const normalizeIndonesianPhone = (phone) => {
     if (!phone) return null;
@@ -4057,6 +4071,12 @@ app.post('/api/idp', async (req, res) => {
 // only backfills plans that don't exist yet, never overwrites live data.
 app.post('/api/idp/bulk-import', async (req, res) => {
     const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
+    // HR's own bulk import (IDPManager.tsx) is backfilling records HR has already reviewed, so a sheet
+    // carrying reviews/an approval date can create the plan as straight-up Approved. The employee's own
+    // "Import from Excel" (IDPPage.tsx) sends allowAutoApprove:false, since an employee uploading their
+    // own file shouldn't be able to grant themselves HR approval - it can still land as Pending (with
+    // its review history and HR note backfilled) so the real approval still has to happen through HR.
+    const allowAutoApprove = req.body.allowAutoApprove !== false;
     const result = { inserted: 0, skipped: 0, duplicates: [], errors: [] };
 
     for (let i = 0; i < rows.length; i++) {
@@ -4083,23 +4103,82 @@ app.post('/api/idp/bulk-import', async (req, res) => {
             }
             const employeeId = employee.id_employee;
 
-            const existing = await query('SELECT id FROM idp_plans WHERE employee_id = ? AND period_year = ?', [employeeId, row.period_year]);
-            if (existing.length > 0) {
-                result.skipped++;
-                result.duplicates.push({ row: rowLabel, employee_name: row.employee_name, period_year: row.period_year });
-                continue;
-            }
-
             let supervisorName = row.supervisor_name || null;
             if (!supervisorName) {
                 const supervisor = await findReportToEmployee(employeeId);
                 supervisorName = supervisor?.full_name || null;
             }
+            const reviews = Array.isArray(row.reviews) ? row.reviews.filter(r => r.review_date) : [];
+            // Prefer the real employee's canonical name over whatever shorthand the sheet used
+            // ("Indah R"); if it doesn't match anyone (or matches more than one person), keep the
+            // sheet's text as-is rather than guessing.
+            const hrNoteBy = row.hr_note_by ? (await matchEmployeeFullName(row.hr_note_by)) || row.hr_note_by : null;
             const department = row.department || employee.organization_name || '';
             const joinDateLabel = row.join_date_label || formatIndoDate(employee.join_date);
 
-            const reviews = Array.isArray(row.reviews) ? row.reviews.filter(r => r.review_date) : [];
-            const status = row.approved_date || reviews.length > 0 ? 'Approved' : (row.created_by_date ? 'Pending' : 'Draft');
+            const existing = await query(
+                'SELECT id, hr_note, job_position, department, supervisor_name, join_date_label, created_by_date, approved_date FROM idp_plans WHERE employee_id = ? AND period_year = ?',
+                [employeeId, row.period_year]
+            );
+            if (existing.length > 0) {
+                // Don't overwrite the existing plan's narrative fields (achievements, career goal, etc.) -
+                // those may have been hand-edited live in the app since, and the sheet could be a stale
+                // snapshot of them. Factual/administrative fields (job title, dept, dates) are different:
+                // they're not something an employee keeps refining, and created_by_date in particular can
+                // silently drift to "today" if the plan gets resubmitted elsewhere in the app - so the
+                // sheet is treated as authoritative for those, falling back to the existing value only
+                // when the sheet doesn't provide one. Then backfill whatever else the sheet has that the
+                // existing record is missing: review-log rows the plan doesn't have yet (matched by date,
+                // so re-importing the same file is idempotent) and the HR note if none is set yet.
+                const existingPlan = existing[0];
+                await query(
+                    `UPDATE idp_plans SET job_position = ?, department = ?, supervisor_name = ?, join_date_label = ?, created_by_date = ?, approved_date = ? WHERE id = ?`,
+                    [
+                        row.job_position || existingPlan.job_position || '',
+                        department || existingPlan.department || '',
+                        supervisorName || existingPlan.supervisor_name || null,
+                        joinDateLabel || existingPlan.join_date_label || '',
+                        row.created_by_date || existingPlan.created_by_date || null,
+                        // Same rule as the fresh-insert path: an employee-side import (allowAutoApprove
+                        // false) can never write an approval date onto their own plan.
+                        (allowAutoApprove && row.approved_date) || existingPlan.approved_date || null,
+                        existingPlan.id
+                    ]
+                );
+                // Format server-side (DATE_FORMAT) rather than via JS Date/toISOString - the driver
+                // returns DATE columns as local-midnight Date objects, and toISOString() converts to
+                // UTC, which shifts the date backward a day in timezones ahead of UTC (e.g. WIB/UTC+7).
+                const existingReviewDates = new Set(
+                    (await query("SELECT DATE_FORMAT(review_date, '%Y-%m-%d') AS review_date FROM idp_reviews WHERE idp_id = ?", [existingPlan.id]))
+                        .map(r => r.review_date)
+                );
+                let reviewsAdded = 0;
+                for (const review of reviews) {
+                    if (existingReviewDates.has(review.review_date)) continue;
+                    await query(
+                        `INSERT INTO idp_reviews (idp_id, review_date, supervisor_note, reviewed_by, hr_verification_date, hr_note, hr_verified_by)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                        [existingPlan.id, review.review_date, review.supervisor_note || '', review.reviewed_by || supervisorName,
+                         review.hr_verification_date || null, review.hr_note || null, review.hr_verified_by || null]
+                    );
+                    reviewsAdded++;
+                }
+                let noteAdded = false;
+                if (!existingPlan.hr_note && row.hr_note) {
+                    await query('UPDATE idp_plans SET hr_note = ?, hr_note_by = ? WHERE id = ?', [row.hr_note, hrNoteBy, existingPlan.id]);
+                    noteAdded = true;
+                }
+                result.skipped++;
+                result.duplicates.push({ row: rowLabel, employee_name: row.employee_name, period_year: row.period_year, reviewsAdded, noteAdded });
+                continue;
+            }
+
+            const hasApprovalSignal = !!(row.approved_date || reviews.length > 0);
+            const status = allowAutoApprove
+                ? (hasApprovalSignal ? 'Approved' : (row.created_by_date ? 'Pending' : 'Draft'))
+                : ((row.created_by_date || hasApprovalSignal) ? 'Pending' : 'Draft');
+            // Never persist an approval date without the approval itself having actually happened.
+            const approvedDateToStore = allowAutoApprove ? (row.approved_date || null) : null;
 
             const planResult = await query(`
                 INSERT INTO idp_plans
@@ -4111,7 +4190,7 @@ app.post('/api/idp/bulk-import', async (req, res) => {
                 employeeId, row.employee_name.trim(), row.job_position || '', department, supervisorName,
                 row.period_year, joinDateLabel, row.achievements || '', row.career_goal || '',
                 row.existing_skills || '', row.development_area || '', status,
-                row.created_by_date || null, row.approved_date || null, row.hr_note || null, row.hr_note_by || null
+                row.created_by_date || null, approvedDateToStore, row.hr_note || null, hrNoteBy
             ]);
             const idpId = planResult.insertId;
 

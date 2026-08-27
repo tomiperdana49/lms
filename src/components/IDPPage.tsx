@@ -205,15 +205,18 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
     }));
 
     // --- Import from Excel: lets an employee prefill the form from the standard IDP template instead of
-    // typing everything by hand (e.g. if they already filled it out offline). Only fills the narrative
-    // fields and action plan the employee actually edits here — it never touches status, reviews, or HR
-    // notes, so the normal save/submit/approval flow still applies to whatever gets imported. ---
+    // typing everything by hand (e.g. if they already filled it out offline). Prefills the narrative
+    // fields and action plan immediately for editing here, and also sends the full parsed sheet to the
+    // same bulk-import endpoint HR uses (server/server.js POST /api/idp/bulk-import) so the creation
+    // date, review history, and HR note the file carries are backfilled the same way an HR-side import
+    // would - creating the plan outright if none exists yet, or merging into it (without touching
+    // narrative fields already saved) if one does. ---
     const idpImportInputRef = useRef<HTMLInputElement>(null);
     const handleIdpImport = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = (evt) => {
+        reader.onload = async (evt) => {
             try {
                 const bstr = evt.target?.result;
                 const wb = XLSX.read(bstr, { type: 'binary' });
@@ -242,6 +245,34 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                     }))
                 });
                 setNotification({ show: true, type: 'success', message: t('notifications.importSuccess') });
+
+                try {
+                    await fetch(`${API_BASE_URL}/api/idp/bulk-import`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        // allowAutoApprove: false - an employee importing their own file shouldn't be
+                        // able to grant themselves HR approval just because the sheet has review history
+                        // in it. The plan still lands as Pending (or Draft) with everything else backfilled.
+                        body: JSON.stringify({ rows: [parsed], allowAutoApprove: false })
+                    });
+                    // Refetch directly (rather than fire-and-forget fetchMyPlans()) so we can find the
+                    // affected plan's id right away and force its detail (reviews/HR note) to reload too -
+                    // the effect that normally does this only fires when currentYearPlan.id itself
+                    // changes, which won't happen when the import merged into an already-existing plan.
+                    if (currentUser?.employee_id) {
+                        const plansRes = await fetch(`${API_BASE_URL}/api/idp/my-plans?employee_id=${currentUser.employee_id}`);
+                        if (plansRes.ok) {
+                            const plans: IDPPlan[] = await plansRes.json();
+                            setMyPlans(plans);
+                            const updatedPlan = plans.find(p => p.period_year === parsed.period_year);
+                            if (updatedPlan) fetchDetail(updatedPlan.id);
+                        }
+                    }
+                } catch (backfillErr) {
+                    // The draft prefill above already succeeded, so don't surface this as a failure -
+                    // worst case the date/review/HR-note backfill just didn't happen this time.
+                    console.error('IDP import history backfill failed:', backfillErr);
+                }
             } catch (err) {
                 console.error('IDP import parse error:', err);
                 setNotification({ show: true, type: 'error', message: t('notifications.importFailed', { message: err instanceof Error ? err.message : String(err) }) });
