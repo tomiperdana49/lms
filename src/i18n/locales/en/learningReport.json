@@ -67,6 +67,7 @@
     "allBranches": "All Branches",
     "clearAll": "Clear all",
     "rosterHint": "{{count}} employees selected — click a name to show or hide their detail",
+    "topRankingTitle": "Top 3 by Learning Hours",
     "notFound": "No employees found",
     "noSelection": "Select one or more employees to view their learning report."
   },

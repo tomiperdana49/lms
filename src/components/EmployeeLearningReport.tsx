@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { Search, Download, Loader2, CalendarRange, UsersRound, Building2, MapPin, Check, X, ChevronDown } from 'lucide-react';
+import { Search, Download, Loader2, CalendarRange, UsersRound, Building2, MapPin, Check, X, ChevronDown, Trophy, Crown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import {
@@ -54,6 +54,16 @@ const EmployeeLearningReport = () => {
         });
     };
 
+    // Opens (rather than toggles) an employee's roster row and scrolls it into view,
+    // used when the racer avatar on the ranking track is clicked.
+    const selectEmployeeInRoster = (employeeId: string) => {
+        setExpandedEmployeeIds(prev => new Set(prev).add(employeeId));
+        requestAnimationFrame(() => {
+            document.getElementById(`employee-roster-row-${employeeId}`)
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+    };
+
     useEffect(() => {
         fetch(`${API_BASE_URL}/api/employees`)
             .then(res => res.json())
@@ -82,7 +92,9 @@ const EmployeeLearningReport = () => {
             .then(data => {
                 if (!data.error) {
                     setStats(data);
-                    setPerEmployeeStats(Array.isArray(data.perEmployee) ? data.perEmployee : []);
+                    const perEmployee: TeamMemberSummary[] = Array.isArray(data.perEmployee) ? data.perEmployee : [];
+                    perEmployee.sort((a, b) => b.stats.totalJam - a.stats.totalJam);
+                    setPerEmployeeStats(perEmployee);
                 }
             })
             .catch(err => console.error('Error fetching learning stats:', err))
@@ -127,6 +139,8 @@ const EmployeeLearningReport = () => {
 
     const sections = useMemo(() => buildSections(stats, t), [stats, t]);
     const includeEmployeeColumn = selectedEmployees.length > 1;
+    // perEmployeeStats is already sorted descending by totalJam, so this is just the top slice.
+    const topThreeByHours = useMemo(() => perEmployeeStats.slice(0, 3), [perEmployeeStats]);
 
     const handleAddEmployee = (emp: EmployeeOption) => {
         setSelectedEmployees(prev => [...prev, emp]);
@@ -404,6 +418,9 @@ const EmployeeLearningReport = () => {
             ) : (
                 <>
                     <LearningStatsSummaryCards stats={stats} t={t} employeeCount={selectedEmployees.length} />
+                    {topThreeByHours.length > 1 && (
+                        <PodiumRanking members={topThreeByHours} onSelect={selectEmployeeInRoster} t={t} />
+                    )}
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                         {t('employee.rosterHint', { count: selectedEmployees.length })}
                     </p>
@@ -432,7 +449,7 @@ const EmployeeRoster = ({ members, expandedIds, onToggle, t }: EmployeeRosterPro
             {members.map(member => {
                 const isExpanded = expandedIds.has(member.employeeId);
                 return (
-                    <div key={member.employeeId}>
+                    <div key={member.employeeId} id={`employee-roster-row-${member.employeeId}`} className="scroll-mt-24">
                         <button
                             type="button"
                             onClick={() => onToggle(member.employeeId)}
@@ -460,5 +477,78 @@ const EmployeeRoster = ({ members, expandedIds, onToggle, t }: EmployeeRosterPro
         </div>
     </div>
 );
+
+interface PodiumRankingProps {
+    // Pre-sorted descending by stats.totalJam and already capped to the top 3 (>= 2 entries).
+    members: TeamMemberSummary[];
+    onSelect: (employeeId: string) => void;
+    t: (key: string, options?: Record<string, unknown>) => string;
+}
+
+const PODIUM_STYLES = [
+    { avatar: 'from-amber-300 to-amber-500', badge: 'bg-amber-500', platform: 'bg-amber-400' }, // #1 gold
+    { avatar: 'from-slate-300 to-slate-400', badge: 'bg-slate-400', platform: 'bg-slate-300' }, // #2 silver
+    { avatar: 'from-orange-300 to-orange-500', badge: 'bg-orange-500', platform: 'bg-orange-400' } // #3 bronze
+];
+
+const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+};
+
+const PodiumRanking = ({ members, onSelect, t }: PodiumRankingProps) => {
+    const top3 = members.slice(0, 3);
+
+    const values = top3.map(m => m.stats.totalJam);
+    const maxVal = Math.max(...values);
+    const minVal = Math.min(...values);
+    const spread = maxVal - minVal;
+    // Platform height also follows actual hours (min-max over the podium), not just a fixed
+    // 1st/2nd/3rd step, so the podium keeps the same "real gap" story as the race track.
+    const heightFor = (v: number) => 64 + (spread === 0 ? 1 : (v - minVal) / spread) * 56;
+
+    // Classic podium arrangement: 2nd - 1st - 3rd, winner in the center.
+    const order = [1, 0, 2].filter(i => top3[i]);
+
+    return (
+        <div className="bg-white border border-slate-100 rounded-3xl shadow-sm p-6">
+            <div className="flex items-center gap-2 text-slate-400 mb-6">
+                <Trophy size={16} />
+                <span className="text-xs font-black uppercase tracking-widest">{t('employee.topRankingTitle')}</span>
+            </div>
+
+            <div className="flex items-end justify-center gap-4 sm:gap-8">
+                {order.map(i => {
+                    const member = top3[i];
+                    const style = PODIUM_STYLES[i];
+                    const height = heightFor(member.stats.totalJam);
+                    return (
+                        <button
+                            key={member.employeeId}
+                            type="button"
+                            onClick={() => onSelect(member.employeeId)}
+                            className="flex flex-col items-center gap-2 group"
+                        >
+                            {i === 0 && <Crown size={20} className="text-amber-400" />}
+                            <div className="relative">
+                                <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br ${style.avatar} flex items-center justify-center text-white font-black text-lg shadow-md ring-4 ring-white group-hover:scale-105 transition-transform`}>
+                                    {getInitials(member.name)}
+                                </div>
+                                <span className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full ${style.badge} text-white text-[10px] font-black flex items-center justify-center ring-2 ring-white`}>
+                                    {i + 1}
+                                </span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-700 text-center max-w-[110px] truncate">{member.name}</p>
+                            <p className="text-xs text-slate-400 font-semibold">{member.stats.totalJam} {t('hours')}</p>
+                            <div className={`w-20 sm:w-24 rounded-t-xl ${style.platform}`} style={{ height }} />
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
 
 export default EmployeeLearningReport;
