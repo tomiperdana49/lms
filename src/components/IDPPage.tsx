@@ -229,10 +229,18 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                     return;
                 }
 
-                // If the workbook has multiple sheets (e.g. a company-wide file), prefer the one matching
-                // this employee's own name; otherwise fall back to the first sheet with data.
+                // If the workbook has multiple sheets (e.g. a company-wide file), find the one matching
+                // this employee's own name. An employee may only import their own IDP data - never fall
+                // back to someone else's sheet just because the file didn't contain theirs.
                 const ownName = (currentUser?.name || '').trim().toLowerCase();
-                const parsed = parsedSheets.find(p => p.employee_name.trim().toLowerCase() === ownName) || parsedSheets[0];
+                const parsed = parsedSheets.find(p => p.employee_name.trim().toLowerCase() === ownName);
+                if (!parsed) {
+                    setNotification({
+                        show: true, type: 'warning',
+                        message: t('notifications.importNameMismatch', { name: parsedSheets[0].employee_name })
+                    });
+                    return;
+                }
 
                 setDraft({
                     achievements: parsed.achievements,

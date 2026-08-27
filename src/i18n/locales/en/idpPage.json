@@ -92,6 +92,7 @@
     "reviewSuccess": "Review saved.",
     "importSuccess": "Fields filled in from the file. Review them before saving.",
     "importNoData": "No valid IDP data found in this file. Make sure it matches the IDP template.",
+    "importNameMismatch": "This file contains IDP data for \"{{name}}\", not you. You can only import your own IDP data.",
     "importFailed": "Failed to read file: {{message}}"
   },
   "admin": {
