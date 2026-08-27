@@ -62,8 +62,15 @@
     "internalTrainingDeletedMessage": "Sesi training \"{{title}}\" Anda telah dihapus oleh HR.",
     "externalTrainingDeletedTitle": "Pengajuan Training Eksternal Dihapus",
     "externalTrainingDeletedMessage": "Pengajuan training eksternal \"{{title}}\" Anda telah dihapus oleh HR.",
-    "idpApprovedTitle": "IDP: Disetujui",
-    "idpApprovedMessage": "IDP (Individual Development Plan) Anda untuk tahun {{year}} telah disetujui oleh HR."
+    "idpStatusTitle": "IDP: {{status}}",
+    "idpStatusMessage": "IDP (Individual Development Plan) Anda untuk tahun {{year}} telah {{statusLabel}}.",
+    "idpApprovedByHR": "disetujui oleh HR",
+    "idpRejectedWithReason": "ditolak oleh HR dengan alasan: \"{{reason}}\"",
+    "idpRejected": "ditolak oleh HR",
+    "idpNoteTitle": "IDP: Catatan Baru dari HR",
+    "idpNoteMessage": "HR meninggalkan catatan pada IDP Anda untuk tahun {{year}}.",
+    "idpSubmittedTitle": "Pengajuan IDP Baru",
+    "idpSubmittedMessage": "{{name}} mengajukan IDP (Individual Development Plan) untuk tahun {{year}}, menunggu persetujuan Anda."
   },
   "footer": "© 2026 PT Media Antar Nusa",
   "userFallback": "Pengguna",

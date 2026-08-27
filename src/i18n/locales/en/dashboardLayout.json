@@ -62,8 +62,15 @@
     "internalTrainingDeletedMessage": "Your training session \"{{title}}\" has been removed by HR.",
     "externalTrainingDeletedTitle": "External Training Request Removed",
     "externalTrainingDeletedMessage": "Your external training request \"{{title}}\" has been removed by HR.",
-    "idpApprovedTitle": "IDP: Approved",
-    "idpApprovedMessage": "Your Individual Development Plan for {{year}} has been approved by HR."
+    "idpStatusTitle": "IDP: {{status}}",
+    "idpStatusMessage": "Your Individual Development Plan for {{year}} has been {{statusLabel}}.",
+    "idpApprovedByHR": "approved by HR",
+    "idpRejectedWithReason": "rejected by HR with reason: \"{{reason}}\"",
+    "idpRejected": "rejected by HR",
+    "idpNoteTitle": "IDP: New Note from HR",
+    "idpNoteMessage": "HR left a note on your Individual Development Plan for {{year}}.",
+    "idpSubmittedTitle": "New IDP Submitted",
+    "idpSubmittedMessage": "{{name}} submitted their Individual Development Plan for {{year}}, pending your approval."
   },
   "footer": "© 2026 PT Media Antar Nusa",
   "userFallback": "User",

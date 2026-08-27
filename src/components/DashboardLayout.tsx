@@ -84,7 +84,9 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
             if (!user?.email || !user?.name) return;
 
             try {
-                const [meetingsRes, trainingRes, logsRes, myExternalTrainingRes, subordinateExternalTrainingRes, deletedMeetingsRes, deletedExternalTrainingRes, myIdpPlansRes] = await Promise.all([
+                const isHrViewer = userRole === 'HR' || userRole === 'HR_ADMIN';
+
+                const [meetingsRes, trainingRes, logsRes, myExternalTrainingRes, subordinateExternalTrainingRes, deletedMeetingsRes, deletedExternalTrainingRes, myIdpPlansRes, allIdpPlansRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/api/meetings`),
                     fetch(`${API_BASE_URL}/api/training`),
                     fetch(`${API_BASE_URL}/api/logs`),
@@ -92,11 +94,15 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     fetch(`${API_BASE_URL}/api/external-training/subordinates?leader_id=${user.employee_id || ''}`),
                     fetch(`${API_BASE_URL}/api/meetings/deleted`),
                     fetch(`${API_BASE_URL}/api/external-training/deleted?employee_id=${user.employee_id || ''}`),
-                    fetch(`${API_BASE_URL}/api/idp/my-plans?employee_id=${user.employee_id || ''}`)
+                    fetch(`${API_BASE_URL}/api/idp/my-plans?employee_id=${user.employee_id || ''}`),
+                    // Only HR needs to see every employee's IDP (it carries personal development
+                    // data), so this is only requested for HR viewers.
+                    isHrViewer ? fetch(`${API_BASE_URL}/api/idp/all`) : Promise.resolve(null)
                 ]);
 
                 if (!meetingsRes.ok || !trainingRes.ok || !logsRes.ok || !myExternalTrainingRes.ok || !subordinateExternalTrainingRes.ok
-                    || !deletedMeetingsRes.ok || !deletedExternalTrainingRes.ok || !myIdpPlansRes.ok) return;
+                    || !deletedMeetingsRes.ok || !deletedExternalTrainingRes.ok || !myIdpPlansRes.ok
+                    || (allIdpPlansRes && !allIdpPlansRes.ok)) return;
 
                 const meetings = await meetingsRes.json();
                 const training = await trainingRes.json();
@@ -106,6 +112,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                 const deletedMeetings = await deletedMeetingsRes.json();
                 const deletedExternalTraining = await deletedExternalTrainingRes.json();
                 const myIdpPlans = await myIdpPlansRes.json();
+                const allIdpPlans = allIdpPlansRes ? await allIdpPlansRes.json() : [];
 
                 // Get already read notification IDs from LocalStorage
                 let readIds: number[] = [];
@@ -282,23 +289,68 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                         };
                     });
 
-                // 9. IDP: notify the EMPLOYEE when their plan is approved by HR
-                const idpApprovedNotifs = myIdpPlans
-                    .filter((p: any) => p.status === 'Approved')
+                // 9. IDP: notify the EMPLOYEE when HR approves or rejects their plan
+                const idpStatusNotifs = myIdpPlans
+                    .filter((p: any) => p.status === 'Approved' || p.status === 'Rejected')
                     .map((p: any) => {
-                        const notifId = p.id + 700000;
+                        const notifId = p.id + 700000 + (p.status === 'Rejected' ? 1 : 0);
+                        let statusLabel = '';
+                        let type = 'INFO';
+
+                        if (p.status === 'Approved') {
+                            statusLabel = t('notifications.idpApprovedByHR');
+                            type = 'SUCCESS';
+                        } else {
+                            statusLabel = p.rejection_reason
+                                ? t('notifications.idpRejectedWithReason', { reason: p.rejection_reason })
+                                : t('notifications.idpRejected');
+                            type = 'WARNING';
+                        }
+
                         return {
                             id: notifId,
-                            title: t('notifications.idpApprovedTitle'),
-                            message: t('notifications.idpApprovedMessage', { year: p.period_year }),
+                            title: t('notifications.idpStatusTitle', { status: p.status }),
+                            message: t('notifications.idpStatusMessage', { year: p.period_year, statusLabel }),
                             time: new Date(p.approved_date || p.updated_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
-                            type: 'SUCCESS',
+                            type,
                             isRead: readIds.includes(notifId)
                         };
                     });
 
+                // 10. IDP: notify the EMPLOYEE when HR leaves a note on their plan
+                const idpNoteNotifs = myIdpPlans
+                    .filter((p: any) => !!p.hr_note)
+                    .map((p: any) => {
+                        const notifId = p.id + 900000;
+                        return {
+                            id: notifId,
+                            title: t('notifications.idpNoteTitle'),
+                            message: t('notifications.idpNoteMessage', { year: p.period_year }),
+                            time: new Date(p.updated_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            type: 'INFO',
+                            isRead: readIds.includes(notifId)
+                        };
+                    });
+
+                // 11. IDP: notify every HR user when an employee submits a plan for approval
+                const idpSubmittedNotifs = isHrViewer
+                    ? allIdpPlans
+                        .filter((p: any) => p.status === 'Pending')
+                        .map((p: any) => {
+                            const notifId = p.id + 800000;
+                            return {
+                                id: notifId,
+                                title: t('notifications.idpSubmittedTitle'),
+                                message: t('notifications.idpSubmittedMessage', { name: p.employee_name, year: p.period_year }),
+                                time: new Date(p.created_by_date || p.updated_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                                type: 'INFO',
+                                isRead: readIds.includes(notifId)
+                            };
+                        })
+                    : [];
+
                 // Combine and Sort by latest (higher id means more recent)
-                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpApprovedNotifs].sort((a, b) => b.id - a.id);
+                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpStatusNotifs, ...idpNoteNotifs, ...idpSubmittedNotifs].sort((a, b) => b.id - a.id);
                 setNotifications(all);
             } catch (error) {
                 console.error("Failed to fetch header notifications", error);
