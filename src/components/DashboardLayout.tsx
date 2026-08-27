@@ -80,6 +80,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
     // --- Header Notifications State & Logic ---
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const [notifications, setNotifications] = useState<any[]>([]);
+    const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
     useEffect(() => {
         const fetchNotifications = async () => {
@@ -378,6 +379,18 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         return () => document.removeEventListener('click', handleOutsideClick);
     }, [isNotificationsOpen]);
 
+    useEffect(() => {
+        if (!isProfileMenuOpen) return;
+        const handleOutsideClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest('.profile-menu-container')) {
+                setIsProfileMenuOpen(false);
+            }
+        };
+        document.addEventListener('click', handleOutsideClick);
+        return () => document.removeEventListener('click', handleOutsideClick);
+    }, [isProfileMenuOpen]);
+
     const handleNotificationClick = (id: number) => {
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
         try {
@@ -597,24 +610,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                         )}
                     </nav>
 
-                    {/* Help & Feedback Buttons */}
+                    {/* Feedback Button (Help & Sign Out moved to the header profile dropdown) */}
                     <div className="px-4 pt-4 border-t border-slate-800/60 space-y-1">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                onNavigate('help');
-                                setIsSidebarOpen(false);
-                            }}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left cursor-pointer
-                                ${activePage === 'help'
-                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
-                                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                                }
-                            `}
-                        >
-                            <HelpCircle size={20} />
-                            <span className="font-medium">{t('menu.help')}</span>
-                        </button>
                         <button
                             type="button"
                             onClick={() => setIsFeedbackOpen(true)}
@@ -622,17 +619,6 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                         >
                             <MessageSquarePlus size={20} />
                             <span className="font-medium">{t('menu.feedback')}</span>
-                        </button>
-                    </div>
-
-                    {/* Logout Button (Sidebar Bottom) */}
-                    <div className="p-4">
-                        <button
-                            onClick={onLogout}
-                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-slate-800 hover:text-red-300 transition-colors"
-                        >
-                            <LogOut size={20} />
-                            <span className="font-medium">{t('menu.signOut')}</span>
                         </button>
                     </div>
 
@@ -727,26 +713,59 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             )}
                         </div>
 
-                        <div className="flex items-center gap-3 pl-6 border-l border-gray-200">
-                            <div className="text-right hidden sm:block">
-                                <p className="text-sm font-semibold text-slate-800 leading-tight">{user?.name || t('userFallback')}</p>
-                                {user?.employee_id && <p className="text-[10px] text-slate-500 font-medium leading-tight">{user.employee_id}</p>}
-                                <p className="text-xs text-blue-600 font-bold leading-tight mt-0.5">{user?.branch || t('branchFallback')}</p>
-                            </div>
-                            {user?.avatar && !avatarFailed ? (
-                                <img
-                                    src={user.avatar}
-                                    alt={user?.name || t('userFallback')}
-                                    onError={() => setAvatarFailed(true)}
-                                    className="w-10 h-10 rounded-full object-cover shadow-md ring-2 ring-white"
-                                />
-                            ) : (
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white
-                                    ${userRole === 'HR' || userRole === 'HR_ADMIN' ? 'bg-gradient-to-tr from-purple-500 to-pink-600' :
-                                        userRole === 'SUPERVISOR' ? 'bg-gradient-to-tr from-orange-500 to-red-500' :
-                                            'bg-gradient-to-tr from-blue-500 to-teal-500'}
-                                `}>
-                                    {user?.name ? getInitials(user.name) : 'U'}
+                        <div className="relative profile-menu-container">
+                            <button
+                                type="button"
+                                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                                className="flex items-center gap-3 pl-6 border-l border-gray-200 cursor-pointer text-left"
+                            >
+                                <div className="text-right hidden sm:block">
+                                    <p className="text-sm font-semibold text-slate-800 leading-tight">{user?.name || t('userFallback')}</p>
+                                    {user?.employee_id && <p className="text-[10px] text-slate-500 font-medium leading-tight">{user.employee_id}</p>}
+                                    <p className="text-xs text-blue-600 font-bold leading-tight mt-0.5">{user?.branch || t('branchFallback')}</p>
+                                </div>
+                                {user?.avatar && !avatarFailed ? (
+                                    <img
+                                        src={user.avatar}
+                                        alt={user?.name || t('userFallback')}
+                                        onError={() => setAvatarFailed(true)}
+                                        className="w-10 h-10 rounded-full object-cover shadow-md ring-2 ring-white"
+                                    />
+                                ) : (
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white
+                                        ${userRole === 'HR' || userRole === 'HR_ADMIN' ? 'bg-gradient-to-tr from-purple-500 to-pink-600' :
+                                            userRole === 'SUPERVISOR' ? 'bg-gradient-to-tr from-orange-500 to-red-500' :
+                                                'bg-gradient-to-tr from-blue-500 to-teal-500'}
+                                    `}>
+                                        {user?.name ? getInitials(user.name) : 'U'}
+                                    </div>
+                                )}
+                            </button>
+
+                            {isProfileMenuOpen && (
+                                <div className="absolute right-0 mt-2 w-56 bg-white/95 backdrop-blur-md border border-slate-100 shadow-2xl rounded-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200 p-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsProfileMenuOpen(false);
+                                            onNavigate('help');
+                                        }}
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors text-left"
+                                    >
+                                        <HelpCircle size={18} />
+                                        <span className="font-medium text-sm">{t('menu.help')}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsProfileMenuOpen(false);
+                                            onLogout();
+                                        }}
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-red-500 hover:bg-red-50 transition-colors text-left"
+                                    >
+                                        <LogOut size={18} />
+                                        <span className="font-medium text-sm">{t('menu.signOut')}</span>
+                                    </button>
                                 </div>
                             )}
                         </div>
