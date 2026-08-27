@@ -501,15 +501,15 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                 <button
                                     onClick={() => setIsAdminOpen(!isAdminOpen)}
                                     className={`
-                                        w-full flex items-center justify-between px-4 py-3 transition-colors text-left
+                                        w-full flex items-center justify-between px-4 py-3 transition-colors text-left border
                                         ${activePage === 'admin-dashboard' || isAdminOpen
-                                            ? `bg-white text-slate-900 shadow-lg ${isAdminOpen ? 'rounded-t-xl' : 'rounded-xl'}`
-                                            : 'rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white'
+                                            ? `bg-slate-800 text-white border-indigo-500/30 shadow-lg ${isAdminOpen ? 'rounded-t-xl' : 'rounded-xl'}`
+                                            : 'rounded-xl border-transparent text-slate-400 hover:bg-slate-800 hover:text-white'
                                         }
                                     `}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <Shield size={20} />
+                                        <Shield size={20} className={activePage === 'admin-dashboard' || isAdminOpen ? 'text-indigo-400' : ''} />
                                         <span className="font-medium">{t('menu.adminPanel')}</span>
                                     </div>
                                     {isAdminOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -517,10 +517,10 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
 
                                 {/* SUB-MENU (Accordion) */}
                                 {isAdminOpen && (
-                                    <div className="bg-white rounded-b-xl pb-3 space-y-1 shadow-lg">
+                                    <div className="bg-slate-800 border-x border-b border-indigo-500/30 rounded-b-xl pb-3 space-y-1 shadow-lg">
                                         {adminSubItems.map((sub, idx) => (
                                             sub.header ? (
-                                                <p key={idx} className="px-6 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-5">{sub.header}</p>
+                                                <p key={idx} className="px-6 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 mt-5">{sub.header}</p>
                                             ) : (
                                                 <button
                                                     key={idx}
@@ -529,7 +529,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                                         setIsSidebarOpen(false);
                                                     }}
                                                     className={`w-full flex items-center gap-3 px-6 py-2 text-sm transition-colors text-left
-                                                        ${activePage === 'admin-dashboard' && sub.view === adminView ? 'text-blue-600 font-semibold bg-blue-50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'}
+                                                        ${activePage === 'admin-dashboard' && sub.view === adminView ? 'text-indigo-400 font-semibold bg-indigo-500/10' : 'text-slate-400 hover:text-white hover:bg-white/5'}
                                                     `}
                                                 >
                                                     {sub.icon && <sub.icon size={16} className="opacity-70" />}
