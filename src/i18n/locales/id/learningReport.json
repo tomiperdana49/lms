@@ -7,6 +7,8 @@
   "minutes": "mnt",
   "totalHours": "Total Jam Belajar",
   "totalCost": "Total Biaya Belajar",
+  "remainingBudget": "Sisa budget",
+  "budgetExceeded": "Melebihi budget",
   "filter": {
     "label": "Periode",
     "to": "s/d",
@@ -64,7 +66,7 @@
     "allOrganizations": "Semua Organisasi",
     "allBranches": "Semua Cabang",
     "clearAll": "Hapus semua",
-    "combinedFor": "Laporan gabungan untuk {{count}} karyawan",
+    "rosterHint": "{{count}} karyawan dipilih — klik nama untuk menampilkan/menyembunyikan detailnya",
     "notFound": "Karyawan tidak ditemukan",
     "noSelection": "Pilih satu atau beberapa karyawan untuk melihat laporan pembelajarannya."
   },

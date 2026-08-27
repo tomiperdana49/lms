@@ -1711,6 +1711,7 @@ app.post('/api/learning-stats/bulk', async (req, res) => {
         }
 
         const perEmployee = await Promise.all(employees.map(async (emp) => ({
+            employeeId: emp.employee_id,
             name: emp.name,
             stats: await computeLearningStats({ email: emp.email, employee_id: emp.employee_id, startDate, endDate })
         })));
@@ -1752,6 +1753,10 @@ app.post('/api/learning-stats/bulk', async (req, res) => {
         merged.biayaBuku = Math.round(merged.biayaBuku);
         merged.totalJam = Math.round((merged.jamTraining + merged.jamTrainingExternal + merged.jamOnline + merged.jamBuku) * 100) / 100;
         merged.totalBiaya = Math.round(merged.biayaTraining + merged.biayaTrainingExternal + merged.biayaBuku);
+
+        // Per-employee breakdown, so the UI can show/hide each employee's own detail instead of
+        // one merged list.
+        merged.perEmployee = perEmployee.map(({ employeeId, name, stats }) => ({ employeeId, name, stats }));
 
         res.json(merged);
     } catch (err) {

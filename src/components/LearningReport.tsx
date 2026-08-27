@@ -4,6 +4,9 @@ import { Users, Globe, Video, BookOpen, Clock, Wallet, Download, Loader2, CheckC
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 
+// Flat annual learning budget granted to every employee (1 period = 1 calendar year).
+export const ANNUAL_LEARNING_BUDGET = 2000000;
+
 interface LearningStatDetail {
     title: string;
     date: string;
@@ -135,7 +138,7 @@ interface EmployeeRecord {
     id_report_to?: string;
 }
 
-interface TeamMemberSummary {
+export interface TeamMemberSummary {
     employeeId: string;
     name: string;
     email?: string;
@@ -398,8 +401,20 @@ interface LearningStatsBreakdownProps {
     t: (key: string) => string;
 }
 
-export const LearningStatsBreakdown = ({ stats, t }: LearningStatsBreakdownProps) => {
+interface LearningStatsSummaryCardsProps {
+    stats: LearningStats;
+    t: (key: string) => string;
+    // Number of employees the stats cover, so the learning budget (flat per employee, per year)
+    // scales accordingly. Defaults to a single employee.
+    employeeCount?: number;
+}
+
+// Grand-total + per-category summary cards, with no item-level detail. Used on its own for a
+// combined overview (e.g. multiple employees at once) and reused inside LearningStatsBreakdown.
+export const LearningStatsSummaryCards = ({ stats, t, employeeCount = 1 }: LearningStatsSummaryCardsProps) => {
     const sections = buildSections(stats, t);
+    const totalBudget = ANNUAL_LEARNING_BUDGET * Math.max(employeeCount, 1);
+    const remainingBudget = totalBudget - stats.totalBiaya;
 
     return (
         <>
@@ -416,7 +431,21 @@ export const LearningStatsBreakdown = ({ stats, t }: LearningStatsBreakdownProps
                     <Wallet className="absolute -right-4 -bottom-4 opacity-5 text-slate-800" size={100} />
                     <div className="relative z-10">
                         <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">{t('totalCost')}</div>
-                        <div className="text-3xl font-black tracking-tight text-slate-800">Rp {stats.totalBiaya.toLocaleString('id-ID')}</div>
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                            <span className="text-3xl font-black tracking-tight text-slate-800">Rp {stats.totalBiaya.toLocaleString('id-ID')}</span>
+                            <span className="text-sm font-bold text-slate-400">/ Rp {totalBudget.toLocaleString('id-ID')}</span>
+                        </div>
+                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mt-3">
+                            <div
+                                className={`h-full rounded-full ${remainingBudget >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                                style={{ width: `${Math.min((stats.totalBiaya / totalBudget) * 100, 100)}%` }}
+                            />
+                        </div>
+                        <p className={`text-xs font-bold mt-2 ${remainingBudget >= 0 ? 'text-slate-400' : 'text-rose-600'}`}>
+                            {remainingBudget >= 0
+                                ? `${t('remainingBudget')}: Rp ${remainingBudget.toLocaleString('id-ID')}`
+                                : `${t('budgetExceeded')}: Rp ${Math.abs(remainingBudget).toLocaleString('id-ID')}`}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -436,6 +465,16 @@ export const LearningStatsBreakdown = ({ stats, t }: LearningStatsBreakdownProps
                     </div>
                 ))}
             </div>
+        </>
+    );
+};
+
+export const LearningStatsBreakdown = ({ stats, t }: LearningStatsBreakdownProps) => {
+    const sections = buildSections(stats, t);
+
+    return (
+        <>
+            <LearningStatsSummaryCards stats={stats} t={t} />
 
             {/* Detail Sections */}
             <div className="space-y-6">

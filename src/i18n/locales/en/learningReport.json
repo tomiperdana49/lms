@@ -7,6 +7,8 @@
   "minutes": "min",
   "totalHours": "Total Learning Hours",
   "totalCost": "Total Learning Cost",
+  "remainingBudget": "Remaining budget",
+  "budgetExceeded": "Over budget",
   "filter": {
     "label": "Period",
     "to": "to",
@@ -64,7 +66,7 @@
     "allOrganizations": "All Organizations",
     "allBranches": "All Branches",
     "clearAll": "Clear all",
-    "combinedFor": "Combined report for {{count}} employees",
+    "rosterHint": "{{count}} employees selected — click a name to show or hide their detail",
     "notFound": "No employees found",
     "noSelection": "Select one or more employees to view their learning report."
   },

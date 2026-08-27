@@ -12,6 +12,8 @@
   "totalHours": "Total Jam",
   "learningCost": "Biaya Belajar",
   "totalCost": "Total Biaya",
+  "remainingBudget": "Sisa budget",
+  "budgetExceeded": "Budget tahunan terlampaui",
   "detailModal": {
     "hoursTitle": "Detail Jam Belajar",
     "costTitle": "Detail Biaya Belajar",
@@ -25,6 +27,9 @@
     "noReading": "Belum ada buku yang disetujui.",
     "subtotal": "Subtotal",
     "grandTotal": "Total Keseluruhan",
+    "annualBudget": "Budget belajar tahunan (1 periode = 1 tahun)",
+    "remainingBudget": "Sisa budget",
+    "budgetExceeded": "Melebihi budget sebesar",
     "close": "Tutup"
   },
   "menu": {

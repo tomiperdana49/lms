@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { Page, Role } from '../types';
 import LMSCalendar from './LMSCalendar';
 import { API_BASE_URL } from '../config';
+import { ANNUAL_LEARNING_BUDGET } from './LearningReport';
 
 interface LearningStatDetail {
     title: string;
@@ -125,6 +126,8 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
 
     const menuItems = [...baseMenuItems];
 
+    const remainingBudget = Math.max(ANNUAL_LEARNING_BUDGET - learningStats.totalBiaya, 0);
+
     const getGreeting = () => {
         const hour = new Date().getHours();
         if (hour < 11) return t('goodMorning');
@@ -169,9 +172,11 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
                                 </div>
                                 <span className="text-[11px] font-bold text-blue-100 uppercase tracking-wide leading-tight min-w-0 break-words">{t('learningHours')}</span>
                             </div>
-                            <div className="flex items-baseline gap-1 mt-auto">
-                                <span className="text-xl sm:text-2xl font-black tracking-tighter">{learningStats.totalJam}</span>
-                                <span className="text-sm font-bold opacity-60">{t('hours')}</span>
+                            <div className="flex-1 flex items-center justify-center">
+                                <div className="flex flex-col items-center text-center">
+                                    <span className="text-xl sm:text-2xl font-black tracking-tighter">{learningStats.totalJam}</span>
+                                    <span className="text-sm font-bold opacity-60">{t('hours')}</span>
+                                </div>
                             </div>
                         </button>
                         <button
@@ -185,9 +190,27 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
                                 </div>
                                 <span className="text-[11px] font-bold text-blue-100 uppercase tracking-wide leading-tight min-w-0 break-words">{t('learningCost')}</span>
                             </div>
-                            <span className="text-lg sm:text-xl font-black tracking-tighter text-emerald-300 mt-auto whitespace-nowrap" title={`Rp ${learningStats.totalBiaya.toLocaleString('id-ID')}`}>
-                                Rp {learningStats.totalBiaya.toLocaleString('id-ID')}
-                            </span>
+                            <div className="mt-auto space-y-1.5">
+                                <div className="flex items-baseline gap-1 flex-wrap" title={`Rp ${learningStats.totalBiaya.toLocaleString('id-ID')}`}>
+                                    <span className="text-lg sm:text-xl font-black tracking-tighter text-emerald-300 whitespace-nowrap">
+                                        Rp {learningStats.totalBiaya.toLocaleString('id-ID')}
+                                    </span>
+                                    <span className="text-[11px] font-bold text-blue-100/60 whitespace-nowrap">
+                                        / Rp {ANNUAL_LEARNING_BUDGET.toLocaleString('id-ID')}
+                                    </span>
+                                </div>
+                                <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                    <div
+                                        className={`h-full rounded-full ${remainingBudget > 0 ? 'bg-emerald-400' : 'bg-rose-400'}`}
+                                        style={{ width: `${Math.min((learningStats.totalBiaya / ANNUAL_LEARNING_BUDGET) * 100, 100)}%` }}
+                                    />
+                                </div>
+                                <p className={`text-[10px] font-bold whitespace-nowrap ${remainingBudget > 0 ? 'text-blue-100/70' : 'text-rose-300'}`}>
+                                    {remainingBudget > 0
+                                        ? `${t('remainingBudget')}: Rp ${remainingBudget.toLocaleString('id-ID')}`
+                                        : t('budgetExceeded')}
+                                </p>
+                            </div>
                         </button>
                     </div>
                 </div>
@@ -361,6 +384,29 @@ const LearningStatsDetailModal = ({ mode, stats, onClose, t }: LearningStatsDeta
                         </div>
                     ))}
                 </div>
+
+                {!isHours && (
+                    <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 space-y-2 shrink-0">
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                            <span>{t('detailModal.annualBudget')}</span>
+                            <span>Rp {ANNUAL_LEARNING_BUDGET.toLocaleString('id-ID')}</span>
+                        </div>
+                        <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                            <div
+                                className={`h-full rounded-full ${grandTotal <= ANNUAL_LEARNING_BUDGET ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                                style={{ width: `${Math.min((grandTotal / ANNUAL_LEARNING_BUDGET) * 100, 100)}%` }}
+                            />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <span className={`text-xs font-bold ${grandTotal <= ANNUAL_LEARNING_BUDGET ? 'text-slate-500' : 'text-rose-600'}`}>
+                                {grandTotal <= ANNUAL_LEARNING_BUDGET ? t('detailModal.remainingBudget') : t('detailModal.budgetExceeded')}
+                            </span>
+                            <span className={`text-sm font-black ${grandTotal <= ANNUAL_LEARNING_BUDGET ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                Rp {Math.abs(ANNUAL_LEARNING_BUDGET - grandTotal).toLocaleString('id-ID')}
+                            </span>
+                        </div>
+                    </div>
+                )}
 
                 <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl shrink-0">
                     <span className="text-sm font-black text-slate-700 uppercase tracking-wide">{t('detailModal.grandTotal')}</span>

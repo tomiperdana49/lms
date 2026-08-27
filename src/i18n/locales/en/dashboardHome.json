@@ -12,6 +12,8 @@
   "totalHours": "Total Hours",
   "learningCost": "Learning Cost",
   "totalCost": "Total Cost",
+  "remainingBudget": "Remaining budget",
+  "budgetExceeded": "Annual budget exceeded",
   "detailModal": {
     "hoursTitle": "Learning Hours Detail",
     "costTitle": "Learning Cost Detail",
@@ -25,6 +27,9 @@
     "noReading": "No approved books yet.",
     "subtotal": "Subtotal",
     "grandTotal": "Grand Total",
+    "annualBudget": "Annual learning budget (per period, 1 period = 1 year)",
+    "remainingBudget": "Remaining budget",
+    "budgetExceeded": "Over budget by",
     "close": "Close"
   },
   "menu": {

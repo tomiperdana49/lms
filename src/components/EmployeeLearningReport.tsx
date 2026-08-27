@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { Search, Download, Loader2, CalendarRange, UsersRound, Building2, MapPin, Check, X } from 'lucide-react';
+import { Search, Download, Loader2, CalendarRange, UsersRound, Building2, MapPin, Check, X, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import {
@@ -8,9 +8,10 @@ import {
     buildSections,
     getDefaultRange,
     formatDate,
-    LearningStatsBreakdown
+    LearningStatsBreakdown,
+    LearningStatsSummaryCards
 } from './LearningReport';
-import type { LearningStats } from './LearningReport';
+import type { LearningStats, TeamMemberSummary } from './LearningReport';
 
 interface EmployeeOption {
     id_employee: string;
@@ -38,8 +39,19 @@ const EmployeeLearningReport = () => {
     useEffect(() => { selectedBranchRef.current = selectedBranch; }, [selectedBranch]);
     const [selectedEmployees, setSelectedEmployees] = useState<EmployeeOption[]>([]);
     const [stats, setStats] = useState<LearningStats>(EMPTY_STATS);
+    const [perEmployeeStats, setPerEmployeeStats] = useState<TeamMemberSummary[]>([]);
+    const [expandedEmployeeIds, setExpandedEmployeeIds] = useState<Set<string>>(new Set());
     const [statsLoading, setStatsLoading] = useState(false);
     const [{ startDate, endDate }, setRange] = useState(getDefaultRange);
+
+    const toggleEmployeeExpanded = (employeeId: string) => {
+        setExpandedEmployeeIds(prev => {
+            const next = new Set(prev);
+            if (next.has(employeeId)) next.delete(employeeId);
+            else next.add(employeeId);
+            return next;
+        });
+    };
 
     useEffect(() => {
         fetch(`${API_BASE_URL}/api/employees`)
@@ -52,6 +64,7 @@ const EmployeeLearningReport = () => {
     useEffect(() => {
         if (selectedEmployees.length === 0) {
             setStats(EMPTY_STATS);
+            setPerEmployeeStats([]);
             return;
         }
         setStatsLoading(true);
@@ -65,7 +78,12 @@ const EmployeeLearningReport = () => {
             })
         })
             .then(res => res.json())
-            .then(data => { if (!data.error) setStats(data); })
+            .then(data => {
+                if (!data.error) {
+                    setStats(data);
+                    setPerEmployeeStats(Array.isArray(data.perEmployee) ? data.perEmployee : []);
+                }
+            })
             .catch(err => console.error('Error fetching learning stats:', err))
             .finally(() => setStatsLoading(false));
     }, [selectedEmployees, startDate, endDate]);
@@ -380,18 +398,64 @@ const EmployeeLearningReport = () => {
                     <Loader2 className="animate-spin mb-3" size={32} />
                     <p>{t('loading')}</p>
                 </div>
+            ) : selectedEmployees.length === 1 ? (
+                <LearningStatsBreakdown stats={stats} t={t} />
             ) : (
                 <>
-                    {selectedEmployees.length > 1 && (
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                            {t('employee.combinedFor', { count: selectedEmployees.length })}
-                        </p>
-                    )}
-                    <LearningStatsBreakdown stats={stats} t={t} />
+                    <LearningStatsSummaryCards stats={stats} t={t} employeeCount={selectedEmployees.length} />
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                        {t('employee.rosterHint', { count: selectedEmployees.length })}
+                    </p>
+                    <EmployeeRoster
+                        members={perEmployeeStats}
+                        expandedIds={expandedEmployeeIds}
+                        onToggle={toggleEmployeeExpanded}
+                        t={t}
+                    />
                 </>
             )}
         </div>
     );
 };
+
+interface EmployeeRosterProps {
+    members: TeamMemberSummary[];
+    expandedIds: Set<string>;
+    onToggle: (employeeId: string) => void;
+    t: (key: string, options?: Record<string, unknown>) => string;
+}
+
+const EmployeeRoster = ({ members, expandedIds, onToggle, t }: EmployeeRosterProps) => (
+    <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
+        <div className="divide-y divide-slate-50">
+            {members.map(member => {
+                const isExpanded = expandedIds.has(member.employeeId);
+                return (
+                    <div key={member.employeeId}>
+                        <button
+                            type="button"
+                            onClick={() => onToggle(member.employeeId)}
+                            className="w-full flex items-center justify-between gap-4 px-6 py-4 hover:bg-slate-50 transition-colors text-left"
+                        >
+                            <p className="font-semibold text-slate-700 text-sm truncate">{member.name}</p>
+                            <div className="flex items-center gap-3 shrink-0">
+                                <div className="text-right">
+                                    <p className="font-bold text-slate-700 text-sm">{member.stats.totalJam} {t('hours')}</p>
+                                    <p className="text-[11px] text-slate-400">Rp {member.stats.totalBiaya.toLocaleString('id-ID')}</p>
+                                </div>
+                                <ChevronDown size={16} className={`text-slate-300 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                            </div>
+                        </button>
+                        {isExpanded && (
+                            <div className="bg-slate-50 px-6 py-6 border-t border-slate-100 space-y-6">
+                                <LearningStatsBreakdown stats={member.stats} t={t} />
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    </div>
+);
 
 export default EmployeeLearningReport;
