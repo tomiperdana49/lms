@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import {
     EMPTY_STATS,
+    ANNUAL_LEARNING_BUDGET,
     buildSections,
     getDefaultRange,
     formatDate,
@@ -441,7 +442,9 @@ const EmployeeRoster = ({ members, expandedIds, onToggle, t }: EmployeeRosterPro
                             <div className="flex items-center gap-3 shrink-0">
                                 <div className="text-right">
                                     <p className="font-bold text-slate-700 text-sm">{member.stats.totalJam} {t('hours')}</p>
-                                    <p className="text-[11px] text-slate-400">Rp {member.stats.totalBiaya.toLocaleString('id-ID')}</p>
+                                    <p className={`text-[11px] ${member.stats.totalBiaya > ANNUAL_LEARNING_BUDGET ? 'text-red-600 font-bold' : 'text-slate-400'}`}>
+                                        Rp {member.stats.totalBiaya.toLocaleString('id-ID')}
+                                    </p>
                                 </div>
                                 <ChevronDown size={16} className={`text-slate-300 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                             </div>
