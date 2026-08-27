@@ -67,7 +67,7 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
     const [myPlans, setMyPlans] = useState<IDPPlan[]>([]);
     const [teamPlans, setTeamPlans] = useState<IDPPlan[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
-    const [notification, setNotification] = useState<{ show: boolean; type: 'success' | 'error'; message: string }>({ show: false, type: 'success', message: '' });
+    const [notification, setNotification] = useState<{ show: boolean; type: 'success' | 'error' | 'warning'; message: string }>({ show: false, type: 'success', message: '' });
 
     // --- Team IDP: search + period filter, so a leader with many reports can find someone quickly ---
     const [teamSearchQuery, setTeamSearchQuery] = useState('');
@@ -300,10 +300,25 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
 
     const savePlan = async (submit: boolean) => {
         if (submit) {
+            const requiredFields: Array<[string, string]> = [
+                [draft.achievements, t('form.achievements')],
+                [draft.career_goal, t('form.careerGoal')],
+                [draft.existing_skills, t('form.existingSkills')],
+                [draft.development_area, t('form.developmentArea')]
+            ];
+            const missingFields = requiredFields.filter(([value]) => !value.trim()).map(([, label]) => label);
+            if (missingFields.length > 0) {
+                setNotification({
+                    show: true, type: 'warning',
+                    message: t('notifications.requiredFieldsMissing', { fields: missingFields.map(f => `• ${f}`).join('\n') })
+                });
+                return;
+            }
+
             const filledCount = draft.actionItems.filter(i => i.action_description.trim()).length + 1; // +1 for the always-present mandatory row
             if (filledCount < MIN_ACTION_PLAN_ITEMS) {
                 setNotification({
-                    show: true, type: 'error',
+                    show: true, type: 'warning',
                     message: t('notifications.minActionPlanItems', { count: MIN_ACTION_PLAN_ITEMS - filledCount })
                 });
                 return;

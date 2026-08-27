@@ -1,8 +1,10 @@
 {
   "success": "Berhasil!",
   "error": "Error",
+  "warning": "Perhatian",
   "information": "Informasi",
   "continue": "Lanjutkan",
   "tryAgain": "Coba Lagi",
+  "understood": "Mengerti",
   "close": "Tutup"
 }

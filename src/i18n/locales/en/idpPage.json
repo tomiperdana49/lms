@@ -80,6 +80,7 @@
     "Rejected": "Rejected"
   },
   "notifications": {
+    "requiredFieldsMissing": "The following fields must be filled in before submitting for approval:\n{{fields}}",
     "minActionPlanItems": "The Development Action Plan needs at least 4 rows (including the mandatory Learning Hours item). Add {{count}} more row(s).",
     "saveFailed": "Failed to save the IDP.",
     "submitFailed": "Failed to submit the IDP.",

@@ -1,8 +1,10 @@
 {
   "success": "Success!",
   "error": "Error",
+  "warning": "Heads Up",
   "information": "Information",
   "continue": "Continue",
   "tryAgain": "Try Again",
+  "understood": "Understood",
   "close": "Close"
 }

@@ -80,6 +80,7 @@
     "Rejected": "Ditolak"
   },
   "notifications": {
+    "requiredFieldsMissing": "Kolom berikut wajib diisi sebelum mengajukan untuk persetujuan:\n{{fields}}",
     "minActionPlanItems": "Rencana Aksi Pengembangan minimal harus memiliki 4 baris (termasuk item wajib Jam Learning). Tambahkan {{count}} baris lagi.",
     "saveFailed": "Gagal menyimpan IDP.",
     "submitFailed": "Gagal mengajukan IDP.",
