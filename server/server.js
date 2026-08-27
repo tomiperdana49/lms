@@ -817,6 +817,7 @@ app.post('/api/login', async (req, res) => {
                     email: finalUser.email,
                     branch: finalUser.branch,
                     employee_id: finalUser.employee_id,
+                    avatar: finalUser.avatar,
                     isSupervisor
                 }
             });
@@ -897,6 +898,7 @@ app.post('/api/login', async (req, res) => {
                         email: user.email,
                         branch: user.branch,
                         employee_id: user.employee_id,
+                        avatar: user.avatar,
                         isSupervisor
                     }
                 });
@@ -984,6 +986,7 @@ app.post('/api/auth/google', async (req, res) => {
                 email: user.email,
                 branch: user.branch,
                 employee_id: user.employee_id,
+                avatar: user.avatar,
                 isSupervisor
             }
         });
@@ -1052,6 +1055,7 @@ app.post('/api/auth/refresh', async (req, res) => {
                 email: user.email,
                 branch: user.branch,
                 employee_id: user.employee_id,
+                avatar: user.avatar,
                 isSupervisor
             }
         });

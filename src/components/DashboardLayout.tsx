@@ -46,6 +46,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
     const { t, i18n } = useTranslation('dashboardLayout');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+    const [avatarFailed, setAvatarFailed] = useState(false);
+    useEffect(() => { setAvatarFailed(false); }, [user?.avatar]);
     const [isTrainingOpen, setIsTrainingOpen] = useState(() => {
         return activePage === 'internal' || activePage === 'external' || activePage === 'external-approval';
     });
@@ -731,13 +733,22 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                 {user?.employee_id && <p className="text-[10px] text-slate-500 font-medium leading-tight">{user.employee_id}</p>}
                                 <p className="text-xs text-blue-600 font-bold leading-tight mt-0.5">{user?.branch || t('branchFallback')}</p>
                             </div>
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white
-                                ${userRole === 'HR' || userRole === 'HR_ADMIN' ? 'bg-gradient-to-tr from-purple-500 to-pink-600' :
-                                    userRole === 'SUPERVISOR' ? 'bg-gradient-to-tr from-orange-500 to-red-500' :
-                                        'bg-gradient-to-tr from-blue-500 to-teal-500'}
-                            `}>
-                                {user?.name ? getInitials(user.name) : 'U'}
-                            </div>
+                            {user?.avatar && !avatarFailed ? (
+                                <img
+                                    src={user.avatar}
+                                    alt={user?.name || t('userFallback')}
+                                    onError={() => setAvatarFailed(true)}
+                                    className="w-10 h-10 rounded-full object-cover shadow-md ring-2 ring-white"
+                                />
+                            ) : (
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white
+                                    ${userRole === 'HR' || userRole === 'HR_ADMIN' ? 'bg-gradient-to-tr from-purple-500 to-pink-600' :
+                                        userRole === 'SUPERVISOR' ? 'bg-gradient-to-tr from-orange-500 to-red-500' :
+                                            'bg-gradient-to-tr from-blue-500 to-teal-500'}
+                                `}>
+                                    {user?.name ? getInitials(user.name) : 'U'}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </header>
