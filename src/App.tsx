@@ -42,8 +42,9 @@ function App() {
 
   const [sessionExpiredReason, setSessionExpiredReason] = useState<'idle' | 'absolute' | null>(null);
 
-  // Deep links (e.g. from WhatsApp notifications) can force an initial page/tab via ?page=&tab=
-  const [deepLinkTab] = useState<string | null>(() => new URLSearchParams(window.location.search).get('tab'));
+  // Deep links (e.g. from WhatsApp notifications, or the dashboard's "Perlu Tindakan Anda" widget)
+  // can force the External Training tab via ?tab= on load, or via onNavigate('external', tab) later.
+  const [deepLinkTab, setDeepLinkTab] = useState<string | null>(() => new URLSearchParams(window.location.search).get('tab'));
 
   const [activePage, setActivePage] = useState<Page>(() => {
     const linkedPage = new URLSearchParams(window.location.search).get('page');
@@ -272,7 +273,10 @@ function App() {
         activePage={activePage}
         onNavigate={(page, view) => {
           setActivePage(page);
-          if (view) setAdminView(view);
+          if (view) {
+            setAdminView(view);
+            if (page === 'external') setDeepLinkTab(view);
+          }
         }}
         userRole={userRole}
         user={user!}
@@ -281,7 +285,22 @@ function App() {
         adminView={adminView}
         config={config}
       >
-        {activePage === 'dashboard' && <DashboardHome onNavigate={setActivePage} userRole={userRole} userEmail={user?.email} userName={user?.name} config={config} />}
+        {activePage === 'dashboard' && (
+          <DashboardHome
+            onNavigate={(page, view) => {
+              setActivePage(page);
+              if (view) {
+                setAdminView(view);
+                if (page === 'external') setDeepLinkTab(view);
+              }
+            }}
+            userRole={userRole}
+            userEmail={user?.email}
+            userName={user?.name}
+            userEmployeeId={user?.employee_id}
+            config={config}
+          />
+        )}
         {activePage === 'reading-log' && (
           <ReadingLogPage
             user={user!}

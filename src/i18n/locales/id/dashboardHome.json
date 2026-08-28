@@ -32,6 +32,12 @@
     "budgetExceeded": "Melebihi budget sebesar",
     "close": "Tutup"
   },
+  "pendingActions": {
+    "title": "Perlu Tindakan Anda",
+    "empty": "Tidak ada yang perlu ditindaklanjuti saat ini.",
+    "viewAll": "Lihat semua",
+    "idpItem": "IDP Tahun {{year}}"
+  },
   "menu": {
     "readingLogTitle": "Log Bacaan",
     "readingLogSubtitle": "Log bacaan buku",

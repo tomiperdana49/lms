@@ -1,10 +1,17 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, Users, Calendar as CalendarIcon, Video, GraduationCap, Star, Briefcase, Award, X, Clock, Wallet } from 'lucide-react';
+import { BookOpen, Users, Calendar as CalendarIcon, Video, GraduationCap, Star, Briefcase, Award, X, Clock, Wallet, AlertCircle, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Page, Role } from '../types';
 import LMSCalendar from './LMSCalendar';
 import { API_BASE_URL } from '../config';
 import { ANNUAL_LEARNING_BUDGET } from './LearningReport';
+
+interface PendingActionItem {
+    id: number;
+    title: string;
+    subtitle: string;
+    date: string;
+}
 
 interface LearningStatDetail {
     title: string;
@@ -39,15 +46,58 @@ interface LearningStats {
 }
 
 interface DashboardHomeProps {
-    onNavigate?: (page: Page) => void;
+    onNavigate?: (page: Page, view?: string) => void;
     userRole?: Role;
     userEmail?: string;
     userName?: string;
+    userEmployeeId?: string;
     config?: { moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean };
 }
 
-const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: DashboardHomeProps) => {
+const DashboardHome = ({ onNavigate, userRole, userEmail, userName, userEmployeeId, config }: DashboardHomeProps) => {
     const { t } = useTranslation('dashboardHome');
+    const [pendingActions, setPendingActions] = useState<PendingActionItem[]>([]);
+
+    // "Perlu Tindakan Anda": surfaces items where THIS user is the one who needs to act next -
+    // a supervisor's team external-training requests, or HR's employee IDP submissions. Each role
+    // only ever sees the one category relevant to them, mirroring the header notification logic.
+    useEffect(() => {
+        if (userRole === 'SUPERVISOR' && userEmployeeId) {
+            fetch(`${API_BASE_URL}/api/external-training/subordinates?leader_id=${userEmployeeId}`)
+                .then(res => res.json())
+                .then(data => {
+                    const pending = (Array.isArray(data) ? data : []).filter((r: any) => r.status === 'Pending');
+                    setPendingActions(pending.map((r: any) => ({
+                        id: r.id,
+                        title: r.employee_name,
+                        subtitle: r.title,
+                        date: r.created_at
+                    })));
+                })
+                .catch(err => console.error('Error fetching pending external training:', err));
+        } else if (userRole === 'HR' || userRole === 'HR_ADMIN') {
+            fetch(`${API_BASE_URL}/api/idp/all`)
+                .then(res => res.json())
+                .then(data => {
+                    const pending = (Array.isArray(data) ? data : []).filter((p: any) => p.status === 'Pending');
+                    setPendingActions(pending.map((p: any) => ({
+                        id: p.id,
+                        title: p.employee_name,
+                        subtitle: t('pendingActions.idpItem', { year: p.period_year }),
+                        date: p.created_by_date
+                    })));
+                })
+                .catch(err => console.error('Error fetching pending IDP plans:', err));
+        } else {
+            setPendingActions([]);
+        }
+    }, [userRole, userEmployeeId, t]);
+
+    const goToPendingActions = () => {
+        if (!onNavigate) return;
+        if (userRole === 'SUPERVISOR') onNavigate('external', 'team_approvals');
+        else onNavigate('admin-dashboard', 'idp');
+    };
     const [learningStats, setLearningStats] = useState<LearningStats>({
         totalJam: 0, totalBiaya: 0,
         jamTraining: 0, jamTrainingExternal: 0, jamOnline: 0, jamBuku: 0,
@@ -223,6 +273,50 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, config }: Da
                     onClose={() => setDetailModal(null)}
                     t={t}
                 />
+            )}
+
+            {/* Perlu Tindakan Anda - only shown to roles that actually approve something */}
+            {(userRole === 'SUPERVISOR' || userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 sm:p-6 shrink-0">
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                        <div className="flex items-center gap-2.5">
+                            <div className={`p-2 rounded-xl ${pendingActions.length > 0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                <AlertCircle size={18} />
+                            </div>
+                            <h2 className="font-black text-slate-800 text-lg">{t('pendingActions.title')}</h2>
+                            {pendingActions.length > 0 && (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">{pendingActions.length}</span>
+                            )}
+                        </div>
+                        {pendingActions.length > 0 && (
+                            <button onClick={goToPendingActions} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 shrink-0">
+                                {t('pendingActions.viewAll')} <ChevronRight size={14} />
+                            </button>
+                        )}
+                    </div>
+
+                    {pendingActions.length === 0 ? (
+                        <p className="text-sm text-slate-400">{t('pendingActions.empty')}</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {pendingActions.slice(0, 5).map(item => (
+                                <button
+                                    key={item.id}
+                                    onClick={goToPendingActions}
+                                    className="w-full flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                                >
+                                    <div className="min-w-0">
+                                        <p className="font-bold text-slate-700 text-sm truncate">{item.title}</p>
+                                        <p className="text-xs text-slate-400 truncate">{item.subtitle}</p>
+                                    </div>
+                                    <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap shrink-0">
+                                        {new Date(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
             )}
 
             {/* 3-Column Layout */}

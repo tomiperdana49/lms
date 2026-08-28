@@ -32,6 +32,12 @@
     "budgetExceeded": "Over budget by",
     "close": "Close"
   },
+  "pendingActions": {
+    "title": "Needs Your Action",
+    "empty": "Nothing needs your attention right now.",
+    "viewAll": "View all",
+    "idpItem": "IDP for {{year}}"
+  },
   "menu": {
     "readingLogTitle": "Reading Log",
     "readingLogSubtitle": "Book reading logs",
