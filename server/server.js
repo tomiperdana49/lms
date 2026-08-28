@@ -4359,7 +4359,7 @@ app.post('/api/idp/:id/submit', async (req, res) => {
             return res.status(400).json({ error: `The Development Action Plan needs at least ${IDP_MIN_ACTION_PLAN_ITEMS} rows (including the mandatory Learning Hours item).` });
         }
 
-        await query("UPDATE idp_plans SET status = 'Pending', created_by_date = CURDATE() WHERE id = ?", [id]);
+        await query("UPDATE idp_plans SET status = 'Pending', created_by_date = COALESCE(created_by_date, CURDATE()) WHERE id = ?", [id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
