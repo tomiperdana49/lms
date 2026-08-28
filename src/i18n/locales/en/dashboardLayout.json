@@ -70,7 +70,9 @@
     "idpNoteTitle": "IDP: New Note from HR",
     "idpNoteMessage": "HR left a note on your Individual Development Plan for {{year}}.",
     "idpSubmittedTitle": "New IDP Submitted",
-    "idpSubmittedMessage": "{{name}} submitted their Individual Development Plan for {{year}}, pending your approval."
+    "idpSubmittedMessage": "{{name}} submitted their Individual Development Plan for {{year}}, pending your approval.",
+    "idpReviewAddedTitle": "IDP: New Review",
+    "idpReviewAddedMessage": "{{name}} added a new review to your Individual Development Plan for {{year}}."
   },
   "footer": "© 2026 PT Media Antar Nusa",
   "userFallback": "User",

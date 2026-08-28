@@ -70,7 +70,9 @@
     "idpNoteTitle": "IDP: Catatan Baru dari HR",
     "idpNoteMessage": "HR meninggalkan catatan pada IDP Anda untuk tahun {{year}}.",
     "idpSubmittedTitle": "Pengajuan IDP Baru",
-    "idpSubmittedMessage": "{{name}} mengajukan IDP (Individual Development Plan) untuk tahun {{year}}, menunggu persetujuan Anda."
+    "idpSubmittedMessage": "{{name}} mengajukan IDP (Individual Development Plan) untuk tahun {{year}}, menunggu persetujuan Anda.",
+    "idpReviewAddedTitle": "IDP: Evaluasi Baru",
+    "idpReviewAddedMessage": "{{name}} menambahkan evaluasi baru pada IDP Anda untuk tahun {{year}}."
   },
   "footer": "© 2026 PT Media Antar Nusa",
   "userFallback": "Pengguna",

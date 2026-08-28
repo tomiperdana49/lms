@@ -352,8 +352,23 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                         })
                     : [];
 
+                // 12. IDP: notify the EMPLOYEE when their supervisor logs a new monthly 1-on-1 review
+                const idpReviewNotifs = myIdpPlans.flatMap((p: any) =>
+                    (p.reviews || []).map((r: any) => {
+                        const notifId = r.id + 1000000;
+                        return {
+                            id: notifId,
+                            title: t('notifications.idpReviewAddedTitle'),
+                            message: t('notifications.idpReviewAddedMessage', { year: p.period_year, name: r.reviewed_by || p.supervisor_name }),
+                            time: new Date(r.review_date || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            type: 'INFO',
+                            isRead: readIds.includes(notifId)
+                        };
+                    })
+                );
+
                 // Combine and Sort by latest (higher id means more recent)
-                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpStatusNotifs, ...idpNoteNotifs, ...idpSubmittedNotifs].sort((a, b) => b.id - a.id);
+                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpStatusNotifs, ...idpNoteNotifs, ...idpSubmittedNotifs, ...idpReviewNotifs].sort((a, b) => b.id - a.id);
                 setNotifications(all);
             } catch (error) {
                 console.error("Failed to fetch header notifications", error);

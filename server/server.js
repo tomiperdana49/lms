@@ -4235,7 +4235,19 @@ app.get('/api/idp/my-plans', async (req, res) => {
         const { employee_id } = req.query;
         if (!employee_id) return res.json([]);
         const plans = await query('SELECT * FROM idp_plans WHERE employee_id = ? ORDER BY period_year DESC', [employee_id]);
-        res.json(plans);
+        if (plans.length === 0) return res.json([]);
+
+        // Reviews are attached per plan so the header notification poller can tell the employee
+        // when their supervisor logs a new 1-on-1 review (see DashboardLayout.tsx).
+        const placeholders = plans.map(() => '?').join(',');
+        const reviews = await query(
+            `SELECT * FROM idp_reviews WHERE idp_id IN (${placeholders}) ORDER BY review_date ASC, id ASC`,
+            plans.map(p => p.id)
+        );
+        const reviewsByPlan = {};
+        for (const r of reviews) (reviewsByPlan[r.idp_id] ||= []).push(r);
+
+        res.json(plans.map(p => ({ ...p, reviews: reviewsByPlan[p.id] || [] })));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
