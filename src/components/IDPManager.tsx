@@ -529,7 +529,7 @@ export default function IDPManager({ userName }: IDPManagerProps) {
 
                                                     <tr>
                                                         <td colSpan={2} className={idpSectionHeaderCell}>{t('form.actionPlan')}</td>
-                                                        <td className={idpSectionHeaderCell}>{t('form.targetTime')}</td>
+                                                        <td className={`${idpSectionHeaderCell} cursor-help`} title={t('form.targetTimeTooltip')}>{t('form.targetTime')}</td>
                                                         <td className={idpSectionHeaderCell}>{t('form.checklistProgress')}</td>
                                                         <td colSpan={2} className={idpSectionHeaderCell}>
                                                             <div className="flex items-center justify-between">

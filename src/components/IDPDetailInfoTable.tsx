@@ -75,7 +75,7 @@ export default function IDPDetailInfoTable({ plan, editableProgress, onToggleCom
                         <>
                             <tr>
                                 <td colSpan={2} className={sectionHeaderCell}>{t('form.actionPlan')}</td>
-                                <td className={sectionHeaderCell}>{t('form.targetTime')}</td>
+                                <td className={`${sectionHeaderCell} cursor-help`} title={t('form.targetTimeTooltip')}>{t('form.targetTime')}</td>
                                 <td className={sectionHeaderCell}>{t('form.checklistProgress')}</td>
                                 <td colSpan={2} className={sectionHeaderCell}>{t('form.notes')}</td>
                             </tr>

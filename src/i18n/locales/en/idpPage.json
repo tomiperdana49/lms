@@ -30,6 +30,7 @@
     "actionPlanHint": "Write down the steps you'll take to develop yourself and reach your career goal. At least 4 rows (including the mandatory Learning Hours item).",
     "targetTime": "Target Time",
     "targetTimeHint": "Set the target time for carrying out the action plan.",
+    "targetTimeTooltip": "Q1: Jan-Mar  ·  Q2: Apr-Jun  ·  Q3: Jul-Sep  ·  Q4: Oct-Dec",
     "checklistProgress": "Checklist Progress",
     "checklistProgressHint": "Updated by the direct supervisor as progress happens.",
     "checklistProgressLeaderOnly": "Only your direct supervisor can update this",
