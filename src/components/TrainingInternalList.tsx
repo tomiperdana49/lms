@@ -3719,7 +3719,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     {invitedEmployeeIdsList.map((id: string) => {
                                                         const emp = employees.find(e => e.id_employee === id);
                                                         const participationTypes = reportData.participationTypesByEmployee || {};
-                                                        const currentType = participationTypes[id] || 'Targeted Participants';
+                                                        const currentType = participationTypes[id] || 'Self Registered';
 
                                                         return (
                                                             <div key={id} className={`flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-100 ${reportData.isPaid ? 'opacity-60 pointer-events-none' : ''}`}>
@@ -3757,7 +3757,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     })}
                                                     {invitedEmailsList.filter((email: string) => !employees.some(emp => emp.email === email)).map((email: string) => {
                                                         const participationTypes = reportData.participationTypesByEmployee || {};
-                                                        const currentType = participationTypes[email] || 'Targeted Participants';
+                                                        const currentType = participationTypes[email] || 'Self Registered';
 
                                                         return (
                                                             <div key={email} className={`flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-100 ${reportData.isPaid ? 'opacity-60 pointer-events-none' : ''}`}>
