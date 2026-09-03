@@ -533,7 +533,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                     setIsSidebarOpen(false);
                                 }}
                                 className={`
-                                    w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left
+                                    relative w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left
                                     ${activePage === item.id
                                         ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
                                         : 'text-slate-400 hover:bg-slate-800 hover:text-white'
@@ -542,6 +542,9 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             >
                                 <item.icon size={20} />
                                 <span className="font-medium">{item.label}</span>
+                                {activePage === item.id && (
+                                    <span className="absolute -right-4 top-1/2 -translate-y-1/2 h-8 w-1 rounded-l-full bg-blue-400" />
+                                )}
                             </button>
                         ))}
 
@@ -551,7 +554,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                 <button
                                     onClick={() => setIsTrainingOpen(!isTrainingOpen)}
                                     className={`
-                                        w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors text-left
+                                        relative w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors text-left
                                         ${activePage === 'internal' || activePage === 'external' || activePage === 'external-approval' || isTrainingOpen
                                             ? 'bg-slate-800 text-white'
                                             : 'text-slate-400 hover:bg-slate-800 hover:text-white'
@@ -563,6 +566,9 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                         <span className="font-medium">{t('menu.training')}</span>
                                     </div>
                                     {isTrainingOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                    {(activePage === 'internal' || activePage === 'external' || activePage === 'external-approval') && (
+                                        <span className="absolute -right-4 top-1/2 -translate-y-1/2 h-8 w-1 rounded-l-full bg-blue-400" />
+                                    )}
                                 </button>
                                 
                                 {isTrainingOpen && (
@@ -595,7 +601,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                 <button
                                     onClick={() => setIsAdminOpen(!isAdminOpen)}
                                     className={`
-                                        w-full flex items-center justify-between px-4 py-3 transition-colors text-left border
+                                        relative w-full flex items-center justify-between px-4 py-3 transition-colors text-left border
                                         ${activePage === 'admin-dashboard' || isAdminOpen
                                             ? `bg-slate-800 text-white border-indigo-500/30 shadow-lg ${isAdminOpen ? 'rounded-t-xl' : 'rounded-xl'}`
                                             : 'rounded-xl border-transparent text-slate-400 hover:bg-slate-800 hover:text-white'
@@ -607,6 +613,9 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                         <span className="font-medium">{t('menu.adminPanel')}</span>
                                     </div>
                                     {isAdminOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                    {activePage === 'admin-dashboard' && (
+                                        <span className="absolute -right-4 top-1/2 -translate-y-1/2 h-8 w-1 rounded-l-full bg-indigo-400" />
+                                    )}
                                 </button>
 
                                 {/* SUB-MENU (Accordion) */}
