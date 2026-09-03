@@ -919,14 +919,10 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                 user={user}
             />
 
-            {/* Help Drawer */}
+            {/* Help Drawer: a non-blocking panel (no backdrop) so the app underneath stays fully
+                usable — the user can navigate to a feature and follow the guide side by side. */}
             {isHelpOpen && (
-                <>
-                    <div
-                        className="fixed inset-0 bg-black/40 z-[60] animate-in fade-in duration-200"
-                        onClick={closeHelpDrawer}
-                    />
-                    <div className="fixed inset-y-0 right-0 z-[70] w-full max-w-sm bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+                    <div className="fixed inset-y-0 right-0 z-[70] w-full max-w-sm bg-white border-l border-slate-200 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
                         <div className="p-4 border-b border-slate-100 flex items-center gap-2 shrink-0">
                             <div className="relative flex-1">
                                 <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -1041,7 +1037,6 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             )}
                         </div>
                     </div>
-                </>
             )}
         </div>
     );
