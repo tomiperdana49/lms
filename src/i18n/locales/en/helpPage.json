@@ -6,7 +6,8 @@
   "drawer": {
     "index": "Index",
     "searchPlaceholder": "Type something..",
-    "noResults": "No guides match your search."
+    "noResults": "No guides match your search.",
+    "backToIndex": "Back to index"
   },
   "nav": {
     "readingLog": "Reading Log",

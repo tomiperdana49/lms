@@ -6,7 +6,8 @@
   "drawer": {
     "index": "Index",
     "searchPlaceholder": "Ketik sesuatu..",
-    "noResults": "Tidak ada panduan yang cocok dengan pencarianmu."
+    "noResults": "Tidak ada panduan yang cocok dengan pencarianmu.",
+    "backToIndex": "Kembali ke index"
   },
   "nav": {
     "readingLog": "Log Bacaan",

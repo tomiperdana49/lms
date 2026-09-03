@@ -25,7 +25,8 @@ import {
     Target,
     PanelLeftClose,
     PanelLeftOpen,
-    Search
+    Search,
+    ArrowLeft
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Page, Role, User } from '../types';
@@ -37,9 +38,9 @@ import {
     TOPIC_AUDIENCES,
     TOPIC_ICONS,
     AUDIENCE_ICONS,
-    HELP_PENDING_TOPIC_KEY,
     type TopicKey,
-    type AudienceKey
+    type AudienceKey,
+    type GuideContent
 } from './HelpPage';
 
 interface DashboardLayoutProps {
@@ -73,6 +74,12 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
     const [helpQuery, setHelpQuery] = useState('');
+    const [selectedHelpEntry, setSelectedHelpEntry] = useState<{ topic: TopicKey; audience?: AudienceKey } | null>(null);
+    const closeHelpDrawer = () => {
+        setIsHelpOpen(false);
+        setHelpQuery('');
+        setSelectedHelpEntry(null);
+    };
     const [avatarFailed, setAvatarFailed] = useState(false);
     useEffect(() => { setAvatarFailed(false); }, [user?.avatar]);
     const [isTrainingOpen, setIsTrainingOpen] = useState(() => {
@@ -534,12 +541,17 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         ? helpIndex.filter(entry => entry.label.toLowerCase().includes(helpQuery.trim().toLowerCase()))
         : helpIndex;
 
-    const openHelpTopic = (topic: TopicKey, audience?: AudienceKey) => {
-        localStorage.setItem(HELP_PENDING_TOPIC_KEY, JSON.stringify({ topic, audience }));
-        setIsHelpOpen(false);
-        setHelpQuery('');
-        onNavigate('help');
-    };
+    // Guide content for the article currently open in the drawer (null while the index list shows).
+    const selectedHelpAudiences = selectedHelpEntry ? TOPIC_AUDIENCES[selectedHelpEntry.topic] : undefined;
+    const selectedHelpGuide: GuideContent | null = selectedHelpEntry
+        ? (selectedHelpAudiences
+            ? t(`helpPage:topics.${selectedHelpEntry.topic}.audiences.${selectedHelpEntry.audience}`, { returnObjects: true })
+            : t(`helpPage:topics.${selectedHelpEntry.topic}`, { returnObjects: true })
+          ) as GuideContent
+        : null;
+    const SelectedHelpIcon = selectedHelpEntry
+        ? (selectedHelpEntry.audience ? AUDIENCE_ICONS[selectedHelpEntry.audience] : TOPIC_ICONS[selectedHelpEntry.topic])
+        : null;
 
     return (
         <div className="min-h-screen bg-gray-50 flex font-sans text-slate-800">
@@ -912,7 +924,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                 <>
                     <div
                         className="fixed inset-0 bg-black/40 z-[60] animate-in fade-in duration-200"
-                        onClick={() => setIsHelpOpen(false)}
+                        onClick={closeHelpDrawer}
                     />
                     <div className="fixed inset-y-0 right-0 z-[70] w-full max-w-sm bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
                         <div className="p-4 border-b border-slate-100 flex items-center gap-2 shrink-0">
@@ -928,30 +940,104 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                 />
                             </div>
                             <button
-                                onClick={() => setIsHelpOpen(false)}
+                                onClick={closeHelpDrawer}
                                 className="p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
                             >
                                 <X size={20} />
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-5">
-                            <h3 className="text-2xl font-bold text-slate-800 mb-1">{t('helpPage:drawer.index')}</h3>
-                            <p className="text-sm text-slate-400 mb-5">{t('helpPage:header.subtitle')}</p>
-                            {filteredHelpIndex.length === 0 ? (
-                                <p className="text-sm text-slate-400 text-center py-8">{t('helpPage:drawer.noResults')}</p>
+                            {!selectedHelpEntry ? (
+                                <>
+                                    <h3 className="text-2xl font-bold text-slate-800 mb-1">{t('helpPage:drawer.index')}</h3>
+                                    <p className="text-sm text-slate-400 mb-5">{t('helpPage:header.subtitle')}</p>
+                                    {filteredHelpIndex.length === 0 ? (
+                                        <p className="text-sm text-slate-400 text-center py-8">{t('helpPage:drawer.noResults')}</p>
+                                    ) : (
+                                        <div className="space-y-1">
+                                            {filteredHelpIndex.map((entry) => (
+                                                <button
+                                                    key={entry.key}
+                                                    onClick={() => setSelectedHelpEntry({ topic: entry.topic, audience: entry.audience })}
+                                                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                                                >
+                                                    <entry.Icon size={16} className="text-slate-400 shrink-0" />
+                                                    <span>{entry.label}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
                             ) : (
-                                <div className="space-y-1">
-                                    {filteredHelpIndex.map((entry) => (
-                                        <button
-                                            key={entry.key}
-                                            onClick={() => openHelpTopic(entry.topic, entry.audience)}
-                                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
-                                        >
-                                            <entry.Icon size={16} className="text-slate-400 shrink-0" />
-                                            <span>{entry.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
+                                <>
+                                    <button
+                                        onClick={() => setSelectedHelpEntry(null)}
+                                        className="flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-700 mb-4"
+                                    >
+                                        <ArrowLeft size={16} />
+                                        {t('helpPage:drawer.backToIndex')}
+                                    </button>
+
+                                    <div className="flex items-start gap-3 mb-5">
+                                        <div className="w-11 h-11 rounded-2xl bg-indigo-50 flex items-center justify-center shrink-0">
+                                            {SelectedHelpIcon && <SelectedHelpIcon className="w-5 h-5 text-indigo-600" />}
+                                        </div>
+                                        <div>
+                                            <h3 className="text-lg font-bold text-slate-800">{t(`helpPage:nav.${selectedHelpEntry.topic}`)}</h3>
+                                            {selectedHelpGuide && (
+                                                <p className="text-sm text-slate-500 mt-0.5">{selectedHelpGuide.purpose}</p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {selectedHelpAudiences && (
+                                        <div className="flex flex-wrap gap-1.5 mb-5">
+                                            {selectedHelpAudiences.map((audience) => (
+                                                <button
+                                                    key={audience}
+                                                    onClick={() => setSelectedHelpEntry({ topic: selectedHelpEntry.topic, audience })}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                                        audience === selectedHelpEntry.audience
+                                                            ? 'bg-indigo-600 text-white'
+                                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                    }`}
+                                                >
+                                                    {t(`helpPage:topics.${selectedHelpEntry.topic}.audiences.${audience}.label`)}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {selectedHelpGuide && (
+                                        <div className="space-y-4">
+                                            {selectedHelpGuide.steps.map((step, idx) => (
+                                                <div key={idx} className="flex items-start gap-3">
+                                                    <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                                                        {idx + 1}
+                                                    </span>
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-slate-800">{step.title}</p>
+                                                        <p className="text-sm text-slate-500 mt-0.5">{step.description}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {selectedHelpGuide && selectedHelpGuide.tips?.length > 0 && (
+                                        <div className="mt-5 bg-amber-50 border border-amber-100 rounded-xl p-4">
+                                            <p className="text-xs font-bold uppercase tracking-widest text-amber-700 mb-2">{t('helpPage:labels.tips')}</p>
+                                            <ul className="space-y-1.5">
+                                                {selectedHelpGuide.tips.map((tip, idx) => (
+                                                    <li key={idx} className="flex gap-2 text-xs text-amber-900">
+                                                        <span className="text-amber-500 shrink-0">•</span>
+                                                        <span>{tip}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>

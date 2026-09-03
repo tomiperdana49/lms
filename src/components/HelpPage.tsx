@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HelpCircle, Library, BookOpen, Users, Globe, Lightbulb, ListChecks, GraduationCap, UserCheck, Target, Shield } from 'lucide-react';
 
@@ -31,17 +31,12 @@ export const TOPIC_AUDIENCES: Partial<Record<TopicKey, AudienceKey[]>> = {
     idp: ['employee', 'supervisor', 'hr']
 };
 
-// Handoff key: the header Help drawer (DashboardLayout) writes the topic/audience the user
-// picked from its index here before navigating to this page, since it's a plain page route
-// with no params of its own.
-export const HELP_PENDING_TOPIC_KEY = 'lms_help_pending_topic';
-
-interface Step {
+export interface Step {
     title: string;
     description: string;
 }
 
-interface GuideContent {
+export interface GuideContent {
     purpose: string;
     steps: Step[];
     tips: string[];
@@ -49,23 +44,8 @@ interface GuideContent {
 
 export default function HelpPage() {
     const { t } = useTranslation('helpPage');
-    const [activeTopic, setActiveTopic] = useState<TopicKey>(() => {
-        try {
-            const pending = JSON.parse(localStorage.getItem(HELP_PENDING_TOPIC_KEY) || 'null');
-            if (pending?.topic && TOPIC_ORDER.includes(pending.topic)) return pending.topic;
-        } catch { /* ignore malformed value */ }
-        return 'readingLog';
-    });
-    const [activeAudience, setActiveAudience] = useState<AudienceKey>(() => {
-        try {
-            const pending = JSON.parse(localStorage.getItem(HELP_PENDING_TOPIC_KEY) || 'null');
-            if (pending?.audience) return pending.audience;
-        } catch { /* ignore malformed value */ }
-        return 'participant';
-    });
-    useEffect(() => {
-        localStorage.removeItem(HELP_PENDING_TOPIC_KEY);
-    }, []);
+    const [activeTopic, setActiveTopic] = useState<TopicKey>('readingLog');
+    const [activeAudience, setActiveAudience] = useState<AudienceKey>('participant');
 
     const audienceList = TOPIC_AUDIENCES[activeTopic];
     const hasAudiences = !!audienceList;
