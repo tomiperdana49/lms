@@ -4,7 +4,7 @@
     "subtitle": "Guides for using LMS Nusa's features"
   },
   "drawer": {
-    "index": "Index",
+    "index": "Help",
     "searchPlaceholder": "Type something..",
     "noResults": "No guides match your search.",
     "backToIndex": "Back to index"
