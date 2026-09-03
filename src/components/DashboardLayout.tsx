@@ -503,7 +503,9 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                 <div className="h-full flex flex-col">
                     <div className="p-6 border-b border-slate-700 flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <img src="/favicon.svg" alt="Logo" className="w-10 h-10 rounded-xl shadow-md" />
+                            <div className="w-10 h-10 rounded-xl shadow-md bg-white p-1.5 shrink-0">
+                                <img src="/favicon.png" alt="Logo" className="w-full h-full object-contain" />
+                            </div>
                             <h1 className="text-xl font-bold tracking-wider">LMS NUSA</h1>
                         </div>
                         <button onClick={toggleSidebar} className="lg:hidden text-slate-400 hover:text-white">

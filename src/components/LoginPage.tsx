@@ -126,13 +126,7 @@ const LoginPage = ({ onLogin, sessionExpiredReason, onSessionExpiredReasonShown 
             <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
                 <div className="bg-blue-600 p-8 text-center">
                     <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-                        <svg viewBox="0 0 64 64" className="w-9 h-9 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="8" y="16" width="48" height="32" rx="4" />
-                            <path d="M24 56h16M32 48v8" />
-                            <path d="M32 10l16 6-16 6-16-6z" />
-                            <path d="M20 18v6c0 2 5 4 12 4s12-2 12-4v-6" />
-                            <text x="32" y="37" textAnchor="middle" fontSize="12" fontWeight="700" fill="currentColor" stroke="none" fontFamily="Arial, sans-serif">LMS</text>
-                        </svg>
+                        <img src="/favicon.png" alt="LMS Nusa" className="w-10 h-10 object-contain" />
                     </div>
                     <h1 className="text-2xl font-bold text-white tracking-wider">{t('title')}</h1>
                     <p className="text-blue-100 text-sm mt-1">{t('subtitle')}</p>
