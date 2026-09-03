@@ -83,7 +83,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
     const [assessmentScore, setAssessmentScore] = useState<number | null>(null);
     const [preAssessmentScore, setPreAssessmentScore] = useState<number | null>(null);
 
-    const [popup, setPopup] = useState<{ type: 'success' | 'error', message: string, isOpen: boolean }>({ type: 'success', message: '', isOpen: false });
+    const [popup, setPopup] = useState<{ type: 'success' | 'error' | 'warning', message: string, isOpen: boolean }>({ type: 'success', message: '', isOpen: false });
 
     const [showFeedback, setShowFeedback] = useState(false);
     const [lastScore, setLastScore] = useState<number>(0);
@@ -821,7 +821,8 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
             if (!res.ok) {
                 const errorData = await res.json().catch(() => ({}));
-                setPopup({ type: 'error', message: errorData.error || t('notifications.saveProgressFailed'), isOpen: true });
+                // Status 400 here means a completion prerequisite wasn't met (e.g. Post-Test not passed yet) — guidance, not a system error.
+                setPopup({ type: res.status === 400 ? 'warning' : 'error', message: errorData.error || t('notifications.saveProgressFailed'), isOpen: true });
                 return;
             }
 
