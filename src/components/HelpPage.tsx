@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HelpCircle, Library, BookOpen, Users, Globe, Lightbulb, ListChecks, GraduationCap, UserCheck, Target, Shield } from 'lucide-react';
 
-type TopicKey = 'readingLog' | 'onlineModules' | 'trainingInternal' | 'trainingExternal' | 'idp';
-type AudienceKey = 'participant' | 'trainer' | 'employee' | 'supervisor' | 'hr';
+export type TopicKey = 'readingLog' | 'onlineModules' | 'trainingInternal' | 'trainingExternal' | 'idp';
+export type AudienceKey = 'participant' | 'trainer' | 'employee' | 'supervisor' | 'hr';
 
-const TOPIC_ICONS: Record<TopicKey, typeof Library> = {
+export const TOPIC_ICONS: Record<TopicKey, typeof Library> = {
     readingLog: Library,
     onlineModules: BookOpen,
     trainingInternal: Users,
@@ -13,7 +13,7 @@ const TOPIC_ICONS: Record<TopicKey, typeof Library> = {
     idp: Target
 };
 
-const AUDIENCE_ICONS: Record<AudienceKey, typeof Users> = {
+export const AUDIENCE_ICONS: Record<AudienceKey, typeof Users> = {
     participant: UserCheck,
     trainer: GraduationCap,
     employee: UserCheck,
@@ -21,15 +21,20 @@ const AUDIENCE_ICONS: Record<AudienceKey, typeof Users> = {
     hr: Shield
 };
 
-const TOPIC_ORDER: TopicKey[] = ['readingLog', 'onlineModules', 'trainingInternal', 'trainingExternal', 'idp'];
+export const TOPIC_ORDER: TopicKey[] = ['readingLog', 'onlineModules', 'trainingInternal', 'trainingExternal', 'idp'];
 
 // Topics whose guide differs depending on who's using the feature (e.g. a training session's
 // participant vs. its trainer/host, or IDP's employee/supervisor/HR) render a role sub-selector,
 // listing that topic's audiences in display order; everything else is a single guide.
-const TOPIC_AUDIENCES: Partial<Record<TopicKey, AudienceKey[]>> = {
+export const TOPIC_AUDIENCES: Partial<Record<TopicKey, AudienceKey[]>> = {
     trainingInternal: ['participant', 'trainer'],
     idp: ['employee', 'supervisor', 'hr']
 };
+
+// Handoff key: the header Help drawer (DashboardLayout) writes the topic/audience the user
+// picked from its index here before navigating to this page, since it's a plain page route
+// with no params of its own.
+export const HELP_PENDING_TOPIC_KEY = 'lms_help_pending_topic';
 
 interface Step {
     title: string;
@@ -44,8 +49,23 @@ interface GuideContent {
 
 export default function HelpPage() {
     const { t } = useTranslation('helpPage');
-    const [activeTopic, setActiveTopic] = useState<TopicKey>('readingLog');
-    const [activeAudience, setActiveAudience] = useState<AudienceKey>('participant');
+    const [activeTopic, setActiveTopic] = useState<TopicKey>(() => {
+        try {
+            const pending = JSON.parse(localStorage.getItem(HELP_PENDING_TOPIC_KEY) || 'null');
+            if (pending?.topic && TOPIC_ORDER.includes(pending.topic)) return pending.topic;
+        } catch { /* ignore malformed value */ }
+        return 'readingLog';
+    });
+    const [activeAudience, setActiveAudience] = useState<AudienceKey>(() => {
+        try {
+            const pending = JSON.parse(localStorage.getItem(HELP_PENDING_TOPIC_KEY) || 'null');
+            if (pending?.audience) return pending.audience;
+        } catch { /* ignore malformed value */ }
+        return 'participant';
+    });
+    useEffect(() => {
+        localStorage.removeItem(HELP_PENDING_TOPIC_KEY);
+    }, []);
 
     const audienceList = TOPIC_AUDIENCES[activeTopic];
     const hasAudiences = !!audienceList;

@@ -24,13 +24,23 @@ import {
     HelpCircle,
     Target,
     PanelLeftClose,
-    PanelLeftOpen
+    PanelLeftOpen,
+    Search
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Page, Role, User } from '../types';
 import FeedbackModal from './FeedbackModal';
 import LanguageSwitcher from './LanguageSwitcher';
 import { API_BASE_URL } from '../config';
+import {
+    TOPIC_ORDER,
+    TOPIC_AUDIENCES,
+    TOPIC_ICONS,
+    AUDIENCE_ICONS,
+    HELP_PENDING_TOPIC_KEY,
+    type TopicKey,
+    type AudienceKey
+} from './HelpPage';
 
 interface DashboardLayoutProps {
     children: ReactNode;
@@ -61,6 +71,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         }
     }, [isDesktopSidebarOpen]);
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+    const [isHelpOpen, setIsHelpOpen] = useState(false);
+    const [helpQuery, setHelpQuery] = useState('');
     const [avatarFailed, setAvatarFailed] = useState(false);
     useEffect(() => { setAvatarFailed(false); }, [user?.avatar]);
     const [isTrainingOpen, setIsTrainingOpen] = useState(() => {
@@ -490,6 +502,44 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
             .substring(0, 2);
     };
 
+    // Flattened searchable index for the Help drawer: one entry per topic, or one per
+    // audience for topics whose guide branches by role (see TOPIC_AUDIENCES).
+    interface HelpIndexEntry {
+        key: string;
+        topic: TopicKey;
+        audience: AudienceKey | undefined;
+        label: string;
+        Icon: typeof Library;
+    }
+    const helpIndex: HelpIndexEntry[] = TOPIC_ORDER.flatMap((topic): HelpIndexEntry[] => {
+        const audiences = TOPIC_AUDIENCES[topic];
+        if (!audiences) {
+            return [{
+                key: topic,
+                topic,
+                audience: undefined,
+                label: t(`helpPage:nav.${topic}`),
+                Icon: TOPIC_ICONS[topic]
+            }];
+        }
+        return audiences.map((audience) => ({
+            key: `${topic}-${audience}`,
+            topic,
+            audience,
+            label: `${t(`helpPage:nav.${topic}`)} — ${t(`helpPage:topics.${topic}.audiences.${audience}.label`)}`,
+            Icon: AUDIENCE_ICONS[audience]
+        }));
+    });
+    const filteredHelpIndex = helpQuery.trim()
+        ? helpIndex.filter(entry => entry.label.toLowerCase().includes(helpQuery.trim().toLowerCase()))
+        : helpIndex;
+
+    const openHelpTopic = (topic: TopicKey, audience?: AudienceKey) => {
+        localStorage.setItem(HELP_PENDING_TOPIC_KEY, JSON.stringify({ topic, audience }));
+        setIsHelpOpen(false);
+        setHelpQuery('');
+        onNavigate('help');
+    };
 
     return (
         <div className="min-h-screen bg-gray-50 flex font-sans text-slate-800">
@@ -789,7 +839,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
 
                         <button
                             type="button"
-                            onClick={() => onNavigate('help')}
+                            onClick={() => setIsHelpOpen(true)}
                             title={t('menu.help')}
                             className="text-slate-500 hover:text-slate-700 transition-colors p-2 hover:bg-gray-100 rounded-full cursor-pointer flex items-center justify-center focus:outline-none"
                         >
@@ -856,6 +906,57 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                 onClose={() => setIsFeedbackOpen(false)}
                 user={user}
             />
+
+            {/* Help Drawer */}
+            {isHelpOpen && (
+                <>
+                    <div
+                        className="fixed inset-0 bg-black/40 z-[60] animate-in fade-in duration-200"
+                        onClick={() => setIsHelpOpen(false)}
+                    />
+                    <div className="fixed inset-y-0 right-0 z-[70] w-full max-w-sm bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+                        <div className="p-4 border-b border-slate-100 flex items-center gap-2 shrink-0">
+                            <div className="relative flex-1">
+                                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    value={helpQuery}
+                                    onChange={(e) => setHelpQuery(e.target.value)}
+                                    placeholder={t('helpPage:drawer.searchPlaceholder')}
+                                    className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400"
+                                />
+                            </div>
+                            <button
+                                onClick={() => setIsHelpOpen(false)}
+                                className="p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-5">
+                            <h3 className="text-2xl font-bold text-slate-800 mb-1">{t('helpPage:drawer.index')}</h3>
+                            <p className="text-sm text-slate-400 mb-5">{t('helpPage:header.subtitle')}</p>
+                            {filteredHelpIndex.length === 0 ? (
+                                <p className="text-sm text-slate-400 text-center py-8">{t('helpPage:drawer.noResults')}</p>
+                            ) : (
+                                <div className="space-y-1">
+                                    {filteredHelpIndex.map((entry) => (
+                                        <button
+                                            key={entry.key}
+                                            onClick={() => openHelpTopic(entry.topic, entry.audience)}
+                                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                                        >
+                                            <entry.Icon size={16} className="text-slate-400 shrink-0" />
+                                            <span>{entry.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 };

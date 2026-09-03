@@ -3,6 +3,11 @@
     "title": "Help Center",
     "subtitle": "Guides for using LMS Nusa's features"
   },
+  "drawer": {
+    "index": "Index",
+    "searchPlaceholder": "Type something..",
+    "noResults": "No guides match your search."
+  },
   "nav": {
     "readingLog": "Reading Log",
     "onlineModules": "Online Modules",
