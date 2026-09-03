@@ -73,6 +73,13 @@ export const idpValueRightOf = (grid: IdpImportGrid, r: number, c: number): stri
     return '';
 };
 
+// Guiding question rows ("Apa pencapaian kamu...?") are normally detected by their trailing "?", but
+// some real-world sheets have that punctuation dropped when the cell was retyped/copied. Also matching
+// the common Indonesian question openers catches those cases so the prompt text itself doesn't get
+// mistaken for the employee's actual answer.
+const IDP_QUESTION_PREFIX_RE = /^(tuliskan|apa|sebutkan|bagaimana|jelaskan|kompetensi)\b/i;
+const idpLooksLikePrompt = (v: string): boolean => v.includes('?') || IDP_QUESTION_PREFIX_RE.test(v);
+
 // Reads the free-form answer under a section header (e.g. "Pencapaian / Prestasi Kerja"), skipping the
 // guiding question row ("Apa pencapaian kamu...?") so the actual multi-line answer cell is returned.
 const idpFindSectionText = (grid: IdpImportGrid, headerPattern: RegExp, stopPattern: RegExp): string => {
@@ -83,7 +90,7 @@ const idpFindSectionText = (grid: IdpImportGrid, headerPattern: RegExp, stopPatt
         if (row.some(cell => stopPattern.test(idpCellStr(cell)))) break;
         for (const cell of row) {
             const v = idpCellStr(cell);
-            if (!v || v.includes('?') || /^tuliskan/i.test(v)) continue;
+            if (!v || idpLooksLikePrompt(v)) continue;
             return v;
         }
     }
@@ -114,8 +121,8 @@ export const parseIdpSheet = (grid: IdpImportGrid, sheetName: string): IdpImport
             if (/rencana aksi pengembangan/i.test(row.map(idpCellStr).join(' '))) break;
             const skillVal = idpCellStr(row[skillPos.c]);
             const devVal = devPos ? idpCellStr(row[devPos.c]) : '';
-            if (skillVal && !skillVal.includes('?') && !existing_skills) existing_skills = skillVal;
-            if (devVal && !devVal.includes('?') && !development_area) development_area = devVal;
+            if (skillVal && !idpLooksLikePrompt(skillVal) && !existing_skills) existing_skills = skillVal;
+            if (devVal && !idpLooksLikePrompt(devVal) && !development_area) development_area = devVal;
             if (existing_skills && development_area) break;
         }
     }
@@ -135,7 +142,7 @@ export const parseIdpSheet = (grid: IdpImportGrid, sheetName: string): IdpImport
             const rowStr = row.map(idpCellStr).join(' ');
             if (/tanggal idp dibuat/i.test(rowStr) || /evaluasi idp/i.test(rowStr) || /tanggal review/i.test(rowStr)) break;
             const desc = idpCellStr(row[descCol]);
-            if (!desc || desc.includes('?') || /^tuliskan/i.test(desc)) continue;
+            if (!desc || idpLooksLikePrompt(desc)) continue;
             const checklistRaw = checklistCol >= 0 ? idpCellStr(row[checklistCol]) : '';
             action_items.push({
                 action_description: desc,
