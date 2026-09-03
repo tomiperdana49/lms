@@ -48,13 +48,14 @@ interface LearningStats {
 interface DashboardHomeProps {
     onNavigate?: (page: Page, view?: string) => void;
     userRole?: Role;
+    isSupervisor?: boolean;
     userEmail?: string;
     userName?: string;
     userEmployeeId?: string;
     config?: { moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean };
 }
 
-const DashboardHome = ({ onNavigate, userRole, userEmail, userName, userEmployeeId, config }: DashboardHomeProps) => {
+const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName, userEmployeeId, config }: DashboardHomeProps) => {
     const { t } = useTranslation('dashboardHome');
     const [pendingActions, setPendingActions] = useState<PendingActionItem[]>([]);
 
@@ -62,7 +63,7 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, userEmployee
     // a supervisor's team external-training requests, or HR's employee IDP submissions. Each role
     // only ever sees the one category relevant to them, mirroring the header notification logic.
     useEffect(() => {
-        if (userRole === 'SUPERVISOR' && userEmployeeId) {
+        if (isSupervisor && userEmployeeId) {
             fetch(`${API_BASE_URL}/api/external-training/subordinates?leader_id=${userEmployeeId}`)
                 .then(res => res.json())
                 .then(data => {
@@ -91,11 +92,11 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, userEmployee
         } else {
             setPendingActions([]);
         }
-    }, [userRole, userEmployeeId, t]);
+    }, [userRole, isSupervisor, userEmployeeId, t]);
 
     const goToPendingActions = () => {
         if (!onNavigate) return;
-        if (userRole === 'SUPERVISOR') onNavigate('external', 'team_approvals');
+        if (isSupervisor) onNavigate('external', 'team_approvals');
         else onNavigate('admin-dashboard', 'idp');
     };
     const [learningStats, setLearningStats] = useState<LearningStats>({
@@ -276,7 +277,7 @@ const DashboardHome = ({ onNavigate, userRole, userEmail, userName, userEmployee
             )}
 
             {/* Perlu Tindakan Anda - only shown to roles that actually approve something */}
-            {(userRole === 'SUPERVISOR' || userRole === 'HR' || userRole === 'HR_ADMIN') && (
+            {(isSupervisor || userRole === 'HR' || userRole === 'HR_ADMIN') && (
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 sm:p-6 shrink-0">
                     <div className="flex items-center justify-between gap-3 mb-4">
                         <div className="flex items-center gap-2.5">

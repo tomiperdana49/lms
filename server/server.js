@@ -377,16 +377,11 @@ const determineInitialRole = (employee) => {
         return 'HR';
     }
 
-    if (position.includes('SUPERVISOR') || position.includes('SPV') || position.includes('MANAGER')) {
-        return 'SUPERVISOR';
-    }
-
     return 'STAFF';
 };
 
 const checkIsSupervisor = async (user) => {
     if (!user) return false;
-    if (user.role === 'SUPERVISOR') return true;
 
     if (user.employee_id || user.name || user.email) {
         try {

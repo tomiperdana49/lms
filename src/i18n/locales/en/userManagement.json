@@ -17,7 +17,6 @@
   },
   "roles": {
     "STAFF": "Staff",
-    "SUPERVISOR": "Supervisor",
     "HR": "HR Admin",
     "HR_ADMIN": "HR Admin"
   },
@@ -45,7 +44,6 @@
     "passwordKeepCurrent": "(Leave blank to keep current)",
     "role": "Role",
     "roleStaff": "Staff",
-    "roleSupervisor": "Supervisor",
     "roleHrAdmin": "HR Admin",
     "employeeLink": "SimAsset Employee Link (Optional)",
     "noLink": "-- No Link --",

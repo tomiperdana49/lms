@@ -17,7 +17,7 @@ const createUsers = async () => {
 
         const users = [
             { id: '90001', email: 'test.staff@nusa.net.id', password: '123', name: 'Test Staff', role: 'STAFF', branch: 'Medan-HO' },
-            { id: '90002', email: 'test.spv@nusa.net.id', password: '123', name: 'Test Supervisor', role: 'SUPERVISOR', branch: 'Medan-HO' },
+            { id: '90002', email: 'test.spv@nusa.net.id', password: '123', name: 'Test Supervisor', role: 'STAFF', branch: 'Medan-HO' },
             { id: '90003', email: 'test.hr@nusa.net.id', password: '123', name: 'Test HR', role: 'HR', branch: 'Headquarters' }
         ];
 

@@ -21,7 +21,6 @@ import enOnlineModulesManager from './locales/en/onlineModulesManager.json';
 import enPopupNotification from './locales/en/popupNotification.json';
 import enQuizReportList from './locales/en/quizReportList.json';
 import enReadingLogPage from './locales/en/readingLogPage.json';
-import enTrainingExternalForm from './locales/en/trainingExternalForm.json';
 import enTrainingExternalManager from './locales/en/trainingExternalManager.json';
 import enTrainingInternalList from './locales/en/trainingInternalList.json';
 import enUserManagement from './locales/en/userManagement.json';
@@ -46,7 +45,6 @@ import idOnlineModulesManager from './locales/id/onlineModulesManager.json';
 import idPopupNotification from './locales/id/popupNotification.json';
 import idQuizReportList from './locales/id/quizReportList.json';
 import idReadingLogPage from './locales/id/readingLogPage.json';
-import idTrainingExternalForm from './locales/id/trainingExternalForm.json';
 import idTrainingExternalManager from './locales/id/trainingExternalManager.json';
 import idTrainingInternalList from './locales/id/trainingInternalList.json';
 import idUserManagement from './locales/id/userManagement.json';
@@ -80,7 +78,6 @@ i18n
                 popupNotification: enPopupNotification,
                 quizReportList: enQuizReportList,
                 readingLogPage: enReadingLogPage,
-                trainingExternalForm: enTrainingExternalForm,
                 trainingExternalManager: enTrainingExternalManager,
                 trainingInternalList: enTrainingInternalList,
                 userManagement: enUserManagement,
@@ -106,7 +103,6 @@ i18n
                 popupNotification: idPopupNotification,
                 quizReportList: idQuizReportList,
                 readingLogPage: idReadingLogPage,
-                trainingExternalForm: idTrainingExternalForm,
                 trainingExternalManager: idTrainingExternalManager,
                 trainingInternalList: idTrainingInternalList,
                 userManagement: idUserManagement,

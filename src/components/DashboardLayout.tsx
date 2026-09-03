@@ -749,7 +749,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                 ) : (
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white
                                         ${userRole === 'HR' || userRole === 'HR_ADMIN' ? 'bg-gradient-to-tr from-purple-500 to-pink-600' :
-                                            userRole === 'SUPERVISOR' ? 'bg-gradient-to-tr from-orange-500 to-red-500' :
+                                            user?.isSupervisor ? 'bg-gradient-to-tr from-orange-500 to-red-500' :
                                                 'bg-gradient-to-tr from-blue-500 to-teal-500'}
                                     `}>
                                         {user?.name ? getInitials(user.name) : 'U'}

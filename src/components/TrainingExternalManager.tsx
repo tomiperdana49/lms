@@ -68,7 +68,7 @@ const StatusBadge = ({ status }: { status: string }) => {
     );
 };
 
-const TrainingExternalManager = ({ userRole, userName, user }: { userRole: string; userName?: string; user?: any }) => {
+const TrainingExternalManager = ({ userRole, userName }: { userRole: string; userName?: string }) => {
     const { t } = useTranslation('trainingExternalManager');
     // --- Data State ---
     const [requests, setRequests] = useState<TrainingRequest[]>([]);
@@ -392,25 +392,6 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
             (req.employee_id && e.id_employee === req.employee_id) ||
             (req.employeeName && e.full_name && e.full_name.trim().toLowerCase() === req.employeeName.trim().toLowerCase())
         );
-
-        // If the logged-in user is a supervisor (and not HR), only show requests of their subordinates
-        if (userRole === 'SUPERVISOR' && user && !user.role.includes('HR')) {
-            if (!emp) return false;
-            const supervisorId = user.employee_id || '___INVALID___';
-            const supervisorName = user.name || '___INVALID___';
-            const supervisorEmailPrefix = user.email ? user.email.split('@')[0] : '___INVALID___';
-            const supervisorEmail = user.email || '___INVALID___';
-            const reportsTo = emp.id_report_to;
-            if (!reportsTo) return false;
-
-            const isMySubordinate = 
-                reportsTo === supervisorId || 
-                reportsTo === supervisorName || 
-                reportsTo.toLowerCase() === supervisorEmailPrefix.toLowerCase() || 
-                reportsTo.toLowerCase() === supervisorEmail.toLowerCase();
-
-            if (!isMySubordinate) return false;
-        }
 
         const empBranch = emp?.branch_name || 'Others';
 
@@ -1650,7 +1631,7 @@ const TrainingExternalManager = ({ userRole, userName, user }: { userRole: strin
                                     {isSavingDetails ? t('requestModal.saving') : t('requestModal.save')}
                                 </button>
                             )}
-                            {((userRole === 'SUPERVISOR' && selectedRequest.status === 'PENDING_SUPERVISOR') || ((userRole === 'HR' || userRole === 'HR_ADMIN') && selectedRequest.status === 'PENDING_HR')) && (
+                            {((userRole === 'HR' || userRole === 'HR_ADMIN') && selectedRequest.status === 'PENDING_HR') && (
                                 <button onClick={() => setIsApproveConfirmOpen(true)} className="flex-[2] py-2 bg-indigo-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-indigo-700 transition-colors">{t('requestModal.approveRequest')}</button>
                             )}
 

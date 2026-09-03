@@ -295,6 +295,7 @@ function App() {
               }
             }}
             userRole={userRole}
+            isSupervisor={user?.isSupervisor}
             userEmail={user?.email}
             userName={user?.name}
             userEmployeeId={user?.employee_id}

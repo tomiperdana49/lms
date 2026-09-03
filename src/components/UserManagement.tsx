@@ -278,8 +278,7 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                         <div className="flex flex-col gap-1 items-center">
                                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg
                                                 ${(linkedUser.role === 'HR' || linkedUser.role === 'HR_ADMIN') ? 'bg-orange-100 text-orange-700' :
-                                                    linkedUser.role === 'SUPERVISOR' ? 'bg-blue-100 text-blue-700' :
-                                                        'bg-green-100 text-green-700'}`}>
+                                                    'bg-green-100 text-green-700'}`}>
                                                 {t(`roles.${linkedUser.role}`)}
                                             </span>
                                             <span className={`text-[10px] font-medium ${emp.active_status && emp.active_status.toLowerCase() !== 'active' ? 'text-rose-600' : 'text-green-600'}`}>
@@ -405,7 +404,6 @@ const UserManagement = ({ userRole, onBack }: UserManagementProps) => {
                                         className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-purple-500 bg-white"
                                     >
                                         <option value="STAFF">{t('modal.roleStaff')}</option>
-                                        <option value="SUPERVISOR">{t('modal.roleSupervisor')}</option>
                                         <option value="HR">{t('modal.roleHrAdmin')}</option>
                                     </select>
                                 </div>

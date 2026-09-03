@@ -147,52 +147,6 @@ export const initDB = async () => {
             console.log("Migrated NULL planned_finish_date to match finish_date.");
         } catch (e) { /* Ignore */ }
 
-        // 3. Seed Data if Users table is empty
-
-        const [rows] = await connection.query('SELECT COUNT(*) as count FROM users');
-        if (rows[0].count === 0) {
-            console.log('Seeding data...');
-
-            // Seed Users
-            const users = [
-                ['1678891234', 'staff@nusa.com', '123', 'Budi Santoso', 'STAFF'],
-                ['1678891235', 'spv@nusa.com', '123', 'Siti Aminah', 'SUPERVISOR'],
-                ['1678891236', 'hr@nusa.com', '123', 'Dewi Sartika', 'HR']
-            ];
-            await connection.query('INSERT INTO users (id, email, password, name, role) VALUES ?', [users]);
-
-            // Seed Courses
-            const [courseResult] = await connection.query(`
-                INSERT INTO courses (title, category, description, duration) VALUES 
-                ('Dasar Keamanan Informasi', 'IT Security', 'Pengenalan dasar security awareness.', 120),
-                ('Komunikasi Efektif', 'Soft Skills', 'Cara berkomunikasi yang baik.', 60)
-            `);
-
-            // Seed Modules (Hardcoded IDs based only on order of insertion above is risky in real app, but ok for demo)
-            // Assuming IDs 1 and 2
-            await connection.query(`
-                INSERT INTO course_modules (course_id, title, duration, is_locked) VALUES 
-                (1, 'Password Security', '15:00', 0),
-                (1, 'Phishing Awareness', '10:00', 1),
-                (2, 'Verbal Communication', '10:00', 0),
-                (2, 'Non-verbal Cues', '20:00', 1)
-            `);
-
-            // Seed Meetings
-            await connection.query(`
-                INSERT INTO meetings (title, date, time, location, agenda) VALUES 
-                ('Evaluasi Kinerja Q1', '2026-01-25', '14:00', 'Ruang Meeting A', 'Review KPI')
-            `);
-
-            // Seed Reading Logs
-            await connection.query(`
-                INSERT INTO reading_logs (title, author, category, date, duration, review, status, user_name) VALUES 
-                ('Clean Code', 'Robert C. Martin', 'Teknologi', '2026-01-10', 45, 'Great book', 'APPROVED', 'Budi Santoso')
-            `);
-
-            console.log('Data seeding completed.');
-        }
-
         // Standardize employee_id across all tables
         const trackingTables = ['reading_logs', 'training_requests', 'quiz_results', 'progress', 'incentives', 'meetings'];
         for (const table of trackingTables) {
@@ -542,6 +496,14 @@ export const initDB = async () => {
             await connection.query("ALTER TABLE idp_plans ADD COLUMN supervisor_approved_date DATE");
             console.log("Added supervisor_approved_date column to idp_plans.");
         } catch (e) { /* Ignore if exists */ }
+
+        // MIGRATION: Remove SUPERVISOR from users.role — supervisor status is now determined
+        // dynamically via checkIsSupervisor() against the SIMAS org chart, not stored on the user.
+        try {
+            await connection.query("UPDATE users SET role = 'STAFF' WHERE role = 'SUPERVISOR'");
+            await connection.query("ALTER TABLE users MODIFY COLUMN role ENUM('STAFF', 'HR') NOT NULL");
+            console.log("Removed SUPERVISOR from users.role enum.");
+        } catch (e) { /* Ignore if already migrated */ }
 
         connection.release();
     } catch (err) {

@@ -17,7 +17,6 @@
   },
   "roles": {
     "STAFF": "Staf",
-    "SUPERVISOR": "Supervisor",
     "HR": "HR Admin",
     "HR_ADMIN": "HR Admin"
   },
@@ -45,7 +44,6 @@
     "passwordKeepCurrent": "(Kosongkan untuk mempertahankan yang sekarang)",
     "role": "Peran",
     "roleStaff": "Staf",
-    "roleSupervisor": "Supervisor",
     "roleHrAdmin": "HR Admin",
     "employeeLink": "Tautan Karyawan SimAsset (Opsional)",
     "noLink": "-- Tanpa Tautan --",

@@ -338,7 +338,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         name: emp.full_name,
                         email: emp.email,
                         branch: emp.branch_name,
-                        role: (emp.job_position?.includes('HR') && !emp.job_position?.includes('HRIS')) ? 'HR' : (emp.job_position?.includes('Supervisor') ? 'SUPERVISOR' : 'STAFF'),
+                        role: (emp.job_position?.includes('HR') && !emp.job_position?.includes('HRIS')) ? 'HR' : 'STAFF',
                         organization_name: emp.organization_name
                     }));
                     setUsers(mapped);
@@ -1290,7 +1290,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                                     <div><p className="font-bold text-slate-800">{user.name}</p><p className="text-xs text-slate-400">{user.email}</p></div>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${user.role === 'HR' || user.role === 'HR_ADMIN' ? 'bg-purple-100 text-purple-700' : user.role === 'SUPERVISOR' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>{user.role?.replace('_', ' ') || t('common.staffRoleFallback')}</span>
+                                                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${user.role === 'HR' || user.role === 'HR_ADMIN' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>{user.role?.replace('_', ' ') || t('common.staffRoleFallback')}</span>
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-2">
