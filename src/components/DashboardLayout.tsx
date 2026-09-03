@@ -53,6 +53,12 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
     });
     useEffect(() => {
         localStorage.setItem('lms_desktop_sidebar_open', String(isDesktopSidebarOpen));
+        // Collapsing the sidebar into the icon rail leaves no room for expanded
+        // submenus, so close them to avoid clipped, half-visible text.
+        if (!isDesktopSidebarOpen) {
+            setIsTrainingOpen(false);
+            setIsAdminOpen(false);
+        }
     }, [isDesktopSidebarOpen]);
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
     const [avatarFailed, setAvatarFailed] = useState(false);
@@ -501,7 +507,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
           fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0 lg:h-screen
           w-64 bg-slate-900 text-white transition-all duration-300 ease-in-out overflow-hidden
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-          ${isDesktopSidebarOpen ? 'lg:w-64' : 'lg:w-0'}
+          ${isDesktopSidebarOpen ? 'lg:w-64' : 'lg:w-20'}
         `}
             >
                 <style dangerouslySetInnerHTML={{ __html: `
@@ -510,13 +516,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     aside nav::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
                     aside nav::-webkit-scrollbar-thumb:hover { background: #475569; }
                 `}} />
-                <div className="h-full w-64 flex flex-col">
-                    <div className="p-6 border-b border-slate-700 flex items-center justify-between">
+                <div className={`h-full w-64 flex flex-col ${!isDesktopSidebarOpen ? 'lg:w-20' : ''}`}>
+                    <div className={`p-6 border-b border-slate-700 flex items-center justify-between ${!isDesktopSidebarOpen ? 'lg:justify-center lg:px-3' : ''}`}>
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl shadow-md bg-white p-1.5 shrink-0">
                                 <img src="/favicon.png" alt="Logo" className="w-full h-full object-contain" />
                             </div>
-                            <h1 className="text-xl font-bold tracking-wider">LMS NUSA</h1>
+                            <h1 className={`text-xl font-bold tracking-wider ${!isDesktopSidebarOpen ? 'lg:hidden' : ''}`}>LMS NUSA</h1>
                         </div>
                         <button onClick={toggleSidebar} className="lg:hidden text-slate-400 hover:text-white">
                             <X size={24} />
@@ -532,16 +538,18 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                     onNavigate(item.id as Page);
                                     setIsSidebarOpen(false);
                                 }}
+                                title={item.label}
                                 className={`
                                     relative w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left
+                                    ${!isDesktopSidebarOpen ? 'lg:justify-center lg:px-0' : ''}
                                     ${activePage === item.id
                                         ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
                                         : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                                     }
                                 `}
                             >
-                                <item.icon size={20} />
-                                <span className="font-medium">{item.label}</span>
+                                <item.icon size={20} className="shrink-0" />
+                                <span className={`font-medium ${!isDesktopSidebarOpen ? 'lg:hidden' : ''}`}>{item.label}</span>
                                 {activePage === item.id && (
                                     <span className="absolute -right-4 top-1/2 -translate-y-1/2 h-8 w-1 rounded-l-full bg-blue-400" />
                                 )}
@@ -552,9 +560,18 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                         {(config?.moduleInternal || config?.moduleExternal) && (
                             <div className="pt-1" ref={trainingRef}>
                                 <button
-                                    onClick={() => setIsTrainingOpen(!isTrainingOpen)}
+                                    onClick={() => {
+                                        if (!isDesktopSidebarOpen) {
+                                            setIsDesktopSidebarOpen(true);
+                                            setIsTrainingOpen(true);
+                                            return;
+                                        }
+                                        setIsTrainingOpen(!isTrainingOpen);
+                                    }}
+                                    title={t('menu.training')}
                                     className={`
                                         relative w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors text-left
+                                        ${!isDesktopSidebarOpen ? 'lg:justify-center lg:px-0' : ''}
                                         ${activePage === 'internal' || activePage === 'external' || activePage === 'external-approval' || isTrainingOpen
                                             ? 'bg-slate-800 text-white'
                                             : 'text-slate-400 hover:bg-slate-800 hover:text-white'
@@ -562,10 +579,12 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                     `}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <GraduationCap size={20} />
-                                        <span className="font-medium">{t('menu.training')}</span>
+                                        <GraduationCap size={20} className="shrink-0" />
+                                        <span className={`font-medium ${!isDesktopSidebarOpen ? 'lg:hidden' : ''}`}>{t('menu.training')}</span>
                                     </div>
-                                    {isTrainingOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                    <span className={!isDesktopSidebarOpen ? 'lg:hidden' : ''}>
+                                        {isTrainingOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                    </span>
                                     {(activePage === 'internal' || activePage === 'external' || activePage === 'external-approval') && (
                                         <span className="absolute -right-4 top-1/2 -translate-y-1/2 h-8 w-1 rounded-l-full bg-blue-400" />
                                     )}
@@ -599,9 +618,18 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                         {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
                             <div className="pt-2" ref={adminRef}>
                                 <button
-                                    onClick={() => setIsAdminOpen(!isAdminOpen)}
+                                    onClick={() => {
+                                        if (!isDesktopSidebarOpen) {
+                                            setIsDesktopSidebarOpen(true);
+                                            setIsAdminOpen(true);
+                                            return;
+                                        }
+                                        setIsAdminOpen(!isAdminOpen);
+                                    }}
+                                    title={t('menu.adminPanel')}
                                     className={`
                                         relative w-full flex items-center justify-between px-4 py-3 transition-colors text-left border
+                                        ${!isDesktopSidebarOpen ? 'lg:justify-center lg:px-0' : ''}
                                         ${activePage === 'admin-dashboard' || isAdminOpen
                                             ? `bg-slate-800 text-white border-indigo-500/30 shadow-lg ${isAdminOpen ? 'rounded-t-xl' : 'rounded-xl'}`
                                             : 'rounded-xl border-transparent text-slate-400 hover:bg-slate-800 hover:text-white'
@@ -609,10 +637,12 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                     `}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <Shield size={20} className={activePage === 'admin-dashboard' || isAdminOpen ? 'text-indigo-400' : ''} />
-                                        <span className="font-medium">{t('menu.adminPanel')}</span>
+                                        <Shield size={20} className={`shrink-0 ${activePage === 'admin-dashboard' || isAdminOpen ? 'text-indigo-400' : ''}`} />
+                                        <span className={`font-medium ${!isDesktopSidebarOpen ? 'lg:hidden' : ''}`}>{t('menu.adminPanel')}</span>
                                     </div>
-                                    {isAdminOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                    <span className={!isDesktopSidebarOpen ? 'lg:hidden' : ''}>
+                                        {isAdminOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                    </span>
                                     {activePage === 'admin-dashboard' && (
                                         <span className="absolute -right-4 top-1/2 -translate-y-1/2 h-8 w-1 rounded-l-full bg-indigo-400" />
                                     )}
@@ -651,15 +681,16 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                         <button
                             type="button"
                             onClick={() => setIsFeedbackOpen(true)}
-                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-emerald-400 hover:bg-slate-800 hover:text-emerald-300 transition-all text-left cursor-pointer"
+                            title={t('menu.feedback')}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-emerald-400 hover:bg-slate-800 hover:text-emerald-300 transition-all text-left cursor-pointer ${!isDesktopSidebarOpen ? 'lg:justify-center lg:px-0' : ''}`}
                         >
-                            <MessageSquarePlus size={20} />
-                            <span className="font-medium">{t('menu.feedback')}</span>
+                            <MessageSquarePlus size={20} className="shrink-0" />
+                            <span className={`font-medium ${!isDesktopSidebarOpen ? 'lg:hidden' : ''}`}>{t('menu.feedback')}</span>
                         </button>
                     </div>
 
                     {/* User Profile Mini */}
-                    <div className="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
+                    <div className={`p-4 border-t border-slate-800 text-xs text-slate-500 text-center ${!isDesktopSidebarOpen ? 'lg:hidden' : ''}`}>
                         &copy; 2026 PT Media Antar Nusa
                     </div>
                 </div>
