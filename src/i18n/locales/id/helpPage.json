@@ -130,8 +130,8 @@
           "purpose": "Buat sesi training (khusus HR/HR_ADMIN), atau kelola jalannya sesi yang namamu tercatat sebagai Host, sampai peserta dan kamu sendiri dapat sertifikat.",
           "steps": [
             {
-              "title": "Buat sesi baru (khusus HR/HR_ADMIN)",
-              "description": "Di Panel Admin → Internal, klik \"Create Session\". Isi tab \"Session Details\": Judul, Tanggal, Jam Mulai/Selesai, Nama Host (cari dari daftar karyawan; kalau host-nya vendor/pembicara dari luar perusahaan dan tidak ditemukan, ketik namanya lalu pilih opsi \"Use ... as an external host\" yang muncul), Tipe Acara (Online/Tatap Muka/Hybrid), Kompetensi, Tipe GRI, Lokasi atau Link Meeting, Link Materi, dan pilih peserta yang diundang. Di tab \"Exam Configuration\", buat soal Pre-Test dan Post-Test. Klik \"Send Invitations\" untuk membuat sesi (bisa juga import massal lewat tombol \"Import Data\")."
+              "title": "Info dulu ke HR sebelum sesi dibuat",
+              "description": "Kamu tidak bisa membuat sesi sendiri — kirim dulu detailnya ke HR: Judul, Tanggal, Jam Mulai/Selesai, Tipe Acara (Online/Tatap Muka/Hybrid), Lokasi atau Link Meeting, Link Materi, dan daftar peserta yang diundang (plus soal Pre-Test/Post-Test kalau perlu). HR yang akan memasukkan detail ini di Panel Admin → Internal → Create Session dan mengirim undangan — setelah itu namamu tercatat sebagai Host sesi tersebut."
             },
             {
               "title": "Buka kontrol Host di sesimu",
