@@ -759,7 +759,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
             </aside>
 
             {/* Main Content Wrapper */}
-            <div className="flex-1 flex flex-col min-w-0">
+            <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${isHelpOpen ? 'lg:mr-96' : ''}`}>
                 {/* Top Header */}
                 <header className="sticky top-0 z-30 px-6 py-4 bg-white/80 backdrop-blur-md border-b border-gray-200 flex items-center justify-between">
                     <div className="flex items-center gap-4">
