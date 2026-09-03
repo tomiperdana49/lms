@@ -676,7 +676,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                         )}
                     </nav>
 
-                    {/* Feedback Button (Help & Sign Out moved to the header profile dropdown) */}
+                    {/* Feedback Button (Help lives in the header; Sign Out is in the profile dropdown) */}
                     <div className="px-4 pt-4 border-t border-slate-800/60 space-y-1">
                         <button
                             type="button"
@@ -787,6 +787,15 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             )}
                         </div>
 
+                        <button
+                            type="button"
+                            onClick={() => onNavigate('help')}
+                            title={t('menu.help')}
+                            className="text-slate-500 hover:text-slate-700 transition-colors p-2 hover:bg-gray-100 rounded-full cursor-pointer flex items-center justify-center focus:outline-none"
+                        >
+                            <HelpCircle size={20} />
+                        </button>
+
                         <div className="relative profile-menu-container">
                             <button
                                 type="button"
@@ -818,17 +827,6 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
 
                             {isProfileMenuOpen && (
                                 <div className="absolute right-0 mt-2 w-56 bg-white/95 backdrop-blur-md border border-slate-100 shadow-2xl rounded-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200 p-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setIsProfileMenuOpen(false);
-                                            onNavigate('help');
-                                        }}
-                                        className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors text-left"
-                                    >
-                                        <HelpCircle size={18} />
-                                        <span className="font-medium text-sm">{t('menu.help')}</span>
-                                    </button>
                                     <button
                                         type="button"
                                         onClick={() => {
