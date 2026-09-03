@@ -22,7 +22,9 @@ import {
     Globe,
     UsersRound,
     HelpCircle,
-    Target
+    Target,
+    PanelLeftClose,
+    PanelLeftOpen
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Page, Role, User } from '../types';
@@ -45,6 +47,13 @@ interface DashboardLayoutProps {
 const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onLogout, adminView, config }: DashboardLayoutProps) => {
     const { t, i18n } = useTranslation('dashboardLayout');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(() => {
+        const saved = localStorage.getItem('lms_desktop_sidebar_open');
+        return saved !== null ? saved === 'true' : true;
+    });
+    useEffect(() => {
+        localStorage.setItem('lms_desktop_sidebar_open', String(isDesktopSidebarOpen));
+    }, [isDesktopSidebarOpen]);
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
     const [avatarFailed, setAvatarFailed] = useState(false);
     useEffect(() => { setAvatarFailed(false); }, [user?.avatar]);
@@ -490,8 +499,9 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
             <aside
                 className={`
           fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0 lg:h-screen
-          w-64 bg-slate-900 text-white transition-transform duration-300 ease-in-out
+          w-64 bg-slate-900 text-white transition-all duration-300 ease-in-out overflow-hidden
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          ${isDesktopSidebarOpen ? 'lg:w-64' : 'lg:w-0'}
         `}
             >
                 <style dangerouslySetInnerHTML={{ __html: `
@@ -500,7 +510,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     aside nav::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
                     aside nav::-webkit-scrollbar-thumb:hover { background: #475569; }
                 `}} />
-                <div className="h-full flex flex-col">
+                <div className="h-full w-64 flex flex-col">
                     <div className="p-6 border-b border-slate-700 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl shadow-md bg-white p-1.5 shrink-0">
@@ -656,6 +666,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             className="p-2 -ml-2 text-slate-600 hover:bg-gray-100 rounded-lg lg:hidden"
                         >
                             <Menu size={24} />
+                        </button>
+                        <button
+                            onClick={() => setIsDesktopSidebarOpen(!isDesktopSidebarOpen)}
+                            className="hidden lg:flex p-2 -ml-2 text-slate-600 hover:bg-gray-100 rounded-lg"
+                            title={isDesktopSidebarOpen ? t('menu.collapseSidebar') : t('menu.expandSidebar')}
+                        >
+                            {isDesktopSidebarOpen ? <PanelLeftClose size={22} /> : <PanelLeftOpen size={22} />}
                         </button>
                     </div>
 

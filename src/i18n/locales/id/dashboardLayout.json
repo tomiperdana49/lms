@@ -13,7 +13,9 @@
     "adminPanel": "Panel Admin",
     "help": "Bantuan",
     "feedback": "Feedback",
-    "signOut": "Keluar"
+    "signOut": "Keluar",
+    "collapseSidebar": "Sembunyikan menu",
+    "expandSidebar": "Tampilkan menu"
   },
   "admin": {
     "overview": "Ringkasan",

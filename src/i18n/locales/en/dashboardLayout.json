@@ -13,7 +13,9 @@
     "adminPanel": "Admin Panel",
     "help": "Help",
     "feedback": "Feedback",
-    "signOut": "Sign Out"
+    "signOut": "Sign Out",
+    "collapseSidebar": "Hide menu",
+    "expandSidebar": "Show menu"
   },
   "admin": {
     "overview": "Overview",
