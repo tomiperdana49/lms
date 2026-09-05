@@ -202,9 +202,9 @@ const EmployeeLearningReport = () => {
                 [t('export.dateColumn')]: formatDate(item.date),
                 [t('export.hoursColumn')]: item.hours,
                 [t('export.costColumn')]: item.cost,
-                [t('export.preTestColumn')]: section.key === 'training' ? (item.preTestScore ?? t('export.notTaken')) : '',
-                [t('export.postTestColumn')]: section.key === 'training' ? (item.postTestScore ?? t('export.notTaken')) : '',
-                [t('export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (item.feedbackScore ?? t('export.submitted')) : t('export.notSubmitted')) : ''
+                [t('export.preTestColumn')]: section.key === 'training' ? (item.preTestScore ?? '') : '',
+                [t('export.postTestColumn')]: section.key === 'training' ? (item.postTestScore ?? '') : '',
+                [t('export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (item.feedbackScore ?? t('export.submitted')) : '') : ''
             }))
         );
         rows.push({

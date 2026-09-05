@@ -251,9 +251,9 @@ const LearningReport = ({ userEmail, userName, userEmployeeId, isSupervisor }: L
                 [t('export.dateColumn')]: formatDate(item.date),
                 [t('export.hoursColumn')]: item.hours,
                 [t('export.costColumn')]: item.cost,
-                [t('export.preTestColumn')]: section.key === 'training' ? (item.preTestScore ?? t('export.notTaken')) : '',
-                [t('export.postTestColumn')]: section.key === 'training' ? (item.postTestScore ?? t('export.notTaken')) : '',
-                [t('export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (item.feedbackScore ?? t('export.submitted')) : t('export.notSubmitted')) : ''
+                [t('export.preTestColumn')]: section.key === 'training' ? (item.preTestScore ?? '') : '',
+                [t('export.postTestColumn')]: section.key === 'training' ? (item.postTestScore ?? '') : '',
+                [t('export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (item.feedbackScore ?? t('export.submitted')) : '') : ''
             }))
         );
         rows.push({
@@ -291,7 +291,7 @@ const LearningReport = ({ userEmail, userName, userEmployeeId, isSupervisor }: L
                     [t('team.export.preTestColumn')]: item.preTestScore ?? '',
                     [t('team.export.postTestColumn')]: item.postTestScore ?? '',
                     [t('team.export.costColumn')]: item.cost || '',
-                    [t('team.export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? t('export.submitted') : t('export.notSubmitted')) : ''
+                    [t('team.export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (t('export.submitted')) : '') : ''
                 }))
             );
         });
