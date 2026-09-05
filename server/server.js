@@ -131,6 +131,29 @@ const isUnderIncentiveClaimLimit = async (employeeId, userName, referenceDate) =
     return (rows[0]?.cnt || 0) < 5;
 };
 
+// course_modules.duration is stored either as "mm:ss" or as a plain minute count - this converts
+// either form to hours. Shared by the learning-stats aggregation and the Nusawork completion sync.
+const parseModuleDuration = (dur) => {
+    if (!dur) return 0;
+    if (typeof dur === 'string' && dur.includes(':')) {
+        const [mm, ss] = dur.split(':').map(Number);
+        return ((mm || 0) + (ss || 0) / 60) / 60;
+    }
+    const n = Number(dur);
+    return isNaN(n) ? 0 : n / 60;
+};
+
+// courses.duration is the free-text "Total Duration" label an admin sets on the course (e.g.
+// "60 Hours of Learning"), not the sum of its modules' video lengths - that's what should be
+// reported as the course's hours (e.g. to Nusawork), not a tally of raw video playtime.
+const parseCourseTotalDurationHours = (durationLabel) => {
+    if (!durationLabel) return null;
+    const match = String(durationLabel).match(/[\d]+(?:[.,]\d+)?/);
+    if (!match) return null;
+    const n = parseFloat(match[0].replace(',', '.'));
+    return isNaN(n) ? null : n;
+};
+
 // --- CERTIFICATE HELPERS ---
 const ROMAN_MONTHS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 
@@ -345,6 +368,46 @@ const getNusanetToken = async (username, password) => {
     }
 
     return null;
+};
+
+// Pushes one employee note to Nusawork when an online course's final assessment is passed, so the
+// completion (hours/scores) shows up alongside HR's own records there. Fire-and-forget from the
+// caller's point of view - failures are logged but never block the quiz-submit response.
+const pushOnlineModuleCompletionToNusawork = async ({ employeeId, category, title, date, hours, preTest, postTest }) => {
+    if (!employeeId) {
+        console.warn('[NUSAWORK ONLINE SYNC] No employee_id resolved, skipping push for course:', title);
+        return;
+    }
+    try {
+        const token = await getNusanetToken();
+        const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
+        const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
+        const response = await fetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+                employee_id: employeeId,
+                fields: {
+                    category: category || 'Online Module',
+                    title,
+                    date,
+                    hours: String(hours),
+                    cost: 'Rp0',
+                    pre_test: (preTest ?? '') === '' ? '' : String(preTest),
+                    post_test: String(postTest),
+                    feedback: ''
+                }
+            })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            console.error('[NUSAWORK ONLINE SYNC] Failed:', employeeId, title, response.status, data);
+        } else {
+            console.log('[NUSAWORK ONLINE SYNC] Pushed completion note:', employeeId, title);
+        }
+    } catch (err) {
+        console.error('[NUSAWORK ONLINE SYNC] Error:', employeeId, title, err.message);
+    }
 };
 
 const ensureEmployeeColumnsExist = async (employeeData) => {
@@ -1606,26 +1669,20 @@ const computeLearningStats = async ({ email, employee_id, startDate, endDate }) 
         // 3. Online Modules (progress on courses)
         if (targetEmpId || targetUserId) {
             const progressRows = await query(
-                `SELECT p.course_id, p.completed_module_ids, p.last_access, c.title as course_title
+                `SELECT p.course_id, p.completed_module_ids, p.last_access, c.title as course_title, c.duration as course_duration
                  FROM progress p LEFT JOIN courses c ON p.course_id = c.id
                  WHERE (p.employee_id IS NOT NULL AND p.employee_id = ?) OR p.user_id = ?`,
                 [targetEmpId, targetUserId]
             );
 
             if (progressRows.length > 0) {
-                const moduleRows = await query('SELECT id, duration FROM course_modules');
+                const moduleRows = await query('SELECT id, course_id, duration FROM course_modules');
                 const durationMap = {};
-                for (const m of moduleRows) durationMap[m.id] = m.duration;
-
-                const parseModuleDuration = (dur) => {
-                    if (!dur) return 0;
-                    if (typeof dur === 'string' && dur.includes(':')) {
-                        const [mm, ss] = dur.split(':').map(Number);
-                        return ((mm || 0) + (ss || 0) / 60) / 60;
-                    }
-                    const n = Number(dur);
-                    return isNaN(n) ? 0 : n / 60;
-                };
+                const moduleCountByCourse = {};
+                for (const m of moduleRows) {
+                    durationMap[m.id] = m.duration;
+                    moduleCountByCourse[m.course_id] = (moduleCountByCourse[m.course_id] || 0) + 1;
+                }
 
                 for (const p of progressRows) {
                     if (!isWithinRange(p.last_access)) continue;
@@ -1637,9 +1694,20 @@ const computeLearningStats = async ({ email, employee_id, startDate, endDate }) 
                             : (p.completed_module_ids || []);
                     } catch (e) { }
 
-                    let courseHours = 0;
-                    for (const modId of completedIds) {
-                        courseHours += parseModuleDuration(durationMap[modId]);
+                    // Once every module in the course is done, report the admin-set "Total Duration"
+                    // label for the whole course instead of a tally of raw video playtime - a 2-hour
+                    // course made of a few short clips shouldn't read as a few minutes of learning.
+                    // While still in progress, fall back to the per-module tally so partial credit
+                    // still shows something.
+                    const totalModules = moduleCountByCourse[p.course_id] || 0;
+                    const isFullyCompleted = totalModules > 0 && completedIds.length >= totalModules;
+                    const labelHours = isFullyCompleted ? parseCourseTotalDurationHours(p.course_duration) : null;
+
+                    let courseHours;
+                    if (labelHours !== null) {
+                        courseHours = labelHours;
+                    } else {
+                        courseHours = completedIds.reduce((sum, modId) => sum + parseModuleDuration(durationMap[modId]), 0);
                     }
                     jamOnline += courseHours;
 
@@ -3573,6 +3641,35 @@ app.post('/api/quiz/submit', async (req, res) => {
                     await query('INSERT INTO progress (user_id, course_id, completed_module_ids, last_access, employee_id) VALUES (?, ?, ?, ?, ?)',
                         [studentId, courseId, jsonIds, now, employeeId]);
                 }
+            }
+        } else if (score >= 80 && !moduleId && courseId && quizType === 'POST') {
+            // Final course assessment passed (no moduleId - a per-module quiz is handled above).
+            // Push a Nusawork completion note, but only the first time this course is passed -
+            // the row inserted above is included in this count, so exactly 1 means this is it.
+            const passCount = await query(
+                `SELECT COUNT(*) as cnt FROM quiz_results WHERE course_id = ? AND module_id IS NULL AND quiz_type = 'POST' AND score >= 80
+                 AND (student_id = ? OR (employee_id IS NOT NULL AND employee_id = ?))`,
+                [courseId, studentId, employeeId]
+            );
+            if ((passCount[0]?.cnt || 0) === 1) {
+                const courseRows = await query('SELECT title, category, duration FROM courses WHERE id = ?', [courseId]);
+                const course = courseRows[0];
+                const totalHours = parseCourseTotalDurationHours(course?.duration);
+                const preTestRows = await query(
+                    `SELECT score FROM quiz_results WHERE course_id = ? AND module_id IS NULL AND quiz_type = 'PRE'
+                     AND (student_id = ? OR (employee_id IS NOT NULL AND employee_id = ?)) ORDER BY date DESC LIMIT 1`,
+                    [courseId, studentId, employeeId]
+                );
+                // Don't block the quiz-submit response on an external API call.
+                pushOnlineModuleCompletionToNusawork({
+                    employeeId,
+                    category: course?.category,
+                    title: course?.title || `Course #${courseId}`,
+                    date: now.toISOString().slice(0, 10),
+                    hours: totalHours !== null ? Math.round(totalHours * 100) / 100 : 0,
+                    preTest: preTestRows.length > 0 ? preTestRows[0].score : '',
+                    postTest: score
+                });
             }
         }
 
