@@ -108,6 +108,29 @@ const query = async (sql, params) => {
     return results;
 };
 
+// Reading-log incentive claims are capped at 5 (Approved + Pending) per calendar year per employee -
+// matches the frontend's claim-button gating in ReadingLogPage.tsx. Enforced here too since the
+// frontend check can't stop a direct API call from bypassing it.
+const NO_INCENTIVE_CATEGORIES = ['buku fiksi/novel', 'majalah', 'fiction'];
+
+const isIncentiveEligibleCategory = (category) => !NO_INCENTIVE_CATEGORIES.includes((category || '').trim().toLowerCase());
+
+const isUnderIncentiveClaimLimit = async (employeeId, userName, referenceDate) => {
+    const year = new Date(referenceDate || Date.now()).getFullYear();
+    const identifier = employeeId || userName;
+    if (!identifier) return true;
+    const matchClause = employeeId ? 'employee_id = ?' : 'user_name = ?';
+    const rows = await query(
+        `SELECT COUNT(*) as cnt FROM reading_logs
+         WHERE hr_approval_status IN ('Approved', 'Pending')
+         AND status != 'Cancelled'
+         AND ${matchClause}
+         AND YEAR(COALESCE(finish_date, date)) = ?`,
+        [identifier, year]
+    );
+    return (rows[0]?.cnt || 0) < 5;
+};
+
 // --- CERTIFICATE HELPERS ---
 const ROMAN_MONTHS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 
@@ -2298,6 +2321,14 @@ app.post('/api/logs', async (req, res) => {
     try {
         const log = req.body;
         console.log("[POST LOG] Received:", JSON.stringify(log, null, 2));
+
+        if (log.hrApprovalStatus === 'Pending' && isIncentiveEligibleCategory(log.category)) {
+            const withinLimit = await isUnderIncentiveClaimLimit(log.employee_id, log.userName, log.finishDate || log.date);
+            if (!withinLimit) {
+                return res.status(400).json({ error: 'Incentive claim limit reached (5 per year).' });
+            }
+        }
+
         const result = await query(
             'INSERT INTO reading_logs (title, author, category, date, duration, review, status, user_name, employee_id, evidence_url, start_date, finish_date, reading_duration, hr_approval_status, link, sn, planned_finish_date, location, source, claimed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
@@ -2421,6 +2452,16 @@ app.put('/api/logs/:id', async (req, res) => {
         }
         // Auto set claimed_at if status changes to Pending (Claimed)
         if (updates.hrApprovalStatus === 'Pending') {
+            const currentLogs = await query('SELECT employee_id, user_name, category, finish_date, date FROM reading_logs WHERE id = ?', [id]);
+            if (currentLogs.length === 0) return res.status(404).json({ error: 'Reading log not found' });
+            const currentLog = currentLogs[0];
+            const category = updates.category !== undefined ? updates.category : currentLog.category;
+            if (isIncentiveEligibleCategory(category)) {
+                const withinLimit = await isUnderIncentiveClaimLimit(currentLog.employee_id, currentLog.user_name, currentLog.finish_date || currentLog.date);
+                if (!withinLimit) {
+                    return res.status(400).json({ error: 'Incentive claim limit reached (5 per year).' });
+                }
+            }
             dbUpdates.claimed_at = new Date();
         }
         if (updates.status !== undefined) dbUpdates.status = updates.status;
@@ -2506,6 +2547,16 @@ app.post('/api/books/return', async (req, res) => {
         if (!id) return res.status(400).json({ error: 'Log ID is required' });
 
         const finishDateObj = finishDate ? new Date(finishDate) : new Date();
+
+        const existingLogs = await query('SELECT employee_id, user_name, category FROM reading_logs WHERE id = ?', [id]);
+        if (existingLogs.length === 0) return res.status(404).json({ error: 'Log not found' });
+        const existingLog = existingLogs[0];
+        if (isIncentiveEligibleCategory(existingLog.category)) {
+            const withinLimit = await isUnderIncentiveClaimLimit(existingLog.employee_id, existingLog.user_name, finishDateObj);
+            if (!withinLimit) {
+                return res.status(400).json({ error: 'Incentive claim limit reached (5 per year).' });
+            }
+        }
 
         // Prepare SQL and params. If startDate is provided, update it too.
         let sql = 'UPDATE reading_logs SET status = ?, finish_date = ?, review = ?, link = ?, evidence_url = ?, reading_duration = ?, hr_approval_status = ?';
