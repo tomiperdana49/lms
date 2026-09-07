@@ -485,6 +485,10 @@ const deleteNusaworkNote = async ({ employeeId, idGroup }) => {
     }
 };
 
+// Zero means "no cost recorded" (e.g. a Reading Log note pushed before HR approves an incentive) -
+// send '-' rather than the misleading "Rp0", matching the online-module note's own convention.
+const formatNusaworkCost = (cost) => (Number(cost) > 0 ? `Rp ${Math.round(cost).toLocaleString('id-ID')}` : '-');
+
 // Pushes one employee note to Nusawork when an Internal Training meeting is marked Paid, so the
 // cost/hours show up alongside HR's own records there - mirrors pushOnlineModuleCompletionToNusawork.
 // Saves the returned id_group into nusawork_training_notes for later update/delete.
@@ -504,7 +508,7 @@ const pushInternalTrainingNoteToNusawork = async ({ employeeId, meetingId, title
                     title,
                     date,
                     hours: String(hours),
-                    cost: `Rp${Math.round(cost)}`
+                    cost: formatNusaworkCost(cost)
                 }
             })
         });
@@ -548,7 +552,7 @@ const updateInternalTrainingNoteInNusawork = async ({ employeeId, idGroup, title
                     title,
                     date,
                     hours: String(hours),
-                    cost: `Rp${Math.round(cost)}`
+                    cost: formatNusaworkCost(cost)
                 }
             })
         });
@@ -683,7 +687,7 @@ const pushExternalTrainingNoteToNusawork = async ({ employeeId, requestId, title
                     title,
                     date,
                     hours: String(hours),
-                    cost: `Rp${Math.round(cost)}`
+                    cost: formatNusaworkCost(cost)
                 }
             })
         });
@@ -723,7 +727,7 @@ const updateExternalTrainingNoteInNusawork = async ({ employeeId, idGroup, title
                     title,
                     date,
                     hours: String(hours),
-                    cost: `Rp${Math.round(cost)}`
+                    cost: formatNusaworkCost(cost)
                 }
             })
         });
@@ -792,7 +796,7 @@ const pushReadingLogNoteToNusawork = async ({ employeeId, logId, title, date, ho
                     title,
                     date,
                     hours: String(hours),
-                    cost: `Rp${Math.round(cost)}`
+                    cost: formatNusaworkCost(cost)
                 }
             })
         });
@@ -832,7 +836,7 @@ const updateReadingLogNoteInNusawork = async ({ employeeId, idGroup, title, date
                     title,
                     date,
                     hours: String(hours),
-                    cost: `Rp${Math.round(cost)}`
+                    cost: formatNusaworkCost(cost)
                 }
             })
         });
