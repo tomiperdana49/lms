@@ -167,6 +167,13 @@ export const initDB = async () => {
         } catch (e) { /* Ignore if exists */ }
 
         try {
+            // Nusawork's note API returns { data: { id_group } } on success - stored here against the
+            // completing quiz_results row so a future update/delete of that note can reference it.
+            await connection.query("ALTER TABLE quiz_results ADD COLUMN nusawork_id_group INT");
+            console.log("Added nusawork_id_group column to quiz_results.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
             await connection.query("ALTER TABLE meetings ADD COLUMN type VARCHAR(50) DEFAULT 'Offline'");
             console.log("Added type column to meetings.");
         } catch (e) { /* Ignore if exists */ }

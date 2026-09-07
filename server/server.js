@@ -373,7 +373,7 @@ const getNusanetToken = async (username, password) => {
 // Pushes one employee note to Nusawork when an online course's final assessment is passed, so the
 // completion (hours/scores) shows up alongside HR's own records there. Fire-and-forget from the
 // caller's point of view - failures are logged but never block the quiz-submit response.
-const pushOnlineModuleCompletionToNusawork = async ({ employeeId, category, title, date, hours, preTest, postTest }) => {
+const pushOnlineModuleCompletionToNusawork = async ({ employeeId, title, date, hours, preTest, postTest, quizResultId }) => {
     if (!employeeId) {
         console.warn('[NUSAWORK ONLINE SYNC] No employee_id resolved, skipping push for course:', title);
         return;
@@ -388,11 +388,14 @@ const pushOnlineModuleCompletionToNusawork = async ({ employeeId, category, titl
             body: JSON.stringify({
                 employee_id: employeeId,
                 fields: {
-                    category: category || 'Online Module',
+                    // Identifies which LMS feature this note came from (matches the Learning Report's
+                    // section labels) - not the course's own subject-matter category (e.g. "General",
+                    // "Technical"), which isn't meaningful in Nusawork's note list.
+                    category: 'Online Modules',
                     title,
                     date,
                     hours: String(hours),
-                    cost: 'Rp0',
+                    cost: '-',
                     pre_test: (preTest ?? '') === '' ? '' : String(preTest),
                     post_test: String(postTest),
                     feedback: ''
@@ -402,11 +405,82 @@ const pushOnlineModuleCompletionToNusawork = async ({ employeeId, category, titl
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
             console.error('[NUSAWORK ONLINE SYNC] Failed:', employeeId, title, response.status, data);
-        } else {
-            console.log('[NUSAWORK ONLINE SYNC] Pushed completion note:', employeeId, title);
+            return;
+        }
+        console.log('[NUSAWORK ONLINE SYNC] Pushed completion note:', employeeId, title);
+
+        // Save the note's id_group so a later update/delete of this note can reference it -
+        // e.g. { data: { is_group: true, id_group: 3786 } }.
+        const idGroup = data?.data?.id_group;
+        if (idGroup && quizResultId) {
+            try {
+                await query('UPDATE quiz_results SET nusawork_id_group = ? WHERE id = ?', [idGroup, quizResultId]);
+                console.log('[NUSAWORK ONLINE SYNC] Saved id_group', idGroup, 'for quiz_results', quizResultId);
+            } catch (dbErr) {
+                console.error('[NUSAWORK ONLINE SYNC] Failed to save id_group:', dbErr.message);
+            }
         }
     } catch (err) {
         console.error('[NUSAWORK ONLINE SYNC] Error:', employeeId, title, err.message);
+    }
+};
+
+// Updates an already-pushed Nusawork completion note (identified by its saved id_group) when the
+// course it belongs to is edited - e.g. a title/duration change should be reflected on every
+// employee's note, not just future completions. Fire-and-forget, same as the create path.
+const updateOnlineModuleNoteInNusawork = async ({ employeeId, idGroup, title, date, hours }) => {
+    if (!employeeId || !idGroup) return;
+    try {
+        const token = await getNusanetToken();
+        const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
+        const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
+        const response = await fetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+                employee_id: employeeId,
+                id_group: idGroup,
+                fields: {
+                    category: 'Online Modules',
+                    title,
+                    date,
+                    hours: String(hours)
+                }
+            })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            console.error('[NUSAWORK ONLINE SYNC] Update failed:', employeeId, idGroup, response.status, data);
+        } else {
+            console.log('[NUSAWORK ONLINE SYNC] Updated completion note:', employeeId, idGroup, title);
+        }
+    } catch (err) {
+        console.error('[NUSAWORK ONLINE SYNC] Update error:', employeeId, idGroup, err.message);
+    }
+};
+
+// Removes a Nusawork completion note (by employee_id + id_group) when the module it belongs to is
+// deleted from the LMS, e.g. DELETE /emp/api/client/v4/note/web/201/employee?employee_id=0201507&id_group=3788.
+// Fire-and-forget, same as the create/update paths.
+const deleteOnlineModuleNoteInNusawork = async ({ employeeId, idGroup }) => {
+    if (!employeeId || !idGroup) return;
+    try {
+        const token = await getNusanetToken();
+        const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
+        const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
+        const url = `${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee?employee_id=${encodeURIComponent(employeeId)}&id_group=${encodeURIComponent(idGroup)}`;
+        const response = await fetch(url, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            console.error('[NUSAWORK ONLINE SYNC] Delete failed:', employeeId, idGroup, response.status, data);
+        } else {
+            console.log('[NUSAWORK ONLINE SYNC] Deleted completion note:', employeeId, idGroup);
+        }
+    } catch (err) {
+        console.error('[NUSAWORK ONLINE SYNC] Delete error:', employeeId, idGroup, err.message);
     }
 };
 
@@ -1490,307 +1564,307 @@ const computeLearningStats = async ({ email, employee_id, startDate, endDate }) 
     if (!email && !employee_id) throw new Error('Email or employee_id required');
 
     // Optional date-range filter (inclusive). When omitted, every record is included (unfiltered/all-time).
-        const rangeStart = startDate ? new Date(startDate) : null;
-        const rangeEnd = endDate ? new Date(`${endDate}T23:59:59.999`) : null;
-        const isWithinRange = (dateStr) => {
-            if (!rangeStart && !rangeEnd) return true;
-            if (!dateStr) return false;
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return false;
-            if (rangeStart && d < rangeStart) return false;
-            if (rangeEnd && d > rangeEnd) return false;
-            return true;
-        };
+    const rangeStart = startDate ? new Date(startDate) : null;
+    const rangeEnd = endDate ? new Date(`${endDate}T23:59:59.999`) : null;
+    const isWithinRange = (dateStr) => {
+        if (!rangeStart && !rangeEnd) return true;
+        if (!dateStr) return false;
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return false;
+        if (rangeStart && d < rangeStart) return false;
+        if (rangeEnd && d > rangeEnd) return false;
+        return true;
+    };
 
-        let targetEmail = email;
-        let targetEmpId = employee_id;
-        let targetUserId = null;
+    let targetEmail = email;
+    let targetEmpId = employee_id;
+    let targetUserId = null;
 
-        // Find employee if missing
-        let targetName = null;
-        if (targetEmail) {
-            const users = await query('SELECT id, employee_id, name FROM users WHERE email = ?', [targetEmail]);
-            if (users.length > 0) {
-                targetUserId = users[0].id;
-                if (!targetEmpId) targetEmpId = users[0].employee_id;
-                targetName = users[0].name;
-            }
+    // Find employee if missing
+    let targetName = null;
+    if (targetEmail) {
+        const users = await query('SELECT id, employee_id, name FROM users WHERE email = ?', [targetEmail]);
+        if (users.length > 0) {
+            targetUserId = users[0].id;
+            if (!targetEmpId) targetEmpId = users[0].employee_id;
+            targetName = users[0].name;
         }
+    }
 
-        let jamTraining = 0;
-        let biayaTraining = 0;
-        let jamTrainingExternal = 0;
-        let biayaTrainingExternal = 0;
-        let jamOnline = 0;
-        let jamBuku = 0;
-        let biayaBuku = 0;
-        const trainingDetails = [];
-        const trainingExternalDetails = [];
-        const onlineDetails = [];
-        const bookDetails = [];
+    let jamTraining = 0;
+    let biayaTraining = 0;
+    let jamTrainingExternal = 0;
+    let biayaTrainingExternal = 0;
+    let jamOnline = 0;
+    let jamBuku = 0;
+    let biayaBuku = 0;
+    const trainingDetails = [];
+    const trainingExternalDetails = [];
+    const onlineDetails = [];
+    const bookDetails = [];
 
-        // 1. Internal Training (meetings)
-        const meetings = await query("SELECT id, title, date, time, guests_json, cost_report_json, host, employee_id FROM meetings WHERE type IN ('Offline', 'Online', 'Hybrid', 'Internal') AND deleted_at IS NULL");
+    // 1. Internal Training (meetings)
+    const meetings = await query("SELECT id, title, date, time, guests_json, cost_report_json, host, employee_id FROM meetings WHERE type IN ('Offline', 'Online', 'Hybrid', 'Internal') AND deleted_at IS NULL");
 
-        // Fetch this user's pre/post-test scores and feedback submissions across all meetings up front
-        // (avoids N+1 queries inside the loop below).
-        const userQuizResults = await query(
-            `SELECT meeting_id, quiz_type, score FROM quiz_results
+    // Fetch this user's pre/post-test scores and feedback submissions across all meetings up front
+    // (avoids N+1 queries inside the loop below).
+    const userQuizResults = await query(
+        `SELECT meeting_id, quiz_type, score FROM quiz_results
              WHERE meeting_id IS NOT NULL AND module_id IS NULL
                AND (student_id = ? OR (employee_id IS NOT NULL AND employee_id = ?))`,
-            [targetUserId, targetEmpId]
-        );
-        const quizByMeeting = {};
-        for (const r of userQuizResults) {
-            if (!quizByMeeting[r.meeting_id]) quizByMeeting[r.meeting_id] = {};
-            const quizType = (r.quiz_type || 'POST').toUpperCase();
-            if (quizByMeeting[r.meeting_id][quizType] === undefined || r.score > quizByMeeting[r.meeting_id][quizType]) {
-                quizByMeeting[r.meeting_id][quizType] = r.score;
-            }
+        [targetUserId, targetEmpId]
+    );
+    const quizByMeeting = {};
+    for (const r of userQuizResults) {
+        if (!quizByMeeting[r.meeting_id]) quizByMeeting[r.meeting_id] = {};
+        const quizType = (r.quiz_type || 'POST').toUpperCase();
+        if (quizByMeeting[r.meeting_id][quizType] === undefined || r.score > quizByMeeting[r.meeting_id][quizType]) {
+            quizByMeeting[r.meeting_id][quizType] = r.score;
         }
+    }
 
-        const userFeedback = await query(
-            `SELECT meeting_id, submitted_at, feedback_data FROM course_feedback
+    const userFeedback = await query(
+        `SELECT meeting_id, submitted_at, feedback_data FROM course_feedback
              WHERE meeting_id IS NOT NULL
                AND (user_id = ? OR (employee_id IS NOT NULL AND employee_id = ?))`,
-            [targetUserId, targetEmpId]
+        [targetUserId, targetEmpId]
+    );
+    const feedbackByMeeting = {};
+    for (const f of userFeedback) {
+        let rating = null;
+        try {
+            const data = typeof f.feedback_data === 'string' ? JSON.parse(f.feedback_data) : f.feedback_data;
+            if (data && data.rating !== undefined) rating = data.rating;
+        } catch (e) { }
+        feedbackByMeeting[f.meeting_id] = { submittedAt: f.submitted_at, rating };
+    }
+
+    for (const meeting of meetings) {
+        // Skip if the user is the host
+        if ((targetName && meeting.host === targetName) ||
+            (targetEmpId && meeting.employee_id === targetEmpId)) {
+            continue;
+        }
+
+        let isAttended = false;
+        let costReport = null;
+        let guests = null;
+
+        try { if (meeting.cost_report_json) costReport = JSON.parse(meeting.cost_report_json); } catch (e) { }
+        try { if (meeting.guests_json) guests = JSON.parse(meeting.guests_json); } catch (e) { }
+
+        // Check every available signal independently (don't stop at the first truthy container)
+        if (costReport && costReport.attendees && targetEmail && costReport.attendees.includes(targetEmail)) isAttended = true;
+        if (!isAttended && costReport && costReport.attendee_ids && targetEmpId && costReport.attendee_ids.includes(targetEmpId)) isAttended = true;
+        if (!isAttended && guests && guests.emails && targetEmail && guests.emails.includes(targetEmail)) isAttended = true;
+        if (!isAttended && guests && guests.employee_ids && targetEmpId && guests.employee_ids.includes(targetEmpId)) isAttended = true;
+
+        if (isAttended && isWithinRange(meeting.date)) {
+            let itemHours = 0;
+            let itemCost = 0;
+
+            // Parse duration
+            if (meeting.time) {
+                const parts = meeting.time.split('-');
+                if (parts.length === 2) {
+                    const parseTime = (t) => {
+                        const [h, m] = t.split(':').map(Number);
+                        return (h || 0) + (m || 0) / 60;
+                    };
+                    const startH = parseTime(parts[0].trim());
+                    const endH = parseTime(parts[1].trim());
+                    if (endH > startH) itemHours = endH - startH;
+                }
+            }
+            jamTraining += itemHours;
+
+            // Parse cost
+            if (costReport && costReport.participantsCount > 0) {
+                const tInc = Number(costReport.trainerIncentive ?? costReport.trainer) || 0;
+                const sCost = Number(costReport.snackCost ?? costReport.snack) || 0;
+                const lCost = Number(costReport.lunchCost ?? costReport.lunch) || 0;
+                const oCost = Number(costReport.otherCost ?? costReport.other) || 0;
+                const totalCost = tInc + sCost + lCost + oCost;
+                itemCost = totalCost / costReport.participantsCount;
+            }
+            biayaTraining += itemCost;
+
+            const meetingQuiz = quizByMeeting[meeting.id] || {};
+            const feedbackEntry = feedbackByMeeting[meeting.id] || null;
+
+            trainingDetails.push({
+                title: meeting.title,
+                date: meeting.date,
+                hours: Math.round(itemHours * 100) / 100,
+                cost: Math.round(itemCost),
+                preTestScore: meetingQuiz.PRE ?? null,
+                postTestScore: meetingQuiz.POST ?? null,
+                feedbackSubmitted: !!feedbackEntry,
+                feedbackScore: feedbackEntry ? feedbackEntry.rating : null,
+                feedbackDate: feedbackEntry ? feedbackEntry.submittedAt : null,
+                organizer: meeting.host || null
+            });
+        }
+    }
+
+    // 2. External Training (external_training_requests)
+    if (targetEmpId) {
+        const externalTrainings = await query(
+            "SELECT title, vendor, certificate_link, start_date, end_date, registration_fee, travel_flight_cost, accommodation_cost, miscellaneous_cost, learning_hours FROM external_training_requests WHERE employee_id = ? AND status = 'Processed' AND deleted_at IS NULL",
+            [targetEmpId]
         );
-        const feedbackByMeeting = {};
-        for (const f of userFeedback) {
-            let rating = null;
-            try {
-                const data = typeof f.feedback_data === 'string' ? JSON.parse(f.feedback_data) : f.feedback_data;
-                if (data && data.rating !== undefined) rating = data.rating;
-            } catch (e) { }
-            feedbackByMeeting[f.meeting_id] = { submittedAt: f.submitted_at, rating };
-        }
+        for (const ext of externalTrainings) {
+            if (!isWithinRange(ext.start_date)) continue;
 
-        for (const meeting of meetings) {
-            // Skip if the user is the host
-            if ((targetName && meeting.host === targetName) ||
-                (targetEmpId && meeting.employee_id === targetEmpId)) {
-                continue;
+            let itemHours = 0;
+            if (ext.learning_hours != null) {
+                itemHours = Number(ext.learning_hours) || 0;
+            } else if (ext.start_date && ext.end_date) {
+                const diffMs = new Date(ext.end_date).getTime() - new Date(ext.start_date).getTime();
+                if (diffMs > 0) itemHours = diffMs / (1000 * 60 * 60);
             }
+            jamTrainingExternal += itemHours;
 
-            let isAttended = false;
-            let costReport = null;
-            let guests = null;
+            const itemCost = (Number(ext.registration_fee) || 0) + (Number(ext.travel_flight_cost) || 0) +
+                (Number(ext.accommodation_cost) || 0) + (Number(ext.miscellaneous_cost) || 0);
+            biayaTrainingExternal += itemCost;
 
-            try { if (meeting.cost_report_json) costReport = JSON.parse(meeting.cost_report_json); } catch (e) { }
-            try { if (meeting.guests_json) guests = JSON.parse(meeting.guests_json); } catch (e) { }
-
-            // Check every available signal independently (don't stop at the first truthy container)
-            if (costReport && costReport.attendees && targetEmail && costReport.attendees.includes(targetEmail)) isAttended = true;
-            if (!isAttended && costReport && costReport.attendee_ids && targetEmpId && costReport.attendee_ids.includes(targetEmpId)) isAttended = true;
-            if (!isAttended && guests && guests.emails && targetEmail && guests.emails.includes(targetEmail)) isAttended = true;
-            if (!isAttended && guests && guests.employee_ids && targetEmpId && guests.employee_ids.includes(targetEmpId)) isAttended = true;
-
-            if (isAttended && isWithinRange(meeting.date)) {
-                let itemHours = 0;
-                let itemCost = 0;
-
-                // Parse duration
-                if (meeting.time) {
-                    const parts = meeting.time.split('-');
-                    if (parts.length === 2) {
-                        const parseTime = (t) => {
-                            const [h, m] = t.split(':').map(Number);
-                            return (h || 0) + (m || 0) / 60;
-                        };
-                        const startH = parseTime(parts[0].trim());
-                        const endH = parseTime(parts[1].trim());
-                        if (endH > startH) itemHours = endH - startH;
-                    }
-                }
-                jamTraining += itemHours;
-
-                // Parse cost
-                if (costReport && costReport.participantsCount > 0) {
-                    const tInc = Number(costReport.trainerIncentive ?? costReport.trainer) || 0;
-                    const sCost = Number(costReport.snackCost ?? costReport.snack) || 0;
-                    const lCost = Number(costReport.lunchCost ?? costReport.lunch) || 0;
-                    const oCost = Number(costReport.otherCost ?? costReport.other) || 0;
-                    const totalCost = tInc + sCost + lCost + oCost;
-                    itemCost = totalCost / costReport.participantsCount;
-                }
-                biayaTraining += itemCost;
-
-                const meetingQuiz = quizByMeeting[meeting.id] || {};
-                const feedbackEntry = feedbackByMeeting[meeting.id] || null;
-
-                trainingDetails.push({
-                    title: meeting.title,
-                    date: meeting.date,
-                    hours: Math.round(itemHours * 100) / 100,
-                    cost: Math.round(itemCost),
-                    preTestScore: meetingQuiz.PRE ?? null,
-                    postTestScore: meetingQuiz.POST ?? null,
-                    feedbackSubmitted: !!feedbackEntry,
-                    feedbackScore: feedbackEntry ? feedbackEntry.rating : null,
-                    feedbackDate: feedbackEntry ? feedbackEntry.submittedAt : null,
-                    organizer: meeting.host || null
-                });
-            }
+            trainingExternalDetails.push({
+                title: ext.title,
+                date: ext.start_date,
+                hours: Math.round(itemHours * 100) / 100,
+                cost: Math.round(itemCost),
+                organizer: ext.vendor || null,
+                certificateLink: ext.certificate_link || null
+            });
         }
+    }
 
-        // 2. External Training (external_training_requests)
-        if (targetEmpId) {
-            const externalTrainings = await query(
-                "SELECT title, vendor, certificate_link, start_date, end_date, registration_fee, travel_flight_cost, accommodation_cost, miscellaneous_cost, learning_hours FROM external_training_requests WHERE employee_id = ? AND status = 'Processed' AND deleted_at IS NULL",
-                [targetEmpId]
-            );
-            for (const ext of externalTrainings) {
-                if (!isWithinRange(ext.start_date)) continue;
-
-                let itemHours = 0;
-                if (ext.learning_hours != null) {
-                    itemHours = Number(ext.learning_hours) || 0;
-                } else if (ext.start_date && ext.end_date) {
-                    const diffMs = new Date(ext.end_date).getTime() - new Date(ext.start_date).getTime();
-                    if (diffMs > 0) itemHours = diffMs / (1000 * 60 * 60);
-                }
-                jamTrainingExternal += itemHours;
-
-                const itemCost = (Number(ext.registration_fee) || 0) + (Number(ext.travel_flight_cost) || 0) +
-                    (Number(ext.accommodation_cost) || 0) + (Number(ext.miscellaneous_cost) || 0);
-                biayaTrainingExternal += itemCost;
-
-                trainingExternalDetails.push({
-                    title: ext.title,
-                    date: ext.start_date,
-                    hours: Math.round(itemHours * 100) / 100,
-                    cost: Math.round(itemCost),
-                    organizer: ext.vendor || null,
-                    certificateLink: ext.certificate_link || null
-                });
-            }
-        }
-
-        // 3. Online Modules (progress on courses)
-        if (targetEmpId || targetUserId) {
-            const progressRows = await query(
-                `SELECT p.course_id, p.completed_module_ids, p.last_access, c.title as course_title, c.duration as course_duration
+    // 3. Online Modules (progress on courses)
+    if (targetEmpId || targetUserId) {
+        const progressRows = await query(
+            `SELECT p.course_id, p.completed_module_ids, p.last_access, c.title as course_title, c.duration as course_duration
                  FROM progress p LEFT JOIN courses c ON p.course_id = c.id
                  WHERE (p.employee_id IS NOT NULL AND p.employee_id = ?) OR p.user_id = ?`,
-                [targetEmpId, targetUserId]
-            );
+            [targetEmpId, targetUserId]
+        );
 
-            if (progressRows.length > 0) {
-                const moduleRows = await query('SELECT id, course_id, duration FROM course_modules');
-                const durationMap = {};
-                const moduleCountByCourse = {};
-                for (const m of moduleRows) {
-                    durationMap[m.id] = m.duration;
-                    moduleCountByCourse[m.course_id] = (moduleCountByCourse[m.course_id] || 0) + 1;
-                }
-
-                for (const p of progressRows) {
-                    if (!isWithinRange(p.last_access)) continue;
-
-                    let completedIds = [];
-                    try {
-                        completedIds = typeof p.completed_module_ids === 'string'
-                            ? JSON.parse(p.completed_module_ids)
-                            : (p.completed_module_ids || []);
-                    } catch (e) { }
-
-                    // Once every module in the course is done, report the admin-set "Total Duration"
-                    // label for the whole course instead of a tally of raw video playtime - a 2-hour
-                    // course made of a few short clips shouldn't read as a few minutes of learning.
-                    // While still in progress, fall back to the per-module tally so partial credit
-                    // still shows something.
-                    const totalModules = moduleCountByCourse[p.course_id] || 0;
-                    const isFullyCompleted = totalModules > 0 && completedIds.length >= totalModules;
-                    const labelHours = isFullyCompleted ? parseCourseTotalDurationHours(p.course_duration) : null;
-
-                    let courseHours;
-                    if (labelHours !== null) {
-                        courseHours = labelHours;
-                    } else {
-                        courseHours = completedIds.reduce((sum, modId) => sum + parseModuleDuration(durationMap[modId]), 0);
-                    }
-                    jamOnline += courseHours;
-
-                    if (courseHours > 0) {
-                        onlineDetails.push({
-                            title: p.course_title || `Course #${p.course_id}`,
-                            date: p.last_access,
-                            hours: Math.round(courseHours * 100) / 100,
-                            cost: 0
-                        });
-                    }
-                }
+        if (progressRows.length > 0) {
+            const moduleRows = await query('SELECT id, course_id, duration FROM course_modules');
+            const durationMap = {};
+            const moduleCountByCourse = {};
+            for (const m of moduleRows) {
+                durationMap[m.id] = m.duration;
+                moduleCountByCourse[m.course_id] = (moduleCountByCourse[m.course_id] || 0) + 1;
             }
-        }
 
-        // 4. Baca Buku (reading_logs)
-        if (targetEmpId) {
-            const logs = await query("SELECT title, finish_date, date, incentive_amount, category FROM reading_logs WHERE employee_id = ? AND hr_approval_status = 'Approved'", [targetEmpId]);
-            // Biaya buku
-            for (const log of logs) {
-                if (!isWithinRange(log.finish_date || log.date)) continue;
+            for (const p of progressRows) {
+                if (!isWithinRange(p.last_access)) continue;
 
-                const incentive = Number(log.incentive_amount) || 0;
-                biayaBuku += incentive;
+                let completedIds = [];
+                try {
+                    completedIds = typeof p.completed_module_ids === 'string'
+                        ? JSON.parse(p.completed_module_ids)
+                        : (p.completed_module_ids || []);
+                } catch (e) { }
 
-                const category = log.category || '';
-                let itemHours = 0;
+                // Once every module in the course is done, report the admin-set "Total Duration"
+                // label for the whole course instead of a tally of raw video playtime - a 2-hour
+                // course made of a few short clips shouldn't read as a few minutes of learning.
+                // While still in progress, fall back to the per-module tally so partial credit
+                // still shows something.
+                const totalModules = moduleCountByCourse[p.course_id] || 0;
+                const isFullyCompleted = totalModules > 0 && completedIds.length >= totalModules;
+                const labelHours = isFullyCompleted ? parseCourseTotalDurationHours(p.course_duration) : null;
 
-                if (category === 'Buku Fiksi/Novel' || category === 'Majalah') {
-                    // 0 hours
-                } else if (category === 'Komik Bisnis/Non Fiksi') {
-                    itemHours = 3;
-                } else if ([
-                    'Buku Biografi dan Sejarah',
-                    'Buku Bisnis dan Manajemen',
-                    'Buku Paling Diminati',
-                    'Buku Pengembangan Diri',
-                    'Buku Religi dan Hubungan',
-                    'Buku Sales dan Marketing',
-                    'Buku Teknologi',
-                    'Buku Terlaris',
-                    'Buku Wajib Baca'
-                ].includes(category)) {
-                    itemHours = 15;
+                let courseHours;
+                if (labelHours !== null) {
+                    courseHours = labelHours;
                 } else {
-                    // Fallback to old logic just in case an old entry has no category
-                    if (incentive === 100000) itemHours = 15;
-                    else if (incentive === 50000) itemHours = 3;
-                    else if (incentive > 0) itemHours = (incentive / 100000) * 15;
+                    courseHours = completedIds.reduce((sum, modId) => sum + parseModuleDuration(durationMap[modId]), 0);
                 }
+                jamOnline += courseHours;
 
-                jamBuku += itemHours;
-
-                bookDetails.push({
-                    title: log.title,
-                    date: log.finish_date || log.date,
-                    hours: Math.round(itemHours * 100) / 100,
-                    cost: Math.round(incentive)
-                });
+                if (courseHours > 0) {
+                    onlineDetails.push({
+                        title: p.course_title || `Course #${p.course_id}`,
+                        date: p.last_access,
+                        hours: Math.round(courseHours * 100) / 100,
+                        cost: 0
+                    });
+                }
             }
         }
+    }
 
-        const byDateAsc = (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime();
-        trainingDetails.sort(byDateAsc);
-        trainingExternalDetails.sort(byDateAsc);
-        onlineDetails.sort(byDateAsc);
-        bookDetails.sort(byDateAsc);
+    // 4. Baca Buku (reading_logs)
+    if (targetEmpId) {
+        const logs = await query("SELECT title, finish_date, date, incentive_amount, category FROM reading_logs WHERE employee_id = ? AND hr_approval_status = 'Approved'", [targetEmpId]);
+        // Biaya buku
+        for (const log of logs) {
+            if (!isWithinRange(log.finish_date || log.date)) continue;
 
-        return {
-            jamTraining: Math.round(jamTraining * 100) / 100,
-            jamTrainingExternal: Math.round(jamTrainingExternal * 100) / 100,
-            jamOnline: Math.round(jamOnline * 100) / 100,
-            jamBuku: Math.round(jamBuku * 100) / 100,
-            biayaTraining: Math.round(biayaTraining),
-            biayaTrainingExternal: Math.round(biayaTrainingExternal),
-            biayaBuku: Math.round(biayaBuku),
-            totalJam: Math.round((jamTraining + jamTrainingExternal + jamOnline + jamBuku) * 100) / 100,
-            totalBiaya: Math.round(biayaTraining + biayaTrainingExternal + biayaBuku),
-            trainingDetails,
-            trainingExternalDetails,
-            onlineDetails,
-            bookDetails
-        };
+            const incentive = Number(log.incentive_amount) || 0;
+            biayaBuku += incentive;
+
+            const category = log.category || '';
+            let itemHours = 0;
+
+            if (category === 'Buku Fiksi/Novel' || category === 'Majalah') {
+                // 0 hours
+            } else if (category === 'Komik Bisnis/Non Fiksi') {
+                itemHours = 3;
+            } else if ([
+                'Buku Biografi dan Sejarah',
+                'Buku Bisnis dan Manajemen',
+                'Buku Paling Diminati',
+                'Buku Pengembangan Diri',
+                'Buku Religi dan Hubungan',
+                'Buku Sales dan Marketing',
+                'Buku Teknologi',
+                'Buku Terlaris',
+                'Buku Wajib Baca'
+            ].includes(category)) {
+                itemHours = 15;
+            } else {
+                // Fallback to old logic just in case an old entry has no category
+                if (incentive === 100000) itemHours = 15;
+                else if (incentive === 50000) itemHours = 3;
+                else if (incentive > 0) itemHours = (incentive / 100000) * 15;
+            }
+
+            jamBuku += itemHours;
+
+            bookDetails.push({
+                title: log.title,
+                date: log.finish_date || log.date,
+                hours: Math.round(itemHours * 100) / 100,
+                cost: Math.round(incentive)
+            });
+        }
+    }
+
+    const byDateAsc = (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime();
+    trainingDetails.sort(byDateAsc);
+    trainingExternalDetails.sort(byDateAsc);
+    onlineDetails.sort(byDateAsc);
+    bookDetails.sort(byDateAsc);
+
+    return {
+        jamTraining: Math.round(jamTraining * 100) / 100,
+        jamTrainingExternal: Math.round(jamTrainingExternal * 100) / 100,
+        jamOnline: Math.round(jamOnline * 100) / 100,
+        jamBuku: Math.round(jamBuku * 100) / 100,
+        biayaTraining: Math.round(biayaTraining),
+        biayaTrainingExternal: Math.round(biayaTrainingExternal),
+        biayaBuku: Math.round(biayaBuku),
+        totalJam: Math.round((jamTraining + jamTrainingExternal + jamOnline + jamBuku) * 100) / 100,
+        totalBiaya: Math.round(biayaTraining + biayaTrainingExternal + biayaBuku),
+        trainingDetails,
+        trainingExternalDetails,
+        onlineDetails,
+        bookDetails
+    };
 };
 
 app.get('/api/learning-stats', async (req, res) => {
@@ -3066,11 +3140,11 @@ app.get('/api/meetings/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const meetings = await query('SELECT * FROM meetings WHERE id = ?', [id]);
-        
+
         if (!meetings || meetings.length === 0) {
             return res.status(404).json({ error: 'Meeting not found' });
         }
-        
+
         const m = meetings[0];
         // Return same format as PUT endpoint for consistency
         res.json({
@@ -3082,8 +3156,8 @@ app.get('/api/meetings/:id', async (req, res) => {
             post_test_data: m.post_test_data ? (typeof m.post_test_data === 'string' ? JSON.parse(m.post_test_data) : m.post_test_data) : undefined,
             feedback_data: m.feedback_data ? (typeof m.feedback_data === 'string' ? JSON.parse(m.feedback_data) : m.feedback_data) : undefined
         });
-    } catch (err) { 
-        res.status(500).json({ error: err.message }); 
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -3181,7 +3255,7 @@ app.get('/api/courses-json', (req, res) => {
     }
 });
 
-const mapCourse = (c, modules) => {
+const mapCourse = (c, modules, completionCounts) => {
     if (!c) return null;
 
     // Helper to parse JSON safely
@@ -3208,6 +3282,7 @@ const mapCourse = (c, modules) => {
         duration: c.duration,
         assessment: parseJSON(c.assessment_data),
         preAssessment: parseJSON(c.entry_pre_test_data || c.pre_assessment_data),
+        completedCount: completionCounts?.[courseId] || 0,
         modules: (modules || [])
             .filter(m => Number(m.course_id) === courseId)
             .map(m => ({
@@ -3228,8 +3303,77 @@ app.get('/api/courses', async (req, res) => {
     try {
         const courses = await query('SELECT * FROM courses');
         const modules = await query('SELECT * FROM course_modules');
-        const combined = courses.map(c => mapCourse(c, modules));
+        // An employee has "completed" a module once they've passed its final assessment -
+        // same criteria used to trigger the Nusawork completion sync (module_id IS NULL POST >= 80).
+        // Count distinct employees (falling back to student_id when employee_id is unset) so retakes
+        // don't inflate the number.
+        const completionRows = await query(
+            `SELECT course_id, COUNT(DISTINCT COALESCE(employee_id, student_id)) as cnt
+             FROM quiz_results
+             WHERE module_id IS NULL AND quiz_type = 'POST' AND score >= 80
+             GROUP BY course_id`
+        );
+        const completionCounts = {};
+        completionRows.forEach(row => { completionCounts[row.course_id] = row.cnt; });
+        const combined = courses.map(c => mapCourse(c, modules, completionCounts));
         res.json(combined);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Per-employee detail behind the "N Completed" badge on the Online Modules Management card:
+// name plus the pre-/post-test scores from the attempt that satisfied completion (module_id IS
+// NULL POST >= 80) - the same criteria used for the count above and the Nusawork sync.
+app.get('/api/courses/:id/completions', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const rows = await query(
+            `SELECT student_id, employee_id, student_name, score, date, quiz_type
+             FROM quiz_results
+             WHERE course_id = ? AND module_id IS NULL
+             ORDER BY date ASC`,
+            [id]
+        );
+
+        const state = {};
+        for (const row of rows) {
+            const identifier = row.employee_id || row.student_id;
+            if (!identifier) continue;
+            if (!state[identifier]) {
+                state[identifier] = { employeeId: row.employee_id, studentId: row.student_id, name: row.student_name, latestPre: null, completion: null };
+            }
+            const s = state[identifier];
+            if (row.student_name) s.name = row.student_name;
+            if (row.quiz_type === 'PRE') {
+                s.latestPre = row.score;
+            } else if (row.quiz_type === 'POST' && row.score >= 80 && !s.completion) {
+                // First passing post-test only - matches the "count this completion once" rule.
+                s.completion = { preTest: s.latestPre, postTest: row.score, date: row.date };
+            }
+        }
+
+        const completedEntries = Object.values(state).filter(s => s.completion);
+
+        // Prefer the canonical employee name over whatever was cached on the quiz_results row at
+        // submit time (student_name can be stale after a name change in Nusawork).
+        const employeeIds = completedEntries.map(s => s.employeeId).filter(Boolean);
+        let nameByEmployeeId = {};
+        if (employeeIds.length > 0) {
+            const empRows = await query('SELECT id_employee, full_name FROM employees WHERE id_employee IN (?)', [employeeIds]);
+            empRows.forEach(e => { nameByEmployeeId[e.id_employee] = e.full_name; });
+        }
+
+        const result = completedEntries
+            .map(s => ({
+                employeeId: s.employeeId,
+                studentId: s.studentId,
+                name: nameByEmployeeId[s.employeeId] || s.name || s.employeeId || s.studentId,
+                preTest: s.completion.preTest,
+                postTest: s.completion.postTest,
+                date: s.completion.date
+            }))
+            .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+
+        res.json(result);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -3290,6 +3434,11 @@ app.put('/api/courses/:id', async (req, res) => {
         const assessmentJSON = assessmentObj ? JSON.stringify(assessmentObj) : null;
 
         console.log(`[SAVE] Course ${id}: Pre-Test length ${preAssessmentJSON ? preAssessmentJSON.length : 0}`);
+
+        // Snapshot before overwriting, so we can tell afterwards whether title/duration actually
+        // changed - only then do already-completed employees' Nusawork notes need updating.
+        const previousCourseRows = await query('SELECT title, duration FROM courses WHERE id = ?', [id]);
+        const previousCourse = previousCourseRows[0];
 
         // 1. Update Course details
         const updateParams = [
@@ -3362,11 +3511,43 @@ app.put('/api/courses/:id', async (req, res) => {
             }
         }
 
+        // Propagate a title/duration change to every employee already marked "Completed" for this
+        // course, so their Nusawork note stays in sync with what the module is now called/worth.
+        const titleChanged = previousCourse && previousCourse.title !== c.title;
+        const durationChanged = previousCourse && previousCourse.duration !== (c.duration || '');
+        if (previousCourse && (titleChanged || durationChanged)) {
+            const completedRows = await query(
+                'SELECT employee_id, nusawork_id_group, date FROM quiz_results WHERE course_id = ? AND nusawork_id_group IS NOT NULL',
+                [id]
+            );
+            if (completedRows.length > 0) {
+                const totalHours = parseCourseTotalDurationHours(c.duration);
+                const hours = totalHours !== null ? Math.round(totalHours * 100) / 100 : 0;
+                console.log(`[NUSAWORK ONLINE SYNC] Course ${id} title/duration changed - updating ${completedRows.length} completion note(s).`);
+                completedRows.forEach(row => {
+                    updateOnlineModuleNoteInNusawork({
+                        employeeId: row.employee_id,
+                        idGroup: row.nusawork_id_group,
+                        title: c.title,
+                        date: new Date(row.date).toISOString().slice(0, 10),
+                        hours
+                    });
+                });
+            }
+        }
+
         // Return updated
         const updatedCourseData = await query('SELECT * FROM courses WHERE id = ?', [id]);
         const updatedModulesData = await query('SELECT * FROM course_modules WHERE course_id = ?', [id]);
+        const completionCountRows = await query(
+            `SELECT COUNT(DISTINCT COALESCE(employee_id, student_id)) as cnt
+             FROM quiz_results
+             WHERE course_id = ? AND module_id IS NULL AND quiz_type = 'POST' AND score >= 80`,
+            [id]
+        );
+        const completionCounts = { [id]: completionCountRows[0]?.cnt || 0 };
 
-        const mapped = mapCourse(updatedCourseData[0], updatedModulesData);
+        const mapped = mapCourse(updatedCourseData[0], updatedModulesData, completionCounts);
         console.log("SENDING BACK MAPPED COURSE:", mapped.title, "PreAssessment:", !!mapped.preAssessment);
         res.json(mapped);
     } catch (err) {
@@ -3378,7 +3559,28 @@ app.put('/api/courses/:id', async (req, res) => {
 app.delete('/api/courses/:id', async (req, res) => {
     try {
         const { id } = req.params;
+
+        // Grab every completed employee's Nusawork note reference before the course's quiz_results
+        // rows are cleaned up below.
+        const completedRows = await query(
+            'SELECT employee_id, nusawork_id_group FROM quiz_results WHERE course_id = ? AND nusawork_id_group IS NOT NULL',
+            [id]
+        );
+
         await query('DELETE FROM courses WHERE id = ?', [id]);
+
+        // Without this, quiz_results/progress rows outlive the course and show up as
+        // "Unknown Course" in Quiz Report and similar views.
+        await query('DELETE FROM quiz_results WHERE course_id = ?', [id]);
+        await query('DELETE FROM progress WHERE course_id = ?', [id]);
+
+        if (completedRows.length > 0) {
+            console.log(`[NUSAWORK ONLINE SYNC] Course ${id} deleted - removing ${completedRows.length} completion note(s) from Nusawork.`);
+            completedRows.forEach(row => {
+                deleteOnlineModuleNoteInNusawork({ employeeId: row.employee_id, idGroup: row.nusawork_id_group });
+            });
+        }
+
         res.json({ success: true, message: 'Course deleted successfully' });
     } catch (err) {
         console.error("ERROR DELETING COURSE:", err);
@@ -3586,10 +3788,11 @@ app.post('/api/quiz/submit', async (req, res) => {
         const employeeId = userRows.length > 0 ? userRows[0].employee_id : null;
 
         // 1. Save Result
-        await query(
+        const insertResult = await query(
             'INSERT INTO quiz_results (student_id, student_name, course_id, module_id, meeting_id, score, date, quiz_type, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [studentId, studentName, courseId || null, moduleId || null, req.body.meetingId || null, score, now, quizType, employeeId]
         );
+        const quizResultId = insertResult.insertId;
 
         // 2. If Passed (>= 80) and it was a POST test, mark module as complete
         if (score >= 80 && moduleId && quizType === 'POST') {
@@ -3652,7 +3855,7 @@ app.post('/api/quiz/submit', async (req, res) => {
                 [courseId, studentId, employeeId]
             );
             if ((passCount[0]?.cnt || 0) === 1) {
-                const courseRows = await query('SELECT title, category, duration FROM courses WHERE id = ?', [courseId]);
+                const courseRows = await query('SELECT title, duration FROM courses WHERE id = ?', [courseId]);
                 const course = courseRows[0];
                 const totalHours = parseCourseTotalDurationHours(course?.duration);
                 const preTestRows = await query(
@@ -3663,12 +3866,12 @@ app.post('/api/quiz/submit', async (req, res) => {
                 // Don't block the quiz-submit response on an external API call.
                 pushOnlineModuleCompletionToNusawork({
                     employeeId,
-                    category: course?.category,
                     title: course?.title || `Course #${courseId}`,
                     date: now.toISOString().slice(0, 10),
                     hours: totalHours !== null ? Math.round(totalHours * 100) / 100 : 0,
                     preTest: preTestRows.length > 0 ? preTestRows[0].score : '',
-                    postTest: score
+                    postTest: score,
+                    quizResultId
                 });
             }
         }
@@ -4302,7 +4505,7 @@ app.post('/api/idp/bulk-import', async (req, res) => {
                         `INSERT INTO idp_reviews (idp_id, review_date, supervisor_note, reviewed_by, hr_verification_date, hr_note, hr_verified_by)
                          VALUES (?, ?, ?, ?, ?, ?, ?)`,
                         [existingPlan.id, review.review_date, review.supervisor_note || '', review.reviewed_by || supervisorName,
-                         review.hr_verification_date || null, review.hr_note || null, review.hr_verified_by || null]
+                        review.hr_verification_date || null, review.hr_note || null, review.hr_verified_by || null]
                     );
                     reviewsAdded++;
                 }
@@ -4359,7 +4562,7 @@ app.post('/api/idp/bulk-import', async (req, res) => {
                     `INSERT INTO idp_reviews (idp_id, review_date, supervisor_note, reviewed_by, hr_verification_date, hr_note, hr_verified_by)
                      VALUES (?, ?, ?, ?, ?, ?, ?)`,
                     [idpId, review.review_date, review.supervisor_note || '', review.reviewed_by || supervisorName,
-                     review.hr_verification_date || null, review.hr_note || null, review.hr_verified_by || null]
+                        review.hr_verification_date || null, review.hr_note || null, review.hr_verified_by || null]
                 );
             }
 
@@ -4629,13 +4832,16 @@ app.delete('/api/idp/:id', async (req, res) => {
 app.get('/api/admin/quiz-reports', async (req, res) => {
     try {
         const sql = `
-            SELECT 
+            SELECT
                 qr.id,
                 qr.student_id,
                 COALESCE(u.name, qr.student_name) as student_name,
                 u.branch,
                 u.employee_id,
-                c.title as course_title,
+                -- Online-module quizzes carry course_id; Internal/External Training quizzes carry
+                -- meeting_id instead (see the meeting participant import) - fall back to the
+                -- meeting's title so those don't show up as "Unknown Course".
+                COALESCE(c.title, m.title) as course_title,
                 cm.title as module_title,
                 qr.score,
                 qr.date,
@@ -4645,6 +4851,7 @@ app.get('/api/admin/quiz-reports', async (req, res) => {
             LEFT JOIN users u ON qr.student_id = u.id
             LEFT JOIN courses c ON qr.course_id = c.id
             LEFT JOIN course_modules cm ON qr.module_id = cm.id
+            LEFT JOIN meetings m ON qr.meeting_id = m.id
             ORDER BY qr.date DESC
         `;
         const results = await query(sql);

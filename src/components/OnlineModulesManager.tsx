@@ -1,10 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
-import { Edit, Trash2, Plus, GripVertical, Save, X, BookOpen, Clock } from 'lucide-react';
+import { Edit, Trash2, Plus, GripVertical, Save, X, BookOpen, Clock, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { Course, Module, Quiz } from '../types';
 import PopupNotification from './PopupNotification';
 import ConfirmationModal from './ConfirmationModal';
+
+interface CompletionEntry {
+    employeeId: string | null;
+    studentId: string | null;
+    name: string;
+    preTest: number | null;
+    postTest: number;
+    date: string;
+}
 
 const QuizEditor = ({ quiz, onUpdate, onDelete, onNotify }: { quiz: Quiz | undefined, onUpdate: (q: Quiz) => void, onDelete?: () => void, onNotify?: (msg: string, type: 'success' | 'error') => void }) => {
     const { t } = useTranslation('onlineModulesManager');
@@ -135,6 +144,8 @@ const OnlineModulesManager = () => {
     const [editingCourse, setEditingCourse] = useState<Course | null>(null);
     const editorScrollRef = useRef<HTMLDivElement>(null);
 
+    const [completionsView, setCompletionsView] = useState<{ course: Course; loading: boolean; data: CompletionEntry[] } | null>(null);
+
     const [popup, setPopup] = useState<{ type: 'success' | 'error', message: string, isOpen: boolean }>({
         type: 'success',
         message: '',
@@ -197,6 +208,20 @@ const OnlineModulesManager = () => {
 
     const handleEditCourse = (course: Course) => {
         setEditingCourse(course);
+    };
+
+    const handleViewCompletions = async (course: Course) => {
+        setCompletionsView({ course, loading: true, data: [] });
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/courses/${course.id}/completions`);
+            if (!res.ok) throw new Error('Failed to load completions');
+            const data: CompletionEntry[] = await res.json();
+            setCompletionsView({ course, loading: false, data });
+        } catch (e) {
+            console.error('Failed to load completions', e);
+            setCompletionsView({ course, loading: false, data: [] });
+            setPopup({ type: 'error', message: t('completions.loadFailed'), isOpen: true });
+        }
     };
 
     const handleSaveCourse = async () => {
@@ -598,6 +623,62 @@ const OnlineModulesManager = () => {
         );
     };
 
+    const renderCompletionsModal = () => {
+        if (!completionsView) return null;
+        const { course, loading, data } = completionsView;
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                    <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                        <div className="flex flex-col">
+                            <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">{t('completions.badge')}</span>
+                            <h2 className="font-bold text-xl text-slate-800">{course.title}</h2>
+                        </div>
+                        <button onClick={() => setCompletionsView(null)} className="text-slate-400 hover:text-slate-600">
+                            <X size={24} />
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto">
+                        {loading ? (
+                            <div className="py-16 text-center text-slate-400 font-medium">{t('completions.loading')}</div>
+                        ) : data.length === 0 ? (
+                            <div className="py-16 text-center text-slate-400 font-medium">{t('completions.empty')}</div>
+                        ) : (
+                            <table className="w-full text-sm">
+                                <thead className="bg-slate-50 sticky top-0">
+                                    <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        <th className="px-6 py-3">{t('completions.columnName')}</th>
+                                        <th className="px-6 py-3 text-center">{t('completions.columnPreTest')}</th>
+                                        <th className="px-6 py-3 text-center">{t('completions.columnPostTest')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {data.map((entry, idx) => (
+                                        <tr key={entry.employeeId || entry.studentId || idx} className="hover:bg-slate-50">
+                                            <td className="px-6 py-3 font-semibold text-slate-700">{entry.name}</td>
+                                            <td className="px-6 py-3 text-center text-slate-500">{entry.preTest ?? '-'}</td>
+                                            <td className="px-6 py-3 text-center font-bold text-emerald-600">{entry.postTest}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+
+                    <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+                        <button
+                            onClick={() => setCompletionsView(null)}
+                            className="px-6 py-2 rounded-xl text-slate-600 font-bold hover:bg-slate-200 transition-colors"
+                        >
+                            {t('editor.close')}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="space-y-8">
             <div className="bg-gradient-to-br from-blue-700 via-indigo-700 to-purple-800 rounded-[2.5rem] p-8 md:p-12 text-white shadow-2xl relative overflow-hidden group">
@@ -649,15 +730,26 @@ const OnlineModulesManager = () => {
                             </div>
                         </div>
                         <h3 className="text-xl font-black text-slate-800 mb-3 group-hover:text-purple-600 transition-colors tracking-tight leading-tight">{course.title}</h3>
-                        <p className="text-slate-500 text-sm font-medium mb-8 line-clamp-2 leading-relaxed">{course.description}</p>
+                        <p className="text-slate-500 text-sm font-medium mb-4 line-clamp-2 leading-relaxed">{course.description}</p>
+                        {course.duration && (
+                            <div className="inline-flex items-center gap-2 bg-slate-50 text-slate-500 px-3 py-1.5 rounded-xl text-xs font-bold w-fit mb-8">
+                                <Clock size={14} className="text-slate-400" />
+                                <span>{t('card.totalDuration')}: {course.duration}</span>
+                            </div>
+                        )}
                         <div className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest border-t border-slate-50 pt-6 mt-auto">
                             <div className="flex items-center gap-2">
                                 <BookOpen size={14} className="text-purple-400" />
                                 <span>{t('card.coursesCount', { count: course.modules?.length || 0 })}</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <GripVertical size={14} /> {t('card.reorder')}
-                            </div>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); handleViewCompletions(course); }}
+                                className="flex items-center gap-2 text-emerald-500 hover:text-emerald-600 hover:underline"
+                                title={t('completions.viewTitle')}
+                            >
+                                <Users size={14} />
+                                <span>{t('card.completedCount', { count: course.completedCount || 0 })}</span>
+                            </button>
                         </div>
                     </div>
                 ))}
@@ -680,6 +772,7 @@ const OnlineModulesManager = () => {
             </div>
 
             {renderEditor()}
+            {renderCompletionsModal()}
 
             <PopupNotification
                 isOpen={popup.isOpen}

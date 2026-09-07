@@ -75,7 +75,19 @@
     "editCourse": "Ubah Kursus",
     "deleteCourse": "Hapus Kursus",
     "coursesCount": "{{count}} Kursus",
+    "totalDuration": "Total Durasi",
+    "completedCount": "{{count}} Selesai",
     "reorder": "Atur Ulang"
+  },
+  "completions": {
+    "viewTitle": "Lihat siapa saja yang sudah menyelesaikan modul ini",
+    "badge": "Karyawan Selesai",
+    "loading": "Memuat...",
+    "empty": "Belum ada karyawan yang menyelesaikan modul ini.",
+    "loadFailed": "Gagal memuat detail penyelesaian.",
+    "columnName": "Nama",
+    "columnPreTest": "Pre-Test",
+    "columnPostTest": "Post-Test"
   },
   "empty": {
     "title": "Tidak Ada Kursus Ditemukan",

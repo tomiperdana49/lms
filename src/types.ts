@@ -77,6 +77,7 @@ export interface Course {
     duration: string;
     modulesCount: number;
     studentCount: number;
+    completedCount?: number;
     progress: number;
     modules: Module[];
     assessment?: Quiz; // Final Post-test

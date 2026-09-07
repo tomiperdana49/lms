@@ -75,7 +75,19 @@
     "editCourse": "Edit Course",
     "deleteCourse": "Delete Course",
     "coursesCount": "{{count}} Courses",
+    "totalDuration": "Total Duration",
+    "completedCount": "{{count}} Completed",
     "reorder": "Reorder"
+  },
+  "completions": {
+    "viewTitle": "View who completed this module",
+    "badge": "Completed Employees",
+    "loading": "Loading...",
+    "empty": "No employee has completed this module yet.",
+    "loadFailed": "Failed to load completion details.",
+    "columnName": "Name",
+    "columnPreTest": "Pre-Test",
+    "columnPostTest": "Post-Test"
   },
   "empty": {
     "title": "No Courses Found",
