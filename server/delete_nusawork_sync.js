@@ -10,6 +10,7 @@
 //   node server/delete_nusawork_sync.js <employee_id> --dry-run  # preview only, no Nusawork calls, no DB writes
 //   node server/delete_nusawork_sync.js --dry-run                # preview EVERY employee with a synced note
 //   node server/delete_nusawork_sync.js                          # delete for EVERY employee with a synced note
+//   node server/delete_nusawork_sync.js --limit 20                # only the first 20 pending employees
 //
 // Example (the case this was built to demo - Tomi Perdana Putra):
 //   node server/delete_nusawork_sync.js 0201507 --dry-run
@@ -17,7 +18,9 @@
 //
 // Omitting <employee_id> processes every employee who has at least one synced note - this can mean a
 // lot of live Nusawork API calls (one per note), so always run --dry-run first to see the scale
-// before doing the real thing.
+// before doing the real thing. Use --limit N to do it in batches instead of all at once - each run
+// only picks up employees that still have a synced note, so already-cleared ones from a prior batch
+// are automatically skipped and you can just re-run the same command to pick up the next batch.
 //
 // Not run automatically - run manually when you're ready.
 
@@ -31,7 +34,13 @@ const __dirname = path.dirname(__filename);
 
 const cliArgs = process.argv.slice(2);
 const isDryRun = cliArgs.includes('--dry-run');
-const employeeIdArg = cliArgs.find(a => !a.startsWith('--')) || null;
+const limitFlagIndex = cliArgs.indexOf('--limit');
+const limitArg = limitFlagIndex !== -1 ? parseInt(cliArgs[limitFlagIndex + 1], 10) : null;
+const batchLimit = Number.isInteger(limitArg) && limitArg > 0 ? limitArg : null;
+// The value right after --limit belongs to it, not to <employee_id> - skip that index when scanning
+// (only when --limit was actually given; otherwise limitFlagIndex is -1 and there's nothing to skip).
+const limitValueIndex = limitFlagIndex !== -1 ? limitFlagIndex + 1 : -1;
+const employeeIdArg = cliArgs.find((a, i) => !a.startsWith('--') && i !== limitValueIndex) || null;
 
 // --- Nusawork auth (same cache file / client_credentials flow as server.js) ---
 const TOKEN_FILE = path.join(__dirname, '../tmp/nusanet_token.json');
@@ -239,8 +248,12 @@ async function main() {
             await runForEmployee(employeeIdArg);
         } else {
             console.log(`No employee_id given - scanning for every employee with a synced note${isDryRun ? ' (DRY RUN - no Nusawork calls, no DB writes)' : ''}...`);
-            const employeeIds = await findEmployeesWithSyncedNotes();
-            console.log(`Found ${employeeIds.length} employee(s) with at least one synced note.`);
+            const allSyncedIds = await findEmployeesWithSyncedNotes();
+            const employeeIds = batchLimit ? allSyncedIds.slice(0, batchLimit) : allSyncedIds;
+            console.log(`Found ${allSyncedIds.length} employee(s) with at least one synced note.`);
+            if (batchLimit) {
+                console.log(`--limit ${batchLimit} given - processing ${employeeIds.length} of them this run (${allSyncedIds.length - employeeIds.length} remaining for later runs).`);
+            }
             for (let i = 0; i < employeeIds.length; i++) {
                 console.log(`\n############ [${i + 1}/${employeeIds.length}] employee_id=${employeeIds[i]} ############`);
                 await runForEmployee(employeeIds[i]);
