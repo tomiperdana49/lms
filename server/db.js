@@ -174,6 +174,36 @@ export const initDB = async () => {
         } catch (e) { /* Ignore if exists */ }
 
         try {
+            // Tracks the Nusawork note id_group per (meeting, employee) for Internal Training - kept
+            // separate from quiz_results since attendance/payment isn't tied to taking a quiz.
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS nusawork_training_notes (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    meeting_id INT NOT NULL,
+                    employee_id VARCHAR(50) NOT NULL,
+                    id_group INT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY uniq_meeting_employee (meeting_id, employee_id)
+                )
+            `);
+            console.log("Verified nusawork_training_notes table exists.");
+        } catch (e) { console.error("Failed to create nusawork_training_notes:", e.message); }
+
+        try {
+            // External Training is one row per employee already, so the Nusawork note reference is
+            // stored directly on the row instead of a separate tracking table.
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN nusawork_id_group INT");
+            console.log("Added nusawork_id_group column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            // Reading Log is also one row per employee per book, same reasoning as External Training.
+            await connection.query("ALTER TABLE reading_logs ADD COLUMN nusawork_id_group INT");
+            console.log("Added nusawork_id_group column to reading_logs.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
             await connection.query("ALTER TABLE meetings ADD COLUMN type VARCHAR(50) DEFAULT 'Offline'");
             console.log("Added type column to meetings.");
         } catch (e) { /* Ignore if exists */ }

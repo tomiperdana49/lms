@@ -459,10 +459,11 @@ const updateOnlineModuleNoteInNusawork = async ({ employeeId, idGroup, title, da
     }
 };
 
-// Removes a Nusawork completion note (by employee_id + id_group) when the module it belongs to is
-// deleted from the LMS, e.g. DELETE /emp/api/client/v4/note/web/201/employee?employee_id=0201507&id_group=3788.
+// Removes a Nusawork note (by employee_id + id_group) - shared by online-module and internal-training
+// deletion, since the delete call only ever needs those two identifiers, e.g.
+// DELETE /emp/api/client/v4/note/web/201/employee?employee_id=0201507&id_group=3788.
 // Fire-and-forget, same as the create/update paths.
-const deleteOnlineModuleNoteInNusawork = async ({ employeeId, idGroup }) => {
+const deleteNusaworkNote = async ({ employeeId, idGroup }) => {
     if (!employeeId || !idGroup) return;
     try {
         const token = await getNusanetToken();
@@ -475,12 +476,427 @@ const deleteOnlineModuleNoteInNusawork = async ({ employeeId, idGroup }) => {
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
-            console.error('[NUSAWORK ONLINE SYNC] Delete failed:', employeeId, idGroup, response.status, data);
+            console.error('[NUSAWORK SYNC] Delete failed:', employeeId, idGroup, response.status, data);
         } else {
-            console.log('[NUSAWORK ONLINE SYNC] Deleted completion note:', employeeId, idGroup);
+            console.log('[NUSAWORK SYNC] Deleted note:', employeeId, idGroup);
         }
     } catch (err) {
-        console.error('[NUSAWORK ONLINE SYNC] Delete error:', employeeId, idGroup, err.message);
+        console.error('[NUSAWORK SYNC] Delete error:', employeeId, idGroup, err.message);
+    }
+};
+
+// Pushes one employee note to Nusawork when an Internal Training meeting is marked Paid, so the
+// cost/hours show up alongside HR's own records there - mirrors pushOnlineModuleCompletionToNusawork.
+// Saves the returned id_group into nusawork_training_notes for later update/delete.
+const pushInternalTrainingNoteToNusawork = async ({ employeeId, meetingId, title, date, hours, cost }) => {
+    if (!employeeId) return;
+    try {
+        const token = await getNusanetToken();
+        const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
+        const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
+        const response = await fetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+                employee_id: employeeId,
+                fields: {
+                    category: 'Internal Training',
+                    title,
+                    date,
+                    hours: String(hours),
+                    cost: `Rp${Math.round(cost)}`
+                }
+            })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            console.error('[NUSAWORK TRAINING SYNC] Failed:', employeeId, title, response.status, data);
+            return;
+        }
+        console.log('[NUSAWORK TRAINING SYNC] Pushed training note:', employeeId, title);
+        const idGroup = data?.data?.id_group;
+        if (idGroup) {
+            try {
+                await query(
+                    'INSERT INTO nusawork_training_notes (meeting_id, employee_id, id_group) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE id_group = VALUES(id_group)',
+                    [meetingId, employeeId, idGroup]
+                );
+            } catch (dbErr) {
+                console.error('[NUSAWORK TRAINING SYNC] Failed to save id_group:', dbErr.message);
+            }
+        }
+    } catch (err) {
+        console.error('[NUSAWORK TRAINING SYNC] Error:', employeeId, title, err.message);
+    }
+};
+
+// Updates an already-pushed Internal Training note when the meeting is edited while still Paid.
+const updateInternalTrainingNoteInNusawork = async ({ employeeId, idGroup, title, date, hours, cost }) => {
+    if (!employeeId || !idGroup) return;
+    try {
+        const token = await getNusanetToken();
+        const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
+        const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
+        const response = await fetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+                employee_id: employeeId,
+                id_group: idGroup,
+                fields: {
+                    category: 'Internal Training',
+                    title,
+                    date,
+                    hours: String(hours),
+                    cost: `Rp${Math.round(cost)}`
+                }
+            })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            console.error('[NUSAWORK TRAINING SYNC] Update failed:', employeeId, idGroup, response.status, data);
+        } else {
+            console.log('[NUSAWORK TRAINING SYNC] Updated training note:', employeeId, idGroup, title);
+        }
+    } catch (err) {
+        console.error('[NUSAWORK TRAINING SYNC] Update error:', employeeId, idGroup, err.message);
+    }
+};
+
+// Derives the sync inputs for one meeting: attendee employee_ids, total hours (from the "HH:MM-HH:MM"
+// time range), and the per-attendee cost split - same formulas computeLearningStats uses so the
+// Nusawork note matches what the Learning Report shows for this training.
+const getMeetingSyncData = (meetingRow) => {
+    let costReport = null;
+    let guests = null;
+    try { if (meetingRow.cost_report_json) costReport = JSON.parse(meetingRow.cost_report_json); } catch (e) { /* ignore */ }
+    try { if (meetingRow.guests_json) guests = JSON.parse(meetingRow.guests_json); } catch (e) { /* ignore */ }
+
+    let hours = 0;
+    if (meetingRow.time) {
+        const parts = meetingRow.time.split('-');
+        if (parts.length === 2) {
+            const parseTime = (t) => {
+                const [h, m] = t.split(':').map(Number);
+                return (h || 0) + (m || 0) / 60;
+            };
+            const startH = parseTime(parts[0].trim());
+            const endH = parseTime(parts[1].trim());
+            if (endH > startH) hours = endH - startH;
+        }
+    }
+    hours = Math.round(hours * 100) / 100;
+
+    let costPerParticipant = 0;
+    const participantsCount = costReport?.participantsCount || 0;
+    if (costReport && participantsCount > 0) {
+        const tInc = Number(costReport.trainerIncentive ?? costReport.trainer) || 0;
+        const sCost = Number(costReport.snackCost ?? costReport.snack) || 0;
+        const lCost = Number(costReport.lunchCost ?? costReport.lunch) || 0;
+        const oCost = Number(costReport.otherCost ?? costReport.other) || 0;
+        costPerParticipant = (tInc + sCost + lCost + oCost) / participantsCount;
+    }
+
+    // Actual attendance (costReport.attendee_ids) is the authoritative participant list - falls back
+    // to the invited guest list only if attendance wasn't recorded.
+    const employeeIds = new Set();
+    (costReport?.attendee_ids || []).forEach(id => { if (id) employeeIds.add(id); });
+    if (employeeIds.size === 0) {
+        (guests?.employee_ids || []).forEach(id => { if (id) employeeIds.add(id); });
+    }
+
+    return {
+        isPaid: !!costReport?.isPaid,
+        employeeIds: Array.from(employeeIds),
+        hours,
+        cost: Math.round(costPerParticipant)
+    };
+};
+
+// Reconciles Nusawork training notes against a meeting's before/after Paid state and attendee list.
+// Fire-and-forget from the PUT /api/meetings/:id handler - covers three transitions:
+//   unpaid -> paid:  create a note for every current attendee
+//   paid -> paid:    update notes for attendees still present, create for newly-added ones, delete
+//                     for attendees who dropped off the attendance list
+//   paid -> unpaid:  delete every note that was created for this meeting
+const syncInternalTrainingNotes = async ({ meetingId, title, date, previous, current }) => {
+    try {
+        if (!previous.isPaid && !current.isPaid) return;
+
+        const existingRows = await query(
+            'SELECT employee_id, id_group FROM nusawork_training_notes WHERE meeting_id = ?',
+            [meetingId]
+        );
+        const existingByEmployee = {};
+        existingRows.forEach(row => { existingByEmployee[row.employee_id] = row.id_group; });
+
+        if (!current.isPaid) {
+            // Unmarked as Paid - retract every note this meeting had pushed.
+            existingRows.forEach(row => deleteNusaworkNote({ employeeId: row.employee_id, idGroup: row.id_group }));
+            if (existingRows.length > 0) {
+                await query('DELETE FROM nusawork_training_notes WHERE meeting_id = ?', [meetingId]);
+            }
+            return;
+        }
+
+        // Paid (either newly, or still) - sync every current attendee.
+        for (const employeeId of current.employeeIds) {
+            const idGroup = existingByEmployee[employeeId];
+            if (idGroup) {
+                updateInternalTrainingNoteInNusawork({ employeeId, idGroup, title, date, hours: current.hours, cost: current.cost });
+            } else {
+                pushInternalTrainingNoteToNusawork({ employeeId, meetingId, title, date, hours: current.hours, cost: current.cost });
+            }
+        }
+
+        // Attendees removed since the last sync no longer belong in the note list.
+        const currentSet = new Set(current.employeeIds);
+        const droppedRows = existingRows.filter(row => !currentSet.has(row.employee_id));
+        if (droppedRows.length > 0) {
+            droppedRows.forEach(row => deleteNusaworkNote({ employeeId: row.employee_id, idGroup: row.id_group }));
+            await query(
+                'DELETE FROM nusawork_training_notes WHERE meeting_id = ? AND employee_id IN (?)',
+                [meetingId, droppedRows.map(row => row.employee_id)]
+            );
+        }
+    } catch (err) {
+        console.error('[NUSAWORK TRAINING SYNC] Reconcile error:', meetingId, err.message);
+    }
+};
+
+// Pushes/updates the Nusawork note for one External Training request - unlike Internal Training,
+// this is always exactly one employee per row, so the id_group lives directly on the row instead of
+// a separate tracking table.
+const pushExternalTrainingNoteToNusawork = async ({ employeeId, requestId, title, date, hours, cost }) => {
+    if (!employeeId) return;
+    try {
+        const token = await getNusanetToken();
+        const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
+        const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
+        const response = await fetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+                employee_id: employeeId,
+                fields: {
+                    category: 'External Training',
+                    title,
+                    date,
+                    hours: String(hours),
+                    cost: `Rp${Math.round(cost)}`
+                }
+            })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            console.error('[NUSAWORK EXTERNAL TRAINING SYNC] Failed:', employeeId, title, response.status, data);
+            return;
+        }
+        console.log('[NUSAWORK EXTERNAL TRAINING SYNC] Pushed note:', employeeId, title);
+        const idGroup = data?.data?.id_group;
+        if (idGroup && requestId) {
+            try {
+                await query('UPDATE external_training_requests SET nusawork_id_group = ? WHERE id = ?', [idGroup, requestId]);
+            } catch (dbErr) {
+                console.error('[NUSAWORK EXTERNAL TRAINING SYNC] Failed to save id_group:', dbErr.message);
+            }
+        }
+    } catch (err) {
+        console.error('[NUSAWORK EXTERNAL TRAINING SYNC] Error:', employeeId, title, err.message);
+    }
+};
+
+const updateExternalTrainingNoteInNusawork = async ({ employeeId, idGroup, title, date, hours, cost }) => {
+    if (!employeeId || !idGroup) return;
+    try {
+        const token = await getNusanetToken();
+        const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
+        const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
+        const response = await fetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+                employee_id: employeeId,
+                id_group: idGroup,
+                fields: {
+                    category: 'External Training',
+                    title,
+                    date,
+                    hours: String(hours),
+                    cost: `Rp${Math.round(cost)}`
+                }
+            })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            console.error('[NUSAWORK EXTERNAL TRAINING SYNC] Update failed:', employeeId, idGroup, response.status, data);
+        } else {
+            console.log('[NUSAWORK EXTERNAL TRAINING SYNC] Updated note:', employeeId, idGroup, title);
+        }
+    } catch (err) {
+        console.error('[NUSAWORK EXTERNAL TRAINING SYNC] Update error:', employeeId, idGroup, err.message);
+    }
+};
+
+// Re-reads one external_training_requests row and, if it's Processed (HR's paid/finalized state),
+// pushes a new Nusawork note or updates the existing one - covers hr-process (first processing),
+// hr-update-details (title/date/hours corrections), and the settlement PUT (cost corrections), since
+// all three can touch a row that's already Processed. Mirrors computeLearningStats' own hours/cost
+// formula so the note matches what the Learning Report shows.
+const reconcileExternalTrainingNusawork = async (requestId) => {
+    try {
+        const rows = await query('SELECT * FROM external_training_requests WHERE id = ?', [requestId]);
+        const r = rows[0];
+        if (!r || r.status !== 'Processed') return;
+
+        let hours = 0;
+        if (r.learning_hours != null) {
+            hours = Number(r.learning_hours) || 0;
+        } else if (r.start_date && r.end_date) {
+            const diffMs = new Date(r.end_date).getTime() - new Date(r.start_date).getTime();
+            if (diffMs > 0) hours = diffMs / (1000 * 60 * 60);
+        }
+        hours = Math.round(hours * 100) / 100;
+
+        const cost = Math.round(
+            (Number(r.registration_fee) || 0) + (Number(r.travel_flight_cost) || 0) +
+            (Number(r.accommodation_cost) || 0) + (Number(r.miscellaneous_cost) || 0)
+        );
+
+        const date = r.start_date instanceof Date ? r.start_date.toISOString().slice(0, 10) : String(r.start_date).slice(0, 10);
+
+        if (r.nusawork_id_group) {
+            updateExternalTrainingNoteInNusawork({ employeeId: r.employee_id, idGroup: r.nusawork_id_group, title: r.title, date, hours, cost });
+        } else {
+            pushExternalTrainingNoteToNusawork({ employeeId: r.employee_id, requestId: r.id, title: r.title, date, hours, cost });
+        }
+    } catch (err) {
+        console.error('[NUSAWORK EXTERNAL TRAINING SYNC] Reconcile error:', requestId, err.message);
+    }
+};
+
+// Same create/update payload shape as the other Nusawork syncs, category 'Reading Log'.
+const pushReadingLogNoteToNusawork = async ({ employeeId, logId, title, date, hours, cost }) => {
+    if (!employeeId) return;
+    try {
+        const token = await getNusanetToken();
+        const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
+        const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
+        const response = await fetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+                employee_id: employeeId,
+                fields: {
+                    category: 'Reading Log',
+                    title,
+                    date,
+                    hours: String(hours),
+                    cost: `Rp${Math.round(cost)}`
+                }
+            })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            console.error('[NUSAWORK READING LOG SYNC] Failed:', employeeId, title, response.status, data);
+            return;
+        }
+        console.log('[NUSAWORK READING LOG SYNC] Pushed note:', employeeId, title);
+        const idGroup = data?.data?.id_group;
+        if (idGroup && logId) {
+            try {
+                await query('UPDATE reading_logs SET nusawork_id_group = ? WHERE id = ?', [idGroup, logId]);
+            } catch (dbErr) {
+                console.error('[NUSAWORK READING LOG SYNC] Failed to save id_group:', dbErr.message);
+            }
+        }
+    } catch (err) {
+        console.error('[NUSAWORK READING LOG SYNC] Error:', employeeId, title, err.message);
+    }
+};
+
+const updateReadingLogNoteInNusawork = async ({ employeeId, idGroup, title, date, hours, cost }) => {
+    if (!employeeId || !idGroup) return;
+    try {
+        const token = await getNusanetToken();
+        const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
+        const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
+        const response = await fetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+                employee_id: employeeId,
+                id_group: idGroup,
+                fields: {
+                    category: 'Reading Log',
+                    title,
+                    date,
+                    hours: String(hours),
+                    cost: `Rp${Math.round(cost)}`
+                }
+            })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            console.error('[NUSAWORK READING LOG SYNC] Update failed:', employeeId, idGroup, response.status, data);
+        } else {
+            console.log('[NUSAWORK READING LOG SYNC] Updated note:', employeeId, idGroup, title);
+        }
+    } catch (err) {
+        console.error('[NUSAWORK READING LOG SYNC] Update error:', employeeId, idGroup, err.message);
+    }
+};
+
+// Mirrors the category -> hours lookup inside computeLearningStats' "Baca Buku" block, so the note
+// matches what the Learning Report shows for this book. Kept as a separate copy rather than a shared
+// helper to avoid touching the already-working report logic.
+const getReadingLogHours = (category, incentiveAmount) => {
+    if (category === 'Buku Fiksi/Novel' || category === 'Majalah') return 0;
+    if (category === 'Komik Bisnis/Non Fiksi') return 3;
+    if ([
+        'Buku Biografi dan Sejarah', 'Buku Bisnis dan Manajemen', 'Buku Paling Diminati',
+        'Buku Pengembangan Diri', 'Buku Religi dan Hubungan', 'Buku Sales dan Marketing',
+        'Buku Teknologi', 'Buku Terlaris', 'Buku Wajib Baca'
+    ].includes(category)) return 15;
+    const incentive = Number(incentiveAmount) || 0;
+    if (incentive === 100000) return 15;
+    if (incentive === 50000) return 3;
+    if (incentive > 0) return (incentive / 100000) * 15;
+    return 0;
+};
+
+// Re-reads one reading_logs row and reconciles its Nusawork note against `status` (not
+// hr_approval_status - the note represents "this book was read", not "the incentive was approved"):
+//   -> Finished:    create (first time) or update (already synced) the note. Cost is whatever
+//                    incentive_amount holds right now - 0 at first, updated later once HR approves
+//                    a claim and a subsequent save re-reconciles.
+//   Finished -> other (Cancelled): delete the note that was created for it
+const reconcileReadingLogNusawork = async (logId) => {
+    try {
+        const rows = await query('SELECT * FROM reading_logs WHERE id = ?', [logId]);
+        const r = rows[0];
+        if (!r) return;
+
+        if (r.status !== 'Finished') {
+            if (r.nusawork_id_group) {
+                deleteNusaworkNote({ employeeId: r.employee_id, idGroup: r.nusawork_id_group });
+                await query('UPDATE reading_logs SET nusawork_id_group = NULL WHERE id = ?', [logId]);
+            }
+            return;
+        }
+
+        const hours = getReadingLogHours(r.category, r.incentive_amount);
+        const cost = Math.round(Number(r.incentive_amount) || 0);
+        const dateSource = r.finish_date || r.date;
+        const date = dateSource instanceof Date ? dateSource.toISOString().slice(0, 10) : String(dateSource).slice(0, 10);
+
+        if (r.nusawork_id_group) {
+            updateReadingLogNoteInNusawork({ employeeId: r.employee_id, idGroup: r.nusawork_id_group, title: r.title, date, hours, cost });
+        } else {
+            pushReadingLogNoteToNusawork({ employeeId: r.employee_id, logId: r.id, title: r.title, date, hours, cost });
+        }
+    } catch (err) {
+        console.error('[NUSAWORK READING LOG SYNC] Reconcile error:', logId, err.message);
     }
 };
 
@@ -2498,6 +2914,7 @@ app.post('/api/logs', async (req, res) => {
         );
         const newLogs = await query('SELECT * FROM reading_logs WHERE id = ?', [result.insertId]);
         const newLog = newLogs[0];
+        reconcileReadingLogNusawork(newLog.id);
 
         // Return camelCase
         res.json({
@@ -2536,6 +2953,7 @@ app.patch('/api/logs/:id/cancel', async (req, res) => {
         );
 
         console.log(`[CANCEL] Update result:`, result);
+        reconcileReadingLogNusawork(req.params.id);
         res.json({ success: true });
     } catch (err) {
         console.error("[CANCEL LOG ERROR]", err);
@@ -2547,6 +2965,7 @@ app.delete('/api/logs/:id', async (req, res) => {
     try {
         // Soft delete: status Cancelled
         await query('UPDATE reading_logs SET status = "Cancelled", hr_approval_status = "Cancelled", cancelled_at = ? WHERE id = ?', [new Date(), req.params.id]);
+        reconcileReadingLogNusawork(req.params.id);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2622,6 +3041,7 @@ app.put('/api/logs/:id', async (req, res) => {
         console.log(`[API] Updating Reading Log ${id}:`, dbUpdates);
 
         await query(`UPDATE reading_logs SET ${fields} WHERE id = ?`, [...values, id]);
+        reconcileReadingLogNusawork(id);
 
         const updatedLogs = await query('SELECT * FROM reading_logs WHERE id = ?', [id]);
         if (!updatedLogs || updatedLogs.length === 0) {
@@ -2713,6 +3133,7 @@ app.post('/api/books/return', async (req, res) => {
         params.push(id);
 
         await query(sql, params);
+        reconcileReadingLogNusawork(id);
 
         const updatedLogs = await query('SELECT * FROM reading_logs WHERE id = ?', [id]);
         if (updatedLogs.length === 0) return res.status(404).json({ error: 'Log not found' });
@@ -3176,6 +3597,11 @@ app.put('/api/meetings/:id', async (req, res) => {
         const d = new Date(m.date);
         const localDate = new Date(d.getTime() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+        // Snapshot before overwriting, so the Nusawork sync below can tell whether this save just
+        // flipped the meeting's Paid status (or changed hours/cost/attendees while already Paid).
+        const previousRows = await query('SELECT title, date, time, cost_report_json, guests_json FROM meetings WHERE id = ?', [id]);
+        const previousMeeting = previousRows[0];
+
         await query(
             'UPDATE meetings SET title = ?, date = ?, time = ?, host = ?, location = ?, type = ?, meetLink = ?, agenda = ?, guests_json = ?, cost_report_json = ?, employee_id = ?, competency_type = ?, competency_name = ?, training_gr_type = ?, pre_test_link = ?, material_link = ?, post_test_link = ?, feedback_link = ?, pre_test_data = ?, post_test_data = ?, feedback_data = ?, is_pre_test_active = ?, is_post_test_active = ?, is_feedback_active = ?, is_closed = ? WHERE id = ?',
             [
@@ -3211,6 +3637,20 @@ app.put('/api/meetings/:id', async (req, res) => {
         const updated = await query('SELECT * FROM meetings WHERE id = ?', [id]);
         const r = updated[0];
 
+        // Don't block the save on Nusawork calls - reconcile Paid-status/attendee/cost changes
+        // against whatever notes were already pushed for this meeting.
+        if (previousMeeting) {
+            const previousSync = getMeetingSyncData(previousMeeting);
+            const currentSync = getMeetingSyncData(r);
+            syncInternalTrainingNotes({
+                meetingId: Number(id),
+                title: r.title,
+                date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date).slice(0, 10),
+                previous: previousSync,
+                current: currentSync
+            });
+        }
+
         res.json({
             ...r,
             description: r.agenda,
@@ -3227,14 +3667,31 @@ app.put('/api/meetings/:id', async (req, res) => {
 app.delete('/api/meetings/:id', async (req, res) => {
     try {
         const meetingId = req.params.id;
+
+        // Grab any Nusawork notes pushed for this meeting (Paid Internal Training) before removing
+        // the tracking rows, so they can be deleted from Nusawork too.
+        const trainingNoteRows = await query(
+            'SELECT employee_id, id_group FROM nusawork_training_notes WHERE meeting_id = ?',
+            [meetingId]
+        );
+
         // Meetings has no FK cascade to these tables, so clean them up explicitly
         // to avoid leaving orphaned quiz/feedback/certificate rows behind.
         await query('DELETE FROM quiz_results WHERE meeting_id = ?', [meetingId]);
         await query('DELETE FROM course_feedback WHERE meeting_id = ?', [meetingId]);
         await query('DELETE FROM internal_certificates WHERE meeting_id = ?', [meetingId]);
+        await query('DELETE FROM nusawork_training_notes WHERE meeting_id = ?', [meetingId]);
         // Soft delete: keep the row (hidden from every listing via deleted_at IS NULL filters)
         // so the host can still be notified about the removal.
         await query('UPDATE meetings SET deleted_at = ? WHERE id = ?', [new Date(), meetingId]);
+
+        if (trainingNoteRows.length > 0) {
+            console.log(`[NUSAWORK TRAINING SYNC] Meeting ${meetingId} deleted - removing ${trainingNoteRows.length} note(s) from Nusawork.`);
+            trainingNoteRows.forEach(row => {
+                deleteNusaworkNote({ employeeId: row.employee_id, idGroup: row.id_group });
+            });
+        }
+
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3577,7 +4034,7 @@ app.delete('/api/courses/:id', async (req, res) => {
         if (completedRows.length > 0) {
             console.log(`[NUSAWORK ONLINE SYNC] Course ${id} deleted - removing ${completedRows.length} completion note(s) from Nusawork.`);
             completedRows.forEach(row => {
-                deleteOnlineModuleNoteInNusawork({ employeeId: row.employee_id, idGroup: row.nusawork_id_group });
+                deleteNusaworkNote({ employeeId: row.employee_id, idGroup: row.nusawork_id_group });
             });
         }
 
@@ -4274,6 +4731,7 @@ app.post('/api/external-training/hr-process', async (req, res) => {
         params.push(id);
 
         await query(sql, params);
+        reconcileExternalTrainingNusawork(id);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -4309,6 +4767,7 @@ app.post('/api/external-training/hr-update-details', async (req, res) => {
         params.push(id);
 
         await query(sql, params);
+        reconcileExternalTrainingNusawork(id);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -5103,6 +5562,7 @@ app.put('/api/external-training/:id', async (req, res) => {
         }
 
         const updated = await query('SELECT * FROM external_training_requests WHERE id = ?', [id]);
+        reconcileExternalTrainingNusawork(id);
         res.json(updated[0]);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -5122,7 +5582,7 @@ const deleteLocalUpload = (fileUrl) => {
 app.delete('/api/external-training/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const rows = await query('SELECT certificate_link, renewal_certificate_link FROM external_training_requests WHERE id = ?', [id]);
+        const rows = await query('SELECT certificate_link, renewal_certificate_link, employee_id, nusawork_id_group FROM external_training_requests WHERE id = ?', [id]);
         if (rows[0]) {
             deleteLocalUpload(rows[0].certificate_link);
             deleteLocalUpload(rows[0].renewal_certificate_link);
@@ -5130,6 +5590,11 @@ app.delete('/api/external-training/:id', async (req, res) => {
         // Soft delete: keep the row (hidden from every listing via deleted_at IS NULL filters)
         // so the employee can still be notified about the removal.
         await query('UPDATE external_training_requests SET deleted_at = ? WHERE id = ?', [new Date(), id]);
+
+        if (rows[0]?.nusawork_id_group) {
+            deleteNusaworkNote({ employeeId: rows[0].employee_id, idGroup: rows[0].nusawork_id_group });
+        }
+
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
