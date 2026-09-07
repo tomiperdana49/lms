@@ -244,18 +244,20 @@ const LearningReport = ({ userEmail, userName, userEmployeeId, isSupervisor }: L
     const sections = useMemo(() => buildSections(stats, t), [stats, t]);
 
     const handleExport = () => {
-        const rows = sections.flatMap(section =>
-            section.items.map(item => ({
+        const rows = sections.flatMap(section => {
+            // Online Modules has real pre/post-test scores too (just no feedback mechanism).
+            const hasTestScores = section.key === 'training' || section.key === 'online';
+            return section.items.map(item => ({
                 [t('export.categoryColumn')]: section.label,
                 [t('export.titleColumn')]: item.title,
                 [t('export.dateColumn')]: formatDate(item.date),
                 [t('export.hoursColumn')]: item.hours,
                 [t('export.costColumn')]: item.cost,
-                [t('export.preTestColumn')]: section.key === 'training' ? (item.preTestScore ?? '') : '',
-                [t('export.postTestColumn')]: section.key === 'training' ? (item.postTestScore ?? '') : '',
+                [t('export.preTestColumn')]: hasTestScores ? (item.preTestScore ?? '') : '',
+                [t('export.postTestColumn')]: hasTestScores ? (item.postTestScore ?? '') : '',
                 [t('export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (item.feedbackScore ?? t('export.submitted')) : '') : ''
-            }))
-        );
+            }));
+        });
         rows.push({
             [t('export.categoryColumn')]: t('export.grandTotalRow'),
             [t('export.titleColumn')]: '',
@@ -501,11 +503,13 @@ export const LearningStatsBreakdown = ({ stats, t }: LearningStatsBreakdownProps
                                                 {formatDate(item.date)}
                                                 {item.employeeName && <span className="text-slate-300"> · {item.employeeName}</span>}
                                             </p>
-                                            {section.key === 'training' && (
+                                            {(section.key === 'training' || section.key === 'online') && (
                                                 <div className="flex flex-wrap gap-1.5 mt-2">
                                                     <ScoreBadge label={t('assessment.preTest')} score={item.preTestScore} />
                                                     <ScoreBadge label={t('assessment.postTest')} score={item.postTestScore} />
-                                                    <FeedbackBadge submitted={!!item.feedbackSubmitted} score={item.feedbackScore} t={t} />
+                                                    {section.key === 'training' && (
+                                                        <FeedbackBadge submitted={!!item.feedbackSubmitted} score={item.feedbackScore} t={t} />
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -563,8 +567,8 @@ const LearningStatsTable = ({ stats, t }: LearningStatsTableProps) => {
                                 <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">{formatDate(item.date)}</td>
                                 <td className="px-4 py-3 text-right text-slate-700 font-semibold whitespace-nowrap">{item.hours} {t('hours')}</td>
                                 <td className="px-4 py-3 text-right text-slate-500 whitespace-nowrap">{item.cost > 0 ? `Rp ${item.cost.toLocaleString('id-ID')}` : '-'}</td>
-                                <td className="px-4 py-3 text-center text-slate-500 whitespace-nowrap">{item.categoryKey === 'training' ? (item.preTestScore ?? '-') : '-'}</td>
-                                <td className="px-4 py-3 text-center text-slate-500 whitespace-nowrap">{item.categoryKey === 'training' ? (item.postTestScore ?? '-') : '-'}</td>
+                                <td className="px-4 py-3 text-center text-slate-500 whitespace-nowrap">{(item.categoryKey === 'training' || item.categoryKey === 'online') ? (item.preTestScore ?? '-') : '-'}</td>
+                                <td className="px-4 py-3 text-center text-slate-500 whitespace-nowrap">{(item.categoryKey === 'training' || item.categoryKey === 'online') ? (item.postTestScore ?? '-') : '-'}</td>
                                 <td className="px-4 py-3 text-center whitespace-nowrap">
                                     {item.categoryKey === 'training' ? (
                                         item.feedbackSubmitted

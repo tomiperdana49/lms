@@ -492,7 +492,12 @@ const formatNusaworkCost = (cost) => (Number(cost) > 0 ? `Rp ${Math.round(cost).
 // Pushes one employee note to Nusawork when an Internal Training meeting is marked Paid, so the
 // cost/hours show up alongside HR's own records there - mirrors pushOnlineModuleCompletionToNusawork.
 // Saves the returned id_group into nusawork_training_notes for later update/delete.
-const pushInternalTrainingNoteToNusawork = async ({ employeeId, meetingId, title, date, hours, cost }) => {
+// Blank pre_test/post_test/feedback strings when a participant has no such record (didn't take the
+// quiz / hasn't submitted feedback yet) - same "empty string, not omitted" convention as the
+// online-module note.
+const formatNusaworkScore = (score) => (score === null || score === undefined || score === '' ? '' : String(score));
+
+const pushInternalTrainingNoteToNusawork = async ({ employeeId, meetingId, title, date, hours, cost, preTest, postTest, feedback }) => {
     if (!employeeId) return;
     try {
         const token = await getNusanetToken();
@@ -508,7 +513,10 @@ const pushInternalTrainingNoteToNusawork = async ({ employeeId, meetingId, title
                     title,
                     date,
                     hours: String(hours),
-                    cost: formatNusaworkCost(cost)
+                    cost: formatNusaworkCost(cost),
+                    pre_test: formatNusaworkScore(preTest),
+                    post_test: formatNusaworkScore(postTest),
+                    feedback: formatNusaworkScore(feedback)
                 }
             })
         });
@@ -535,7 +543,7 @@ const pushInternalTrainingNoteToNusawork = async ({ employeeId, meetingId, title
 };
 
 // Updates an already-pushed Internal Training note when the meeting is edited while still Paid.
-const updateInternalTrainingNoteInNusawork = async ({ employeeId, idGroup, title, date, hours, cost }) => {
+const updateInternalTrainingNoteInNusawork = async ({ employeeId, idGroup, title, date, hours, cost, preTest, postTest, feedback }) => {
     if (!employeeId || !idGroup) return;
     try {
         const token = await getNusanetToken();
@@ -552,7 +560,10 @@ const updateInternalTrainingNoteInNusawork = async ({ employeeId, idGroup, title
                     title,
                     date,
                     hours: String(hours),
-                    cost: formatNusaworkCost(cost)
+                    cost: formatNusaworkCost(cost),
+                    pre_test: formatNusaworkScore(preTest),
+                    post_test: formatNusaworkScore(postTest),
+                    feedback: formatNusaworkScore(feedback)
                 }
             })
         });
@@ -617,6 +628,37 @@ const getMeetingSyncData = (meetingRow) => {
     };
 };
 
+// Per-employee pre-test/post-test/feedback for one meeting - same source tables and "keep the best
+// score" rule computeLearningStats uses, so the Nusawork note matches what the Learning Report shows.
+const getMeetingParticipantScores = async (meetingId) => {
+    const quizRows = await query(
+        `SELECT employee_id, quiz_type, score FROM quiz_results
+         WHERE meeting_id = ? AND module_id IS NULL AND employee_id IS NOT NULL`,
+        [meetingId]
+    );
+    const feedbackRows = await query(
+        `SELECT employee_id, feedback_data FROM course_feedback WHERE meeting_id = ? AND employee_id IS NOT NULL`,
+        [meetingId]
+    );
+
+    const scores = {};
+    for (const row of quizRows) {
+        if (!scores[row.employee_id]) scores[row.employee_id] = { preTest: null, postTest: null, feedback: null };
+        const key = (row.quiz_type || 'POST').toUpperCase() === 'PRE' ? 'preTest' : 'postTest';
+        if (scores[row.employee_id][key] === null || row.score > scores[row.employee_id][key]) {
+            scores[row.employee_id][key] = row.score;
+        }
+    }
+    for (const row of feedbackRows) {
+        if (!scores[row.employee_id]) scores[row.employee_id] = { preTest: null, postTest: null, feedback: null };
+        try {
+            const data = typeof row.feedback_data === 'string' ? JSON.parse(row.feedback_data) : row.feedback_data;
+            if (data && data.rating !== undefined) scores[row.employee_id].feedback = data.rating;
+        } catch (e) { /* ignore */ }
+    }
+    return scores;
+};
+
 // Reconciles Nusawork training notes against a meeting's before/after Paid state and attendee list.
 // Fire-and-forget from the PUT /api/meetings/:id handler - covers three transitions:
 //   unpaid -> paid:  create a note for every current attendee
@@ -644,12 +686,14 @@ const syncInternalTrainingNotes = async ({ meetingId, title, date, previous, cur
         }
 
         // Paid (either newly, or still) - sync every current attendee.
+        const scoresByEmployee = await getMeetingParticipantScores(meetingId);
         for (const employeeId of current.employeeIds) {
             const idGroup = existingByEmployee[employeeId];
+            const s = scoresByEmployee[employeeId] || { preTest: null, postTest: null, feedback: null };
             if (idGroup) {
-                updateInternalTrainingNoteInNusawork({ employeeId, idGroup, title, date, hours: current.hours, cost: current.cost });
+                updateInternalTrainingNoteInNusawork({ employeeId, idGroup, title, date, hours: current.hours, cost: current.cost, preTest: s.preTest, postTest: s.postTest, feedback: s.feedback });
             } else {
-                pushInternalTrainingNoteToNusawork({ employeeId, meetingId, title, date, hours: current.hours, cost: current.cost });
+                pushInternalTrainingNoteToNusawork({ employeeId, meetingId, title, date, hours: current.hours, cost: current.cost, preTest: s.preTest, postTest: s.postTest, feedback: s.feedback });
             }
         }
 
@@ -687,7 +731,10 @@ const pushExternalTrainingNoteToNusawork = async ({ employeeId, requestId, title
                     title,
                     date,
                     hours: String(hours),
-                    cost: formatNusaworkCost(cost)
+                    cost: formatNusaworkCost(cost),
+                    pre_test: '',
+                    post_test: '',
+                    feedback: ''
                 }
             })
         });
@@ -727,7 +774,10 @@ const updateExternalTrainingNoteInNusawork = async ({ employeeId, idGroup, title
                     title,
                     date,
                     hours: String(hours),
-                    cost: formatNusaworkCost(cost)
+                    cost: formatNusaworkCost(cost),
+                    pre_test: '',
+                    post_test: '',
+                    feedback: ''
                 }
             })
         });
@@ -796,7 +846,10 @@ const pushReadingLogNoteToNusawork = async ({ employeeId, logId, title, date, ho
                     title,
                     date,
                     hours: String(hours),
-                    cost: formatNusaworkCost(cost)
+                    cost: formatNusaworkCost(cost),
+                    pre_test: '',
+                    post_test: '',
+                    feedback: ''
                 }
             })
         });
@@ -836,7 +889,10 @@ const updateReadingLogNoteInNusawork = async ({ employeeId, idGroup, title, date
                     title,
                     date,
                     hours: String(hours),
-                    cost: formatNusaworkCost(cost)
+                    cost: formatNusaworkCost(cost),
+                    pre_test: '',
+                    post_test: '',
+                    feedback: ''
                 }
             })
         });
@@ -2178,6 +2234,23 @@ const computeLearningStats = async ({ email, employee_id, startDate, endDate }) 
                 moduleCountByCourse[m.course_id] = (moduleCountByCourse[m.course_id] || 0) + 1;
             }
 
+            // This employee's course-level (not per-module) PRE/POST scores, fetched up front to
+            // avoid N+1 queries - same "keep the best score" rule as the meetings section above.
+            const courseQuizRows = await query(
+                `SELECT course_id, quiz_type, score FROM quiz_results
+                 WHERE course_id IS NOT NULL AND module_id IS NULL
+                   AND (student_id = ? OR (employee_id IS NOT NULL AND employee_id = ?))`,
+                [targetUserId, targetEmpId]
+            );
+            const quizByCourse = {};
+            for (const r of courseQuizRows) {
+                if (!quizByCourse[r.course_id]) quizByCourse[r.course_id] = {};
+                const quizType = (r.quiz_type || 'POST').toUpperCase();
+                if (quizByCourse[r.course_id][quizType] === undefined || r.score > quizByCourse[r.course_id][quizType]) {
+                    quizByCourse[r.course_id][quizType] = r.score;
+                }
+            }
+
             for (const p of progressRows) {
                 if (!isWithinRange(p.last_access)) continue;
 
@@ -2206,11 +2279,14 @@ const computeLearningStats = async ({ email, employee_id, startDate, endDate }) 
                 jamOnline += courseHours;
 
                 if (courseHours > 0) {
+                    const courseQuiz = quizByCourse[p.course_id] || {};
                     onlineDetails.push({
                         title: p.course_title || `Course #${p.course_id}`,
                         date: p.last_access,
                         hours: Math.round(courseHours * 100) / 100,
-                        cost: 0
+                        cost: 0,
+                        preTestScore: courseQuiz.PRE ?? null,
+                        postTestScore: courseQuiz.POST ?? null
                     });
                 }
             }

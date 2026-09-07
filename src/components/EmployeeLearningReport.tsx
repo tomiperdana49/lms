@@ -194,19 +194,21 @@ const EmployeeLearningReport = () => {
 
     const handleExport = () => {
         if (selectedEmployees.length === 0) return;
-        const rows = sections.flatMap(section =>
-            section.items.map(item => ({
+        const rows = sections.flatMap(section => {
+            // Online Modules has real pre/post-test scores too (just no feedback mechanism).
+            const hasTestScores = section.key === 'training' || section.key === 'online';
+            return section.items.map(item => ({
                 ...(includeEmployeeColumn ? { [t('export.employeeColumn')]: item.employeeName || '' } : {}),
                 [t('export.categoryColumn')]: section.label,
                 [t('export.titleColumn')]: item.title,
                 [t('export.dateColumn')]: formatDate(item.date),
                 [t('export.hoursColumn')]: item.hours,
                 [t('export.costColumn')]: item.cost,
-                [t('export.preTestColumn')]: section.key === 'training' ? (item.preTestScore ?? '') : '',
-                [t('export.postTestColumn')]: section.key === 'training' ? (item.postTestScore ?? '') : '',
+                [t('export.preTestColumn')]: hasTestScores ? (item.preTestScore ?? '') : '',
+                [t('export.postTestColumn')]: hasTestScores ? (item.postTestScore ?? '') : '',
                 [t('export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (item.feedbackScore ?? t('export.submitted')) : '') : ''
-            }))
-        );
+            }));
+        });
         rows.push({
             ...(includeEmployeeColumn ? { [t('export.employeeColumn')]: '' } : {}),
             [t('export.categoryColumn')]: t('export.grandTotalRow'),

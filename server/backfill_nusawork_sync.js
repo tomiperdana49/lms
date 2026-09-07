@@ -86,8 +86,12 @@ const getNusanetToken = async () => {
 // Zero means "no cost recorded" - send '-' rather than the misleading "Rp0" (matches server.js).
 const formatNusaworkCost = (cost) => (Number(cost) > 0 ? `Rp ${Math.round(cost).toLocaleString('id-ID')}` : '-');
 
+// Blank when a participant has no such record - same "empty string, not omitted" convention as the
+// live app (matches formatNusaworkScore in server.js).
+const formatNusaworkScore = (score) => (score === null || score === undefined || score === '' ? '' : String(score));
+
 // --- Push one note, return its id_group ---
-const pushNote = async ({ employeeId, category, title, date, hours, cost }) => {
+const pushNote = async ({ employeeId, category, title, date, hours, cost, preTest = null, postTest = null, feedback = null }) => {
     const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
     const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
     const token = await getNusanetToken();
@@ -97,7 +101,10 @@ const pushNote = async ({ employeeId, category, title, date, hours, cost }) => {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
             employee_id: employeeId,
-            fields: { category, title, date, hours: String(hours), cost: formatNusaworkCost(cost) }
+            fields: {
+                category, title, date, hours: String(hours), cost: formatNusaworkCost(cost),
+                pre_test: formatNusaworkScore(preTest), post_test: formatNusaworkScore(postTest), feedback: formatNusaworkScore(feedback)
+            }
         })
     });
     const data = await response.json().catch(() => ({}));
@@ -148,10 +155,18 @@ async function backfillOnlineModules(empId) {
         const hours = match ? Math.round(parseFloat(match[1]) * 100) / 100 : 0;
         const date = new Date(row.date).toISOString().slice(0, 10);
 
-        console.log(`  - [${row.quiz_result_id}] "${row.course_title}" on ${date}, ${hours}h`);
+        // Latest PRE-test attempt for this course, same as the preTestRows lookup in /api/quiz/submit.
+        const [preRows] = await pool.query(
+            `SELECT score FROM quiz_results WHERE course_id = ? AND module_id IS NULL AND quiz_type = 'PRE'
+             AND employee_id = ? ORDER BY date DESC LIMIT 1`,
+            [row.course_id, empId]
+        );
+        const preTest = preRows.length > 0 ? preRows[0].score : null;
+
+        console.log(`  - [${row.quiz_result_id}] "${row.course_title}" on ${date}, ${hours}h, pre=${preTest ?? '-'}, post=${row.score}`);
         if (isDryRun) continue;
 
-        const idGroup = await pushNote({ employeeId: empId, category: 'Online Modules', title: row.course_title, date, hours, cost: 0 });
+        const idGroup = await pushNote({ employeeId: empId, category: 'Online Modules', title: row.course_title, date, hours, cost: 0, preTest, postTest: row.score });
         if (idGroup) {
             await pool.query('UPDATE quiz_results SET nusawork_id_group = ? WHERE id = ?', [idGroup, row.quiz_result_id]);
             console.log(`    -> pushed, id_group=${idGroup}`);
@@ -215,10 +230,36 @@ async function backfillInternalTraining(empId) {
         const [[dateRow]] = await pool.query('SELECT date FROM meetings WHERE id = ?', [meeting.id]);
         const date = new Date(dateRow.date).toISOString().slice(0, 10);
 
-        console.log(`  - [meeting ${meeting.id}] "${meeting.title}" on ${date}, ${hours}h, ${formatNusaworkCost(cost)}`);
+        // Best PRE/POST score and feedback rating for this employee on this meeting - same "keep the
+        // best score" rule as computeLearningStats / getMeetingParticipantScores in server.js.
+        const [quizRows] = await pool.query(
+            `SELECT quiz_type, score FROM quiz_results WHERE meeting_id = ? AND module_id IS NULL AND employee_id = ?`,
+            [meeting.id, empId]
+        );
+        let preTest = null, postTest = null;
+        for (const q of quizRows) {
+            if ((q.quiz_type || 'POST').toUpperCase() === 'PRE') {
+                if (preTest === null || q.score > preTest) preTest = q.score;
+            } else if (postTest === null || q.score > postTest) {
+                postTest = q.score;
+            }
+        }
+        const [feedbackRows] = await pool.query(
+            `SELECT feedback_data FROM course_feedback WHERE meeting_id = ? AND employee_id = ?`,
+            [meeting.id, empId]
+        );
+        let feedback = null;
+        if (feedbackRows.length > 0) {
+            try {
+                const data = typeof feedbackRows[0].feedback_data === 'string' ? JSON.parse(feedbackRows[0].feedback_data) : feedbackRows[0].feedback_data;
+                if (data && data.rating !== undefined) feedback = data.rating;
+            } catch (e) { /* ignore */ }
+        }
+
+        console.log(`  - [meeting ${meeting.id}] "${meeting.title}" on ${date}, ${hours}h, ${formatNusaworkCost(cost)}, pre=${preTest ?? '-'}, post=${postTest ?? '-'}, feedback=${feedback ?? '-'}`);
         if (isDryRun) continue;
 
-        const idGroup = await pushNote({ employeeId: empId, category: 'Internal Training', title: meeting.title, date, hours, cost });
+        const idGroup = await pushNote({ employeeId: empId, category: 'Internal Training', title: meeting.title, date, hours, cost, preTest, postTest, feedback });
         if (idGroup) {
             await pool.query(
                 'INSERT INTO nusawork_training_notes (meeting_id, employee_id, id_group) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE id_group = VALUES(id_group)',
