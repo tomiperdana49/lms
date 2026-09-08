@@ -486,6 +486,11 @@ export const LearningStatsBreakdown = ({ stats, t }: LearningStatsBreakdownProps
                             <div className="flex items-center gap-2 text-slate-700">
                                 <span className={section.color}>{section.icon}</span>
                                 <span className="text-sm font-black uppercase tracking-widest">{section.label}</span>
+                                {section.items.length > 0 && (
+                                    <span className="text-[11px] font-bold text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">
+                                        {section.items.length}
+                                    </span>
+                                )}
                             </div>
                             <span className="text-xs font-bold text-slate-400">
                                 {section.hours} {t('hours')}{section.key !== 'online' ? ` · Rp ${section.cost.toLocaleString('id-ID')}` : ''}
