@@ -171,7 +171,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             message: t('notifications.meetingMessage', { title: m.title, time: m.time, type: m.type }),
                             time: new Date(m.date).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
                             type: 'INFO',
-                            isRead: readIds.includes(notifId)
+                            isRead: readIds.includes(notifId),
+                            page: 'calendar'
                         };
                     });
 
@@ -224,7 +225,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             message: t('notifications.readingMessage', { title: l.title, statusLabel }),
                             time: new Date(l.approvedAt || l.finishDate || l.date || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
                             type,
-                            isRead: readIds.includes(notifId)
+                            isRead: readIds.includes(notifId),
+                            page: 'reading-log'
                         };
                     });
 
@@ -243,7 +245,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             message: t('notifications.internalTrainingApprovedMessage', { title: m.title }),
                             time: new Date(m.date).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
                             type: 'SUCCESS',
-                            isRead: readIds.includes(notifId)
+                            isRead: readIds.includes(notifId),
+                            page: 'internal'
                         };
                     });
 
@@ -258,7 +261,9 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             message: t('notifications.externalTrainingNewRequestMessage', { name: r.employee_name, title: r.title }),
                             time: new Date(r.created_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
                             type: 'INFO',
-                            isRead: readIds.includes(notifId)
+                            isRead: readIds.includes(notifId),
+                            page: 'external',
+                            view: 'team_approvals'
                         };
                     });
 
@@ -292,7 +297,9 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             message: t('notifications.externalTrainingStatusMessage', { title: r.title, statusLabel }),
                             time: new Date(r.updated_at || r.created_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
                             type,
-                            isRead: readIds.includes(notifId)
+                            isRead: readIds.includes(notifId),
+                            page: 'external',
+                            view: 'my_requests'
                         };
                     });
 
@@ -308,7 +315,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             message: t('notifications.internalTrainingDeletedMessage', { title: m.title }),
                             time: new Date(m.deleted_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
                             type: 'WARNING',
-                            isRead: readIds.includes(notifId)
+                            isRead: readIds.includes(notifId),
+                            page: 'internal'
                         };
                     });
 
@@ -322,7 +330,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             message: t('notifications.externalTrainingDeletedMessage', { title: r.title }),
                             time: new Date(r.deleted_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
                             type: 'WARNING',
-                            isRead: readIds.includes(notifId)
+                            isRead: readIds.includes(notifId),
+                            page: 'external'
                         };
                     });
 
@@ -350,7 +359,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             message: t('notifications.idpStatusMessage', { year: p.period_year, statusLabel }),
                             time: new Date(p.approved_date || p.updated_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
                             type,
-                            isRead: readIds.includes(notifId)
+                            isRead: readIds.includes(notifId),
+                            page: 'idp'
                         };
                     });
 
@@ -365,7 +375,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             message: t('notifications.idpNoteMessage', { year: p.period_year }),
                             time: new Date(p.updated_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
                             type: 'INFO',
-                            isRead: readIds.includes(notifId)
+                            isRead: readIds.includes(notifId),
+                            page: 'idp'
                         };
                     });
 
@@ -381,7 +392,9 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                 message: t('notifications.idpSubmittedMessage', { name: p.employee_name, year: p.period_year }),
                                 time: new Date(p.created_by_date || p.updated_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
                                 type: 'INFO',
-                                isRead: readIds.includes(notifId)
+                                isRead: readIds.includes(notifId),
+                                page: 'admin-dashboard',
+                                view: 'idp'
                             };
                         })
                     : [];
@@ -396,7 +409,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             message: t('notifications.idpReviewAddedMessage', { year: p.period_year, name: r.reviewed_by || p.supervisor_name }),
                             time: new Date(r.review_date || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
                             type: 'INFO',
-                            isRead: readIds.includes(notifId)
+                            isRead: readIds.includes(notifId),
+                            page: 'idp'
                         };
                     })
                 );
@@ -440,17 +454,21 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         return () => document.removeEventListener('click', handleOutsideClick);
     }, [isProfileMenuOpen]);
 
-    const handleNotificationClick = (id: number) => {
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    const handleNotificationClick = (notif: { id: number; page?: Page; view?: string }) => {
+        setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
         try {
             const saved = localStorage.getItem(`lms_read_notifs_${user?.email || 'guest'}`);
             const readList = saved ? JSON.parse(saved) : [];
-            if (!readList.includes(id)) {
-                readList.push(id);
+            if (!readList.includes(notif.id)) {
+                readList.push(notif.id);
                 localStorage.setItem(`lms_read_notifs_${user?.email || 'guest'}`, JSON.stringify(readList));
             }
         } catch (e) {
             console.error(e);
+        }
+        if (notif.page) {
+            onNavigate(notif.page, notif.view);
+            setIsNotificationsOpen(false);
         }
     };
 
@@ -811,12 +829,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                             </div>
                                         ) : (
                                             notifications.map(notif => (
-                                                <div 
-                                                    key={notif.id} 
-                                                    onClick={() => handleNotificationClick(notif.id)}
-                                                    className={`p-3 rounded-2xl transition-all cursor-pointer flex gap-3 text-left 
-                                                        ${notif.isRead 
-                                                            ? 'bg-transparent opacity-60 hover:opacity-100' 
+                                                <div
+                                                    key={notif.id}
+                                                    onClick={() => handleNotificationClick(notif)}
+                                                    className={`p-3 rounded-2xl transition-all flex gap-3 text-left
+                                                        ${notif.page ? 'cursor-pointer' : 'cursor-default'}
+                                                        ${notif.isRead
+                                                            ? 'bg-transparent opacity-60 hover:opacity-100'
                                                             : 'bg-blue-50/50 hover:bg-blue-50 border border-blue-50/50 shadow-sm'
                                                         }
                                                     `}
