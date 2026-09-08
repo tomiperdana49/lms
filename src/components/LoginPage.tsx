@@ -125,8 +125,8 @@ const LoginPage = ({ onLogin, sessionExpiredReason, onSessionExpiredReasonShown 
 
             <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
                 <div className="bg-blue-600 p-8 text-center">
-                    <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-                        <img src="/favicon.png" alt="LMS Nusa" className="w-10 h-10 object-contain" />
+                    <div className="w-16 h-16 bg-white rounded-2xl shadow-md flex items-center justify-center mx-auto mb-4 p-2.5">
+                        <img src="/favicon.png" alt="LMS Nusa" className="w-full h-full object-contain" />
                     </div>
                     <h1 className="text-2xl font-bold text-white tracking-wider">{t('title')}</h1>
                     <p className="text-blue-100 text-sm mt-1">{t('subtitle')}</p>
