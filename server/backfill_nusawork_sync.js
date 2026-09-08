@@ -328,7 +328,7 @@ async function backfillExternalTraining(empId) {
 
 // --- Category 4: Reading Log (Finished) ---
 function getReadingLogHours(category, incentiveAmount) {
-    if (category === 'Buku Fiksi/Novel' || category === 'Majalah') return 0;
+    if (category === 'Buku Fiksi/Novel' || category === 'Majalah' || category === 'Buku Lainnya') return 0;
     if (category === 'Komik Bisnis/Non Fiksi') return 3;
     if ([
         'Buku Biografi dan Sejarah', 'Buku Bisnis dan Manajemen', 'Buku Paling Diminati',

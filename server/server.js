@@ -907,11 +907,50 @@ const updateReadingLogNoteInNusawork = async ({ employeeId, idGroup, title, date
     }
 };
 
+// SIMAS sends its own subCategory taxonomy, which has drifted over time (English names, "&" vs "dan",
+// missing "Buku " prefix, typos) and doesn't line up with LMS's official reading_logs category list.
+// Storing it raw is what caused the "90 hours instead of 15" bug fixed manually in
+// migrate_reading_log_categories.js - getReadingLogHours() below only recognizes the exact official
+// strings, so anything else silently fell through to the cost-based fallback formula.
+// This only covers straight renames/typos seen in production; genre judgment calls (e.g. a bare
+// "Buku" or "Buku Pribadi" source label) aren't guessable from the string alone and are left to fall
+// through to 'Buku Lainnya' with a warning, same as any other unrecognized value.
+const READING_LOG_CATEGORIES = [
+    'Buku Fiksi/Novel', 'Majalah', 'Komik Bisnis/Non Fiksi', 'Buku Biografi dan Sejarah',
+    'Buku Bisnis dan Manajemen', 'Buku Paling Diminati', 'Buku Pengembangan Diri',
+    'Buku Religi dan Hubungan', 'Buku Sales dan Marketing', 'Buku Teknologi', 'Buku Terlaris',
+    'Buku Wajib Baca', 'Buku Lainnya'
+];
+const READING_LOG_CATEGORY_ALIASES = {
+    'biography': 'Buku Biografi dan Sejarah',
+    'buku biografi & sejarah': 'Buku Biografi dan Sejarah',
+    'buku sales & marketing': 'Buku Sales dan Marketing',
+    'business & economy': 'Buku Bisnis dan Manajemen',
+    'self development': 'Buku Pengembangan Diri',
+    'others': 'Buku Lainnya',
+    'buku lainya': 'Buku Lainnya',
+    'lainnya': 'Buku Lainnya',
+    'komik self-help/non fiksi': 'Komik Bisnis/Non Fiksi'
+};
+const normalizeReadingLogCategory = (rawCategory, { source } = {}) => {
+    const trimmed = (rawCategory || '').trim();
+    if (!trimmed) return 'Buku Lainnya';
+
+    const officialMatch = READING_LOG_CATEGORIES.find(c => c.toLowerCase() === trimmed.toLowerCase());
+    if (officialMatch) return officialMatch;
+
+    const alias = READING_LOG_CATEGORY_ALIASES[trimmed.toLowerCase()];
+    if (alias) return alias;
+
+    console.warn(`[READING LOG] Unrecognized category "${rawCategory}"${source ? ` from ${source}` : ''} - falling back to "Buku Lainnya". Add a mapping to READING_LOG_CATEGORY_ALIASES if this is a known rename.`);
+    return 'Buku Lainnya';
+};
+
 // Mirrors the category -> hours lookup inside computeLearningStats' "Baca Buku" block, so the note
 // matches what the Learning Report shows for this book. Kept as a separate copy rather than a shared
 // helper to avoid touching the already-working report logic.
 const getReadingLogHours = (category, incentiveAmount) => {
-    if (category === 'Buku Fiksi/Novel' || category === 'Majalah') return 0;
+    if (category === 'Buku Fiksi/Novel' || category === 'Majalah' || category === 'Buku Lainnya') return 0;
     if (category === 'Komik Bisnis/Non Fiksi') return 3;
     if ([
         'Buku Biografi dan Sejarah', 'Buku Bisnis dan Manajemen', 'Buku Paling Diminati',
@@ -2306,7 +2345,7 @@ const computeLearningStats = async ({ email, employee_id, startDate, endDate }) 
             const category = log.category || '';
             let itemHours = 0;
 
-            if (category === 'Buku Fiksi/Novel' || category === 'Majalah') {
+            if (category === 'Buku Fiksi/Novel' || category === 'Majalah' || category === 'Buku Lainnya') {
                 // 0 hours
             } else if (category === 'Komik Bisnis/Non Fiksi') {
                 itemHours = 3;
@@ -2848,7 +2887,7 @@ app.post('/api/simas/sync', async (req, res) => {
                                 await query(
                                     'INSERT IGNORE INTO reading_logs (title, author, category, date, review, status, user_name, employee_id, evidence_url, return_evidence_url, start_date, finish_date, hr_approval_status, link, sn, location, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                                     [
-                                        b.name, '', b.subCategory || 'Lainnya', startDate,
+                                        b.name, '', normalizeReadingLogCategory(b.subCategory, { source: 'SIMAS' }), startDate,
                                         isReturned ? (b.loanHistory.return.linkReview || '') : '',
                                         isReturned ? 'Finished' : 'Reading',
                                         targetName, targetEid, b.loanHistory.loaning.loanPhoto || '',

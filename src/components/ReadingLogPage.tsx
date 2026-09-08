@@ -370,7 +370,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         "Buku Teknologi",
         "Buku Terlaris",
         "Buku Wajib Baca",
-        "Buku Lainya"
+        "Buku Lainnya"
     ];
 
     const [filterYear] = useState(new Date().getFullYear());
@@ -637,7 +637,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                     const totalEarned = approvedLogs.reduce((acc, log) => acc + Number(log.incentiveAmount || 0), 0);
                     const totalLearningHours = approvedLogs.reduce((acc, log) => {
                         const category = log.category || '';
-                        if (category === 'Buku Fiksi/Novel' || category === 'Majalah') {
+                        if (category === 'Buku Fiksi/Novel' || category === 'Majalah' || category === 'Buku Lainnya') {
                             return acc;
                         } else if (category === 'Komik Bisnis/Non Fiksi') {
                             return acc + 3;

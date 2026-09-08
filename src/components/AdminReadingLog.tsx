@@ -38,7 +38,7 @@ const categories = [
     "Buku Teknologi",
     "Buku Terlaris",
     "Buku Wajib Baca",
-    "Buku Lainya"
+    "Buku Lainnya"
 ];
 
 const formatToDatetimeLocal = (dateStr?: string | Date) => {
