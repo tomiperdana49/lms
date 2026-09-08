@@ -256,6 +256,19 @@ const loadCachedToken = () => {
     return null;
 };
 
+// A cached token can go bad without the 24h TTL catching it - e.g. Nusawork revokes/changes the
+// client's permissions server-side, which shows up as a 401/403 on the next call, not an expiry we
+// can see locally. Clearing both the in-memory and on-disk cache forces the next getNusanetToken()
+// call to request a fresh one instead of reusing the same bad token for up to 24h.
+const invalidateCachedToken = () => {
+    cachedNusanetToken = null;
+    try {
+        if (fs.existsSync(TOKEN_FILE)) fs.unlinkSync(TOKEN_FILE);
+    } catch (e) {
+        console.error(`[NUSANET OAUTH] Failed to clear token cache:`, e.message);
+    }
+};
+
 const getNusanetToken = async (username, password) => {
     if (process.env.NUSANET_TOKEN) {
         return process.env.NUSANET_TOKEN;
@@ -370,6 +383,23 @@ const getNusanetToken = async (username, password) => {
     return null;
 };
 
+// Wraps a Nusawork note API call with automatic retry-on-bad-token: the cached token has no expiry
+// we can inspect locally, so a 401/403 here is treated as "the cached token is no longer good"
+// (revoked/changed permissions, or genuinely expired) - clear it, fetch a fresh one, and retry the
+// same request exactly once. Used by all the note push/update/delete calls below, which previously
+// grabbed the token once and never noticed a stale one until the next 24h cache expiry.
+const nusaworkFetch = async (url, options = {}) => {
+    const withAuth = (t) => ({ ...options, headers: { ...(options.headers || {}), 'Authorization': `Bearer ${t}` } });
+    let token = await getNusanetToken();
+    let response = await fetch(url, withAuth(token));
+    if (response.status === 401 || response.status === 403) {
+        invalidateCachedToken();
+        token = await getNusanetToken();
+        response = await fetch(url, withAuth(token));
+    }
+    return response;
+};
+
 // Pushes one employee note to Nusawork when an online course's final assessment is passed, so the
 // completion (hours/scores) shows up alongside HR's own records there. Fire-and-forget from the
 // caller's point of view - failures are logged but never block the quiz-submit response.
@@ -379,12 +409,11 @@ const pushOnlineModuleCompletionToNusawork = async ({ employeeId, title, date, h
         return;
     }
     try {
-        const token = await getNusanetToken();
         const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
         const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
-        const response = await fetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
+        const response = await nusaworkFetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 employee_id: employeeId,
                 fields: {
@@ -431,12 +460,11 @@ const pushOnlineModuleCompletionToNusawork = async ({ employeeId, title, date, h
 const updateOnlineModuleNoteInNusawork = async ({ employeeId, idGroup, title, date, hours }) => {
     if (!employeeId || !idGroup) return;
     try {
-        const token = await getNusanetToken();
         const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
         const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
-        const response = await fetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
+        const response = await nusaworkFetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 employee_id: employeeId,
                 id_group: idGroup,
@@ -466,14 +494,10 @@ const updateOnlineModuleNoteInNusawork = async ({ employeeId, idGroup, title, da
 const deleteNusaworkNote = async ({ employeeId, idGroup }) => {
     if (!employeeId || !idGroup) return;
     try {
-        const token = await getNusanetToken();
         const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
         const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
         const url = `${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee?employee_id=${encodeURIComponent(employeeId)}&id_group=${encodeURIComponent(idGroup)}`;
-        const response = await fetch(url, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await nusaworkFetch(url, { method: 'DELETE' });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
             console.error('[NUSAWORK SYNC] Delete failed:', employeeId, idGroup, response.status, data);
@@ -500,12 +524,11 @@ const formatNusaworkScore = (score) => (score === null || score === undefined ||
 const pushInternalTrainingNoteToNusawork = async ({ employeeId, meetingId, title, date, hours, cost, preTest, postTest, feedback }) => {
     if (!employeeId) return;
     try {
-        const token = await getNusanetToken();
         const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
         const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
-        const response = await fetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
+        const response = await nusaworkFetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 employee_id: employeeId,
                 fields: {
@@ -546,12 +569,11 @@ const pushInternalTrainingNoteToNusawork = async ({ employeeId, meetingId, title
 const updateInternalTrainingNoteInNusawork = async ({ employeeId, idGroup, title, date, hours, cost, preTest, postTest, feedback }) => {
     if (!employeeId || !idGroup) return;
     try {
-        const token = await getNusanetToken();
         const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
         const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
-        const response = await fetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
+        const response = await nusaworkFetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 employee_id: employeeId,
                 id_group: idGroup,
@@ -718,12 +740,11 @@ const syncInternalTrainingNotes = async ({ meetingId, title, date, previous, cur
 const pushExternalTrainingNoteToNusawork = async ({ employeeId, requestId, title, date, hours, cost }) => {
     if (!employeeId) return;
     try {
-        const token = await getNusanetToken();
         const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
         const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
-        const response = await fetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
+        const response = await nusaworkFetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 employee_id: employeeId,
                 fields: {
@@ -760,12 +781,11 @@ const pushExternalTrainingNoteToNusawork = async ({ employeeId, requestId, title
 const updateExternalTrainingNoteInNusawork = async ({ employeeId, idGroup, title, date, hours, cost }) => {
     if (!employeeId || !idGroup) return;
     try {
-        const token = await getNusanetToken();
         const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
         const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
-        const response = await fetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
+        const response = await nusaworkFetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 employee_id: employeeId,
                 id_group: idGroup,
@@ -830,15 +850,18 @@ const reconcileExternalTrainingNusawork = async (requestId) => {
 };
 
 // Same create/update payload shape as the other Nusawork syncs, category 'Reading Log'.
+// Returns { success, error } (instead of the fire-and-forget void the other Nusawork push/update
+// helpers use) so reconcileReadingLogNusawork can hand a real pass/fail result back to the
+// PUT /api/logs/:id handler, which surfaces it to the admin instead of leaving a sync failure
+// visible only in the server log.
 const pushReadingLogNoteToNusawork = async ({ employeeId, logId, title, date, hours, cost }) => {
-    if (!employeeId) return;
+    if (!employeeId) return { success: false, error: 'No employee_id resolved for this reading log.' };
     try {
-        const token = await getNusanetToken();
         const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
         const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
-        const response = await fetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
+        const response = await nusaworkFetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 employee_id: employeeId,
                 fields: {
@@ -856,7 +879,7 @@ const pushReadingLogNoteToNusawork = async ({ employeeId, logId, title, date, ho
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
             console.error('[NUSAWORK READING LOG SYNC] Failed:', employeeId, title, response.status, data);
-            return;
+            return { success: false, error: data?.message || `Nusawork returned ${response.status}` };
         }
         console.log('[NUSAWORK READING LOG SYNC] Pushed note:', employeeId, title);
         const idGroup = data?.data?.id_group;
@@ -867,20 +890,21 @@ const pushReadingLogNoteToNusawork = async ({ employeeId, logId, title, date, ho
                 console.error('[NUSAWORK READING LOG SYNC] Failed to save id_group:', dbErr.message);
             }
         }
+        return { success: true };
     } catch (err) {
         console.error('[NUSAWORK READING LOG SYNC] Error:', employeeId, title, err.message);
+        return { success: false, error: err.message };
     }
 };
 
 const updateReadingLogNoteInNusawork = async ({ employeeId, idGroup, title, date, hours, cost }) => {
-    if (!employeeId || !idGroup) return;
+    if (!employeeId || !idGroup) return { success: false, error: 'Missing employee_id or Nusawork id_group.' };
     try {
-        const token = await getNusanetToken();
         const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
         const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
-        const response = await fetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
+        const response = await nusaworkFetch(`${baseUrl}/emp/api/client/v4/note/web/${categoryFieldId}/employee`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 employee_id: employeeId,
                 id_group: idGroup,
@@ -899,11 +923,13 @@ const updateReadingLogNoteInNusawork = async ({ employeeId, idGroup, title, date
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
             console.error('[NUSAWORK READING LOG SYNC] Update failed:', employeeId, idGroup, response.status, data);
-        } else {
-            console.log('[NUSAWORK READING LOG SYNC] Updated note:', employeeId, idGroup, title);
+            return { success: false, error: data?.message || `Nusawork returned ${response.status}` };
         }
+        console.log('[NUSAWORK READING LOG SYNC] Updated note:', employeeId, idGroup, title);
+        return { success: true };
     } catch (err) {
         console.error('[NUSAWORK READING LOG SYNC] Update error:', employeeId, idGroup, err.message);
+        return { success: false, error: err.message };
     }
 };
 
@@ -970,18 +996,20 @@ const getReadingLogHours = (category, incentiveAmount) => {
 //                    incentive_amount holds right now - 0 at first, updated later once HR approves
 //                    a claim and a subsequent save re-reconciles.
 //   Finished -> other (Cancelled): delete the note that was created for it
+// Returns { success, error, skipped } so callers that await it (the PUT /api/logs/:id handler) can
+// surface a sync failure to the admin instead of it only ever showing up in the server log.
 const reconcileReadingLogNusawork = async (logId) => {
     try {
         const rows = await query('SELECT * FROM reading_logs WHERE id = ?', [logId]);
         const r = rows[0];
-        if (!r) return;
+        if (!r) return { success: false, error: 'Reading log not found.' };
 
         if (r.status !== 'Finished') {
             if (r.nusawork_id_group) {
                 deleteNusaworkNote({ employeeId: r.employee_id, idGroup: r.nusawork_id_group });
                 await query('UPDATE reading_logs SET nusawork_id_group = NULL WHERE id = ?', [logId]);
             }
-            return;
+            return { success: true, skipped: true };
         }
 
         const hours = getReadingLogHours(r.category, r.incentive_amount);
@@ -990,12 +1018,13 @@ const reconcileReadingLogNusawork = async (logId) => {
         const date = dateSource instanceof Date ? dateSource.toISOString().slice(0, 10) : String(dateSource).slice(0, 10);
 
         if (r.nusawork_id_group) {
-            updateReadingLogNoteInNusawork({ employeeId: r.employee_id, idGroup: r.nusawork_id_group, title: r.title, date, hours, cost });
+            return await updateReadingLogNoteInNusawork({ employeeId: r.employee_id, idGroup: r.nusawork_id_group, title: r.title, date, hours, cost });
         } else {
-            pushReadingLogNoteToNusawork({ employeeId: r.employee_id, logId: r.id, title: r.title, date, hours, cost });
+            return await pushReadingLogNoteToNusawork({ employeeId: r.employee_id, logId: r.id, title: r.title, date, hours, cost });
         }
     } catch (err) {
         console.error('[NUSAWORK READING LOG SYNC] Reconcile error:', logId, err.message);
+        return { success: false, error: err.message };
     }
 };
 
@@ -3164,7 +3193,9 @@ app.put('/api/logs/:id', async (req, res) => {
         console.log(`[API] Updating Reading Log ${id}:`, dbUpdates);
 
         await query(`UPDATE reading_logs SET ${fields} WHERE id = ?`, [...values, id]);
-        reconcileReadingLogNusawork(id);
+        // Awaited (unlike the fire-and-forget elsewhere) so a Nusawork sync failure can be reported
+        // back to the admin who just clicked Save, instead of only ever showing up in the server log.
+        const nusaworkSync = await reconcileReadingLogNusawork(id);
 
         const updatedLogs = await query('SELECT * FROM reading_logs WHERE id = ?', [id]);
         if (!updatedLogs || updatedLogs.length === 0) {
@@ -3185,7 +3216,8 @@ app.put('/api/logs/:id', async (req, res) => {
             rejectionReason: updated.rejection_reason,
             cancelledAt: updated.cancelled_at,
             cancelledBy: updated.cancelled_by,
-            claimedAt: updated.claimed_at
+            claimedAt: updated.claimed_at,
+            nusaworkSync
         });
     } catch (err) {
         console.error(`[API ERROR] Update Reading Log ${req.params.id} Failed:`, err);

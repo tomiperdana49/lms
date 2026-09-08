@@ -809,6 +809,13 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 setEditLogModal({ open: false, log: null, formData: {} });
                 setEditEvidenceFile(null);
                 setEditReturnEvidenceFile(null);
+
+                // The LMS side saved fine either way - this only warns that the mirrored Nusawork
+                // note (e.g. its Hours) is now out of sync, since that failure otherwise only shows
+                // up in the server log where an admin would never see it.
+                if (updated.nusaworkSync && updated.nusaworkSync.success === false) {
+                    alert(t('alerts.nusaworkSyncFailed', { error: updated.nusaworkSync.error || '' }));
+                }
             }
         } catch (err) { console.error(err); }
     };

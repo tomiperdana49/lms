@@ -201,6 +201,7 @@
     "simasSyncFailed": "Gagal menyinkronkan data SIMAS.",
     "simasSyncError": "Terjadi kesalahan saat sinkronisasi data.",
     "failedToExportExcel": "Gagal mengekspor file Excel. Silakan coba lagi.",
-    "failedToUploadPhoto": "Gagal mengunggah foto. Silakan coba lagi."
+    "failedToUploadPhoto": "Gagal mengunggah foto. Silakan coba lagi.",
+    "nusaworkSyncFailed": "Reading log tersimpan di LMS, tapi gagal sinkron ke Nusawork sehingga Hours di sana belum ter-update. {{error}}"
   }
 }
