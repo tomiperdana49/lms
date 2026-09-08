@@ -2333,14 +2333,18 @@ const computeLearningStats = async ({ email, employee_id, startDate, endDate }) 
     }
 
     // 4. Baca Buku (reading_logs)
+    // Learning hours count every book the employee actually finished reading, not just the ones HR
+    // approved an incentive for - the 5-claims-per-year cap (see comment near line 111) means someone
+    // who reads more than 5 books a year, or who never submitted a claim, still did the reading. Only
+    // the incentive total (biayaBuku) stays gated on approval, since that's real money paid.
     if (targetEmpId) {
-        const logs = await query("SELECT title, finish_date, date, incentive_amount, category FROM reading_logs WHERE employee_id = ? AND hr_approval_status = 'Approved'", [targetEmpId]);
-        // Biaya buku
+        const logs = await query("SELECT title, finish_date, date, incentive_amount, category, hr_approval_status FROM reading_logs WHERE employee_id = ? AND status = 'Finished'", [targetEmpId]);
         for (const log of logs) {
             if (!isWithinRange(log.finish_date || log.date)) continue;
 
+            const isApproved = log.hr_approval_status === 'Approved';
             const incentive = Number(log.incentive_amount) || 0;
-            biayaBuku += incentive;
+            if (isApproved) biayaBuku += incentive;
 
             const category = log.category || '';
             let itemHours = 0;
