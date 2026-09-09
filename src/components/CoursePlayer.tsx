@@ -29,6 +29,7 @@ declare global {
         seekTo: (seconds: number, allowSeekAhead: boolean) => void;
         playVideo: () => void;
         getIframe: () => HTMLIFrameElement;
+        setSize: (width: number, height: number) => void;
     }
 
     interface YTPlayerEvent {
@@ -144,6 +145,15 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
     // Player State
     const playerRef = useRef<YTPlayer | null>(null);
+    // Tracks whether the current player instance has fired onReady (methods like
+    // cueVideoById only become callable after that, otherwise they throw).
+    const playerReadyRef = useRef(false);
+    // If a cue request arrives before the player is ready, it's applied once onReady fires.
+    const pendingCueRef = useRef<{ videoId: string; startSeconds: number } | null>(null);
+    // Wraps the video iframe; observed so the YT player's internal canvas can be
+    // explicitly resized on layout/breakpoint changes (it doesn't always repaint
+    // correctly on its own when its container is resized by CSS alone).
+    const videoContainerRef = useRef<HTMLDivElement | null>(null);
 
     const [moduleProgress, setModuleProgress] = useState<Record<number, number>>({});
     const playerInterval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -461,17 +471,26 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
             if (isPlayerValid) {
                 // Use cueVideoById to prevent auto-play on module change
-                try {
-                    playerRef.current?.cueVideoById({
-                        videoId: activeModule.videoId,
-                        startSeconds: savedTime
-                    });
-                } catch (e) { console.error("Player Load Error", e); }
+                if (playerReadyRef.current) {
+                    try {
+                        playerRef.current?.cueVideoById({
+                            videoId: activeModule.videoId,
+                            startSeconds: savedTime
+                        });
+                    } catch (e) { console.error("Player Load Error", e); }
+                } else {
+                    // Player instance exists but hasn't fired onReady yet (cueVideoById
+                    // isn't callable until then) — queue it and apply once ready.
+                    pendingCueRef.current = { videoId: activeModule.videoId, startSeconds: savedTime };
+                }
             } else {
                 // Determine if we should destroy a stale player reference
                 if (playerRef.current) {
                     try { playerRef.current.destroy(); } catch { /* ignore */ }
                 }
+
+                playerReadyRef.current = false;
+                pendingCueRef.current = null;
 
                 try {
                     playerRef.current = new window.YT.Player('youtube-player', {
@@ -490,7 +509,12 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         },
                         events: {
                             onReady: () => {
-                                // No auto-play on ready
+                                playerReadyRef.current = true;
+                                if (pendingCueRef.current) {
+                                    const cue = pendingCueRef.current;
+                                    pendingCueRef.current = null;
+                                    try { playerRef.current?.cueVideoById(cue); } catch (e) { console.error("Player Load Error", e); }
+                                }
                             },
                             onStateChange: (event: { data: number }) => {
                                 if (event.data === window.YT.PlayerState.ENDED) {
@@ -522,6 +546,28 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
         };
     }, [activeModuleId, activeModule, activeCourse, viewMode, quizResults, preQuizResults, activeQuiz, userId, moduleProgress]);
     // Simplified dependencies but included necessary ones for closure correctness
+
+    // Keep the YouTube player's internal canvas in sync with its container's actual
+    // pixel size. Responsive breakpoints (e.g. switching between the stacked mobile
+    // layout and the desktop side-by-side layout) resize the container purely via
+    // CSS; the embedded player doesn't always repaint itself for that and can be
+    // left rendering blank/black until explicitly told its new size.
+    useEffect(() => {
+        const container = videoContainerRef.current;
+        if (!container || viewMode !== 'player') return;
+
+        const resizeObserver = new ResizeObserver(entries => {
+            const entry = entries[0];
+            if (!entry) return;
+            const { width, height } = entry.contentRect;
+            if (width > 0 && height > 0 && playerRef.current?.setSize) {
+                try { playerRef.current.setSize(width, height); } catch { /* ignore */ }
+            }
+        });
+        resizeObserver.observe(container);
+
+        return () => resizeObserver.disconnect();
+    }, [viewMode, activeModuleId]);
 
     // Custom Controls Handlers
 
@@ -1228,7 +1274,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                 <div className="flex-1 overflow-y-auto flex flex-col bg-slate-950 relative">
                     <div className="w-full h-full flex flex-col">
                         <div className="flex-1 flex items-center justify-center p-4 lg:p-10 min-h-[400px]">
-                            <div className="w-full max-w-5xl aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative ring-1 ring-slate-800 group">
+                            <div ref={videoContainerRef} className="w-full max-w-5xl aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative ring-1 ring-slate-800 group">
                                 {activeModule?.videoType === 'youtube' && activeModule.videoId ? (
                                     <div id="youtube-player" className="absolute inset-0" />
                                 ) : (
