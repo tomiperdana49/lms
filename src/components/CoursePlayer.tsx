@@ -69,6 +69,53 @@ declare global {
     }
 }
 
+const renderFormattedDescription = (text: string) => {
+    if (!text) return null;
+    const bulletPattern = /^[-•]\s+/;
+
+    type Group = { type: 'text' | 'list'; lines: string[] };
+    const groups: Group[] = [];
+    let forceNewGroup = false;
+
+    text.split('\n').forEach(rawLine => {
+        const line = rawLine.trim();
+        if (line === '') {
+            forceNewGroup = true;
+            return;
+        }
+
+        const isBullet = bulletPattern.test(line);
+        const groupType: Group['type'] = isBullet ? 'list' : 'text';
+        const content = isBullet ? line.replace(bulletPattern, '') : line;
+
+        const lastGroup = groups[groups.length - 1];
+        if (lastGroup && lastGroup.type === groupType && !(groupType === 'text' && forceNewGroup)) {
+            lastGroup.lines.push(content);
+        } else {
+            groups.push({ type: groupType, lines: [content] });
+        }
+        forceNewGroup = false;
+    });
+
+    return groups.map((group, groupIndex) => {
+        if (group.type === 'list') {
+            return (
+                <ul key={groupIndex} className="list-disc pl-5 space-y-1.5 mb-4 last:mb-0">
+                    {group.lines.map((line, lineIndex) => (
+                        <li key={lineIndex}>{line}</li>
+                    ))}
+                </ul>
+            );
+        }
+
+        return (
+            <p key={groupIndex} className="mb-4 last:mb-0">
+                {group.lines.join(' ')}
+            </p>
+        );
+    });
+};
+
 const CoursePlayer = ({ user }: CoursePlayerProps) => {
     const { t } = useTranslation('coursePlayer');
     // --- State ---
@@ -782,9 +829,9 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                     <div className="p-8 md:p-12 flex flex-col items-center">
                         <div className="w-full max-w-2xl mb-8">
                             <h3 className="text-xl font-bold text-slate-800 mb-4">{t('overview.moduleDescription')}</h3>
-                            <p className="text-slate-600 leading-relaxed text-lg">
-                                {activeCourse.description}
-                            </p>
+                            <div className="text-slate-600 leading-relaxed text-lg text-left">
+                                {renderFormattedDescription(activeCourse.description)}
+                            </div>
                         </div>
                         <PopupNotification
                             isOpen={popup.isOpen}
