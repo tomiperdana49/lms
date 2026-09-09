@@ -1259,22 +1259,23 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
     if (!activeCourse) return null;
 
     return (
-        <div className="flex flex-col h-[calc(100vh-80px)] bg-slate-900">
+        <div className="flex flex-col h-[calc(100dvh-104px)] lg:h-[calc(100dvh-120px)] bg-slate-900">
             {/* Header */}
-            <div className="bg-slate-900 border-b border-slate-800 p-4 flex items-center justify-between z-20 shadow-md">
-                <div className="flex items-center gap-4">
-                    <button onClick={handleBackToList} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors">
-                        <ArrowLeft size={24} />
+            <div className="bg-slate-900 border-b border-slate-800 p-2.5 lg:p-4 flex items-center justify-between z-20 shadow-md shrink-0">
+                <div className="flex items-center gap-3 lg:gap-4 min-w-0">
+                    <button onClick={handleBackToList} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors shrink-0">
+                        <ArrowLeft size={20} className="lg:hidden" />
+                        <ArrowLeft size={24} className="hidden lg:block" />
                     </button>
-                    <h2 className="font-bold text-lg text-white tracking-wide">{activeCourse.title}</h2>
+                    <h2 className="font-bold text-sm lg:text-lg text-white tracking-wide truncate">{activeCourse.title}</h2>
                 </div>
             </div>
 
-            <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
-                <div className="flex-1 overflow-y-auto flex flex-col bg-slate-950 relative">
+            <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
+                <div className="shrink lg:flex-1 min-h-0 overflow-hidden lg:overflow-y-auto flex flex-col bg-slate-950 relative">
                     <div className="w-full h-full flex flex-col">
-                        <div className="flex-1 flex items-center justify-center p-4 lg:p-10 min-h-[400px]">
-                            <div ref={videoContainerRef} className="w-full max-w-5xl aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative ring-1 ring-slate-800 group">
+                        <div className="flex items-center justify-center p-2 lg:p-10 lg:flex-1 lg:min-h-[400px]">
+                            <div ref={videoContainerRef} className="w-full max-w-[280px] mx-auto lg:max-w-5xl lg:mx-0 aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative ring-1 ring-slate-800 group">
                                 {activeModule?.videoType === 'youtube' && activeModule.videoId ? (
                                     <div id="youtube-player" className="absolute inset-0" />
                                 ) : (
@@ -1287,18 +1288,18 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                         </div>
 
                         {/* Video Info Area */}
-                        <div className="bg-slate-900 border-t border-slate-800 p-6 md:p-10 pb-20">
-                            <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-8 justify-between items-start">
+                        <div className="bg-slate-900 border-t border-slate-800 p-2.5 md:p-10 pb-2.5 md:pb-20">
+                            <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-2 md:gap-8 justify-between items-start">
                                 <div>
                                     <div className="flex-1">
-                                        <h1 className="text-2xl font-bold text-white mb-2">{activeModule?.title || t('player.materialTitleFallback')}</h1>
+                                        <h1 className="text-sm md:text-2xl font-bold text-white mb-1 md:mb-2 line-clamp-1 md:line-clamp-none">{activeModule?.title || t('player.materialTitleFallback')}</h1>
                                         <div className="flex items-center gap-4 text-white/60 text-sm">
-                                            <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full backdrop-blur-md">
-                                                <Clock size={14} /> {activeModule?.duration || t('player.durationFallback')}
+                                            <div className="flex items-center gap-1.5 bg-white/10 px-2 py-0.5 md:px-3 md:py-1 rounded-full backdrop-blur-md text-xs md:text-sm">
+                                                <Clock size={12} className="md:hidden" /> <Clock size={14} className="hidden md:block" /> {activeModule?.duration || t('player.durationFallback')}
                                             </div>
                                         </div>
                                     </div>
-                                    <p className="text-slate-400 leading-relaxed max-w-2xl mt-4">
+                                    <p className="hidden md:block text-slate-400 leading-relaxed max-w-2xl mt-4">
                                         {t('player.moduleHint')}
                                     </p>
                                 </div>
@@ -1326,16 +1327,18 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                 {t('player.checkingStatus')}
                                             </button>
                                         ) : (
-                                            <div className="flex flex-col items-end gap-2">
+                                            <div className="flex flex-col items-end gap-1 md:gap-2">
                                                 <button
                                                     disabled={!isVideoCompleted && !activeModule.completed}
                                                     onClick={() => setActiveQuiz({ quiz: activeModule.quiz!, moduleId: activeModule.id, type: 'POST' })}
-                                                    className={`px-8 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2 ${(!isVideoCompleted && !activeModule.completed) ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500 animate-pulse'}`}
+                                                    className={`px-3 py-1.5 text-xs md:px-8 md:py-3 md:text-base rounded-xl font-bold shadow-lg transition-all flex items-center gap-1.5 md:gap-2 ${(!isVideoCompleted && !activeModule.completed) ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500 animate-pulse'}`}
                                                 >
-                                                    {(!isVideoCompleted && !activeModule.completed) && <Lock size={18} />} {(activeModule.quiz.questions && activeModule.quiz.questions.length > 0) ? t('player.takeQuizWithQuestions', { count: activeModule.quiz.questions.length }) : t('player.takeQuiz')}
+                                                    {(!isVideoCompleted && !activeModule.completed) && <Lock size={14} className="md:hidden" />}
+                                                    {(!isVideoCompleted && !activeModule.completed) && <Lock size={18} className="hidden md:block" />}
+                                                    {(activeModule.quiz.questions && activeModule.quiz.questions.length > 0) ? t('player.takeQuizWithQuestions', { count: activeModule.quiz.questions.length }) : t('player.takeQuiz')}
                                                 </button>
                                                 {(!isVideoCompleted && !activeModule.completed) && (
-                                                    <span className="text-amber-600 text-sm font-medium flex items-center gap-1">
+                                                    <span className="hidden md:flex text-amber-600 text-sm font-medium items-center gap-1">
                                                         <AlertCircle size={14} /> {t('player.watchToUnlockQuiz')}
                                                     </span>
                                                 )}
@@ -1407,44 +1410,45 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                 </div>
 
                 {/* Sidebar (Right/Bottom) - Light Theme for Readability */}
-                <div className="w-full lg:w-[400px] bg-white border-l border-slate-200 flex flex-col shrink-0 z-10 shadow-xl">
-                    <div className="p-6 border-b border-slate-100 bg-white sticky top-0 font-sans">
-                        <div className="flex justify-between items-start mb-1">
+                <div className="w-full lg:w-[400px] flex-1 min-h-[46%] lg:min-h-0 lg:flex-none bg-white border-l border-slate-200 flex flex-col lg:shrink-0 z-10 shadow-xl overflow-hidden lg:overflow-visible">
+                    <div className="p-2.5 md:p-6 border-b border-slate-100 bg-white sticky top-0 font-sans shrink-0">
+                        <div className="flex justify-between items-start">
                             <div>
-                                <h3 className="font-bold text-slate-800 text-lg">{t('sidebar.materialList')}</h3>
-                                <p className="text-sm text-slate-400">
+                                <h3 className="font-bold text-slate-800 text-sm md:text-lg">{t('sidebar.materialList')}</h3>
+                                <p className="text-xs md:text-sm text-slate-400">
                                     {t('sidebar.materialsCompleted', { completed: activeCourse.modules.filter(m => m.completed).length, total: activeCourse.modules.length })}
                                 </p>
                             </div>
                             {activeCourse.preAssessment && preAssessmentScore !== null && (
                                 <div className="text-right">
-                                    <div className="text-[10px] font-bold text-amber-600 uppercase tracking-tight">{t('sidebar.preTestScore')}</div>
-                                    <div className="text-lg font-black text-amber-500">{preAssessmentScore}</div>
+                                    <div className="text-[9px] md:text-[10px] font-bold text-amber-600 uppercase tracking-tight">{t('sidebar.preTestScore')}</div>
+                                    <div className="text-sm md:text-lg font-black text-amber-500">{preAssessmentScore}</div>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto">
+                    <div className="shrink-0 min-h-0 lg:flex-1 lg:overflow-y-auto">
                         {/* Course Pre-Test (if any and not taken) */}
                         {activeCourse.preAssessment && preAssessmentScore === null && (
-                            <div className="p-4 pb-0 space-y-3">
+                            <div className="p-2.5 md:p-4 pb-0 space-y-2 md:space-y-3">
                                 <button
                                     onClick={() => setActiveQuiz({ quiz: activeCourse.preAssessment!, moduleId: undefined, type: 'PRE' })}
-                                    className="w-full p-4 rounded-xl flex items-center gap-4 text-left border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 transition-all shadow-sm"
+                                    className="w-full p-2.5 md:p-4 rounded-xl flex items-center gap-2.5 md:gap-4 text-left border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 transition-all shadow-sm"
                                 >
-                                    <div className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center bg-amber-600 text-white shadow-lg shadow-amber-200">
-                                        <BookOpen size={20} />
+                                    <div className="w-7 h-7 md:w-10 md:h-10 shrink-0 rounded-full flex items-center justify-center bg-amber-600 text-white shadow-lg shadow-amber-200">
+                                        <BookOpen size={16} className="md:hidden" />
+                                        <BookOpen size={20} className="hidden md:block" />
                                     </div>
                                     <div className="flex-1">
-                                        <p className="font-bold text-amber-900 leading-tight">{t('sidebar.modulePreTest')}</p>
-                                        <p className="text-[10px] text-amber-700 font-medium uppercase tracking-wider mt-1">{t('sidebar.mandatory')}</p>
+                                        <p className="font-bold text-amber-900 leading-tight text-xs md:text-base">{t('sidebar.modulePreTest')}</p>
+                                        <p className="text-[9px] md:text-[10px] text-amber-700 font-medium uppercase tracking-wider mt-0.5 md:mt-1">{t('sidebar.mandatory')}</p>
                                     </div>
                                     <ChevronRight size={18} className="text-amber-400" />
                                 </button>
                             </div>
                         )}
-                        <div className="p-4 space-y-2">
+                        <div className="p-2.5 md:p-4 space-y-1.5 md:space-y-2">
                             {(activeCourse.modules || []).map((mod, idx) => {
                                 const isActive = mod.id === activeModuleId;
                                 const isLocked = mod.locked;
@@ -1455,14 +1459,14 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         key={mod.id}
                                         onClick={() => !isLocked && setActiveModuleId(mod.id)}
                                         disabled={isLocked}
-                                        className={`w-full p-4 rounded-xl flex items-start gap-4 text-left transition-all duration-200 group
+                                        className={`w-full p-2 md:p-4 rounded-xl flex items-start gap-2.5 md:gap-4 text-left transition-all duration-200 group
                                             ${isActive
                                                 ? 'bg-blue-50 ring-1 ring-blue-100 shadow-sm'
                                                 : 'hover:bg-slate-50 border border-transparent'}
                                             ${isLocked ? 'opacity-50 grayscale cursor-not-allowed' : ''}
                                         `}
                                     >
-                                        <div className={`mt-0.5 shrink-0 w-6 h-6 rounded-full flex items-center justify-center border transition-colors
+                                        <div className={`mt-0.5 shrink-0 w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center border transition-colors
                                             ${isCompleted
                                                 ? 'bg-green-500 border-green-500 text-white'
                                                 : isActive
@@ -1470,23 +1474,23 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                                     : 'border-slate-300 text-slate-400'}
                                         `}>
                                             {isCompleted ? (
-                                                <CheckCircle size={14} />
+                                                <CheckCircle size={13} />
                                             ) : isLocked ? (
-                                                <Lock size={12} />
+                                                <Lock size={11} />
                                             ) : isActive ? (
-                                                <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                                                <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-white rounded-full animate-pulse" />
                                             ) : (
-                                                <span className="text-xs font-medium">{idx + 1}</span>
+                                                <span className="text-[10px] md:text-xs font-medium">{idx + 1}</span>
                                             )}
                                         </div>
 
                                         <div className="flex-1 min-w-0">
-                                            <p className={`text-sm font-semibold line-clamp-2 ${isActive ? 'text-blue-900' : 'text-slate-700'}`}>
+                                            <p className={`text-xs md:text-sm font-semibold line-clamp-1 md:line-clamp-2 ${isActive ? 'text-blue-900' : 'text-slate-700'}`}>
                                                 {mod.title}
                                             </p>
-                                            <div className="flex items-center gap-3 mt-1.5">
-                                                <span className="text-xs text-slate-400 flex items-center gap-1">
-                                                    <Clock size={12} /> {mod.duration}
+                                            <div className="flex items-center gap-3 mt-1 md:mt-1.5">
+                                                <span className="text-[10px] md:text-xs text-slate-400 flex items-center gap-1">
+                                                    <Clock size={11} /> {mod.duration}
                                                 </span>
                                                 {mod.quiz && (
                                                     <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider
@@ -1506,7 +1510,7 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
 
                     {/* Assessment & Finish Button */}
                     {activeCourse.assessment && (
-                        <div className="p-4 pt-0 space-y-3">
+                        <div className="p-2.5 pt-0 md:p-4 md:pt-0 space-y-3 shrink-0">
                             {/* State 1: Ready to take Assessment */}
                             {(!assessmentScore || assessmentScore < 80) ? (
                                 <button
@@ -1520,18 +1524,19 @@ const CoursePlayer = ({ user }: CoursePlayerProps) => {
                                         }
                                     }}
                                     disabled={activeCourse.progress < 90}
-                                    className={`w-full p-4 rounded-xl flex items-center gap-4 text-left transition-all border-2 border-dashed
+                                    className={`w-full p-2.5 md:p-4 rounded-xl flex items-center gap-2.5 md:gap-4 text-left transition-all border-2 border-dashed
                                             ${activeCourse.progress >= 90
                                             ? 'border-indigo-400 bg-indigo-50 hover:bg-indigo-100 cursor-pointer shadow-sm animate-pulse'
                                             : 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-60'}
                                         `}
                                 >
-                                    <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center ${activeCourse.progress >= 90 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
-                                        <Award size={20} />
+                                    <div className={`w-7 h-7 md:w-10 md:h-10 shrink-0 rounded-full flex items-center justify-center ${activeCourse.progress >= 90 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                                        <Award size={16} className="md:hidden" />
+                                        <Award size={20} className="hidden md:block" />
                                     </div>
                                     <div>
-                                        <p className={`font-bold ${activeCourse.progress >= 90 ? 'text-indigo-900' : 'text-slate-500'}`}>{t('sidebar.finalAssessmentTitle')}</p>
-                                        <p className="text-[10px] text-slate-500 font-medium">
+                                        <p className={`font-bold text-xs md:text-base ${activeCourse.progress >= 90 ? 'text-indigo-900' : 'text-slate-500'}`}>{t('sidebar.finalAssessmentTitle')}</p>
+                                        <p className="text-[9px] md:text-[10px] text-slate-500 font-medium">
                                             {activeCourse.progress >= 90
                                                 ? (assessmentScore !== null && assessmentScore < 80
                                                     ? t('sidebar.finalAssessmentRetry', { score: assessmentScore })
