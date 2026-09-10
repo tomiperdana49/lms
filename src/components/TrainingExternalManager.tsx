@@ -1125,9 +1125,15 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                             <StatusBadge status={req.status} />
                                         </div>
 
-                                        <p className="text-sm font-bold text-slate-500">
-                                            {req.employeeName} <span className="mx-2 text-slate-300">—</span> {t(`categoryLabels.${req.employeeRole}`, { defaultValue: req.employeeRole })}
-                                        </p>
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <p className="text-sm font-bold text-slate-500">
+                                                {req.employeeName} <span className="mx-2 text-slate-300">—</span> {t(`categoryLabels.${req.employeeRole}`, { defaultValue: req.employeeRole })}
+                                            </p>
+                                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 rounded-lg text-[10px] font-black text-slate-400 border border-slate-100 w-fit">
+                                                <Calendar size={14} className="text-slate-300" />
+                                                {new Date(req.date).toLocaleDateString('en-GB')}
+                                            </div>
+                                        </div>
 
                                         <button
                                             type="button"
@@ -1141,10 +1147,6 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                         {isExpanded && (
                                         <>
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 rounded-lg text-[10px] font-black text-slate-400 border border-slate-100">
-                                                <Calendar size={14} className="text-slate-300" />
-                                                {new Date(req.date).toLocaleDateString('en-GB')}
-                                            </div>
                                             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 rounded-lg text-[10px] font-black text-slate-400 border border-slate-100">
                                                 <Wallet size={14} className="text-slate-300" />
                                                 {formatCurrency(req.cost || 0)}
