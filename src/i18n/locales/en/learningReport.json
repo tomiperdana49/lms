@@ -9,6 +9,12 @@
   "totalCost": "Total Learning Cost",
   "remainingBudget": "Remaining budget",
   "budgetExceeded": "Over budget",
+  "nusawork": {
+    "syncButton": "Sync Nusawork",
+    "retrySync": "Retry",
+    "synced": "Synced",
+    "syncFailed": "Failed to sync to Nusawork"
+  },
   "filter": {
     "label": "Period",
     "to": "to",

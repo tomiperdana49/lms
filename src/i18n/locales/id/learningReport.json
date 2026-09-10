@@ -9,6 +9,12 @@
   "totalCost": "Total Biaya Belajar",
   "remainingBudget": "Sisa budget",
   "budgetExceeded": "Melebihi budget",
+  "nusawork": {
+    "syncButton": "Sync Nusawork",
+    "retrySync": "Coba Lagi",
+    "synced": "Tersinkron",
+    "syncFailed": "Gagal sync ke Nusawork"
+  },
   "filter": {
     "label": "Periode",
     "to": "s/d",

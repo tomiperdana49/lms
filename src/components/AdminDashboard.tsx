@@ -143,7 +143,7 @@ const AdminDashboard = ({ user, initialView }: AdminDashboardProps) => {
             case 'reports':
                 return <HRReportGenerator />;
             case 'employee-learning-report':
-                return <EmployeeLearningReport />;
+                return <EmployeeLearningReport userRole={user.role} />;
             case 'idp':
                 return <IDPManager userRole={user.role} userName={user.name} />;
             case 'calendar':

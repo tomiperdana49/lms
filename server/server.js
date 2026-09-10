@@ -738,8 +738,11 @@ const syncInternalTrainingNotes = async ({ meetingId, title, date, previous, cur
 // Pushes/updates the Nusawork note for one External Training request - unlike Internal Training,
 // this is always exactly one employee per row, so the id_group lives directly on the row instead of
 // a separate tracking table.
+// Returns { success, error } (like the reading log Nusawork helpers) instead of the fire-and-forget
+// void the other push helpers use, so a manual "Sync Nusawork" click can report a real pass/fail
+// back to the admin instead of only ever showing up in the server log.
 const pushExternalTrainingNoteToNusawork = async ({ employeeId, requestId, title, date, hours, cost }) => {
-    if (!employeeId) return;
+    if (!employeeId) return { success: false, error: 'No employee_id resolved for this request.' };
     try {
         const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
         const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
@@ -763,7 +766,7 @@ const pushExternalTrainingNoteToNusawork = async ({ employeeId, requestId, title
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
             console.error('[NUSAWORK EXTERNAL TRAINING SYNC] Failed:', employeeId, title, response.status, data);
-            return;
+            return { success: false, error: data?.message || `Nusawork API returned ${response.status}` };
         }
         console.log('[NUSAWORK EXTERNAL TRAINING SYNC] Pushed note:', employeeId, title);
         const idGroup = data?.data?.id_group;
@@ -774,13 +777,15 @@ const pushExternalTrainingNoteToNusawork = async ({ employeeId, requestId, title
                 console.error('[NUSAWORK EXTERNAL TRAINING SYNC] Failed to save id_group:', dbErr.message);
             }
         }
+        return { success: true };
     } catch (err) {
         console.error('[NUSAWORK EXTERNAL TRAINING SYNC] Error:', employeeId, title, err.message);
+        return { success: false, error: err.message };
     }
 };
 
 const updateExternalTrainingNoteInNusawork = async ({ employeeId, idGroup, title, date, hours, cost }) => {
-    if (!employeeId || !idGroup) return;
+    if (!employeeId || !idGroup) return { success: false, error: 'No employee_id or Nusawork id_group to update.' };
     try {
         const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
         const categoryFieldId = process.env.NUSAWORK_NOTE_CATEGORY_ID || '201';
@@ -805,24 +810,28 @@ const updateExternalTrainingNoteInNusawork = async ({ employeeId, idGroup, title
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
             console.error('[NUSAWORK EXTERNAL TRAINING SYNC] Update failed:', employeeId, idGroup, response.status, data);
-        } else {
-            console.log('[NUSAWORK EXTERNAL TRAINING SYNC] Updated note:', employeeId, idGroup, title);
+            return { success: false, error: data?.message || `Nusawork API returned ${response.status}` };
         }
+        console.log('[NUSAWORK EXTERNAL TRAINING SYNC] Updated note:', employeeId, idGroup, title);
+        return { success: true };
     } catch (err) {
         console.error('[NUSAWORK EXTERNAL TRAINING SYNC] Update error:', employeeId, idGroup, err.message);
+        return { success: false, error: err.message };
     }
 };
 
 // Re-reads one external_training_requests row and, if it's Processed (HR's paid/finalized state),
 // pushes a new Nusawork note or updates the existing one - covers hr-process (first processing),
-// hr-update-details (title/date/hours corrections), and the settlement PUT (cost corrections), since
-// all three can touch a row that's already Processed. Mirrors computeLearningStats' own hours/cost
-// formula so the note matches what the Learning Report shows.
+// hr-update-details (title/date/hours corrections), the settlement PUT (cost corrections), and the
+// manual "Sync Nusawork" button (POST /api/external-training/:id/sync-nusawork) for rows that were
+// never synced automatically (e.g. bulk-imported historical data). Mirrors computeLearningStats' own
+// hours/cost formula so the note matches what the Learning Report shows. Returns { success, error }.
 const reconcileExternalTrainingNusawork = async (requestId) => {
     try {
         const rows = await query('SELECT * FROM external_training_requests WHERE id = ?', [requestId]);
         const r = rows[0];
-        if (!r || r.status !== 'Processed') return;
+        if (!r) return { success: false, error: 'External training request not found.' };
+        if (r.status !== 'Processed') return { success: false, error: 'Only Processed (HR-approved) requests can be synced to Nusawork.' };
 
         let hours = 0;
         if (r.learning_hours != null) {
@@ -841,12 +850,12 @@ const reconcileExternalTrainingNusawork = async (requestId) => {
         const date = r.start_date instanceof Date ? r.start_date.toISOString().slice(0, 10) : String(r.start_date).slice(0, 10);
 
         if (r.nusawork_id_group) {
-            updateExternalTrainingNoteInNusawork({ employeeId: r.employee_id, idGroup: r.nusawork_id_group, title: r.title, date, hours, cost });
-        } else {
-            pushExternalTrainingNoteToNusawork({ employeeId: r.employee_id, requestId: r.id, title: r.title, date, hours, cost });
+            return await updateExternalTrainingNoteInNusawork({ employeeId: r.employee_id, idGroup: r.nusawork_id_group, title: r.title, date, hours, cost });
         }
+        return await pushExternalTrainingNoteToNusawork({ employeeId: r.employee_id, requestId: r.id, title: r.title, date, hours, cost });
     } catch (err) {
         console.error('[NUSAWORK EXTERNAL TRAINING SYNC] Reconcile error:', requestId, err.message);
+        return { success: false, error: err.message };
     }
 };
 
@@ -2255,7 +2264,7 @@ const computeLearningStats = async ({ email, employee_id, startDate, endDate }) 
     // 2. External Training (external_training_requests)
     if (targetEmpId) {
         const externalTrainings = await query(
-            "SELECT title, vendor, certificate_link, start_date, end_date, registration_fee, travel_flight_cost, accommodation_cost, miscellaneous_cost, learning_hours FROM external_training_requests WHERE employee_id = ? AND status = 'Processed' AND deleted_at IS NULL",
+            "SELECT id, title, vendor, certificate_link, start_date, end_date, registration_fee, travel_flight_cost, accommodation_cost, miscellaneous_cost, learning_hours, nusawork_id_group FROM external_training_requests WHERE employee_id = ? AND status = 'Processed' AND deleted_at IS NULL",
             [targetEmpId]
         );
         for (const ext of externalTrainings) {
@@ -2275,12 +2284,14 @@ const computeLearningStats = async ({ email, employee_id, startDate, endDate }) 
             biayaTrainingExternal += itemCost;
 
             trainingExternalDetails.push({
+                id: ext.id,
                 title: ext.title,
                 date: ext.start_date,
                 hours: Math.round(itemHours * 100) / 100,
                 cost: Math.round(itemCost),
                 organizer: ext.vendor || null,
-                certificateLink: ext.certificate_link || null
+                certificateLink: ext.certificate_link || null,
+                nusaworkSynced: !!ext.nusawork_id_group
             });
         }
     }
@@ -5034,6 +5045,19 @@ app.post('/api/external-training/hr-update-details', async (req, res) => {
         reconcileExternalTrainingNusawork(id);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Manual retry for a Processed request that never made it to Nusawork - covers bulk-imported/historical
+// rows (which skip the automatic push entirely) and any row where the automatic push failed silently.
+// Awaited (unlike the fire-and-forget calls above) so the button that triggers this can show a real
+// pass/fail result instead of the admin only finding out later that the note never showed up.
+app.post('/api/external-training/:id/sync-nusawork', async (req, res) => {
+    const { id } = req.params;
+    const result = await reconcileExternalTrainingNusawork(id);
+    if (!result?.success) {
+        return res.status(400).json({ error: result?.error || 'Failed to sync to Nusawork.' });
+    }
+    res.json({ success: true });
 });
 
 // HR renews an already-processed certificate's expiry date (and optionally a fresh incentive amount),

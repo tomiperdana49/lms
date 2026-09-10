@@ -22,6 +22,10 @@ interface LearningStatDetail {
     certificateLink?: string | null;
     // Set only when a report combines multiple employees, to distinguish whose record this is
     employeeName?: string;
+    // External Training only - the underlying external_training_requests row id and whether it's
+    // already pushed to Nusawork (used to offer a manual "Sync Nusawork" retry when it isn't).
+    id?: number;
+    nusaworkSynced?: boolean;
 }
 
 export interface LearningStats {
@@ -401,7 +405,55 @@ const LearningReport = ({ userEmail, userName, userEmployeeId, isSupervisor }: L
 interface LearningStatsBreakdownProps {
     stats: LearningStats;
     t: (key: string) => string;
+    // Only HR can retry a Nusawork push, and only the admin-facing Employee Learning Report passes
+    // this - the employee's own "Learning Report" view never sets it, so the button never shows there.
+    canSyncNusawork?: boolean;
 }
+
+type SyncState = 'idle' | 'loading' | 'error';
+
+// Manual retry for an External Training row that never made it to Nusawork (bulk-imported historical
+// data skips the automatic push entirely, and an automatic push can also fail silently). Tracks its
+// own state since the item list comes from props and isn't refetched after a successful sync.
+const SyncNusaworkButton = ({ requestId, t }: { requestId: number; t: (key: string) => string }) => {
+    const [state, setState] = useState<SyncState>('idle');
+    const [synced, setSynced] = useState(false);
+    const [errorMsg, setErrorMsg] = useState('');
+
+    if (synced) {
+        return <span className="text-[11px] font-bold text-emerald-600">{t('nusawork.synced')}</span>;
+    }
+
+    const handleClick = async () => {
+        setState('loading');
+        setErrorMsg('');
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/external-training/${requestId}/sync-nusawork`, { method: 'POST' });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || t('nusawork.syncFailed'));
+            setSynced(true);
+        } catch (err) {
+            setState('error');
+            setErrorMsg(err instanceof Error ? err.message : t('nusawork.syncFailed'));
+        }
+    };
+
+    return (
+        <div className="flex flex-col items-end gap-0.5">
+            <button
+                type="button"
+                onClick={handleClick}
+                disabled={state === 'loading'}
+                title={state === 'error' ? errorMsg : undefined}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 text-[11px] font-bold hover:bg-amber-100 transition-colors disabled:opacity-60"
+            >
+                {state === 'loading' && <Loader2 size={12} className="animate-spin" />}
+                {state === 'error' ? t('nusawork.retrySync') : t('nusawork.syncButton')}
+            </button>
+            {state === 'error' && <span className="text-[10px] text-rose-500 max-w-[160px] text-right">{errorMsg}</span>}
+        </div>
+    );
+};
 
 interface LearningStatsSummaryCardsProps {
     stats: LearningStats;
@@ -471,7 +523,7 @@ export const LearningStatsSummaryCards = ({ stats, t, employeeCount = 1 }: Learn
     );
 };
 
-export const LearningStatsBreakdown = ({ stats, t }: LearningStatsBreakdownProps) => {
+export const LearningStatsBreakdown = ({ stats, t, canSyncNusawork }: LearningStatsBreakdownProps) => {
     const sections = buildSections(stats, t);
 
     return (
@@ -518,9 +570,14 @@ export const LearningStatsBreakdown = ({ stats, t }: LearningStatsBreakdownProps
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="text-right shrink-0">
-                                            <p className="font-bold text-slate-700 text-sm">{item.hours} {t('hours')}</p>
-                                            {item.cost > 0 && <p className="text-[11px] text-slate-400">Rp {item.cost.toLocaleString('id-ID')}</p>}
+                                        <div className="flex items-center gap-3 shrink-0">
+                                            <div className="text-right">
+                                                <p className="font-bold text-slate-700 text-sm">{item.hours} {t('hours')}</p>
+                                                {item.cost > 0 && <p className="text-[11px] text-slate-400">Rp {item.cost.toLocaleString('id-ID')}</p>}
+                                            </div>
+                                            {section.key === 'trainingExternal' && canSyncNusawork && item.id && !item.nusaworkSynced && (
+                                                <SyncNusaworkButton requestId={item.id} t={t} />
+                                            )}
                                         </div>
                                     </div>
                                 ))}

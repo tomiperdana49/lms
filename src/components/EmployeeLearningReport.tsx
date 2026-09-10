@@ -23,7 +23,8 @@ interface EmployeeOption {
     photo_profile?: string;
 }
 
-const EmployeeLearningReport = () => {
+const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
+    const canSyncNusawork = userRole === 'HR' || userRole === 'HR_ADMIN';
     const { t } = useTranslation('learningReport');
     const [employees, setEmployees] = useState<EmployeeOption[]>([]);
     const [employeesLoading, setEmployeesLoading] = useState(true);
@@ -434,7 +435,7 @@ const EmployeeLearningReport = () => {
                     <p>{t('loading')}</p>
                 </div>
             ) : selectedEmployees.length === 1 ? (
-                <LearningStatsBreakdown stats={stats} t={t} />
+                <LearningStatsBreakdown stats={stats} t={t} canSyncNusawork={canSyncNusawork} />
             ) : (
                 <>
                     <LearningStatsSummaryCards stats={stats} t={t} employeeCount={selectedEmployees.length} />
@@ -448,6 +449,7 @@ const EmployeeLearningReport = () => {
                         members={perEmployeeStats}
                         expandedIds={expandedEmployeeIds}
                         onToggle={toggleEmployeeExpanded}
+                        canSyncNusawork={canSyncNusawork}
                         t={t}
                     />
                 </>
@@ -460,10 +462,11 @@ interface EmployeeRosterProps {
     members: TeamMemberSummary[];
     expandedIds: Set<string>;
     onToggle: (employeeId: string) => void;
+    canSyncNusawork?: boolean;
     t: (key: string, options?: Record<string, unknown>) => string;
 }
 
-const EmployeeRoster = ({ members, expandedIds, onToggle, t }: EmployeeRosterProps) => (
+const EmployeeRoster = ({ members, expandedIds, onToggle, canSyncNusawork, t }: EmployeeRosterProps) => (
     <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
         <div className="divide-y divide-slate-50">
             {members.map(member => {
@@ -488,7 +491,7 @@ const EmployeeRoster = ({ members, expandedIds, onToggle, t }: EmployeeRosterPro
                         </button>
                         {isExpanded && (
                             <div className="bg-slate-50 px-6 py-6 border-t border-slate-100 space-y-6">
-                                <LearningStatsBreakdown stats={member.stats} t={t} />
+                                <LearningStatsBreakdown stats={member.stats} t={t} canSyncNusawork={canSyncNusawork} />
                             </div>
                         )}
                     </div>
