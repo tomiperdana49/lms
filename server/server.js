@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import pool, { initDB, simAssetPool } from './db.js';
@@ -2508,6 +2509,114 @@ app.post('/api/learning-stats/bulk', async (req, res) => {
     } catch (err) {
         console.error('[API] Error in /api/learning-stats/bulk:', err);
         res.status(500).json({ error: err.message });
+    }
+});
+
+// --- EXTERNAL API (OAuth2 client_credentials) ---
+// Lets other Nusa systems fetch an employee's Total Learning Hours without a human LMS login.
+// Auth is a standard OAuth2 client_credentials flow: the client exchanges its CLIENT_ID/CLIENT_SECRET
+// for a short-lived Bearer token at /api/oauth/token, then calls the data endpoint with that token.
+// Tokens are stateless (HMAC-signed, no DB/session table) so verification needs no extra storage.
+const EXTERNAL_API_TOKEN_TTL = parseInt(process.env.EXTERNAL_API_TOKEN_TTL || '3600', 10);
+
+const base64url = (buf) => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+const signExternalApiToken = (clientId) => {
+    const payload = { cid: clientId, exp: Date.now() + EXTERNAL_API_TOKEN_TTL * 1000 };
+    const payloadB64 = base64url(Buffer.from(JSON.stringify(payload)));
+    const signature = base64url(crypto.createHmac('sha256', process.env.EXTERNAL_API_CLIENT_SECRET)
+        .update(payloadB64).digest());
+    return `${payloadB64}.${signature}`;
+};
+
+const verifyExternalApiToken = (token) => {
+    if (!token || typeof token !== 'string' || !token.includes('.')) return null;
+    const [payloadB64, signature] = token.split('.');
+    const expectedSignature = base64url(crypto.createHmac('sha256', process.env.EXTERNAL_API_CLIENT_SECRET)
+        .update(payloadB64).digest());
+    const sigBuf = Buffer.from(signature);
+    const expectedBuf = Buffer.from(expectedSignature);
+    if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) return null;
+    try {
+        const payload = JSON.parse(Buffer.from(payloadB64, 'base64').toString('utf8'));
+        if (!payload.exp || payload.exp < Date.now()) return null;
+        return payload;
+    } catch (e) {
+        return null;
+    }
+};
+
+const authenticateExternalApi = (req, res, next) => {
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const payload = verifyExternalApiToken(token);
+    if (!payload) {
+        return res.status(401).json({ error: 'invalid_token', error_description: 'Missing, invalid, or expired access token' });
+    }
+    next();
+};
+
+// Exchange CLIENT_ID/CLIENT_SECRET for a Bearer access token (grant_type=client_credentials).
+// Accepts JSON or form-urlencoded body, per the OAuth2 spec convention.
+app.post('/api/oauth/token', (req, res) => {
+    const { client_id, client_secret, grant_type } = req.body || {};
+
+    if (grant_type !== 'client_credentials') {
+        return res.status(400).json({ error: 'unsupported_grant_type' });
+    }
+    if (!process.env.EXTERNAL_API_CLIENT_ID || !process.env.EXTERNAL_API_CLIENT_SECRET) {
+        return res.status(500).json({ error: 'server_error', error_description: 'External API credentials are not configured' });
+    }
+    if (!client_id || !client_secret) {
+        return res.status(400).json({ error: 'invalid_request', error_description: 'client_id and client_secret are required' });
+    }
+
+    const idMatches = client_id.length === process.env.EXTERNAL_API_CLIENT_ID.length &&
+        crypto.timingSafeEqual(Buffer.from(client_id), Buffer.from(process.env.EXTERNAL_API_CLIENT_ID));
+    const secretMatches = client_secret.length === process.env.EXTERNAL_API_CLIENT_SECRET.length &&
+        crypto.timingSafeEqual(Buffer.from(client_secret), Buffer.from(process.env.EXTERNAL_API_CLIENT_SECRET));
+    if (!idMatches || !secretMatches) {
+        return res.status(401).json({ error: 'invalid_client' });
+    }
+
+    res.json({
+        access_token: signExternalApiToken(client_id),
+        token_type: 'Bearer',
+        expires_in: EXTERNAL_API_TOKEN_TTL
+    });
+});
+
+// Total Learning Hours for one employee, for external systems (e.g. HRIS) authenticated via the
+// client_credentials token above. Reuses the same computeLearningStats aggregation as the internal
+// report, but the response is deliberately trimmed to hours only - no course/training titles, dates,
+// or cost figures, since this endpoint is reachable by systems outside the LMS.
+app.get('/api/external/v1/employees/:employeeId/learning-hours', authenticateExternalApi, async (req, res) => {
+    try {
+        const { employeeId } = req.params;
+        const { startDate, endDate } = req.query;
+
+        const users = await query('SELECT employee_id, name FROM users WHERE employee_id = ?', [employeeId]);
+        if (users.length === 0) {
+            return res.status(404).json({ error: 'not_found', error_description: `No employee found with employee_id ${employeeId}` });
+        }
+
+        const stats = await computeLearningStats({ employee_id: employeeId, startDate, endDate });
+
+        res.json({
+            employee_id: employeeId,
+            name: users[0].name,
+            period: { start_date: startDate || null, end_date: endDate || null },
+            total_learning_hours: Math.round(stats.totalJam * 100) / 100,
+            breakdown: {
+                internal_training_hours: Math.round(stats.jamTraining * 100) / 100,
+                external_training_hours: Math.round(stats.jamTrainingExternal * 100) / 100,
+                online_module_hours: Math.round(stats.jamOnline * 100) / 100,
+                reading_hours: Math.round(stats.jamBuku * 100) / 100
+            }
+        });
+    } catch (err) {
+        console.error('[API] Error in /api/external/v1/employees/:employeeId/learning-hours:', err);
+        res.status(500).json({ error: 'server_error', error_description: err.message });
     }
 });
 
