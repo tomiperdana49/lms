@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from './config';
 import DashboardLayout from './components/DashboardLayout';
 import DashboardHome from './components/DashboardHome';
@@ -29,6 +29,55 @@ const ACTIVITY_WRITE_THROTTLE_MS = 5 * 1000;
 const LOGIN_AT_KEY = 'lms_login_at';
 const LAST_ACTIVITY_KEY = 'lms_last_activity';
 
+// Mirrors the Page union in types.ts - kept as a runtime list so a URL path (typed by hand, or
+// visited via back/forward) can be validated before being cast to Page.
+const VALID_PAGES: Page[] = ['dashboard', 'reading-log', 'courses', 'internal', 'external', 'external-approval', 'pte-team', 'calendar', 'users', 'admin-logs', 'admin-dashboard', 'incentives', 'learning-report', 'help', 'idp'];
+const isValidPage = (value: string): value is Page => (VALID_PAGES as string[]).includes(value);
+
+// These four live under the sidebar's "Training" group, so their URL nests the same way
+// (/training/internal) instead of sitting flat at the root like every other page.
+const TRAINING_SUB_PAGES: Page[] = ['internal', 'external', 'external-approval', 'pte-team'];
+
+// Mirrors adminSubItems' `view` values in DashboardLayout.tsx - the Admin Panel's own sidebar
+// group, nested under /admin/<view> (e.g. /admin/calendar) the same way Training nests.
+const ADMIN_VIEWS = ['overview', 'calendar', 'users', 'courses', 'meetings', 'training', 'post-training-evaluation', 'logs', 'quiz-reports', 'reports', 'employee-learning-report', 'idp'];
+const isValidAdminView = (value: string): boolean => ADMIN_VIEWS.includes(value);
+
+// A couple of internal view ids don't read as their sidebar label (e.g. 'logs' is the "Reading
+// Log" section) - give those a URL slug that matches what the menu actually says instead of the
+// internal id. Every other view's slug is just its id.
+const ADMIN_VIEW_TO_SLUG: Record<string, string> = { logs: 'reading-log', users: 'user-management' };
+const ADMIN_SLUG_TO_VIEW: Record<string, string> = Object.fromEntries(
+    Object.entries(ADMIN_VIEW_TO_SLUG).map(([view, slug]) => [slug, view])
+);
+const adminViewToSlug = (view: string): string => ADMIN_VIEW_TO_SLUG[view] || view;
+const adminSlugToView = (slug: string): string | null => {
+    if (ADMIN_SLUG_TO_VIEW[slug]) return ADMIN_SLUG_TO_VIEW[slug];
+    return ADMIN_VIEWS.includes(slug) ? slug : null;
+};
+
+// adminView doubles as a generic "last view" hint for non-admin deep links (e.g. External
+// Training's team-approvals tab), so it isn't always a real admin view - fall back to overview
+// rather than putting that unrelated value into the admin URL.
+const pageToPath = (page: Page, adminView: string): string => {
+    if (page === 'admin-dashboard') return `/admin/${adminViewToSlug(isValidAdminView(adminView) ? adminView : 'overview')}`;
+    if (TRAINING_SUB_PAGES.includes(page)) return `/training/${page}`;
+    return `/${page}`;
+};
+
+const pathToRoute = (pathname: string): { page: Page; adminView?: string } | null => {
+    const trimmed = pathname.replace(/^\/+/, '');
+    if (trimmed.startsWith('admin/')) {
+        const view = adminSlugToView(trimmed.slice('admin/'.length));
+        return view ? { page: 'admin-dashboard', adminView: view } : null;
+    }
+    if (trimmed.startsWith('training/')) {
+        const sub = trimmed.slice('training/'.length);
+        return TRAINING_SUB_PAGES.includes(sub as Page) ? { page: sub as Page } : null;
+    }
+    return isValidPage(trimmed) ? { page: trimmed } : null;
+};
+
 function App() {
   // Public certificate verification page - accessible without login, no hooks used above this check.
   if (window.location.pathname.startsWith('/verify/')) {
@@ -48,6 +97,11 @@ function App() {
   const [deepLinkTab, setDeepLinkTab] = useState<string | null>(() => new URLSearchParams(window.location.search).get('tab'));
 
   const [activePage, setActivePage] = useState<Page>(() => {
+    // A path like /dashboard, /training/internal or /admin/calendar (typed directly, bookmarked,
+    // or restored via refresh) wins over the legacy ?page= deep link and the last page remembered
+    // in localStorage.
+    const route = pathToRoute(window.location.pathname);
+    if (route) return route.page;
     const linkedPage = new URLSearchParams(window.location.search).get('page');
     if (linkedPage) return linkedPage as Page;
     const savedPage = localStorage.getItem('lms_active_page');
@@ -62,6 +116,8 @@ function App() {
   }, []);
 
   const [adminView, setAdminView] = useState<string>(() => {
+    const route = pathToRoute(window.location.pathname);
+    if (route?.adminView) return route.adminView;
     return localStorage.getItem('lms_admin_view') || 'overview';
   });
 
@@ -160,11 +216,50 @@ function App() {
     return () => clearInterval(intervalId);
   }, [user]);
 
+  // Keeps the address bar in sync with the active page (e.g. clicking "Dashboard" in the sidebar
+  // shows /dashboard, "Internal" under Training shows /training/internal, an Admin Panel section
+  // shows /admin/<view>) - replaceState on the very first sync (page load) so it doesn't add a
+  // spare history entry before the user has navigated anywhere, pushState afterwards so
+  // back/forward work. Depends on adminView too, since navigating within the Admin Panel changes
+  // the URL without necessarily changing activePage.
+  const hasSyncedUrlOnce = useRef(false);
   useEffect(() => {
-    if (activePage) {
-      localStorage.setItem('lms_active_page', activePage);
+    if (!activePage) return;
+    localStorage.setItem('lms_active_page', activePage);
+
+    const targetPath = pageToPath(activePage, adminView);
+    if (window.location.pathname !== targetPath) {
+      if (hasSyncedUrlOnce.current) {
+        window.history.pushState({ page: activePage, adminView }, '', targetPath);
+      } else {
+        window.history.replaceState({ page: activePage, adminView }, '', targetPath);
+      }
     }
-  }, [activePage]);
+    hasSyncedUrlOnce.current = true;
+  }, [activePage, adminView]);
+
+  // Browser back/forward - read the page back out of the URL instead of the history state object,
+  // since state is empty for entries that existed before this SPA-routing sync was added.
+  useEffect(() => {
+    const handlePopState = () => {
+      const route = pathToRoute(window.location.pathname);
+      if (!route) return;
+      setActivePage(route.page);
+      if (route.adminView) setAdminView(route.adminView);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Admin Panel is HR/HR_ADMIN only (enforced again at render below, which is what used to make
+  // this render blank instead of wrong). Now that /admin/... is a real, guessable/bookmarkable
+  // URL, a staff account landing here - via a shared link, stale localStorage, or a role
+  // downgrade while already on the page - must bounce to the dashboard, not sit on a blank page.
+  useEffect(() => {
+    if (activePage === 'admin-dashboard' && user && user.role !== 'HR' && user.role !== 'HR_ADMIN') {
+      setActivePage('dashboard');
+    }
+  }, [activePage, user]);
 
   useEffect(() => {
     if (adminView) {
