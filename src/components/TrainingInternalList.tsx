@@ -628,8 +628,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 setPteResponse(null);
             }
 
-            // Fetch summary for host/HR
-            if (selectedMeeting && (effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' || (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id))) {
+            // Fetch summary - every viewer can open the Completed/Not Completed participant list
+            // (Pre-Test/Post-Test/Feedback per person), not just Host/HR.
+            if (selectedMeeting) {
                 try {
                     const sRes = await fetch(`${API_BASE_URL}/api/meetings/summary/${mid}`);
                     if (sRes.ok) {
@@ -637,7 +638,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         setMeetingSummary(sData);
                     }
                 } catch (e) { console.error("Failed to fetch summary", e); }
+            }
 
+            if (selectedMeeting && (effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' || (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id))) {
                 // Every attendee's PTE answers - admin view only, mirrors the Participant Feedback
                 // list above which is also host/HR-only.
                 if (selectedMeeting.pte_form_id) {
@@ -4871,14 +4874,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 </div>
                                              )}
 
-                                             {/* Completion counts are aggregate-only (no per-person answers), so
-                                                 shown to every viewer; only Host/HR can click through to the
-                                                 per-participant list. */}
+                                             {/* Completed/Not Completed - any viewer, including a plain participant,
+                                                 can click through to the per-participant Pre-Test/Post-Test/Feedback list. */}
                                              {!!completionSummary && (
                                                 <div className="mb-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-2 shadow-inner">
                                                     <div
-                                                        className={`flex justify-between items-center p-2 rounded-xl transition-colors ${isHostOrHR ? 'hover:bg-slate-100 cursor-pointer' : ''}`}
-                                                        onClick={() => { if (isHostOrHR) setShowParticipantModal('sudah'); }}
+                                                        className="flex justify-between items-center p-2 rounded-xl transition-colors hover:bg-slate-100 cursor-pointer"
+                                                        onClick={() => setShowParticipantModal('sudah')}
                                                     >
                                                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('detailModal.done')}</span>
                                                         <span className="text-sm font-black text-emerald-600 bg-emerald-50 px-3 py-0.5 rounded-full border border-emerald-100">
@@ -4886,8 +4888,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                         </span>
                                                     </div>
                                                     <div
-                                                        className={`flex justify-between items-center p-2 rounded-xl transition-colors ${isHostOrHR ? 'hover:bg-slate-100 cursor-pointer' : ''}`}
-                                                        onClick={() => { if (isHostOrHR) setShowParticipantModal('belum'); }}
+                                                        className="flex justify-between items-center p-2 rounded-xl transition-colors hover:bg-slate-100 cursor-pointer"
+                                                        onClick={() => setShowParticipantModal('belum')}
                                                     >
                                                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t('detailModal.pendingCount')}</span>
                                                         <span className="text-sm font-black text-orange-600 bg-orange-50 px-3 py-0.5 rounded-full border border-orange-100">
