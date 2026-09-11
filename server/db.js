@@ -271,6 +271,121 @@ export const initDB = async () => {
             console.log("Added is_imported column to course_feedback.");
         } catch (e) { /* Ignore if exists */ }
 
+        // MIGRATION: Post Training Evaluation - a Likert-scale evaluation form template. Not yet
+        // tied to any Internal Training meeting/attendee flow (meeting_id kept nullable for now so
+        // that link can be added later without another migration).
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS post_training_evaluation_forms (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    meeting_id INT NULL,
+                    category VARCHAR(100),
+                    created_by VARCHAR(255),
+                    title VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    scale_min_label VARCHAR(255),
+                    scale_max_label VARCHAR(255),
+                    status ENUM('DRAFT','PUBLISHED') NOT NULL DEFAULT 'DRAFT',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    deleted_at DATETIME NULL
+                )
+            `);
+            console.log("Verified post_training_evaluation_forms table exists.");
+        } catch (e) {
+            console.error("Error creating post_training_evaluation_forms table:", e);
+        }
+
+        try {
+            await connection.query("ALTER TABLE post_training_evaluation_forms MODIFY COLUMN meeting_id INT NULL");
+            console.log("Made meeting_id nullable on post_training_evaluation_forms.");
+        } catch (e) { /* Ignore if already nullable */ }
+
+        try {
+            await connection.query("ALTER TABLE post_training_evaluation_forms ADD COLUMN category VARCHAR(100)");
+            console.log("Added category column to post_training_evaluation_forms.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE post_training_evaluation_forms ADD COLUMN created_by VARCHAR(255)");
+            console.log("Added created_by column to post_training_evaluation_forms.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE post_training_evaluation_forms ADD COLUMN description TEXT");
+            console.log("Added description column to post_training_evaluation_forms.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS post_training_evaluation_questions (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    form_id INT NOT NULL,
+                    order_index INT NOT NULL,
+                    type ENUM('SCALE','TEXT') NOT NULL DEFAULT 'SCALE',
+                    competency_label VARCHAR(255),
+                    question_text TEXT NOT NULL
+                )
+            `);
+            console.log("Verified post_training_evaluation_questions table exists.");
+        } catch (e) {
+            console.error("Error creating post_training_evaluation_questions table:", e);
+        }
+
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS post_training_evaluation_responses (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    form_id INT NOT NULL,
+                    meeting_id INT NULL,
+                    evaluatee_employee_id VARCHAR(50) NOT NULL,
+                    evaluator_employee_id VARCHAR(50) NOT NULL,
+                    answers JSON NOT NULL,
+                    submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_form_meeting_evaluatee (form_id, meeting_id, evaluatee_employee_id)
+                )
+            `);
+            console.log("Verified post_training_evaluation_responses table exists.");
+        } catch (e) {
+            console.error("Error creating post_training_evaluation_responses table:", e);
+        }
+
+        // MIGRATION: a PTE form template can be reused across multiple meetings, but the response
+        // table used to only key on (form_id, evaluatee_employee_id) - evaluating the same person
+        // a second time under a reused template silently overwrote their first meeting's answers.
+        // meeting_id makes each meeting's response independent; server.js backfills existing rows'
+        // meeting_id once query()/getFormMeetings() are available (see backfillPteResponseMeetingIds).
+        try {
+            await connection.query("ALTER TABLE post_training_evaluation_responses ADD COLUMN meeting_id INT NULL AFTER form_id");
+            console.log("Added meeting_id column to post_training_evaluation_responses.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE post_training_evaluation_responses DROP INDEX unique_form_evaluatee");
+            console.log("Dropped old unique_form_evaluatee index on post_training_evaluation_responses.");
+        } catch (e) { /* Ignore if already dropped/never existed */ }
+
+        try {
+            await connection.query("ALTER TABLE post_training_evaluation_responses ADD UNIQUE KEY unique_form_meeting_evaluatee (form_id, meeting_id, evaluatee_employee_id)");
+            console.log("Added unique_form_meeting_evaluatee index on post_training_evaluation_responses.");
+        } catch (e) { /* Ignore if already exists */ }
+
+        // Only succeeds once every row has been backfilled with a real meeting_id (see server.js) -
+        // fails harmlessly on earlier runs while NULLs still remain, and locks the column down once
+        // the backfill has caught up.
+        try {
+            await connection.query("ALTER TABLE post_training_evaluation_responses MODIFY COLUMN meeting_id INT NOT NULL");
+            console.log("Made meeting_id required on post_training_evaluation_responses.");
+        } catch (e) { /* Ignore until backfill has filled every row */ }
+
+        // A meeting picks one existing Post Training Evaluation template to use (the same template
+        // can be reused across many meetings, so this lives on meetings, not on the form). The
+        // linked form is auto-published when the meeting is marked Paid - see PUT /api/meetings/:id.
+        try {
+            await connection.query("ALTER TABLE meetings ADD COLUMN pte_form_id INT NULL");
+            console.log("Added pte_form_id column to meetings.");
+        } catch (e) { /* Ignore if exists */ }
+
         // MIGRATION: Add external_training_requests table
         try {
             await connection.query(`

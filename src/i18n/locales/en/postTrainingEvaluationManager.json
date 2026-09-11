@@ -1,0 +1,54 @@
+{
+  "title": "Post Training Evaluation",
+  "subtitle": "Build and manage evaluation form templates",
+  "addForm": "New Evaluation Form",
+  "loading": "Loading...",
+  "empty": "No evaluation forms yet.",
+  "table": {
+    "category": "Category",
+    "title": "Form Title",
+    "createdBy": "Created By",
+    "createdAt": "Created At",
+    "unknownCreator": "Unknown"
+  },
+  "actions": {
+    "edit": "Edit",
+    "delete": "Delete",
+    "viewForm": "View Form"
+  },
+  "confirm": {
+    "delete": "Delete this evaluation form? This cannot be undone."
+  },
+  "builder": {
+    "createTitle": "New Evaluation Form",
+    "editTitle": "Edit Evaluation Form",
+    "close": "Close",
+    "categoryLabel": "Category",
+    "categoryPlaceholder": "e.g. Teknikal, Sales, Umum",
+    "titleLabel": "Form Title",
+    "descriptionLabel": "Instructions",
+    "defaultDescription": "Mohon bantuan Bapak/Ibu untuk dapat melakukan evaluasi dengan memberikan penilaian di bawah ini (angka 1 sd 4).\nKriteria Penilaian adalah sebagai berikut:\n\n1. Masih kurang/belum terlihat dalam menerapkan skill terkait.\n2. Terdapat penerapan skill terkait namun masih terbatas/sebagian serta belum diterapkan secara konsisten.\n3. Menerapkan sebagian besar dari skill terkait serta telah/dapat memberikan saran perubahan/ improvement di bidang pekerjaan dalam kaitan dengan skill tersebut.\n4. Telah menerapkan secara konsisten serta dapat menjadi role model dan/atau salah satu nara sumber bagi rekan kerja di bagiannya.",
+    "questionsLabel": "Questions",
+    "addScaleQuestion": "Add Competency Question",
+    "addTextQuestion": "Add Open Text Question",
+    "questionTextLabel": "Statement",
+    "questionTextScalePlaceholder": "e.g. After the training, the employee is able to...",
+    "questionTextTextPlaceholder": "e.g. Any behavior change worth noting?",
+    "removeQuestion": "Remove",
+    "save": "Save",
+    "noQuestions": "No questions yet - add at least one."
+  },
+  "preview": {
+    "textAnswerPlaceholder": "(Open text answer)",
+    "noQuestions": "This form has no questions yet."
+  },
+  "notifications": {
+    "loadFailed": "Failed to load evaluation forms.",
+    "createSuccess": "Evaluation form created.",
+    "createFailed": "Failed to create the evaluation form.",
+    "updateSuccess": "Evaluation form updated.",
+    "updateFailed": "Failed to update the evaluation form.",
+    "deleteSuccess": "Evaluation form deleted.",
+    "deleteFailed": "Failed to delete the evaluation form."
+  }
+}

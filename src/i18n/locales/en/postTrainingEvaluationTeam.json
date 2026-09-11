@@ -1,0 +1,20 @@
+{
+  "title": "Post Training Evaluation",
+  "subtitle": "Evaluations for your direct reports.",
+  "loading": "Loading...",
+  "tabs": {
+    "active": "Active",
+    "closed": "Closed"
+  },
+  "emptyActive": "Nothing to evaluate right now.",
+  "emptyClosed": "No completed evaluations yet.",
+  "fillButton": "Fill Evaluation",
+  "submittedOn": "Submitted on {{date}}",
+  "score": "Score: {{score}} / 4",
+  "formHeader": "POST TRAINING EVALUATION",
+  "evaluating": "Evaluating: {{name}}",
+  "loadingForm": "Loading form...",
+  "textPlaceholder": "Write your answer here...",
+  "sending": "Sending...",
+  "submitButton": "SUBMIT EVALUATION"
+}

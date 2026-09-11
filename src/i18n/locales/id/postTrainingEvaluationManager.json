@@ -1,0 +1,54 @@
+{
+  "title": "Post Training Evaluation",
+  "subtitle": "Buat dan kelola template form evaluasi",
+  "addForm": "Form Evaluasi Baru",
+  "loading": "Memuat...",
+  "empty": "Belum ada form evaluasi.",
+  "table": {
+    "category": "Kategori",
+    "title": "Judul Form",
+    "createdBy": "Dibuat Oleh",
+    "createdAt": "Dibuat Pada",
+    "unknownCreator": "Tidak diketahui"
+  },
+  "actions": {
+    "edit": "Edit",
+    "delete": "Hapus",
+    "viewForm": "Lihat Form"
+  },
+  "confirm": {
+    "delete": "Hapus form evaluasi ini? Tindakan ini tidak bisa dibatalkan."
+  },
+  "builder": {
+    "createTitle": "Form Evaluasi Baru",
+    "editTitle": "Edit Form Evaluasi",
+    "close": "Tutup",
+    "categoryLabel": "Kategori",
+    "categoryPlaceholder": "cth: Teknikal, Sales, Umum",
+    "titleLabel": "Judul Form",
+    "descriptionLabel": "Penjelasan",
+    "defaultDescription": "Mohon bantuan Bapak/Ibu untuk dapat melakukan evaluasi dengan memberikan penilaian di bawah ini (angka 1 sd 4).\nKriteria Penilaian adalah sebagai berikut:\n\n1. Masih kurang/belum terlihat dalam menerapkan skill terkait.\n2. Terdapat penerapan skill terkait namun masih terbatas/sebagian serta belum diterapkan secara konsisten.\n3. Menerapkan sebagian besar dari skill terkait serta telah/dapat memberikan saran perubahan/ improvement di bidang pekerjaan dalam kaitan dengan skill tersebut.\n4. Telah menerapkan secara konsisten serta dapat menjadi role model dan/atau salah satu nara sumber bagi rekan kerja di bagiannya.",
+    "questionsLabel": "Pertanyaan",
+    "addScaleQuestion": "Tambah Pertanyaan Kompetensi",
+    "addTextQuestion": "Tambah Pertanyaan Isian Bebas",
+    "questionTextLabel": "Pernyataan",
+    "questionTextScalePlaceholder": "cth: Setelah mengikuti training, Karyawan mampu...",
+    "questionTextTextPlaceholder": "cth: Apakah ada perubahan perilaku yang perlu dicatat?",
+    "removeQuestion": "Hapus",
+    "save": "Simpan",
+    "noQuestions": "Belum ada pertanyaan - tambahkan minimal satu."
+  },
+  "preview": {
+    "textAnswerPlaceholder": "(Jawaban isian bebas)",
+    "noQuestions": "Form ini belum punya pertanyaan."
+  },
+  "notifications": {
+    "loadFailed": "Gagal memuat form evaluasi.",
+    "createSuccess": "Form evaluasi berhasil dibuat.",
+    "createFailed": "Gagal membuat form evaluasi.",
+    "updateSuccess": "Form evaluasi berhasil diperbarui.",
+    "updateFailed": "Gagal memperbarui form evaluasi.",
+    "deleteSuccess": "Form evaluasi berhasil dihapus.",
+    "deleteFailed": "Gagal menghapus form evaluasi."
+  }
+}

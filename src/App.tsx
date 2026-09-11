@@ -16,6 +16,7 @@ import LearningReport from './components/LearningReport';
 import VerifyCertificate from './components/VerifyCertificate';
 import HelpPage from './components/HelpPage';
 import IDPPage from './components/IDPPage';
+import PostTrainingEvaluationTeam from './components/PostTrainingEvaluationTeam';
 import type { Page, Role, User } from './types';
 
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -310,6 +311,7 @@ function App() {
         )}
         {activePage === 'courses' && <CoursePlayer user={user!} />}
         {activePage === 'internal' && <TrainingInternalList userRole={userRole} user={user!} isManagementMode={false} />}
+        {activePage === 'pte-team' && <PostTrainingEvaluationTeam user={user!} />}
         {activePage === 'help' && <HelpPage />}
         {activePage === 'idp' && <IDPPage currentUser={user} />}
 

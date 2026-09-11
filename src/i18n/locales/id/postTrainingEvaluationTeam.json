@@ -1,0 +1,20 @@
+{
+  "title": "Post Training Evaluation",
+  "subtitle": "Evaluasi untuk karyawan Anda.",
+  "loading": "Memuat...",
+  "tabs": {
+    "active": "Active",
+    "closed": "Closed"
+  },
+  "emptyActive": "Belum ada yang perlu dievaluasi saat ini.",
+  "emptyClosed": "Belum ada evaluasi yang selesai diisi.",
+  "fillButton": "Isi Evaluasi",
+  "submittedOn": "Diisi pada {{date}}",
+  "score": "Nilai: {{score}} / 4",
+  "formHeader": "POST TRAINING EVALUATION",
+  "evaluating": "Menilai: {{name}}",
+  "loadingForm": "Memuat form...",
+  "textPlaceholder": "Tulis jawaban Anda di sini...",
+  "sending": "Mengirim...",
+  "submitButton": "KIRIM EVALUASI"
+}

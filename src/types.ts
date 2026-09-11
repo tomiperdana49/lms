@@ -28,7 +28,7 @@ export interface ReadingLogEntry {
     claimedAt?: string;
 }
 
-export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'external-approval' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives' | 'learning-report' | 'help' | 'idp';
+export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'external-approval' | 'pte-team' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives' | 'learning-report' | 'help' | 'idp';
 export type Role = 'STAFF' | 'HR' | 'HR_ADMIN';
 export type AdminView = 'users' | 'logs' | 'approval' | 'meetings' | 'courses' | 'assets' | 'employees';
 
@@ -176,6 +176,8 @@ export interface Meeting {
     training_gr_type?: string;  // ESG/HSE/Other
     esg_hse_other?: string;
     action_plan?: string;
+    // Post Training Evaluation template attached to this session - auto-publishes once Paid.
+    pte_form_id?: number | null;
     detail_participant_type?: string;
 }
 

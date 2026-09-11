@@ -26,7 +26,8 @@ import {
     PanelLeftClose,
     PanelLeftOpen,
     Search,
-    ArrowLeft
+    ArrowLeft,
+    ClipboardList
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Page, Role, User } from '../types';
@@ -83,7 +84,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
     const [avatarFailed, setAvatarFailed] = useState(false);
     useEffect(() => { setAvatarFailed(false); }, [user?.avatar]);
     const [isTrainingOpen, setIsTrainingOpen] = useState(() => {
-        return activePage === 'internal' || activePage === 'external' || activePage === 'external-approval';
+        return activePage === 'internal' || activePage === 'external' || activePage === 'external-approval' || activePage === 'pte-team';
     });
     const trainingRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -123,7 +124,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
             try {
                 const isHrViewer = userRole === 'HR' || userRole === 'HR_ADMIN';
 
-                const [meetingsRes, trainingRes, logsRes, myExternalTrainingRes, subordinateExternalTrainingRes, deletedMeetingsRes, deletedExternalTrainingRes, myIdpPlansRes, allIdpPlansRes] = await Promise.all([
+                const [meetingsRes, trainingRes, logsRes, myExternalTrainingRes, subordinateExternalTrainingRes, deletedMeetingsRes, deletedExternalTrainingRes, myIdpPlansRes, allIdpPlansRes, pteSubordinatesRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/api/meetings`),
                     fetch(`${API_BASE_URL}/api/training`),
                     fetch(`${API_BASE_URL}/api/logs`),
@@ -134,12 +135,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     fetch(`${API_BASE_URL}/api/idp/my-plans?employee_id=${user.employee_id || ''}`),
                     // Only HR needs to see every employee's IDP (it carries personal development
                     // data), so this is only requested for HR viewers.
-                    isHrViewer ? fetch(`${API_BASE_URL}/api/idp/all`) : Promise.resolve(null)
+                    isHrViewer ? fetch(`${API_BASE_URL}/api/idp/all`) : Promise.resolve(null),
+                    fetch(`${API_BASE_URL}/api/post-training-evaluations/subordinates?leader_id=${user.employee_id || ''}`)
                 ]);
 
                 if (!meetingsRes.ok || !trainingRes.ok || !logsRes.ok || !myExternalTrainingRes.ok || !subordinateExternalTrainingRes.ok
                     || !deletedMeetingsRes.ok || !deletedExternalTrainingRes.ok || !myIdpPlansRes.ok
-                    || (allIdpPlansRes && !allIdpPlansRes.ok)) return;
+                    || (allIdpPlansRes && !allIdpPlansRes.ok) || !pteSubordinatesRes.ok) return;
 
                 const meetings = await meetingsRes.json();
                 const training = await trainingRes.json();
@@ -150,6 +152,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                 const deletedExternalTraining = await deletedExternalTrainingRes.json();
                 const myIdpPlans = await myIdpPlansRes.json();
                 const allIdpPlans = allIdpPlansRes ? await allIdpPlansRes.json() : [];
+                const pteSubordinates = await pteSubordinatesRes.json();
 
                 // Get already read notification IDs from LocalStorage
                 let readIds: number[] = [];
@@ -415,8 +418,25 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     })
                 );
 
+                // 13. Post Training Evaluation: notify the LEADER when a direct report has a training
+                // session closed out (Paid) that's now waiting on their evaluation.
+                const pteLeaderNotifs = pteSubordinates
+                    .filter((it: any) => !it.submitted)
+                    .map((it: any) => {
+                        const notifId = 1100000 + it.formId * 10000000 + Number(it.evaluateeEmployeeId || 0);
+                        return {
+                            id: notifId,
+                            title: t('notifications.pteNewEvaluationTitle'),
+                            message: t('notifications.pteNewEvaluationMessage', { name: it.evaluateeName, title: it.meetingTitle }),
+                            time: new Date(it.meetingDate || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            type: 'INFO',
+                            isRead: readIds.includes(notifId),
+                            page: 'pte-team'
+                        };
+                    });
+
                 // Combine and Sort by latest (higher id means more recent)
-                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpStatusNotifs, ...idpNoteNotifs, ...idpSubmittedNotifs, ...idpReviewNotifs].sort((a, b) => b.id - a.id);
+                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpStatusNotifs, ...idpNoteNotifs, ...idpSubmittedNotifs, ...idpReviewNotifs, ...pteLeaderNotifs].sort((a, b) => b.id - a.id);
                 setNotifications(all);
             } catch (error) {
                 console.error("Failed to fetch header notifications", error);
@@ -495,6 +515,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         ...((config?.moduleInternal || config?.moduleExternal) ? [{ header: t('admin.trainingHeader') }] : []),
         ...(config?.moduleInternal ? [{ icon: Users, label: t('admin.internal'), id: 'admin-dashboard', view: 'meetings' }] : []),
         ...(config?.moduleExternal ? [{ icon: FileText, label: t('admin.external'), id: 'admin-dashboard', view: 'training' }] : []),
+        ...(config?.moduleInternal ? [{ icon: ClipboardList, label: t('admin.postTrainingEvaluation'), id: 'admin-dashboard', view: 'post-training-evaluation' }] : []),
         { header: t('admin.reportHeader') },
         { icon: Library, label: t('admin.readingLog'), id: 'admin-dashboard', view: 'logs' },
         { icon: Award, label: t('admin.quizReport'), id: 'admin-dashboard', view: 'quiz-reports' },
@@ -516,6 +537,9 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
     const trainingSubItems = [
         ...(config?.moduleInternal ? [{ icon: Users, label: t('menu.internal'), id: 'internal' }] : []),
         ...(config?.moduleExternal ? [{ icon: Globe, label: t('menu.external'), id: 'external' }] : []),
+        // Only supervisors have anything to do here - they evaluate their direct reports after
+        // a training session is marked Paid, staff have no self-facing angle on this page.
+        ...(config?.moduleInternal && user?.isSupervisor ? [{ icon: ClipboardList, label: t('menu.pteTeam'), id: 'pte-team' }] : []),
     ];
 
     const getInitials = (name: string) => {
@@ -652,7 +676,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                     className={`
                                         relative w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors text-left
                                         ${!isDesktopSidebarOpen ? 'lg:justify-center lg:px-0' : ''}
-                                        ${activePage === 'internal' || activePage === 'external' || activePage === 'external-approval' || isTrainingOpen
+                                        ${activePage === 'internal' || activePage === 'external' || activePage === 'external-approval' || activePage === 'pte-team' || isTrainingOpen
                                             ? 'bg-slate-800 text-white'
                                             : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                                         }
@@ -665,7 +689,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                     <span className={!isDesktopSidebarOpen ? 'lg:hidden' : ''}>
                                         {isTrainingOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                     </span>
-                                    {(activePage === 'internal' || activePage === 'external' || activePage === 'external-approval') && (
+                                    {(activePage === 'internal' || activePage === 'external' || activePage === 'external-approval' || activePage === 'pte-team') && (
                                         <span className="absolute -right-4 top-1/2 -translate-y-1/2 h-8 w-1 rounded-l-full bg-blue-400" />
                                     )}
                                 </button>
@@ -679,14 +703,14 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                                     onNavigate(sub.id as Page);
                                                     setIsSidebarOpen(false);
                                                 }}
-                                                className={`w-full flex items-center gap-3 px-6 py-2.5 text-sm rounded-xl transition-all
-                                                    ${activePage === sub.id 
-                                                        ? 'text-white font-bold bg-blue-600 shadow-md translate-x-1' 
+                                                className={`w-full flex items-start gap-3 px-6 py-2.5 text-sm rounded-xl transition-all text-left
+                                                    ${activePage === sub.id
+                                                        ? 'text-white font-bold bg-blue-600 shadow-md translate-x-1'
                                                         : 'text-slate-400 hover:text-white hover:bg-slate-800'}
                                                 `}
                                             >
-                                                <sub.icon size={16} className={activePage === sub.id ? 'opacity-100' : 'opacity-60'} />
-                                                <span>{sub.label}</span>
+                                                <sub.icon size={16} className={`mt-0.5 shrink-0 ${activePage === sub.id ? 'opacity-100' : 'opacity-60'}`} />
+                                                <span className="leading-snug">{sub.label}</span>
                                             </button>
                                         ))}
                                     </div>

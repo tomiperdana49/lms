@@ -10,6 +10,7 @@
     "training": "Training",
     "internal": "Internal",
     "external": "Eksternal",
+    "pteTeam": "Post Training Evaluation",
     "adminPanel": "Panel Admin",
     "help": "Bantuan",
     "feedback": "Feedback",
@@ -26,6 +27,7 @@
     "trainingHeader": "TRAINING",
     "internal": "Internal",
     "external": "Eksternal",
+    "postTrainingEvaluation": "Post Training Evaluation",
     "reportHeader": "LAPORAN",
     "readingLog": "Log Bacaan",
     "quizReport": "Laporan Kuis",
@@ -74,7 +76,9 @@
     "idpSubmittedTitle": "Pengajuan IDP Baru",
     "idpSubmittedMessage": "{{name}} mengajukan IDP (Individual Development Plan) untuk tahun {{year}}, menunggu persetujuan Anda.",
     "idpReviewAddedTitle": "IDP: Evaluasi Baru",
-    "idpReviewAddedMessage": "{{name}} menambahkan evaluasi baru pada IDP Anda untuk tahun {{year}}."
+    "idpReviewAddedMessage": "{{name}} menambahkan evaluasi baru pada IDP Anda untuk tahun {{year}}.",
+    "pteNewEvaluationTitle": "Post Training Evaluation Menunggu",
+    "pteNewEvaluationMessage": "Training \"{{title}}\" milik {{name}} sudah closed dan menunggu evaluasi Anda."
   },
   "footer": "© 2026 PT Media Antar Nusa",
   "userFallback": "Pengguna",

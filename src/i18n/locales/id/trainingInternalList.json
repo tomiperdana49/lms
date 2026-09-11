@@ -59,6 +59,7 @@
     "colPreTest": "Pre-Test",
     "colPostTest": "Post-Test",
     "colFeedback": "Feedback",
+    "colPte": "PTE",
     "noData": "Tidak ada data peserta."
   },
   "hero": {
@@ -92,6 +93,7 @@
     "colAvgPreTest": "Rata-rata Pre-Test",
     "colAvgPostTest": "Rata-rata Post-Test",
     "colAvgFeedback": "Rata-rata Feedback",
+    "colAvgPte": "Rata-rata PTE",
     "colCost": "Biaya",
     "colStatus": "Status",
     "paid": "Lunas",
@@ -100,10 +102,12 @@
     "colPreTest": "Pre-Test",
     "colPostTest": "Post-Test",
     "colFeedback": "Feedback",
+    "colPte": "PTE",
     "colAttendance": "Kehadiran",
     "colParticipationType": "Jenis Partisipasi",
     "noParticipants": "Tidak ada peserta tercatat untuk sesi ini.",
-    "feedbackSent": "Terkirim"
+    "feedbackSent": "Terkirim",
+    "pteSent": "Terkirim"
   },
   "listView": {
     "noMeetings": "Belum ada pertemuan yang dijadwalkan.",
@@ -149,6 +153,9 @@
     "griEsg": "ESG (Environmental, Social, and Governance)",
     "griHse": "HSE (Health, Safety, and Environment)",
     "griOther": "Lainnya",
+    "pteFormLabel": "Post Training Evaluation",
+    "selectPteFormPlaceholder": "Tanpa form evaluasi (opsional)",
+    "noMatchingPteForms": "Tidak ada form evaluasi yang cocok.",
     "locationLabel": "Ruangan / Lokasi",
     "locationPlaceholder": "cth. Ruang Rapat A, Lantai 2",
     "meetLinkLabel": "Link Meeting Online",
@@ -216,6 +223,7 @@
     "invitedGuests": "{{count}} Tamu Diundang",
     "noInvitesSent": "Tidak ada undangan khusus yang dikirim.",
     "participantFeedback": "Feedback Peserta",
+    "pteFeedback": "PTE Feedback",
     "whatWentWell": "Hal yang sudah baik:",
     "whatToImprove": "Yang perlu ditingkatkan:",
     "trainingDocumentation": "Dokumentasi Training",

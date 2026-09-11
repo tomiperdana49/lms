@@ -10,6 +10,7 @@
     "training": "Training",
     "internal": "Internal",
     "external": "External",
+    "pteTeam": "Post Training Evaluation",
     "adminPanel": "Admin Panel",
     "help": "Help",
     "feedback": "Feedback",
@@ -26,6 +27,7 @@
     "trainingHeader": "TRAINING",
     "internal": "Internal",
     "external": "External",
+    "postTrainingEvaluation": "Post Training Evaluation",
     "reportHeader": "REPORT",
     "readingLog": "Reading Log",
     "quizReport": "Quiz Report",
@@ -74,7 +76,9 @@
     "idpSubmittedTitle": "New IDP Submitted",
     "idpSubmittedMessage": "{{name}} submitted their Individual Development Plan for {{year}}, pending your approval.",
     "idpReviewAddedTitle": "IDP: New Review",
-    "idpReviewAddedMessage": "{{name}} added a new review to your Individual Development Plan for {{year}}."
+    "idpReviewAddedMessage": "{{name}} added a new review to your Individual Development Plan for {{year}}.",
+    "pteNewEvaluationTitle": "Post Training Evaluation Pending",
+    "pteNewEvaluationMessage": "{{name}}'s training \"{{title}}\" is closed and waiting on your evaluation."
   },
   "footer": "© 2026 PT Media Antar Nusa",
   "userFallback": "User",

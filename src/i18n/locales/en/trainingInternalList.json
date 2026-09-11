@@ -59,6 +59,7 @@
     "colPreTest": "Pre-Test",
     "colPostTest": "Post-Test",
     "colFeedback": "Feedback",
+    "colPte": "PTE",
     "noData": "No participant data available."
   },
   "hero": {
@@ -92,6 +93,7 @@
     "colAvgPreTest": "Avg Pre-Test",
     "colAvgPostTest": "Avg Post-Test",
     "colAvgFeedback": "Avg Feedback",
+    "colAvgPte": "Avg PTE",
     "colCost": "Cost",
     "colStatus": "Status",
     "paid": "Paid",
@@ -100,10 +102,12 @@
     "colPreTest": "Pre-Test",
     "colPostTest": "Post-Test",
     "colFeedback": "Feedback",
+    "colPte": "PTE",
     "colAttendance": "Attendance",
     "colParticipationType": "Participation Type",
     "noParticipants": "No participants recorded for this session.",
-    "feedbackSent": "Sent"
+    "feedbackSent": "Sent",
+    "pteSent": "Sent"
   },
   "listView": {
     "noMeetings": "No meetings scheduled.",
@@ -149,6 +153,9 @@
     "griEsg": "ESG (Environmental, Social, and Governance)",
     "griHse": "HSE (Health, Safety, and Environment)",
     "griOther": "Other",
+    "pteFormLabel": "Post Training Evaluation",
+    "selectPteFormPlaceholder": "No evaluation form (optional)",
+    "noMatchingPteForms": "No matching evaluation forms found.",
     "locationLabel": "Room / Location",
     "locationPlaceholder": "e.g. Meeting Room A, 2nd Floor",
     "meetLinkLabel": "Online Meeting Link",
@@ -216,6 +223,7 @@
     "invitedGuests": "{{count}} Invited Guests",
     "noInvitesSent": "No specific invites sent.",
     "participantFeedback": "Participant Feedback",
+    "pteFeedback": "PTE Feedback",
     "whatWentWell": "What went well:",
     "whatToImprove": "What needs improvement:",
     "trainingDocumentation": "Training Documentation",

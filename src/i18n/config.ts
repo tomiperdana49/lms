@@ -19,6 +19,8 @@ import enLearningReport from './locales/en/learningReport.json';
 import enLMSCalendar from './locales/en/lmsCalendar.json';
 import enOnlineModulesManager from './locales/en/onlineModulesManager.json';
 import enPopupNotification from './locales/en/popupNotification.json';
+import enPostTrainingEvaluationManager from './locales/en/postTrainingEvaluationManager.json';
+import enPostTrainingEvaluationTeam from './locales/en/postTrainingEvaluationTeam.json';
 import enQuizReportList from './locales/en/quizReportList.json';
 import enReadingLogPage from './locales/en/readingLogPage.json';
 import enTrainingExternalManager from './locales/en/trainingExternalManager.json';
@@ -43,6 +45,8 @@ import idLearningReport from './locales/id/learningReport.json';
 import idLMSCalendar from './locales/id/lmsCalendar.json';
 import idOnlineModulesManager from './locales/id/onlineModulesManager.json';
 import idPopupNotification from './locales/id/popupNotification.json';
+import idPostTrainingEvaluationManager from './locales/id/postTrainingEvaluationManager.json';
+import idPostTrainingEvaluationTeam from './locales/id/postTrainingEvaluationTeam.json';
 import idQuizReportList from './locales/id/quizReportList.json';
 import idReadingLogPage from './locales/id/readingLogPage.json';
 import idTrainingExternalManager from './locales/id/trainingExternalManager.json';
@@ -76,6 +80,8 @@ i18n
                 lmsCalendar: enLMSCalendar,
                 onlineModulesManager: enOnlineModulesManager,
                 popupNotification: enPopupNotification,
+                postTrainingEvaluationManager: enPostTrainingEvaluationManager,
+                postTrainingEvaluationTeam: enPostTrainingEvaluationTeam,
                 quizReportList: enQuizReportList,
                 readingLogPage: enReadingLogPage,
                 trainingExternalManager: enTrainingExternalManager,
@@ -101,6 +107,8 @@ i18n
                 lmsCalendar: idLMSCalendar,
                 onlineModulesManager: idOnlineModulesManager,
                 popupNotification: idPopupNotification,
+                postTrainingEvaluationManager: idPostTrainingEvaluationManager,
+                postTrainingEvaluationTeam: idPostTrainingEvaluationTeam,
                 quizReportList: idQuizReportList,
                 readingLogPage: idReadingLogPage,
                 trainingExternalManager: idTrainingExternalManager,
