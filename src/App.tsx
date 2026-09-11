@@ -156,6 +156,16 @@ function App() {
     }
   }, [user]);
 
+  // LoginPage renders below regardless of the URL whenever there's no user, so the address bar
+  // should say so too - shows /login on logout, on session expiry, and for a fresh unauthenticated
+  // visit to any URL. Once logged back in, the activePage-sync effect takes back over and moves
+  // the URL to wherever activePage points.
+  useEffect(() => {
+    if (!user && window.location.pathname !== '/login') {
+      window.history.replaceState({}, '', '/login');
+    }
+  }, [user]);
+
   const forceLogout = (reason: 'idle' | 'absolute') => {
     setUser(null);
     setActivePage('dashboard');
@@ -221,10 +231,12 @@ function App() {
   // shows /admin/<view>) - replaceState on the very first sync (page load) so it doesn't add a
   // spare history entry before the user has navigated anywhere, pushState afterwards so
   // back/forward work. Depends on adminView too, since navigating within the Admin Panel changes
-  // the URL without necessarily changing activePage.
+  // the URL without necessarily changing activePage. Skipped while logged out - activePage isn't
+  // what's on screen then (LoginPage is, regardless of its value), and syncing it would stomp the
+  // /login the effect below just set.
   const hasSyncedUrlOnce = useRef(false);
   useEffect(() => {
-    if (!activePage) return;
+    if (!activePage || !user) return;
     localStorage.setItem('lms_active_page', activePage);
 
     const targetPath = pageToPath(activePage, adminView);
@@ -236,7 +248,7 @@ function App() {
       }
     }
     hasSyncedUrlOnce.current = true;
-  }, [activePage, adminView]);
+  }, [activePage, adminView, user]);
 
   // Browser back/forward - read the page back out of the URL instead of the history state object,
   // since state is empty for entries that existed before this SPA-routing sync was added.
