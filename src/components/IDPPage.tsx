@@ -677,7 +677,7 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                                         <div className="space-y-2">
                                             {detail.reviews!.map(review => (
                                                 <div key={review.id} className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-sm">
-                                                    <p className="text-xs font-bold text-gray-400 mb-1">{new Date(review.review_date).toLocaleDateString()}</p>
+                                                    <p className="text-xs font-bold text-gray-400 mb-1">{new Date(review.review_date).toLocaleDateString('en-GB')}</p>
                                                     <p className="text-gray-700">{review.supervisor_note}</p>
                                                 </div>
                                             ))}
@@ -797,7 +797,7 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                                             <label className="block text-sm font-semibold text-gray-700">{t('form.reviewHistory')}</label>
                                             {teamDetail.reviews!.map(review => (
                                                 <div key={review.id} className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-sm">
-                                                    <p className="text-xs font-bold text-gray-400 mb-1">{new Date(review.review_date).toLocaleDateString()}</p>
+                                                    <p className="text-xs font-bold text-gray-400 mb-1">{new Date(review.review_date).toLocaleDateString('en-GB')}</p>
                                                     <p className="text-gray-700">{review.supervisor_note}</p>
                                                 </div>
                                             ))}

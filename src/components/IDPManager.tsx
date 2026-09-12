@@ -634,7 +634,7 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                                         <div className="space-y-3">
                                             {detail.reviews!.map(review => (
                                                 <div key={review.id} className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-sm">
-                                                    <p className="text-xs font-bold text-gray-400 mb-1">{new Date(review.review_date).toLocaleDateString()} &middot; {review.reviewed_by}</p>
+                                                    <p className="text-xs font-bold text-gray-400 mb-1">{new Date(review.review_date).toLocaleDateString('en-GB')} &middot; {review.reviewed_by}</p>
                                                     <p className="text-gray-700">{review.supervisor_note}</p>
                                                 </div>
                                             ))}
