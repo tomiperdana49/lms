@@ -1,22 +1,17 @@
 {
   "title": "Post Training Evaluation",
-  "subtitle": "Evaluasi untuk karyawan Anda.",
+  "subtitle": "Evaluasi pelatihan Anda.",
   "explanation": "Post Training Evaluation (PTE) adalah evaluasi yang dilakukan oleh Atasan terhadap keikutsertaan timnya dalam suatu program pelatihan. Tujuan dari PTE ini adalah untuk mengetahui apakah materi yang disampaikan telah/masih diimplementasikan/diaplikasikan di dalam suatu pekerjaan termasuk apakah ada perubahan sikap kerja (PTE dilakukan setelah sekitar 1 (satu) bulan dari sejak Pelatihan berakhir).",
   "loading": "Memuat...",
   "tabs": {
     "active": "Active",
     "closed": "Closed"
   },
-  "emptyActive": "Belum ada yang perlu dievaluasi saat ini.",
-  "emptyClosed": "Belum ada evaluasi yang selesai diisi.",
-  "fillButton": "Isi Evaluasi",
+  "emptyActive": "Belum ada evaluasi yang menunggu saat ini.",
+  "emptyClosed": "Belum ada evaluasi yang selesai.",
+  "pendingLabel": "Menunggu evaluasi",
   "viewButton": "Lihat",
-  "submittedOn": "Diisi pada {{date}}",
   "score": "Nilai: {{score}} / 4",
   "formHeader": "POST TRAINING EVALUATION",
-  "evaluating": "Menilai: {{name}}",
-  "loadingForm": "Memuat form...",
-  "textPlaceholder": "Tulis jawaban Anda di sini...",
-  "sending": "Mengirim...",
-  "submitButton": "KIRIM EVALUASI"
+  "loadingForm": "Memuat form..."
 }

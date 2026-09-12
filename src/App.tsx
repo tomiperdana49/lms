@@ -17,6 +17,7 @@ import VerifyCertificate from './components/VerifyCertificate';
 import HelpPage from './components/HelpPage';
 import IDPPage from './components/IDPPage';
 import PostTrainingEvaluationTeam from './components/PostTrainingEvaluationTeam';
+import PostTrainingEvaluationMine from './components/PostTrainingEvaluationMine';
 import type { Page, Role, User } from './types';
 
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -31,12 +32,12 @@ const LAST_ACTIVITY_KEY = 'lms_last_activity';
 
 // Mirrors the Page union in types.ts - kept as a runtime list so a URL path (typed by hand, or
 // visited via back/forward) can be validated before being cast to Page.
-const VALID_PAGES: Page[] = ['dashboard', 'reading-log', 'courses', 'internal', 'external', 'external-approval', 'pte-team', 'calendar', 'users', 'admin-logs', 'admin-dashboard', 'incentives', 'learning-report', 'help', 'idp'];
+const VALID_PAGES: Page[] = ['dashboard', 'reading-log', 'courses', 'internal', 'external', 'external-approval', 'pte-team', 'pte-mine', 'calendar', 'users', 'admin-logs', 'admin-dashboard', 'incentives', 'learning-report', 'help', 'idp'];
 const isValidPage = (value: string): value is Page => (VALID_PAGES as string[]).includes(value);
 
-// These four live under the sidebar's "Training" group, so their URL nests the same way
+// These five live under the sidebar's "Training" group, so their URL nests the same way
 // (/training/internal) instead of sitting flat at the root like every other page.
-const TRAINING_SUB_PAGES: Page[] = ['internal', 'external', 'external-approval', 'pte-team'];
+const TRAINING_SUB_PAGES: Page[] = ['internal', 'external', 'external-approval', 'pte-team', 'pte-mine'];
 
 // Mirrors adminSubItems' `view` values in DashboardLayout.tsx - the Admin Panel's own sidebar
 // group, nested under /admin/<view> (e.g. /admin/calendar) the same way Training nests.
@@ -419,6 +420,7 @@ function App() {
         {activePage === 'courses' && <CoursePlayer user={user!} />}
         {activePage === 'internal' && <TrainingInternalList userRole={userRole} user={user!} isManagementMode={false} />}
         {activePage === 'pte-team' && <PostTrainingEvaluationTeam user={user!} />}
+        {activePage === 'pte-mine' && <PostTrainingEvaluationMine user={user!} />}
         {activePage === 'help' && <HelpPage />}
         {activePage === 'idp' && <IDPPage currentUser={user} />}
 

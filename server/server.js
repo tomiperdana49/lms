@@ -4348,6 +4348,75 @@ app.get('/api/post-training-evaluations/subordinates', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Staff self-service: every (form, meeting) pair where the caller was themselves an attendee -
+// mirrors /subordinates above but scoped to one employee_id instead of a leader's whole team, and
+// never returns other attendees' answers/scores.
+app.get('/api/post-training-evaluations/mine', async (req, res) => {
+    try {
+        const { employee_id } = req.query;
+        if (!employee_id) return res.json([]);
+
+        const forms = await query(`
+            SELECT f.*, m.title AS meeting_title, m.date AS meeting_date, m.guests_json, m.cost_report_json
+            FROM post_training_evaluation_forms f
+            LEFT JOIN meetings m ON f.meeting_id = m.id
+            WHERE f.status = 'PUBLISHED' AND f.deleted_at IS NULL
+        `);
+
+        const items = [];
+        for (const form of forms) {
+            const meetings = await getFormMeetings(form);
+            if (meetings.length === 0) continue;
+
+            const responses = await query(
+                'SELECT meeting_id, submitted_at, answers FROM post_training_evaluation_responses WHERE form_id = ? AND evaluatee_employee_id = ?',
+                [form.id, employee_id]
+            );
+            const responseByMeeting = {};
+            responses.forEach(r => { responseByMeeting[r.meeting_id] = r; });
+
+            const scaleQuestionRows = await query(
+                "SELECT id FROM post_training_evaluation_questions WHERE form_id = ? AND type = 'SCALE'",
+                [form.id]
+            );
+            const scaleQuestionIds = scaleQuestionRows.map(q => String(q.id));
+
+            for (const meeting of meetings) {
+                // Same 30-day gate as /subordinates - the evaluation doesn't exist yet from
+                // anyone's perspective until the leader is eligible to fill it.
+                if (!meeting.date) continue;
+                const daysSinceTraining = (Date.now() - new Date(meeting.date).getTime()) / (24 * 60 * 60 * 1000);
+                if (daysSinceTraining < 30) continue;
+
+                const attendeeIds = await getMeetingAttendeeEmployeeIds(meeting);
+                if (!attendeeIds.includes(employee_id)) continue;
+
+                const response = responseByMeeting[meeting.id];
+                let averageScore = null;
+                if (response) {
+                    try {
+                        const answers = typeof response.answers === 'string' ? JSON.parse(response.answers) : response.answers;
+                        const scores = scaleQuestionIds.map(qId => Number(answers?.[qId])).filter(v => !isNaN(v));
+                        if (scores.length > 0) averageScore = Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10;
+                    } catch (e) { }
+                }
+                items.push({
+                    formId: form.id,
+                    formTitle: form.title,
+                    meetingId: meeting.id,
+                    meetingTitle: meeting.title,
+                    meetingDate: meeting.date,
+                    submitted: !!response,
+                    submittedAt: response ? response.submitted_at : null,
+                    averageScore
+                });
+            }
+        }
+
+        res.json(items);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Full detail for HR: questions + per-attendee response status ("who's done").
 app.get('/api/post-training-evaluations/:id', async (req, res) => {
     try {

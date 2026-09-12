@@ -21,6 +21,7 @@ import enOnlineModulesManager from './locales/en/onlineModulesManager.json';
 import enPopupNotification from './locales/en/popupNotification.json';
 import enPostTrainingEvaluationManager from './locales/en/postTrainingEvaluationManager.json';
 import enPostTrainingEvaluationTeam from './locales/en/postTrainingEvaluationTeam.json';
+import enPostTrainingEvaluationMine from './locales/en/postTrainingEvaluationMine.json';
 import enQuizReportList from './locales/en/quizReportList.json';
 import enReadingLogPage from './locales/en/readingLogPage.json';
 import enTrainingExternalManager from './locales/en/trainingExternalManager.json';
@@ -47,6 +48,7 @@ import idOnlineModulesManager from './locales/id/onlineModulesManager.json';
 import idPopupNotification from './locales/id/popupNotification.json';
 import idPostTrainingEvaluationManager from './locales/id/postTrainingEvaluationManager.json';
 import idPostTrainingEvaluationTeam from './locales/id/postTrainingEvaluationTeam.json';
+import idPostTrainingEvaluationMine from './locales/id/postTrainingEvaluationMine.json';
 import idQuizReportList from './locales/id/quizReportList.json';
 import idReadingLogPage from './locales/id/readingLogPage.json';
 import idTrainingExternalManager from './locales/id/trainingExternalManager.json';
@@ -82,6 +84,7 @@ i18n
                 popupNotification: enPopupNotification,
                 postTrainingEvaluationManager: enPostTrainingEvaluationManager,
                 postTrainingEvaluationTeam: enPostTrainingEvaluationTeam,
+                postTrainingEvaluationMine: enPostTrainingEvaluationMine,
                 quizReportList: enQuizReportList,
                 readingLogPage: enReadingLogPage,
                 trainingExternalManager: enTrainingExternalManager,
@@ -109,6 +112,7 @@ i18n
                 popupNotification: idPopupNotification,
                 postTrainingEvaluationManager: idPostTrainingEvaluationManager,
                 postTrainingEvaluationTeam: idPostTrainingEvaluationTeam,
+                postTrainingEvaluationMine: idPostTrainingEvaluationMine,
                 quizReportList: idQuizReportList,
                 readingLogPage: idReadingLogPage,
                 trainingExternalManager: idTrainingExternalManager,

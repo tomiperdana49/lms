@@ -1,22 +1,17 @@
 {
   "title": "Post Training Evaluation",
-  "subtitle": "Evaluations for your direct reports.",
+  "subtitle": "Your own training evaluations.",
   "explanation": "Post Training Evaluation (PTE) is an evaluation carried out by a supervisor on their team's participation in a training program. Its purpose is to find out whether the material delivered has been/is still being implemented/applied in the job, including whether there has been a change in work attitude (PTE is conducted about 1 (one) month after the training ends).",
   "loading": "Loading...",
   "tabs": {
     "active": "Active",
     "closed": "Closed"
   },
-  "emptyActive": "Nothing to evaluate right now.",
+  "emptyActive": "No evaluation pending right now.",
   "emptyClosed": "No completed evaluations yet.",
-  "fillButton": "Fill Evaluation",
+  "pendingLabel": "Awaiting evaluation",
   "viewButton": "View",
-  "submittedOn": "Submitted on {{date}}",
   "score": "Score: {{score}} / 4",
   "formHeader": "POST TRAINING EVALUATION",
-  "evaluating": "Evaluating: {{name}}",
-  "loadingForm": "Loading form...",
-  "textPlaceholder": "Write your answer here...",
-  "sending": "Sending...",
-  "submitButton": "SUBMIT EVALUATION"
+  "loadingForm": "Loading form..."
 }

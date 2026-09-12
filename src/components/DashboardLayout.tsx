@@ -84,7 +84,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
     const [avatarFailed, setAvatarFailed] = useState(false);
     useEffect(() => { setAvatarFailed(false); }, [user?.avatar]);
     const [isTrainingOpen, setIsTrainingOpen] = useState(() => {
-        return activePage === 'internal' || activePage === 'external' || activePage === 'external-approval' || activePage === 'pte-team';
+        return activePage === 'internal' || activePage === 'external' || activePage === 'external-approval' || activePage === 'pte-team' || activePage === 'pte-mine';
     });
     const trainingRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -537,9 +537,10 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
     const trainingSubItems = [
         ...(config?.moduleInternal ? [{ icon: Users, label: t('menu.internal'), id: 'internal' }] : []),
         ...(config?.moduleExternal ? [{ icon: Globe, label: t('menu.external'), id: 'external' }] : []),
-        // Only supervisors have anything to do here - they evaluate their direct reports after
-        // a training session is marked Paid, staff have no self-facing angle on this page.
+        // Supervisors evaluate their direct reports here after a training session is marked
+        // Paid; staff instead get a read-only view scoped to evaluations about themselves.
         ...(config?.moduleInternal && user?.isSupervisor ? [{ icon: ClipboardList, label: t('menu.pteTeam'), id: 'pte-team' }] : []),
+        ...(config?.moduleInternal && !user?.isSupervisor ? [{ icon: ClipboardList, label: t('menu.pteMine'), id: 'pte-mine' }] : []),
     ];
 
     const getInitials = (name: string) => {
@@ -676,7 +677,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                     className={`
                                         relative w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors text-left
                                         ${!isDesktopSidebarOpen ? 'lg:justify-center lg:px-0' : ''}
-                                        ${activePage === 'internal' || activePage === 'external' || activePage === 'external-approval' || activePage === 'pte-team' || isTrainingOpen
+                                        ${activePage === 'internal' || activePage === 'external' || activePage === 'external-approval' || activePage === 'pte-team' || activePage === 'pte-mine' || isTrainingOpen
                                             ? 'bg-slate-800 text-white'
                                             : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                                         }
@@ -689,7 +690,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                     <span className={!isDesktopSidebarOpen ? 'lg:hidden' : ''}>
                                         {isTrainingOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                     </span>
-                                    {(activePage === 'internal' || activePage === 'external' || activePage === 'external-approval' || activePage === 'pte-team') && (
+                                    {(activePage === 'internal' || activePage === 'external' || activePage === 'external-approval' || activePage === 'pte-team' || activePage === 'pte-mine') && (
                                         <span className="absolute -right-4 top-1/2 -translate-y-1/2 h-8 w-1 rounded-l-full bg-blue-400" />
                                     )}
                                 </button>

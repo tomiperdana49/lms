@@ -32,12 +32,17 @@ interface EvaluationFormDetailDTO {
     questions: EvaluationQuestionDTO[];
 }
 
+interface EvaluationResponseDetailDTO extends EvaluationFormDetailDTO {
+    answers: Record<string, number | string> | null;
+}
+
 const PostTrainingEvaluationTeam = ({ user }: { user: User }) => {
     const { t } = useTranslation('postTrainingEvaluationTeam');
     const [items, setItems] = useState<EvaluationItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [tab, setTab] = useState<'active' | 'closed'>('active');
     const [activeItem, setActiveItem] = useState<EvaluationItem | null>(null);
+    const [viewingItem, setViewingItem] = useState<EvaluationItem | null>(null);
 
     const fetchItems = async () => {
         if (!user.employee_id) return;
@@ -65,6 +70,9 @@ const PostTrainingEvaluationTeam = ({ user }: { user: User }) => {
                     <ClipboardList className="text-purple-600" /> {t('title')}
                 </h1>
                 <p className="text-sm text-slate-500 mt-1">{t('subtitle')}</p>
+                <p className="text-sm text-slate-500 mt-3 bg-purple-50 border border-purple-100 rounded-2xl p-4 leading-relaxed">
+                    {t('explanation')}
+                </p>
             </div>
 
             <div className="flex gap-2 mb-4">
@@ -113,6 +121,12 @@ const PostTrainingEvaluationTeam = ({ user }: { user: User }) => {
                                         <CheckCircle2 size={14} />
                                         {t('submittedOn', { date: item.submittedAt ? new Date(item.submittedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '' })}
                                     </span>
+                                    <button
+                                        onClick={() => setViewingItem(item)}
+                                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black uppercase tracking-wider rounded-xl shrink-0 transition-all"
+                                    >
+                                        {t('viewButton')}
+                                    </button>
                                 </div>
                             ) : (
                                 <button
@@ -143,6 +157,90 @@ const PostTrainingEvaluationTeam = ({ user }: { user: User }) => {
                     }}
                 />
             )}
+
+            {viewingItem && (
+                <ViewModal
+                    item={viewingItem}
+                    onClose={() => setViewingItem(null)}
+                />
+            )}
+        </div>
+    );
+};
+
+const ViewModal = ({ item, onClose }: {
+    item: EvaluationItem;
+    onClose: () => void;
+}) => {
+    const { t } = useTranslation('postTrainingEvaluationTeam');
+    const [detail, setDetail] = useState<EvaluationResponseDetailDTO | null>(null);
+
+    useEffect(() => {
+        fetch(`${API_BASE_URL}/api/post-training-evaluations/${item.formId}/response/${encodeURIComponent(item.evaluateeEmployeeId)}?meetingId=${item.meetingId}`)
+            .then(res => res.json())
+            .then(setDetail)
+            .catch(err => console.error(err));
+    }, [item.formId, item.meetingId, item.evaluateeEmployeeId]);
+
+    const questions = detail?.questions || [];
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[85vh] overflow-y-auto">
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 sticky top-0">
+                    <div>
+                        <span className="text-[10px] font-black uppercase text-purple-500 tracking-widest">{t('formHeader')}</span>
+                        <h2 className="font-black text-lg text-slate-800 leading-tight">{detail?.title || item.formTitle}</h2>
+                        <p className="text-xs font-bold text-slate-400 mt-1">{t('evaluating', { name: item.evaluateeName })}</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400"><X size={20} /></button>
+                </div>
+
+                {!detail ? (
+                    <div className="p-10 text-center text-slate-400 font-bold">{t('loadingForm')}</div>
+                ) : (
+                    <div className="p-6 space-y-6">
+                        {detail.description && (
+                            <p className="text-sm text-slate-600 whitespace-pre-wrap">{detail.description}</p>
+                        )}
+                        {questions.map((q, idx) => {
+                            const answer = detail.answers?.[q.id];
+                            return (
+                                <div key={q.id}>
+                                    <p className="text-sm font-bold text-slate-700 mb-2">{idx + 1}. {q.question_text}</p>
+                                    {q.type === 'SCALE' ? (
+                                        <>
+                                            <div className="flex gap-2">
+                                                {[1, 2, 3, 4].map(v => (
+                                                    <div
+                                                        key={v}
+                                                        className={`flex-1 py-2.5 rounded-xl border-2 text-center text-sm font-black ${Number(answer) === v
+                                                            ? 'bg-purple-600 border-purple-600 text-white shadow-lg shadow-purple-500/30'
+                                                            : 'bg-white border-slate-100 text-slate-300'
+                                                            }`}
+                                                    >
+                                                        {v}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {(detail.scaleMinLabel || detail.scaleMaxLabel) && (
+                                                <div className="flex justify-between gap-4 mt-1.5">
+                                                    <span className="text-[10px] font-bold text-slate-400 flex-1">{detail.scaleMinLabel}</span>
+                                                    <span className="text-[10px] font-bold text-slate-400 flex-1 text-right">{detail.scaleMaxLabel}</span>
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <p className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-semibold text-slate-700 whitespace-pre-wrap">
+                                            {String(answer || '-')}
+                                        </p>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
