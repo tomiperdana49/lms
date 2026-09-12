@@ -79,7 +79,14 @@
     "idpReviewAddedTitle": "IDP: New Review",
     "idpReviewAddedMessage": "{{name}} added a new review to your Individual Development Plan for {{year}}.",
     "pteNewEvaluationTitle": "Post Training Evaluation Pending",
-    "pteNewEvaluationMessage": "{{name}}'s training \"{{title}}\" is closed and waiting on your evaluation."
+    "pteNewEvaluationMessage": "{{name}}'s training \"{{title}}\" is closed and waiting on your evaluation.",
+    "pteEvaluationCompletedTitle": "Post Training Evaluation Completed",
+    "pteEvaluationCompletedMessage": "Your leader has completed the Post Training Evaluation for \"{{title}}\".",
+    "incentiveApproved": "approved",
+    "incentivePaid": "paid",
+    "incentiveCanceled": "canceled",
+    "incentiveStatusTitle": "Incentive {{status}}",
+    "incentiveStatusMessage": "Your incentive for \"{{title}}\" has been {{statusLabel}}."
   },
   "footer": "© 2026 PT Media Antar Nusa",
   "userFallback": "User",

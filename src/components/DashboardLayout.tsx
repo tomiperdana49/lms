@@ -124,7 +124,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
             try {
                 const isHrViewer = userRole === 'HR' || userRole === 'HR_ADMIN';
 
-                const [meetingsRes, trainingRes, logsRes, myExternalTrainingRes, subordinateExternalTrainingRes, deletedMeetingsRes, deletedExternalTrainingRes, myIdpPlansRes, allIdpPlansRes, pteSubordinatesRes] = await Promise.all([
+                const [meetingsRes, trainingRes, logsRes, myExternalTrainingRes, subordinateExternalTrainingRes, deletedMeetingsRes, deletedExternalTrainingRes, myIdpPlansRes, allIdpPlansRes, pteSubordinatesRes, pteMineRes, incentivesRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/api/meetings`),
                     fetch(`${API_BASE_URL}/api/training`),
                     fetch(`${API_BASE_URL}/api/logs`),
@@ -136,12 +136,16 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     // Only HR needs to see every employee's IDP (it carries personal development
                     // data), so this is only requested for HR viewers.
                     isHrViewer ? fetch(`${API_BASE_URL}/api/idp/all`) : Promise.resolve(null),
-                    fetch(`${API_BASE_URL}/api/post-training-evaluations/subordinates?leader_id=${user.employee_id || ''}`)
+                    fetch(`${API_BASE_URL}/api/post-training-evaluations/subordinates?leader_id=${user.employee_id || ''}`),
+                    // Only non-supervisors have the "My PTE" page to send this notification to.
+                    !user.isSupervisor ? fetch(`${API_BASE_URL}/api/post-training-evaluations/mine?employee_id=${user.employee_id || ''}`) : Promise.resolve(null),
+                    config?.moduleIncentive ? fetch(`${API_BASE_URL}/api/incentives`) : Promise.resolve(null)
                 ]);
 
                 if (!meetingsRes.ok || !trainingRes.ok || !logsRes.ok || !myExternalTrainingRes.ok || !subordinateExternalTrainingRes.ok
                     || !deletedMeetingsRes.ok || !deletedExternalTrainingRes.ok || !myIdpPlansRes.ok
-                    || (allIdpPlansRes && !allIdpPlansRes.ok) || !pteSubordinatesRes.ok) return;
+                    || (allIdpPlansRes && !allIdpPlansRes.ok) || !pteSubordinatesRes.ok || (pteMineRes && !pteMineRes.ok)
+                    || (incentivesRes && !incentivesRes.ok)) return;
 
                 const meetings = await meetingsRes.json();
                 const training = await trainingRes.json();
@@ -153,6 +157,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                 const myIdpPlans = await myIdpPlansRes.json();
                 const allIdpPlans = allIdpPlansRes ? await allIdpPlansRes.json() : [];
                 const pteSubordinates = await pteSubordinatesRes.json();
+                const pteMine = pteMineRes ? await pteMineRes.json() : [];
+                const incentives = incentivesRes ? await incentivesRes.json() : [];
 
                 // Get already read notification IDs from LocalStorage
                 let readIds: number[] = [];
@@ -435,8 +441,61 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                         };
                     });
 
+                // 14. Post Training Evaluation: notify the STAFF (evaluatee) when their leader has
+                // submitted the evaluation about them, so they know to check their own result.
+                const pteMineNotifs = pteMine
+                    .filter((it: any) => it.submitted)
+                    .map((it: any) => {
+                        const notifId = 1200000000 + it.formId * 100000 + it.meetingId;
+                        return {
+                            id: notifId,
+                            title: t('notifications.pteEvaluationCompletedTitle'),
+                            message: t('notifications.pteEvaluationCompletedMessage', { title: it.meetingTitle }),
+                            time: new Date(it.submittedAt || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            type: 'SUCCESS',
+                            isRead: readIds.includes(notifId),
+                            page: 'pte-mine'
+                        };
+                    });
+
+                // 15. Incentives: notify the EMPLOYEE when HR approves, pays out, or cancels their
+                // incentive claim - mirrors the reading log / external training status notifs above.
+                const incentiveNotifs = incentives
+                    .filter((i: any) => {
+                        const matchesId = user.employee_id && i.employee_id === user.employee_id;
+                        const matchesName = user.name && i.employeeName === user.name;
+                        return (matchesId || matchesName) && ['Active', 'Paid', 'Canceled'].includes(i.status);
+                    })
+                    .map((i: any) => {
+                        // Each stage (approved vs paid vs canceled) gets its own read/unread
+                        // tracking instead of collapsing into one notification.
+                        const stageCode = i.status === 'Active' ? 1 : i.status === 'Paid' ? 2 : 3;
+                        const notifId = 1400000 + i.id * 10 + stageCode;
+                        let statusLabel = '';
+                        let type = 'SUCCESS';
+
+                        if (i.status === 'Active') {
+                            statusLabel = t('notifications.incentiveApproved');
+                        } else if (i.status === 'Paid') {
+                            statusLabel = t('notifications.incentivePaid');
+                        } else {
+                            statusLabel = t('notifications.incentiveCanceled');
+                            type = 'WARNING';
+                        }
+
+                        return {
+                            id: notifId,
+                            title: t('notifications.incentiveStatusTitle', { status: i.status }),
+                            message: t('notifications.incentiveStatusMessage', { title: i.courseName, statusLabel }),
+                            time: new Date(i.approvedDate || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            type,
+                            isRead: readIds.includes(notifId),
+                            page: 'incentives'
+                        };
+                    });
+
                 // Combine and Sort by latest (higher id means more recent)
-                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpStatusNotifs, ...idpNoteNotifs, ...idpSubmittedNotifs, ...idpReviewNotifs, ...pteLeaderNotifs].sort((a, b) => b.id - a.id);
+                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpStatusNotifs, ...idpNoteNotifs, ...idpSubmittedNotifs, ...idpReviewNotifs, ...pteLeaderNotifs, ...pteMineNotifs, ...incentiveNotifs].sort((a, b) => b.id - a.id);
                 setNotifications(all);
             } catch (error) {
                 console.error("Failed to fetch header notifications", error);

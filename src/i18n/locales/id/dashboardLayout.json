@@ -79,7 +79,14 @@
     "idpReviewAddedTitle": "IDP: Evaluasi Baru",
     "idpReviewAddedMessage": "{{name}} menambahkan evaluasi baru pada IDP Anda untuk tahun {{year}}.",
     "pteNewEvaluationTitle": "Post Training Evaluation Menunggu",
-    "pteNewEvaluationMessage": "Training \"{{title}}\" milik {{name}} sudah closed dan menunggu evaluasi Anda."
+    "pteNewEvaluationMessage": "Training \"{{title}}\" milik {{name}} sudah closed dan menunggu evaluasi Anda.",
+    "pteEvaluationCompletedTitle": "Post Training Evaluation Selesai",
+    "pteEvaluationCompletedMessage": "Atasan Anda telah menyelesaikan Post Training Evaluation untuk \"{{title}}\".",
+    "incentiveApproved": "disetujui",
+    "incentivePaid": "dibayarkan",
+    "incentiveCanceled": "dibatalkan",
+    "incentiveStatusTitle": "Insentif {{status}}",
+    "incentiveStatusMessage": "Insentif Anda untuk \"{{title}}\" telah {{statusLabel}}."
   },
   "footer": "© 2026 PT Media Antar Nusa",
   "userFallback": "Pengguna",
