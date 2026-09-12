@@ -4049,6 +4049,8 @@ app.put('/api/meetings/:id', async (req, res) => {
             try { return JSON.parse(previousMeeting.cost_report_json)?.isPaid; } catch (e) { return false; }
         })());
 
+        const finalPteFormId = has('pte_form_id') ? (m.pte_form_id || null) : previousMeeting.pte_form_id;
+
         await query(
             'UPDATE meetings SET title = ?, date = ?, time = ?, host = ?, location = ?, type = ?, meetLink = ?, agenda = ?, guests_json = ?, cost_report_json = ?, employee_id = ?, competency_type = ?, competency_name = ?, training_gr_type = ?, pre_test_link = ?, material_link = ?, post_test_link = ?, feedback_link = ?, pre_test_data = ?, post_test_data = ?, feedback_data = ?, is_pre_test_active = ?, is_post_test_active = ?, is_feedback_active = ?, is_closed = ?, pte_form_id = ? WHERE id = ?',
             [
@@ -4077,17 +4079,20 @@ app.put('/api/meetings/:id', async (req, res) => {
                 has('is_post_test_active') ? (m.is_post_test_active ? 1 : 0) : previousMeeting.is_post_test_active,
                 has('is_feedback_active') ? (m.is_feedback_active ? 1 : 0) : previousMeeting.is_feedback_active,
                 has('is_closed') ? (m.is_closed ? 1 : 0) : previousMeeting.is_closed,
-                has('pte_form_id') ? (m.pte_form_id || null) : previousMeeting.pte_form_id,
+                finalPteFormId,
                 id
             ]
         );
 
-        // The linked Post Training Evaluation template only goes live once this session is marked
-        // Paid - matches the same "finalize the report, then activate what comes after" pattern the
-        // Nusawork sync below already follows for hours/cost. Fire-and-forget, same as that sync.
-        if (!wasPaid && costReport?.isPaid && m.pte_form_id) {
-            query("UPDATE post_training_evaluation_forms SET status = 'PUBLISHED' WHERE id = ? AND deleted_at IS NULL", [m.pte_form_id])
-                .then(() => console.log(`[PTE] Published form ${m.pte_form_id} - meeting ${id} marked Paid.`))
+        // The linked Post Training Evaluation template only goes live once this session is Paid.
+        // Deliberately not gated on "just transitioned to Paid" (wasPaid) - HR can attach or swap
+        // the PTE form via Edit Session well after a session was already marked Paid, and that
+        // form must still go live, not silently stay DRAFT forever. Re-publishing an already-
+        // published form is a harmless no-op, so this can safely fire on every save of a Paid
+        // session that has a form linked. Fire-and-forget, same as the Nusawork sync below.
+        if (costReport?.isPaid && finalPteFormId) {
+            query("UPDATE post_training_evaluation_forms SET status = 'PUBLISHED' WHERE id = ? AND deleted_at IS NULL", [finalPteFormId])
+                .then(() => console.log(`[PTE] Published form ${finalPteFormId} - meeting ${id} is Paid.`))
                 .catch(e => console.error('[PTE] Failed to publish linked form on Paid:', e.message));
         }
 
