@@ -1236,8 +1236,16 @@ const getMeetingAttendeeEmployeeIds = async (meeting) => {
     try { if (meeting.guests_json) guests = typeof meeting.guests_json === 'string' ? JSON.parse(meeting.guests_json) : meeting.guests_json; } catch (e) { }
     try { if (meeting.cost_report_json) costReport = typeof meeting.cost_report_json === 'string' ? JSON.parse(meeting.cost_report_json) : meeting.cost_report_json; } catch (e) { }
 
-    const employeeIds = new Set(costReport ? (costReport.attendee_ids || []) : (guests?.employee_ids || []));
-    const emails = costReport ? (costReport.attendees || []) : (guests?.emails || []);
+    // A cost report can exist (trainer/snack/lunch costs, photos) before the Host has actually
+    // reached the "check off who attended" step in Finalize Report, so its presence alone doesn't
+    // mean attendee_ids/attendees is ground truth yet - only trust it once it's actually recorded
+    // someone, otherwise fall back to guests_json like the "no cost report yet" case below.
+    const hasRecordedAttendance = !!costReport && (
+        (costReport.attendee_ids && costReport.attendee_ids.length > 0) ||
+        (costReport.attendees && costReport.attendees.length > 0)
+    );
+    const employeeIds = new Set(hasRecordedAttendance ? (costReport.attendee_ids || []) : (guests?.employee_ids || []));
+    const emails = hasRecordedAttendance ? (costReport.attendees || []) : (guests?.emails || []);
     if (emails.length > 0) {
         const placeholders = emails.map(() => '?').join(',');
         const rows = await query(`SELECT employee_id FROM users WHERE email IN (${placeholders}) AND employee_id IS NOT NULL`, emails);
