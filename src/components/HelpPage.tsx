@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { HelpCircle, Library, BookOpen, Users, Globe, Lightbulb, ListChecks, GraduationCap, UserCheck, Target, Shield } from 'lucide-react';
+import { HelpCircle, Library, BookOpen, Users, Globe, Lightbulb, ListChecks, GraduationCap, UserCheck, Target, Shield, ClipboardList } from 'lucide-react';
 
-export type TopicKey = 'readingLog' | 'onlineModules' | 'trainingInternal' | 'trainingExternal' | 'idp';
+export type TopicKey = 'readingLog' | 'onlineModules' | 'trainingInternal' | 'trainingExternal' | 'postTrainingEvaluation' | 'idp';
 export type AudienceKey = 'participant' | 'trainer' | 'employee' | 'supervisor' | 'hr';
 
 export const TOPIC_ICONS: Record<TopicKey, typeof Library> = {
@@ -10,6 +10,7 @@ export const TOPIC_ICONS: Record<TopicKey, typeof Library> = {
     onlineModules: BookOpen,
     trainingInternal: Users,
     trainingExternal: Globe,
+    postTrainingEvaluation: ClipboardList,
     idp: Target
 };
 
@@ -21,13 +22,14 @@ export const AUDIENCE_ICONS: Record<AudienceKey, typeof Users> = {
     hr: Shield
 };
 
-export const TOPIC_ORDER: TopicKey[] = ['readingLog', 'onlineModules', 'trainingInternal', 'trainingExternal', 'idp'];
+export const TOPIC_ORDER: TopicKey[] = ['readingLog', 'onlineModules', 'trainingInternal', 'trainingExternal', 'postTrainingEvaluation', 'idp'];
 
 // Topics whose guide differs depending on who's using the feature (e.g. a training session's
 // participant vs. its trainer/host, or IDP's employee/supervisor/HR) render a role sub-selector,
 // listing that topic's audiences in display order; everything else is a single guide.
 export const TOPIC_AUDIENCES: Partial<Record<TopicKey, AudienceKey[]>> = {
     trainingInternal: ['participant', 'trainer'],
+    postTrainingEvaluation: ['participant', 'supervisor'],
     idp: ['employee', 'supervisor', 'hr']
 };
 

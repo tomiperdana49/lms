@@ -14,6 +14,7 @@
     "onlineModules": "Modul Online",
     "trainingInternal": "Training Internal",
     "trainingExternal": "Training Eksternal",
+    "postTrainingEvaluation": "Post Training Evaluation",
     "idp": "IDP"
   },
   "labels": {
@@ -201,6 +202,55 @@
         "Tab \"Team Approvals\" hanya muncul kalau kamu memang punya bawahan yang tercatat di data kepegawaian.",
         "\"Show Detail\" tersedia di kedua tab (My Requests & Team Approvals) untuk melihat rincian lengkap termasuk sertifikat."
       ]
+    },
+    "postTrainingEvaluation": {
+      "title": "Post Training Evaluation",
+      "audiences": {
+        "participant": {
+          "label": "Sebagai Peserta",
+          "purpose": "Cek apakah atasanmu sudah mengevaluasi penerapan training internal yang kamu ikuti di pekerjaan, dan lihat hasilnya setelah diisi.",
+          "steps": [
+            {
+              "title": "Buka menunya",
+              "description": "Di sidebar, buka Training → Post Training Evaluation. Evaluasi milikmu terbagi jadi Active (belum diisi atasan) dan Closed (sudah diisi)."
+            },
+            {
+              "title": "Tunggu jendela evaluasinya terbuka",
+              "description": "Evaluasi baru tersedia untuk diisi atasanmu sekitar 1 (satu) bulan setelah tanggal trainingmu, jadi training yang baru selesai biasanya belum menampilkan apa-apa."
+            },
+            {
+              "title": "Lihat evaluasi yang sudah selesai",
+              "description": "Setelah atasanmu submit, item pindah ke Closed. Klik \"View\" untuk melihat semua pertanyaan dan jawabannya, termasuk skor rata-rata kalau form punya pertanyaan skala."
+            }
+          ],
+          "tips": [
+            "Halaman ini bersifat read-only — evaluasi diisi oleh atasanmu, bukan oleh kamu sendiri.",
+            "Belum ada yang muncul sampai sekitar 30 hari setelah tanggal training, meskipun sesi trainingnya sendiri sudah closed/paid."
+          ]
+        },
+        "supervisor": {
+          "label": "Sebagai Atasan Langsung",
+          "purpose": "Evaluasi apakah training internal yang diikuti anak buahmu benar-benar diterapkan di pekerjaan, dan apakah ada perubahan sikap kerja — dilakukan sekitar 1 (satu) bulan setelah training berakhir.",
+          "steps": [
+            {
+              "title": "Buka daftar tim",
+              "description": "Training → Post Training Evaluation menampilkan setiap anak buah yang mengikuti training internal yang sudah closed minimal 30 hari lalu, terbagi jadi Active (belum diisi) dan Closed (sudah diisi)."
+            },
+            {
+              "title": "Isi evaluasi",
+              "description": "Klik \"Fill Evaluation\" pada item Active, jawab setiap pertanyaan skala (1-4) dan pertanyaan teks bebas (kalau ada), lalu submit."
+            },
+            {
+              "title": "Tinjau evaluasi yang sudah diisi",
+              "description": "Item Closed menampilkan skor rata-rata dan tanggal submit. Klik \"View\" untuk melihat lagi seluruh jawabannya."
+            }
+          ],
+          "tips": [
+            "Evaluasi baru tersedia 30 hari setelah tanggal training — training yang baru saja closed belum akan muncul meskipun statusnya sudah Paid.",
+            "Form evaluasi yang dipakai ulang untuk beberapa sesi training melacak jawaban tiap peserta secara terpisah per sesi."
+          ]
+        }
+      }
     },
     "idp": {
       "title": "IDP",

@@ -14,6 +14,7 @@
     "onlineModules": "Online Modules",
     "trainingInternal": "Training Internal",
     "trainingExternal": "Training External",
+    "postTrainingEvaluation": "Post Training Evaluation",
     "idp": "IDP"
   },
   "labels": {
@@ -201,6 +202,55 @@
         "The \"Team Approvals\" tab only appears if you actually have direct reports recorded in the employee data.",
         "\"Show Detail\" is available on both tabs (My Requests & Team Approvals) to see the full breakdown, including the certificate."
       ]
+    },
+    "postTrainingEvaluation": {
+      "title": "Post Training Evaluation",
+      "audiences": {
+        "participant": {
+          "label": "As a Participant",
+          "purpose": "Check whether your supervisor has evaluated how you've applied an internal training back on the job, and view the result once it's submitted.",
+          "steps": [
+            {
+              "title": "Open the menu",
+              "description": "In the sidebar, go to Training → Post Training Evaluation. Your own evaluations are split into Active (not yet submitted by your supervisor) and Closed (already submitted)."
+            },
+            {
+              "title": "Wait for the evaluation window",
+              "description": "The evaluation only becomes available to your supervisor about 1 (one) month after your training's date, so a recently finished training normally shows nothing yet."
+            },
+            {
+              "title": "View a completed evaluation",
+              "description": "Once your supervisor submits it, the item moves to Closed. Click \"View\" to see every question and answer, plus your average score if the form has scale questions."
+            }
+          ],
+          "tips": [
+            "This page is read-only — the evaluation is filled in by your supervisor, not by you.",
+            "Nothing shows up until about 30 days after the training's date, even if the training session itself is already closed/paid."
+          ]
+        },
+        "supervisor": {
+          "label": "As a Direct Supervisor",
+          "purpose": "Evaluate whether the internal training your direct reports attended is actually being applied on the job, and whether it changed their work attitude — done about 1 (one) month after the training ends.",
+          "steps": [
+            {
+              "title": "Open your team's list",
+              "description": "Training → Post Training Evaluation lists every direct report who attended an internal training that closed at least 30 days ago, split into Active (not yet filled) and Closed (already filled)."
+            },
+            {
+              "title": "Fill an evaluation",
+              "description": "Click \"Fill Evaluation\" on an Active item, answer each scale question (1-4) and any open-text question, then submit."
+            },
+            {
+              "title": "Review a submitted evaluation",
+              "description": "Closed items show the average score and submission date. Click \"View\" to see the full set of answers again."
+            }
+          ],
+          "tips": [
+            "An evaluation only becomes available 30 days after the training date — a training that just closed doesn't show up yet even if it's marked Paid.",
+            "A reused evaluation form (applied across multiple training sessions) tracks each attendee's answers separately per session."
+          ]
+        }
+      }
     },
     "idp": {
       "title": "IDP",
