@@ -656,6 +656,22 @@ const getMeetingSyncData = (meetingRow) => {
     };
 };
 
+// The Training Feedback form saves raw per-question answers ({ q1..q10: 1-4 scale, q11/q12: free
+// text }), not a single score - so a plain `feedback_data.rating` lookup only ever matches legacy
+// bulk-imported rows (which do store a flat { rating }), and silently comes up null for every real
+// submission. Averages the numeric qN answers instead, same approach the HR export in
+// TrainingInternalList.tsx uses for its own feedback-average column.
+const computeFeedbackRating = (data) => {
+    if (!data || typeof data !== 'object') return null;
+    if (data.rating !== undefined && data.rating !== null) return Number(data.rating);
+    const scaleScores = Object.keys(data)
+        .filter(k => /^q\d+$/.test(k))
+        .map(k => Number(data[k]))
+        .filter(v => !isNaN(v));
+    if (scaleScores.length === 0) return null;
+    return Math.round((scaleScores.reduce((a, b) => a + b, 0) / scaleScores.length) * 10) / 10;
+};
+
 // Per-employee pre-test/post-test/feedback for one meeting - same source tables and "keep the best
 // score" rule computeLearningStats uses, so the Nusawork note matches what the Learning Report shows.
 const getMeetingParticipantScores = async (meetingId) => {
@@ -681,7 +697,7 @@ const getMeetingParticipantScores = async (meetingId) => {
         if (!scores[row.employee_id]) scores[row.employee_id] = { preTest: null, postTest: null, feedback: null };
         try {
             const data = typeof row.feedback_data === 'string' ? JSON.parse(row.feedback_data) : row.feedback_data;
-            if (data && data.rating !== undefined) scores[row.employee_id].feedback = data.rating;
+            scores[row.employee_id].feedback = computeFeedbackRating(data);
         } catch (e) { /* ignore */ }
     }
     return scores;
@@ -2323,7 +2339,7 @@ const computeLearningStats = async ({ email, employee_id, startDate, endDate }) 
         let rating = null;
         try {
             const data = typeof f.feedback_data === 'string' ? JSON.parse(f.feedback_data) : f.feedback_data;
-            if (data && data.rating !== undefined) rating = data.rating;
+            rating = computeFeedbackRating(data);
         } catch (e) { }
         feedbackByMeeting[f.meeting_id] = { submittedAt: f.submitted_at, rating };
     }
