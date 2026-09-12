@@ -39,6 +39,8 @@
     "sessionCloseError": "Gagal menutup sesi.",
     "sessionReopened": "Sesi berhasil dibuka kembali.",
     "sessionReopenError": "Gagal membuka kembali sesi.",
+    "reportUnlocked": "Laporan dibuka kembali untuk diedit.",
+    "reportUnlockError": "Gagal membuka kunci laporan.",
     "certificateGenerationError": "Gagal membuat sertifikat. Silakan coba lagi."
   },
   "cancelMeetingModal": {
@@ -50,6 +52,11 @@
     "title": "Konfirmasi Pembayaran",
     "message": "Apakah Anda yakin ingin menandai ini sebagai LUNAS? Ini akan mengunci laporan dan biaya tidak dapat diubah lagi.",
     "confirmText": "Ya, Tandai Lunas"
+  },
+  "confirmUnlockPaidModal": {
+    "title": "Buka Kunci Laporan yang Sudah Lunas?",
+    "message": "Ini akan membuka laporan untuk diedit kembali. Sertifikat yang sudah terbit dan Post Training Evaluation yang sudah dipublish tidak akan terpengaruh, tapi kamu perlu klik \"Tandai Lunas\" lagi setelah selesai melakukan koreksi.",
+    "confirmText": "Ya, Buka Kunci"
   },
   "participantModal": {
     "titleDone": "Peserta Sudah Selesai",
@@ -193,6 +200,7 @@
     "totalEstimatedCost": "Total Perkiraan Biaya",
     "cancelButton": "Batal",
     "reportPaidLocked": "Laporan Lunas & Terkunci",
+    "unlockToEdit": "Buka Kunci untuk Edit",
     "sessionStillOpen": "Sesi Masih Terbuka",
     "markPaid": "Tandai Lunas"
   },

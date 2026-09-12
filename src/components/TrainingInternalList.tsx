@@ -95,6 +95,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
     const [meetingToDelete, setMeetingToDelete] = useState<number | null>(null);
     const [confirmMarkPaid, setConfirmMarkPaid] = useState<boolean>(false);
+    const [confirmUnlockPaid, setConfirmUnlockPaid] = useState<boolean>(false);
     const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
     const [isDownloadingCert, setIsDownloadingCert] = useState(false);
     const [certInfo, setCertInfo] = useState<{ certNo: string; serial: string; qrDataUrl: string; trainingDate: Date; role: 'participant' | 'host'; issuedIn?: string } | null>(null);
@@ -1539,6 +1540,41 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             console.error(e);
             setNotification({ show: true, type: 'error', message: t('notifications.sessionReopenError') });
         }
+    };
+
+    // HR-only escape hatch for a cost report that was marked Paid by mistake (wrong incentive/cost
+    // figures, missing attendees) - unlike Reopen Session (which only touches is_closed), this
+    // flips costReport.isPaid back off so Finalize Report's fields become editable again. HR then
+    // has to click "Mark Paid" again once corrections are done, same as the original flow.
+    const handleUnlockReport = async () => {
+        if (!reportingId) return;
+        const meeting = meetings.find(m => m.id === reportingId);
+        if (!meeting) return;
+
+        const updatedData = { ...reportData, isPaid: false };
+
+        try {
+            const body = { ...meeting, costReport: updatedData };
+            const res = await fetch(`${API_BASE_URL}/api/meetings/${reportingId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                const safeData = safeMeeting(data);
+                setReportData(updatedData);
+                setMeetings(prev => prev.map(m => m.id === safeData.id ? safeData : m));
+                setNotification({ show: true, type: 'success', message: t('notifications.reportUnlocked') });
+            } else {
+                throw new Error("Failed to unlock report.");
+            }
+        } catch (e) {
+            console.error(e);
+            setNotification({ show: true, type: 'error', message: t('notifications.reportUnlockError') });
+        }
+        setConfirmUnlockPaid(false);
     };
 
     const handleDownloadInternalCertificate = async (role: 'participant' | 'host' = 'participant') => {
@@ -4165,9 +4201,18 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                 </button>
 
                                 {reportData.isPaid ? (
-                                    <div className="flex-[2] py-3 bg-slate-100 text-slate-400 font-bold rounded-xl flex items-center justify-center gap-2 border border-slate-200">
-                                        <CheckCircle size={18} /> {t('reportModal.reportPaidLocked')}
-                                    </div>
+                                    (effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN') ? (
+                                        <button
+                                            onClick={() => setConfirmUnlockPaid(true)}
+                                            className="flex-[2] py-3 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold rounded-xl flex items-center justify-center gap-2 border border-amber-200 transition-all"
+                                        >
+                                            <Lock size={18} /> {t('reportModal.unlockToEdit')}
+                                        </button>
+                                    ) : (
+                                        <div className="flex-[2] py-3 bg-slate-100 text-slate-400 font-bold rounded-xl flex items-center justify-center gap-2 border border-slate-200">
+                                            <CheckCircle size={18} /> {t('reportModal.reportPaidLocked')}
+                                        </div>
+                                    )
                                 ) : (
                                     (() => {
                                         // Check if meeting is closed - only closed meetings can be paid by HR
@@ -4238,6 +4283,17 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 message={t('confirmPaidModal.message')}
                 confirmText={t('confirmPaidModal.confirmText')}
                 variant="success"
+            />
+
+            {/* Confirm Unlock Paid Report Modal */}
+            <ConfirmationModal
+                isOpen={confirmUnlockPaid}
+                onClose={() => setConfirmUnlockPaid(false)}
+                onConfirm={handleUnlockReport}
+                title={t('confirmUnlockPaidModal.title')}
+                message={t('confirmUnlockPaidModal.message')}
+                confirmText={t('confirmUnlockPaidModal.confirmText')}
+                variant="warning"
             />
 
 

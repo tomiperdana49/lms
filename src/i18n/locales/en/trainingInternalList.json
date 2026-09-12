@@ -39,6 +39,8 @@
     "sessionCloseError": "Failed to close session.",
     "sessionReopened": "Session reopened successfully.",
     "sessionReopenError": "Failed to reopen session.",
+    "reportUnlocked": "Report unlocked for editing.",
+    "reportUnlockError": "Failed to unlock report.",
     "certificateGenerationError": "Failed to generate certificate. Please try again."
   },
   "cancelMeetingModal": {
@@ -50,6 +52,11 @@
     "title": "Confirm Payment",
     "message": "Are you sure you want to mark this as PAID? This will lock the report and costs cannot be changed anymore.",
     "confirmText": "Yes, Mark Paid"
+  },
+  "confirmUnlockPaidModal": {
+    "title": "Unlock Paid Report?",
+    "message": "This will reopen the report for editing. Certificates already issued and Post Training Evaluations already published are not affected, but you'll need to click \"Mark Paid\" again after making corrections.",
+    "confirmText": "Yes, Unlock"
   },
   "participantModal": {
     "titleDone": "Participants Completed",
@@ -193,6 +200,7 @@
     "totalEstimatedCost": "Total Estimated Cost",
     "cancelButton": "Cancel",
     "reportPaidLocked": "Report Paid & Locked",
+    "unlockToEdit": "Unlock to Edit",
     "sessionStillOpen": "Session Still Open",
     "markPaid": "Mark Paid"
   },
