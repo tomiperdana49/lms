@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
+import { Lock, Mail, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { jwtDecode } from "jwt-decode";
 import { useTranslation } from 'react-i18next';
@@ -176,8 +176,9 @@ const LoginPage = ({ onLogin, sessionExpiredReason, onSessionExpiredReasonShown 
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
+                            {isLoading && <Loader2 size={18} className="animate-spin" />}
                             {isLoading ? t('signingIn') : t('signIn')}
                         </button>
 
