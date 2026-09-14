@@ -57,6 +57,22 @@ import idUserManagement from './locales/id/userManagement.json';
 
 export const LANGUAGE_STORAGE_KEY = 'lms_language';
 
+const SUPPORTED_LANGUAGES = ['en', 'id'] as const;
+
+const detectBrowserLanguage = (): 'en' | 'id' => {
+    if (typeof navigator === 'undefined') return 'en';
+    const browserLangs = navigator.languages && navigator.languages.length > 0
+        ? navigator.languages
+        : [navigator.language];
+    for (const lang of browserLangs) {
+        const code = lang?.split('-')[0].toLowerCase();
+        if ((SUPPORTED_LANGUAGES as readonly string[]).includes(code)) {
+            return code as 'en' | 'id';
+        }
+    }
+    return 'en';
+};
+
 const savedLanguage = typeof window !== 'undefined' ? localStorage.getItem(LANGUAGE_STORAGE_KEY) : null;
 
 i18n
@@ -120,7 +136,7 @@ i18n
                 userManagement: idUserManagement,
             },
         },
-        lng: savedLanguage || 'en',
+        lng: savedLanguage || detectBrowserLanguage(),
         fallbackLng: 'en',
         defaultNS: 'common',
         interpolation: {
