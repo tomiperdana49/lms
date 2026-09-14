@@ -1121,11 +1121,12 @@ const checkIsSupervisor = async (user) => {
     if (user.employee_id || user.name || user.email) {
         try {
             const subCount = await querySimAsset(
-                `SELECT COUNT(*) as count FROM employees 
-                 WHERE id_report_to = ? 
-                    OR id_report_to = ? 
-                    OR id_report_to LIKE ? 
-                    OR id_report_to = ?`,
+                `SELECT COUNT(*) as count FROM employees
+                 WHERE (id_report_to = ?
+                    OR id_report_to = ?
+                    OR id_report_to LIKE ?
+                    OR id_report_to = ?)
+                    AND (active_status IS NULL OR active_status != 'Resign')`,
                 [
                     user.employee_id || '___INVALID___',
                     user.name || '___INVALID___',
