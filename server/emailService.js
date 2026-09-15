@@ -57,7 +57,7 @@ PRODID:-//LMS Nusa//Meeting//EN
 CALSCALE:GREGORIAN
 METHOD:REQUEST
 BEGIN:VEVENT
-UID:${meeting.id}@lms.nusa.net.id
+UID:${meeting.id}@lms.nusa.id
 DTSTAMP:${now}
 DTSTART:${start}
 DTEND:${end}
