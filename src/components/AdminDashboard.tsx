@@ -22,14 +22,17 @@ import QuizReportList from './QuizReportList';
 import EmployeeLearningReport from './EmployeeLearningReport';
 import IDPManager from './IDPManager';
 import PostTrainingEvaluationManager from './PostTrainingEvaluationManager';
+import CompetencyTemplateManager from './CompetencyTemplateManager';
+import CompetencyApprovalManager from './CompetencyApprovalManager';
+import CompetencyOverviewPage from './CompetencyOverviewPage';
 
 interface AdminDashboardProps {
     user: User;
-    onNavigate: (page: Page) => void;
+    onNavigate: (page: Page, view?: string) => void;
     initialView?: string;
 }
 
-type AdminView = 'overview' | 'users' | 'logs' | 'training' | 'meetings' | 'courses' | 'reports' | 'calendar' | 'quiz-reports' | 'employee-learning-report' | 'idp' | 'post-training-evaluation';
+type AdminView = 'overview' | 'users' | 'logs' | 'training' | 'meetings' | 'courses' | 'reports' | 'calendar' | 'quiz-reports' | 'employee-learning-report' | 'idp' | 'post-training-evaluation' | 'competency-template' | 'competency-approvals' | 'competency-overview';
 
 interface StatCardProps {
     label: string;
@@ -62,16 +65,24 @@ const StatCard = ({ label, value, icon: Icon, color, trend }: StatCardProps) => 
     );
 };
 
-const AdminDashboard = ({ user, initialView }: AdminDashboardProps) => {
+const AdminDashboard = ({ user, onNavigate, initialView }: AdminDashboardProps) => {
     const { t } = useTranslation('adminDashboard');
     const [currentView, setCurrentView] = useState<AdminView>((initialView as AdminView) || 'overview');
-    
+
     // Sinkronkan view jika prop berubah dari sidebar utama
     useEffect(() => {
         if (initialView) {
             setCurrentView(initialView as AdminView);
         }
     }, [initialView]);
+
+    // Report every internal navigation (including a sub-view's "Back to Dashboard") back up to
+    // App.tsx's adminView state - otherwise the sidebar keeps highlighting the view you left,
+    // since it only reads that outer state, not this component's own currentView.
+    useEffect(() => {
+        onNavigate('admin-dashboard', currentView);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentView]);
 
     // Save to localStorage for persistence on reload
     useEffect(() => {
@@ -148,6 +159,12 @@ const AdminDashboard = ({ user, initialView }: AdminDashboardProps) => {
                 return <EmployeeLearningReport userRole={user.role} />;
             case 'idp':
                 return <IDPManager userRole={user.role} userName={user.name} />;
+            case 'competency-template':
+                return <CompetencyTemplateManager userRole={user.role} onBack={() => setCurrentView('overview')} />;
+            case 'competency-approvals':
+                return <CompetencyApprovalManager userRole={user.role} reviewerId={user.employee_id} onBack={() => setCurrentView('overview')} />;
+            case 'competency-overview':
+                return <CompetencyOverviewPage userRole={user.role} onBack={() => setCurrentView('overview')} />;
             case 'calendar':
                 return <LMSCalendar compact={false} userEmail={user.email} userRole={user.role} />;
             case 'overview':

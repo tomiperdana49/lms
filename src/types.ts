@@ -28,7 +28,7 @@ export interface ReadingLogEntry {
     claimedAt?: string;
 }
 
-export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'external-approval' | 'pte-team' | 'pte-mine' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives' | 'learning-report' | 'help' | 'idp';
+export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'external-approval' | 'pte-team' | 'pte-mine' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives' | 'learning-report' | 'help' | 'idp' | 'competency-team' | 'competency-mine';
 export type Role = 'STAFF' | 'HR' | 'HR_ADMIN';
 export type AdminView = 'users' | 'logs' | 'approval' | 'meetings' | 'courses' | 'assets' | 'employees';
 
@@ -43,6 +43,13 @@ export interface User {
     employee_name?: string;
     isSupervisor?: boolean; // Dynamically computed if they have subordinates
     organization_name?: string;
+}
+
+export interface TeamMember {
+    employeeId: string;
+    fullName: string;
+    jobPosition: string;
+    isSupervisor: boolean;
 }
 
 export interface Question {
@@ -212,6 +219,44 @@ export interface Incentive {
     paymentType?: 'One-Time' | 'Recurring'; // New: Payment frequency
     approvedDate?: string;
     employee_id?: string;
+}
+
+export interface CompetencyTemplate {
+    id: number;
+    competencyType: string;
+    position: string;
+    competencyName: string;
+    operationalDefinition: string;
+    standardLevelIndicator: string;
+    jdReference: string;
+    standardScore?: number | null;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+export interface CompetencyStandardOverride {
+    position: string;
+    competencyType: string;
+    competencyName: string;
+    standardScore: number;
+}
+
+export interface CompetencyChangeRequest {
+    id: number;
+    requesterId: string;
+    position: string;
+    action: 'ADD' | 'EDIT' | 'DELETE' | 'STANDARD_OVERRIDE';
+    competencyType: string;
+    competencyName: string;
+    targetTemplateId: number | null;
+    payload: Record<string, unknown> | null;
+    previous: Record<string, unknown> | null;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    reviewedBy: string | null;
+    reviewedAt: string | null;
+    rejectionReason: string | null;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface Employee {

@@ -1242,6 +1242,16 @@ const findSubordinateEmployeeIds = async (leaderId) => {
     return subordinatesResult.map(s => s.id_employee);
 };
 
+// The set of every employee_id/full_name that appears as someone else's id_report_to -
+// membership means "this person has at least one direct report". Shared by /api/team-members and
+// /api/employees/directory so both compute isSupervisor the same way.
+const getSupervisorIdentifierSet = async () => {
+    const leaderRows = await querySimAsset(
+        `SELECT DISTINCT id_report_to FROM employees WHERE id_report_to IS NOT NULL`
+    );
+    return new Set(leaderRows.map(r => r.id_report_to));
+};
+
 // Resolves the definitive ATTENDED employee_id list for a meeting row - used only by Post
 // Training Evaluation, where a no-show must never be counted as someone to evaluate. Once the
 // cost report is finalized, its attendee_ids/attendees are the ground truth for who actually
@@ -2980,6 +2990,56 @@ app.get('/api/users', async (req, res) => {
 });
 
 // SIMASSET integration routes moved up
+app.get('/api/employees/positions', async (req, res) => {
+    try {
+        const rows = await querySimAsset(`
+            SELECT DISTINCT job_position FROM employees
+            WHERE deleted_at IS NULL AND job_position IS NOT NULL AND job_position <> ''
+            ORDER BY job_position ASC
+        `);
+        res.json(rows.map(r => r.job_position));
+    } catch (err) {
+        console.error("[API] Error in /api/employees/positions:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Every active employee company-wide, with isSupervisor - unlike /api/team-members (which is
+// scoped to one leader's subordinates), this powers HR's company-wide Competency Overview.
+// Must stay registered before /api/employees/:employeeId below, or Express would match
+// "directory" as an :employeeId instead.
+app.get('/api/employees/directory', async (req, res) => {
+    try {
+        const employees = await querySimAsset(
+            `SELECT id_employee, full_name, job_position FROM employees
+             WHERE deleted_at IS NULL AND (active_status IS NULL OR active_status != 'Resign')
+               AND (status_join IS NULL OR status_join != 'Internship')
+             ORDER BY full_name ASC`
+        );
+        const reportToSet = await getSupervisorIdentifierSet();
+        const mapped = employees.map(e => ({
+            employeeId: e.id_employee,
+            fullName: e.full_name,
+            jobPosition: e.job_position,
+            isSupervisor: reportToSet.has(e.id_employee) || reportToSet.has(e.full_name)
+        }));
+        res.json(mapped);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/employees/:employeeId', async (req, res) => {
+    try {
+        const { employeeId } = req.params;
+        const rows = await querySimAsset(
+            'SELECT id_employee, full_name, job_position FROM employees WHERE id_employee = ?',
+            [employeeId]
+        );
+        if (rows.length === 0) return res.status(404).json({ error: 'Employee not found' });
+        const e = rows[0];
+        res.json({ employeeId: e.id_employee, fullName: e.full_name, jobPosition: e.job_position });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/employees', async (req, res) => {
     console.log("[API] GET /api/employees - Fetching data from SimAsset");
     try {
@@ -6054,6 +6114,37 @@ app.get('/api/idp/subordinates', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Team members for a leader (used by the "Kompetensi Teams" page to show each report's
+// applicable competencies). isSupervisor is included per member so "Semua Posisi Level
+// Leader" competency rows can be matched even when a direct report is themselves a leader.
+app.get('/api/team-members', async (req, res) => {
+    try {
+        const { leader_id } = req.query;
+        if (!leader_id) return res.json([]);
+
+        const subordinateIds = await findSubordinateEmployeeIds(leader_id);
+        if (subordinateIds.length === 0) return res.json([]);
+
+        const placeholders = subordinateIds.map(() => '?').join(',');
+        const members = await querySimAsset(
+            `SELECT id_employee, full_name, job_position FROM employees
+             WHERE id_employee IN (${placeholders}) AND (active_status IS NULL OR active_status != 'Resign')
+               AND (status_join IS NULL OR status_join != 'Internship')
+             ORDER BY full_name ASC`,
+            subordinateIds
+        );
+
+        const reportToSet = await getSupervisorIdentifierSet();
+        const mapped = members.map(m => ({
+            employeeId: m.id_employee,
+            fullName: m.full_name,
+            jobPosition: m.job_position,
+            isSupervisor: reportToSet.has(m.id_employee) || reportToSet.has(m.full_name)
+        }));
+        res.json(mapped);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // 4. HR/admin: every IDP.
 app.get('/api/idp/all', async (req, res) => {
     try {
@@ -6404,6 +6495,417 @@ app.delete('/api/incentives/:id', async (req, res) => {
     try {
         const { id } = req.params;
         await query('DELETE FROM incentives WHERE id = ?', [id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- COMPETENCY TEMPLATES (Admin > Settings > Template Kompetensi) ---
+// A non-HR requester (a team leader) may only write templates for a position held by one of
+// their own direct/indirect reports - never company-wide. HR bypasses this entirely. When no
+// requesterId is supplied at all (e.g. an older/internal caller), we skip the check rather than
+// reject, since these endpoints historically had no auth and other callers may not send one yet.
+const getManagedPositions = async (leaderId) => {
+    const subordinateIds = await findSubordinateEmployeeIds(leaderId);
+    if (subordinateIds.length === 0) return [];
+    const placeholders = subordinateIds.map(() => '?').join(',');
+    const rows = await querySimAsset(
+        `SELECT DISTINCT job_position FROM employees
+         WHERE id_employee IN (${placeholders}) AND (active_status IS NULL OR active_status != 'Resign')
+           AND (status_join IS NULL OR status_join != 'Internship')
+           AND job_position IS NOT NULL AND job_position != ''`,
+        subordinateIds
+    );
+    return rows.map(r => r.job_position);
+};
+
+const getRequesterRole = async (requesterId) => {
+    if (!requesterId) return null;
+    const userRows = await query('SELECT role FROM users WHERE employee_id = ?', [requesterId]);
+    return userRows[0]?.role || 'STAFF';
+};
+
+const authorizeTemplateWrite = async (requesterId, position) => {
+    if (!requesterId) return null;
+    const role = await getRequesterRole(requesterId);
+    if (role === 'HR') return null;
+    const managedPositions = await getManagedPositions(requesterId);
+    if (!position || !managedPositions.includes(position)) {
+        return 'You can only manage competencies for positions within your own team.';
+    }
+    return null;
+};
+
+// Every non-HR write (a team leader's Add/Edit/Delete on FUNCTIONAL, or Standard override on
+// CORE) is queued here instead of touching real data - HR approving the request is what actually
+// applies it (see the /approve handler below), and rejecting it just marks the row REJECTED.
+const mapChangeRequest = (row) => ({
+    id: row.id,
+    requesterId: row.requester_id,
+    position: row.position,
+    action: row.action,
+    competencyType: row.competency_type,
+    competencyName: row.competency_name,
+    targetTemplateId: row.target_template_id,
+    payload: row.payload_json ? JSON.parse(row.payload_json) : null,
+    previous: row.previous_json ? JSON.parse(row.previous_json) : null,
+    status: row.status,
+    reviewedBy: row.reviewed_by,
+    reviewedAt: row.reviewed_at,
+    rejectionReason: row.rejection_reason,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+});
+
+const createChangeRequest = async ({ requesterId, position, action, competencyType, competencyName, targetTemplateId, payload, previous }) => {
+    const result = await query(
+        `INSERT INTO competency_change_requests
+         (requester_id, position, action, competency_type, competency_name, target_template_id, payload_json, previous_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+            requesterId, position, action, competencyType, competencyName,
+            targetTemplateId || null,
+            payload ? JSON.stringify(payload) : null,
+            previous ? JSON.stringify(previous) : null
+        ]
+    );
+    const rows = await query('SELECT * FROM competency_change_requests WHERE id = ?', [result.insertId]);
+    return mapChangeRequest(rows[0]);
+};
+
+const mapCompetencyTemplate = (row) => ({
+    ...row,
+    competencyType: row.jenis_kompetensi,
+    position: row.posisi,
+    competencyName: row.kompetensi,
+    operationalDefinition: row.definisi_operasional,
+    standardLevelIndicator: row.indikator_level_standar,
+    jdReference: row.acuan_jd,
+    standardScore: row.standar_jabatan,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+});
+
+app.get('/api/competency-templates', async (req, res) => {
+    try {
+        const rows = await query('SELECT * FROM competency_templates ORDER BY id DESC');
+        res.json(rows.map(mapCompetencyTemplate));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/competency-templates', async (req, res) => {
+    try {
+        const c = req.body;
+        const authError = await authorizeTemplateWrite(c.requesterId, c.position);
+        if (authError) return res.status(403).json({ error: authError });
+        const payload = {
+            competencyType: c.competencyType || '',
+            position: c.position || '',
+            competencyName: c.competencyName || '',
+            operationalDefinition: c.operationalDefinition || '',
+            standardLevelIndicator: c.standardLevelIndicator || '',
+            jdReference: c.jdReference || '',
+            standardScore: c.standardScore || null
+        };
+        const role = await getRequesterRole(c.requesterId);
+        if (c.requesterId && role !== 'HR') {
+            const request = await createChangeRequest({
+                requesterId: c.requesterId,
+                position: payload.position,
+                action: 'ADD',
+                competencyType: payload.competencyType,
+                competencyName: payload.competencyName,
+                payload
+            });
+            return res.json({ pending: true, request });
+        }
+        const result = await query(
+            'INSERT INTO competency_templates (jenis_kompetensi, posisi, kompetensi, definisi_operasional, indikator_level_standar, acuan_jd, standar_jabatan) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [payload.competencyType, payload.position, payload.competencyName, payload.operationalDefinition, payload.standardLevelIndicator, payload.jdReference, payload.standardScore]
+        );
+        const created = await query('SELECT * FROM competency_templates WHERE id = ?', [result.insertId]);
+        res.json(mapCompetencyTemplate(created[0]));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/competency-templates/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const c = req.body;
+        const existingRows = await query('SELECT * FROM competency_templates WHERE id = ?', [id]);
+        if (existingRows.length === 0) return res.status(404).json({ error: 'Template not found' });
+        const currentAuthError = await authorizeTemplateWrite(c.requesterId, existingRows[0].posisi);
+        if (currentAuthError) return res.status(403).json({ error: currentAuthError });
+        const newAuthError = await authorizeTemplateWrite(c.requesterId, c.position || existingRows[0].posisi);
+        if (newAuthError) return res.status(403).json({ error: newAuthError });
+        const payload = {
+            competencyType: c.competencyType || '',
+            position: c.position || existingRows[0].posisi,
+            competencyName: c.competencyName || '',
+            operationalDefinition: c.operationalDefinition || '',
+            standardLevelIndicator: c.standardLevelIndicator || '',
+            jdReference: c.jdReference || '',
+            standardScore: c.standardScore || null
+        };
+        const role = await getRequesterRole(c.requesterId);
+        if (c.requesterId && role !== 'HR') {
+            const existing = mapCompetencyTemplate(existingRows[0]);
+            const request = await createChangeRequest({
+                requesterId: c.requesterId,
+                position: existing.position,
+                action: 'EDIT',
+                competencyType: payload.competencyType,
+                competencyName: payload.competencyName,
+                targetTemplateId: existing.id,
+                payload,
+                previous: existing
+            });
+            return res.json({ pending: true, request });
+        }
+        await query(
+            'UPDATE competency_templates SET jenis_kompetensi = ?, posisi = ?, kompetensi = ?, definisi_operasional = ?, indikator_level_standar = ?, acuan_jd = ?, standar_jabatan = ? WHERE id = ?',
+            [payload.competencyType, payload.position, payload.competencyName, payload.operationalDefinition, payload.standardLevelIndicator, payload.jdReference, payload.standardScore, id]
+        );
+        const updated = await query('SELECT * FROM competency_templates WHERE id = ?', [id]);
+        res.json(mapCompetencyTemplate(updated[0]));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/competency-templates/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { requesterId } = req.query;
+        const existingRows = await query('SELECT * FROM competency_templates WHERE id = ?', [id]);
+        if (existingRows.length === 0) return res.status(404).json({ error: 'Template not found' });
+        const authError = await authorizeTemplateWrite(requesterId, existingRows[0].posisi);
+        if (authError) return res.status(403).json({ error: authError });
+        const role = await getRequesterRole(requesterId);
+        if (requesterId && role !== 'HR') {
+            const existing = mapCompetencyTemplate(existingRows[0]);
+            const request = await createChangeRequest({
+                requesterId,
+                position: existing.position,
+                action: 'DELETE',
+                competencyType: existing.competencyType,
+                competencyName: existing.competencyName,
+                targetTemplateId: existing.id,
+                previous: existing
+            });
+            return res.json({ pending: true, request });
+        }
+        await query('DELETE FROM competency_templates WHERE id = ?', [id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- COMPETENCY STANDARD OVERRIDES (a team leader's own Standard, isolated from HR's template) ---
+const mapStandardOverride = (row) => ({
+    position: row.position,
+    competencyType: row.competency_type,
+    competencyName: row.competency_name,
+    standardScore: row.standard_score
+});
+
+app.get('/api/competency-standard-overrides', async (req, res) => {
+    try {
+        const rows = await query('SELECT * FROM competency_standard_overrides');
+        res.json(rows.map(mapStandardOverride));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/competency-standard-overrides', async (req, res) => {
+    try {
+        const { position, competencyType, competencyName, standardScore, requesterId } = req.body;
+        const authError = await authorizeTemplateWrite(requesterId, position);
+        if (authError) return res.status(403).json({ error: authError });
+        const role = await getRequesterRole(requesterId);
+        if (requesterId && role !== 'HR') {
+            const existingRows = await query(
+                'SELECT * FROM competency_standard_overrides WHERE position = ? AND competency_type = ? AND competency_name = ?',
+                [position, competencyType, competencyName]
+            );
+            const request = await createChangeRequest({
+                requesterId,
+                position,
+                action: 'STANDARD_OVERRIDE',
+                competencyType,
+                competencyName,
+                payload: { standardScore },
+                previous: existingRows[0] ? mapStandardOverride(existingRows[0]) : null
+            });
+            return res.json({ pending: true, request });
+        }
+        await query(
+            `INSERT INTO competency_standard_overrides (position, competency_type, competency_name, standard_score)
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE standard_score = VALUES(standard_score)`,
+            [position, competencyType, competencyName, standardScore]
+        );
+        const updated = await query(
+            'SELECT * FROM competency_standard_overrides WHERE position = ? AND competency_type = ? AND competency_name = ?',
+            [position, competencyType, competencyName]
+        );
+        res.json(mapStandardOverride(updated[0]));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- COMPETENCY CHANGE REQUESTS (HR review queue for leader Add/Edit/Delete/Standard actions) ---
+app.get('/api/competency-change-requests', async (req, res) => {
+    try {
+        const { status, requesterId } = req.query;
+        const conditions = [];
+        const params = [];
+        if (status) { conditions.push('status = ?'); params.push(status); }
+        if (requesterId) { conditions.push('requester_id = ?'); params.push(requesterId); }
+        const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+        const rows = await query(`SELECT * FROM competency_change_requests ${where} ORDER BY created_at DESC`, params);
+        res.json(rows.map(mapChangeRequest));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/competency-change-requests/:id/approve', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reviewerId } = req.body;
+        const role = await getRequesterRole(reviewerId);
+        if (role !== 'HR') return res.status(403).json({ error: 'Only HR can approve requests.' });
+        const rows = await query('SELECT * FROM competency_change_requests WHERE id = ?', [id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'Request not found' });
+        const reqRow = rows[0];
+        if (reqRow.status !== 'PENDING') return res.status(409).json({ error: 'This request has already been reviewed.' });
+        const payload = reqRow.payload_json ? JSON.parse(reqRow.payload_json) : null;
+
+        if (reqRow.action === 'ADD') {
+            await query(
+                'INSERT INTO competency_templates (jenis_kompetensi, posisi, kompetensi, definisi_operasional, indikator_level_standar, acuan_jd, standar_jabatan) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [payload.competencyType, payload.position, payload.competencyName, payload.operationalDefinition, payload.standardLevelIndicator, payload.jdReference, payload.standardScore]
+            );
+        } else if (reqRow.action === 'EDIT') {
+            await query(
+                'UPDATE competency_templates SET jenis_kompetensi = ?, posisi = ?, kompetensi = ?, definisi_operasional = ?, indikator_level_standar = ?, acuan_jd = ?, standar_jabatan = ? WHERE id = ?',
+                [payload.competencyType, payload.position, payload.competencyName, payload.operationalDefinition, payload.standardLevelIndicator, payload.jdReference, payload.standardScore, reqRow.target_template_id]
+            );
+        } else if (reqRow.action === 'DELETE') {
+            await query('DELETE FROM competency_templates WHERE id = ?', [reqRow.target_template_id]);
+        } else if (reqRow.action === 'STANDARD_OVERRIDE') {
+            await query(
+                `INSERT INTO competency_standard_overrides (position, competency_type, competency_name, standard_score)
+                 VALUES (?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE standard_score = VALUES(standard_score)`,
+                [reqRow.position, reqRow.competency_type, reqRow.competency_name, payload.standardScore]
+            );
+        }
+
+        await query(
+            "UPDATE competency_change_requests SET status = 'APPROVED', reviewed_by = ?, reviewed_at = NOW() WHERE id = ?",
+            [reviewerId, id]
+        );
+        const updated = await query('SELECT * FROM competency_change_requests WHERE id = ?', [id]);
+        res.json(mapChangeRequest(updated[0]));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/competency-change-requests/:id/reject', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reviewerId, reason } = req.body;
+        const role = await getRequesterRole(reviewerId);
+        if (role !== 'HR') return res.status(403).json({ error: 'Only HR can reject requests.' });
+        const rows = await query('SELECT * FROM competency_change_requests WHERE id = ?', [id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'Request not found' });
+        if (rows[0].status !== 'PENDING') return res.status(409).json({ error: 'This request has already been reviewed.' });
+        await query(
+            "UPDATE competency_change_requests SET status = 'REJECTED', reviewed_by = ?, reviewed_at = NOW(), rejection_reason = ? WHERE id = ?",
+            [reviewerId, reason || null, id]
+        );
+        const updated = await query('SELECT * FROM competency_change_requests WHERE id = ?', [id]);
+        res.json(mapChangeRequest(updated[0]));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- COMPETENCY ASSESSMENTS (Kompetensi Teams: leader-submitted "Aktual" scores) ---
+// Assessments are scoped to a quarter+year period. A period becomes immutable as soon as any
+// row exists for it (enforced in the POST handler below) - there's no separate approval step,
+// saving is what makes a quarter final.
+
+// One row per quarter/year the employee has been assessed for - used to notify the employee
+// when their leader submits a new period, since /latest requires already knowing the period.
+app.get('/api/competency-assessments/periods', async (req, res) => {
+    try {
+        const { employee_id } = req.query;
+        if (!employee_id) return res.json([]);
+        const rows = await query(
+            `SELECT quarter, year, MIN(assessed_at) as assessed_at, MIN(assessed_by_name) as assessed_by_name
+             FROM competency_assessments WHERE employee_id = ? GROUP BY quarter, year ORDER BY (year * 4 + quarter) DESC`,
+            [employee_id]
+        );
+        res.json(rows.map(r => ({ quarter: r.quarter, year: r.year, assessedAt: r.assessed_at, assessedByName: r.assessed_by_name })));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/competency-assessments/latest', async (req, res) => {
+    try {
+        const { employee_id, quarter, year } = req.query;
+        if (!employee_id || !quarter || !year) {
+            return res.json({ current: {}, isLocked: false, previousTotal: null, previousPeriod: null, notes: null, assessedByName: null });
+        }
+
+        const rows = await query(
+            'SELECT competency_template_id, actual_score, assessed_by_name FROM competency_assessments WHERE employee_id = ? AND quarter = ? AND year = ?',
+            [employee_id, quarter, year]
+        );
+        const current = {};
+        rows.forEach(r => { current[r.competency_template_id] = r.actual_score; });
+        const assessedByName = rows[0]?.assessed_by_name ?? null;
+
+        const prev = await query(
+            `SELECT quarter, year, SUM(actual_score) as total FROM competency_assessments
+             WHERE employee_id = ? AND (year * 4 + quarter) < (? * 4 + ?)
+             GROUP BY quarter, year ORDER BY (year * 4 + quarter) DESC LIMIT 1`,
+            [employee_id, year, quarter]
+        );
+        const previousTotal = prev[0]?.total ?? null;
+        const previousPeriod = prev[0] ? { quarter: prev[0].quarter, year: prev[0].year } : null;
+
+        const notesRow = await query(
+            'SELECT notes FROM competency_assessment_notes WHERE employee_id = ? AND quarter = ? AND year = ?',
+            [employee_id, quarter, year]
+        );
+        const notes = notesRow[0]?.notes ?? null;
+
+        res.json({ current, isLocked: rows.length > 0, previousTotal, previousPeriod, notes, assessedByName });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/competency-assessments', async (req, res) => {
+    try {
+        const { employeeId, quarter, year, assessedByEmployeeId, assessedByName, scores, notes } = req.body;
+        if (!employeeId || !quarter || !year || !Array.isArray(scores) || scores.length === 0) {
+            return res.status(400).json({ error: 'employeeId, quarter, year and scores are required' });
+        }
+
+        const existing = await query(
+            'SELECT COUNT(*) as c FROM competency_assessments WHERE employee_id = ? AND quarter = ? AND year = ?',
+            [employeeId, quarter, year]
+        );
+        if (existing[0].c > 0) {
+            return res.status(409).json({ error: 'This period has already been saved and is locked.' });
+        }
+
+        const assessedAt = new Date();
+        for (const s of scores) {
+            await query(
+                'INSERT INTO competency_assessments (employee_id, competency_template_id, actual_score, assessed_at, quarter, year, assessed_by_employee_id, assessed_by_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [employeeId, s.competencyTemplateId, s.actualScore, assessedAt, quarter, year, assessedByEmployeeId || null, assessedByName || null]
+            );
+        }
+        if (notes && notes.trim()) {
+            await query(
+                `INSERT INTO competency_assessment_notes (employee_id, quarter, year, notes, assessed_by_employee_id, assessed_by_name)
+                 VALUES (?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE notes = VALUES(notes), assessed_by_employee_id = VALUES(assessed_by_employee_id), assessed_by_name = VALUES(assessed_by_name)`,
+                [employeeId, quarter, year, notes.trim(), assessedByEmployeeId || null, assessedByName || null]
+            );
+        }
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });

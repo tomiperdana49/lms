@@ -1,0 +1,54 @@
+{
+  "backToDashboard": "Back to Dashboard",
+  "title": "Competency Approvals",
+  "subtitle": "{{count}} request(s) awaiting your review. Nothing takes effect until you approve it.",
+  "loading": "Loading...",
+  "noRequests": "No pending requests right now.",
+  "accessDenied": "You don't have access to this page.",
+  "requestedBy": "Requested by {{name}}",
+  "approve": "Approve",
+  "reject": "Reject",
+  "tabs": {
+    "pending": "Pending",
+    "history": "History"
+  },
+  "noHistory": "No approval history yet.",
+  "reviewedBy": "Reviewed by {{name}}",
+  "statusLabel": {
+    "APPROVED": "Approved",
+    "REJECTED": "Rejected"
+  },
+  "rejectionReason": "Reason: \"{{reason}}\"",
+  "actions": {
+    "ADD": "Add",
+    "EDIT": "Edit",
+    "DELETE": "Delete",
+    "STANDARD_OVERRIDE": "Standard"
+  },
+  "fields": {
+    "competencyName": "Name",
+    "standardScore": "Standard",
+    "operationalDefinition": "Operational Definition",
+    "standardLevelIndicator": "Standard Level Indicator",
+    "jdReference": "JD Reference"
+  },
+  "summary": {
+    "add": "New competency \"{{name}}\" with Standard {{standard}}.",
+    "delete": "Remove \"{{name}}\" (currently Standard {{standard}}).",
+    "standard": "Standard: {{from}} → {{to}}",
+    "hrDefault": "HR default"
+  },
+  "rejectModal": {
+    "title": "Reject Request",
+    "message": "Reject the request for \"{{name}}\"? The leader's change will not be applied.",
+    "confirm": "Reject",
+    "reasonPlaceholder": "Optional: let the leader know why (visible to them)"
+  },
+  "notifications": {
+    "loadFailed": "Failed to load requests.",
+    "approveSuccess": "Request approved and applied.",
+    "approveFailed": "Failed to approve the request.",
+    "rejectSuccess": "Request rejected.",
+    "rejectFailed": "Failed to reject the request."
+  }
+}

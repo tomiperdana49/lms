@@ -1,0 +1,124 @@
+{
+  "backToDashboard": "Back to Dashboard",
+  "title": "Team Competencies",
+  "subtitle": "Assess each team member's competencies against the standard for their position.",
+  "loading": "Loading...",
+  "noTeamMembers": "You don't have any team members yet.",
+  "teamMembers": "Team Members",
+  "position": "Position",
+  "assessmentFor": "Assessment for {{name}}",
+  "employeeId": "Emp. ID",
+  "previousScore": "Previous assessment score",
+  "previousScoreFor": "Score for {{period}}",
+  "noCompetenciesForPosition": "No competencies have been defined yet for this position.",
+  "overview": {
+    "clickToAssess": "Click an employee's name to fill in their assessment.",
+    "backToOverview": "Back to Team Competencies"
+  },
+  "period": {
+    "name": "Quarter {{quarter}} {{year}}",
+    "locked": "Locked",
+    "lockedNotice": "This quarter has already been saved and can no longer be edited."
+  },
+  "sectionHeaders": {
+    "CORE": "CORE COMPETENCIES",
+    "FUNCTIONAL": "FUNCTIONAL COMPETENCIES",
+    "LEADERSHIP": "LEADERSHIP COMPETENCIES",
+    "default": "{{type}} COMPETENCIES"
+  },
+  "table": {
+    "no": "No",
+    "competency": "Competency",
+    "standard": "Position Standard",
+    "actual": "Actual",
+    "gap": "Gap",
+    "operationalDefinition": "Operational Definition",
+    "standardLevelIndicator": "Standard Level Indicator",
+    "jdReference": "JD Reference"
+  },
+  "summary": {
+    "totalScore": "Total Score",
+    "achievementPercent": "% Achievement vs. Standard",
+    "gapCount": "Competencies Below Standard",
+    "readinessStatus": "Position Readiness Status"
+  },
+  "notes": {
+    "label": "Notes / Supervisor's Recommendation",
+    "placeholder": "Write a note or recommendation for this employee...",
+    "empty": "No notes yet."
+  },
+  "status": {
+    "ready": "Ready",
+    "limitedDevelopment": "Needs limited development",
+    "significantDevelopment": "Needs significant development"
+  },
+  "actions": {
+    "save": "Save Assessment"
+  },
+  "notifications": {
+    "saveSuccess": "Assessment saved successfully!",
+    "saveFailed": "Failed to save assessment.",
+    "loadFailed": "Failed to load data.",
+    "unassessedRemaining": "{{count}} competencies not yet assessed",
+    "periodLocked": "This quarter has already been saved by someone else and is now locked."
+  },
+  "dictionary": {
+    "openButton": "Competency Dictionary",
+    "title": "Competency Dictionary",
+    "subtitle": "Propose competencies and standards for your team's position(s). Nothing takes effect until HR approves it.",
+    "standardOnlyNotice": "Defined by HR. You can only propose a Standard change for your own position."
+  },
+  "templateActions": {
+    "add": "Add",
+    "edit": "Edit competency",
+    "delete": "Delete competency",
+    "editStandard": "Edit standard",
+    "editStandardTitle": "Edit Standard",
+    "addTitle": "Add Competency",
+    "editTitle": "Edit Competency",
+    "positionLabel": "Position",
+    "competencyType": "Competency Type",
+    "competencyName": "Competency Name",
+    "operationalDefinition": "Operational Definition",
+    "standardLevelIndicator": "Standard Level Indicator",
+    "jdReference": "JD Reference",
+    "standardScore": "Position Standard",
+    "standardScoreShort": "Standard",
+    "selectStandardScore": "Select a standard score",
+    "cancel": "Cancel",
+    "save": "Submit for approval",
+    "addSuccess": "Competency added successfully!",
+    "updateSuccess": "Updated successfully!",
+    "deleteSuccess": "Competency deleted successfully!",
+    "submittedForApproval": "Submitted! This change will apply once HR approves it.",
+    "saveFailed": "Failed to save.",
+    "deleteFailed": "Failed to delete competency.",
+    "deleteTitle": "Delete Competency",
+    "deleteMessage": "Submit a request to delete \"{{name}}\"? It will only be removed once HR approves.",
+    "awaitingApproval": "Awaiting HR approval",
+    "pendingStandard": "Standard {{value}} proposed - awaiting HR approval",
+    "pendingEdit": "Edit proposed - awaiting HR approval",
+    "pendingDelete": "Deletion proposed - awaiting HR approval",
+    "pendingAdd": "New competency proposed - awaiting HR approval",
+    "scoreLabels": {
+      "1": "Basic",
+      "2": "Autonomous",
+      "3": "Proficient",
+      "4": "Expert"
+    }
+  },
+  "mine": {
+    "title": "My Competency",
+    "subtitle": "Review your competency assessment from your supervisor.",
+    "noAssessmentYet": "No assessment from your supervisor for this period yet.",
+    "assessedBy": "Assessed by {{name}}"
+  },
+  "allEmployees": {
+    "title": "Employee Competency",
+    "subtitle": "Look up any employee's competency assessment across the company.",
+    "accessDenied": "Access Denied. HR Only.",
+    "searchPlaceholder": "Search by name, ID or position...",
+    "noResults": "No employees match your search.",
+    "selectPrompt": "Select an employee from the list to view their competency assessment."
+  }
+}

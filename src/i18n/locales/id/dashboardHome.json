@@ -36,7 +36,8 @@
     "title": "Perlu Tindakan Anda",
     "empty": "Tidak ada yang perlu ditindaklanjuti saat ini.",
     "viewAll": "Lihat semua",
-    "idpItem": "IDP Tahun {{year}}"
+    "idpItem": "IDP Tahun {{year}}",
+    "competencyItem": "Perubahan kompetensi - {{position}}"
   },
   "menu": {
     "readingLogTitle": "Log Bacaan",

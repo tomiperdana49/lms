@@ -657,6 +657,136 @@ export const initDB = async () => {
             console.log("Removed SUPERVISOR from users.role enum.");
         } catch (e) { /* Ignore if already migrated */ }
 
+        // Competency dictionary maintained by HR under Admin > Settings > Template Kompetensi.
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS competency_templates (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    jenis_kompetensi VARCHAR(255),
+                    posisi VARCHAR(255),
+                    kompetensi VARCHAR(255) NOT NULL,
+                    definisi_operasional TEXT,
+                    indikator_level_standar TEXT,
+                    acuan_jd VARCHAR(255),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            `);
+            console.log("Verified competency_templates table exists.");
+        } catch (e) { console.error("Failed to create competency_templates:", e.message); }
+
+        // MIGRATION: Target/standard score (1-4 scale) per competency, set by HR. Nullable since
+        // existing rows predate this field and are backfilled gradually.
+        try {
+            await connection.query("ALTER TABLE competency_templates ADD COLUMN standar_jabatan TINYINT");
+            console.log("Added standar_jabatan column to competency_templates.");
+        } catch (e) { /* Ignore if exists */ }
+
+        // History of leader-submitted "Aktual" scores per team member per competency, one row
+        // per competency per quarter. A quarter is immutable once any rows exist for it (see the
+        // POST /api/competency-assessments lock check in server.js) - there is no separate
+        // approval step, saving is what makes a quarter final.
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS competency_assessments (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    employee_id VARCHAR(50) NOT NULL,
+                    competency_template_id INT NOT NULL,
+                    actual_score TINYINT NOT NULL,
+                    assessed_at DATETIME NOT NULL,
+                    assessed_by_employee_id VARCHAR(50),
+                    assessed_by_name VARCHAR(255),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_employee_assessed (employee_id, assessed_at)
+                )
+            `);
+            console.log("Verified competency_assessments table exists.");
+        } catch (e) { console.error("Failed to create competency_assessments:", e.message); }
+
+        // MIGRATION: Quarter/year period for each assessment row, replacing the earlier
+        // "most recent two timestamp groups" heuristic with an explicit, queryable period.
+        try {
+            await connection.query("ALTER TABLE competency_assessments ADD COLUMN quarter TINYINT");
+            console.log("Added quarter column to competency_assessments.");
+        } catch (e) { /* Ignore if exists */ }
+        try {
+            await connection.query("ALTER TABLE competency_assessments ADD COLUMN year SMALLINT");
+            console.log("Added year column to competency_assessments.");
+        } catch (e) { /* Ignore if exists */ }
+        try {
+            await connection.query("ALTER TABLE competency_assessments ADD UNIQUE KEY uniq_employee_competency_period (employee_id, competency_template_id, quarter, year)");
+            console.log("Added uniq_employee_competency_period key to competency_assessments.");
+        } catch (e) { /* Ignore if exists */ }
+
+        // The leader's free-text note/recommendation for a team member, one per employee per
+        // quarter - kept separate from competency_assessments since it isn't per-competency.
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS competency_assessment_notes (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    employee_id VARCHAR(50) NOT NULL,
+                    quarter TINYINT NOT NULL,
+                    year SMALLINT NOT NULL,
+                    notes TEXT,
+                    assessed_by_employee_id VARCHAR(50),
+                    assessed_by_name VARCHAR(255),
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY uniq_employee_notes_period (employee_id, quarter, year)
+                )
+            `);
+            console.log("Verified competency_assessment_notes table exists.");
+        } catch (e) { console.error("Failed to create competency_assessment_notes:", e.message); }
+
+        // A team leader may tune the Standard for a competency within their own position, but
+        // must never touch the HR-authored competency_templates row itself (name, definition,
+        // indicator, JD reference, or its original standard) - not even for the same position,
+        // since that row is the one HR also sees/edits. This table holds just that one number,
+        // keyed by (position, type, name) so it applies regardless of whether the HR source row
+        // for that competency lives under "Umum" or the position itself.
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS competency_standard_overrides (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    position VARCHAR(255) NOT NULL,
+                    competency_type VARCHAR(255) NOT NULL,
+                    competency_name VARCHAR(255) NOT NULL,
+                    standard_score TINYINT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY uniq_standard_override (position, competency_type, competency_name)
+                )
+            `);
+            console.log("Verified competency_standard_overrides table exists.");
+        } catch (e) { console.error("Failed to create competency_standard_overrides:", e.message); }
+
+        // No leader action in the Competency Dictionary takes effect immediately - every Add,
+        // Edit, Delete (FUNCTIONAL) and Standard adjustment (CORE) is queued here first. HR
+        // approving it is what actually writes to competency_templates /
+        // competency_standard_overrides; rejecting it just marks the row REJECTED and nothing
+        // the leader did ever touches real data.
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS competency_change_requests (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    requester_id VARCHAR(50) NOT NULL,
+                    position VARCHAR(255) NOT NULL,
+                    action ENUM('ADD', 'EDIT', 'DELETE', 'STANDARD_OVERRIDE') NOT NULL,
+                    competency_type VARCHAR(255) NOT NULL,
+                    competency_name VARCHAR(255) NOT NULL,
+                    target_template_id INT,
+                    payload_json TEXT,
+                    previous_json TEXT,
+                    status ENUM('PENDING', 'APPROVED', 'REJECTED') NOT NULL DEFAULT 'PENDING',
+                    reviewed_by VARCHAR(50),
+                    reviewed_at DATETIME,
+                    rejection_reason TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            `);
+            console.log("Verified competency_change_requests table exists.");
+        } catch (e) { console.error("Failed to create competency_change_requests:", e.message); }
+
         connection.release();
     } catch (err) {
         console.error('Database initialization failed:', err);
