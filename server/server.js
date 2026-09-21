@@ -5946,12 +5946,11 @@ app.post('/api/idp', async (req, res) => {
 // only backfills plans that don't exist yet, never overwrites live data.
 app.post('/api/idp/bulk-import', async (req, res) => {
     const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
-    // HR's own bulk import (IDPManager.tsx) is backfilling records HR has already reviewed, so a sheet
-    // carrying reviews/an approval date can create the plan as straight-up Approved. The employee's own
-    // "Import from Excel" (IDPPage.tsx) sends allowAutoApprove:false, since an employee uploading their
-    // own file shouldn't be able to grant themselves HR approval - it can still land as Pending (with
-    // its review history and HR note backfilled) so the real approval still has to happen through HR.
-    const allowAutoApprove = req.body.allowAutoApprove !== false;
+    // Neither HR's own bulk import (IDPManager.tsx) nor the employee's "Import from Excel"
+    // (IDPPage.tsx) can auto-approve a plan just because its sheet already carries a review history
+    // or an approval date - that data is backfilled either way (see hasApprovalSignal below), but the
+    // plan still lands as Pending/Draft, exactly like a sheet with no history at all, so a real HR
+    // approval always has to happen through the app afterward rather than being implied by the import.
     const result = { inserted: 0, skipped: 0, duplicates: [], errors: [] };
 
     for (let i = 0; i < rows.length; i++) {
@@ -5964,11 +5963,11 @@ app.post('/api/idp/bulk-import', async (req, res) => {
             }
 
             const nameMatches = await querySimAsset(
-                'SELECT id_employee, full_name, organization_name, join_date FROM employees WHERE full_name = ? LIMIT 1',
+                'SELECT id_employee, full_name, job_position, organization_name, join_date FROM employees WHERE full_name = ? LIMIT 1',
                 [row.employee_name.trim()]
             );
             const employee = nameMatches[0] || (await querySimAsset(
-                'SELECT id_employee, full_name, organization_name, join_date FROM employees WHERE full_name LIKE ? LIMIT 1',
+                'SELECT id_employee, full_name, job_position, organization_name, join_date FROM employees WHERE full_name LIKE ? LIMIT 1',
                 [`%${row.employee_name.trim()}%`]
             ))[0];
 
@@ -5981,22 +5980,22 @@ app.post('/api/idp/bulk-import', async (req, res) => {
             // sheet had typed ("januar ilham") - the row already matched to this exact employee above.
             const employeeName = employee.full_name || row.employee_name.trim();
 
-            // Same best-effort match as hrNoteBy below: "fani" -> "Fani Hardianto" only when exactly
-            // one employee matches that text, so a shortened/misspelled name is never silently
-            // attributed to the wrong person. Falls back to the org chart's report-to relationship
-            // when the sheet didn't name a supervisor at all.
-            let supervisorName = row.supervisor_name ? (await matchEmployeeFullName(row.supervisor_name)) || row.supervisor_name.trim() : null;
-            if (!supervisorName) {
-                const supervisor = await findReportToEmployee(employeeId);
-                supervisorName = supervisor?.full_name || null;
-            }
+            // Job Position, Department, Direct Supervisor and Start Date at Company are all sourced
+            // from the org chart record matched above, never from the sheet - these are factual/
+            // administrative fields the org chart owns, and the sheet's copy is often stale (typed
+            // whenever the employee last filled the template) or malformed (e.g. a raw Excel date
+            // serial like 39142 leaking through when the "Start Date" cell wasn't a real date).
+            const jobPosition = employee.job_position || '';
+            const department = employee.organization_name || '';
+            const joinDateLabel = formatIndoDate(employee.join_date);
+            const supervisor = await findReportToEmployee(employeeId);
+            const supervisorName = supervisor?.full_name || null;
+
             const reviews = Array.isArray(row.reviews) ? row.reviews.filter(r => r.review_date) : [];
             // Prefer the real employee's canonical name over whatever shorthand the sheet used
             // ("Indah R"); if it doesn't match anyone (or matches more than one person), keep the
             // sheet's text as-is rather than guessing.
             const hrNoteBy = row.hr_note_by ? (await matchEmployeeFullName(row.hr_note_by)) || row.hr_note_by : null;
-            const department = row.department || employee.organization_name || '';
-            const joinDateLabel = row.join_date_label || formatIndoDate(employee.join_date);
 
             const existing = await query(
                 'SELECT id, hr_note, employee_name, job_position, department, supervisor_name, join_date_label, created_by_date, approved_date FROM idp_plans WHERE employee_id = ? AND period_year = ?',
@@ -6005,26 +6004,28 @@ app.post('/api/idp/bulk-import', async (req, res) => {
             if (existing.length > 0) {
                 // Don't overwrite the existing plan's narrative fields (achievements, career goal, etc.) -
                 // those may have been hand-edited live in the app since, and the sheet could be a stale
-                // snapshot of them. Factual/administrative fields (job title, dept, dates) are different:
-                // they're not something an employee keeps refining, and created_by_date in particular can
-                // silently drift to "today" if the plan gets resubmitted elsewhere in the app - so the
-                // sheet is treated as authoritative for those, falling back to the existing value only
-                // when the sheet doesn't provide one. Then backfill whatever else the sheet has that the
+                // snapshot of them. employee_name/job_position/department/supervisor_name/join_date_label
+                // are always the org chart's current values (resolved above), never the sheet's, so they
+                // just overwrite outright here too - re-importing an old sheet can't regress them back to
+                // a stale snapshot. created_by_date is the one administrative field still sourced from the
+                // sheet (the org chart has no equivalent), falling back to the existing value only when the
+                // sheet doesn't provide one - it can otherwise silently drift to "today" if the plan gets
+                // resubmitted elsewhere in the app. Then backfill whatever else the sheet has that the
                 // existing record is missing: review-log rows the plan doesn't have yet (matched by date,
                 // so re-importing the same file is idempotent) and the HR note if none is set yet.
                 const existingPlan = existing[0];
                 await query(
                     `UPDATE idp_plans SET employee_name = ?, job_position = ?, department = ?, supervisor_name = ?, join_date_label = ?, created_by_date = ?, approved_date = ? WHERE id = ?`,
                     [
-                        employeeName || existingPlan.employee_name || '',
-                        row.job_position || existingPlan.job_position || '',
-                        department || existingPlan.department || '',
-                        supervisorName || existingPlan.supervisor_name || null,
-                        joinDateLabel || existingPlan.join_date_label || '',
+                        employeeName,
+                        jobPosition,
+                        department,
+                        supervisorName,
+                        joinDateLabel,
                         row.created_by_date || existingPlan.created_by_date || null,
-                        // Same rule as the fresh-insert path: an employee-side import (allowAutoApprove
-                        // false) can never write an approval date onto their own plan.
-                        (allowAutoApprove && row.approved_date) || existingPlan.approved_date || null,
+                        // Same rule as the fresh-insert path: import never writes a new approval date -
+                        // only preserves one the plan already has from a real approval in the app.
+                        existingPlan.approved_date || null,
                         existingPlan.id
                     ]
                 );
@@ -6057,11 +6058,10 @@ app.post('/api/idp/bulk-import', async (req, res) => {
             }
 
             const hasApprovalSignal = !!(row.approved_date || reviews.length > 0);
-            const status = allowAutoApprove
-                ? (hasApprovalSignal ? 'Approved' : (row.created_by_date ? 'Pending' : 'Draft'))
-                : ((row.created_by_date || hasApprovalSignal) ? 'Pending' : 'Draft');
-            // Never persist an approval date without the approval itself having actually happened.
-            const approvedDateToStore = allowAutoApprove ? (row.approved_date || null) : null;
+            const status = (row.created_by_date || hasApprovalSignal) ? 'Pending' : 'Draft';
+            // Never persist an approval date via import - approval always has to be a real, explicit
+            // action taken through the app, never implied by whatever the sheet happened to carry.
+            const approvedDateToStore = null;
 
             const planResult = await query(`
                 INSERT INTO idp_plans
@@ -6070,7 +6070,7 @@ app.post('/api/idp/bulk-import', async (req, res) => {
                  created_by_date, approved_date, hr_note, hr_note_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
-                employeeId, employeeName, row.job_position || '', department, supervisorName,
+                employeeId, employeeName, jobPosition, department, supervisorName,
                 row.period_year, joinDateLabel, row.achievements || '', row.career_goal || '',
                 row.existing_skills || '', row.development_area || '', status,
                 row.created_by_date || null, approvedDateToStore, row.hr_note || null, hrNoteBy

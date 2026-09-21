@@ -258,10 +258,10 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                     await fetch(`${API_BASE_URL}/api/idp/bulk-import`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        // allowAutoApprove: false - an employee importing their own file shouldn't be
-                        // able to grant themselves HR approval just because the sheet has review history
-                        // in it. The plan still lands as Pending (or Draft) with everything else backfilled.
-                        body: JSON.stringify({ rows: [parsed], allowAutoApprove: false })
+                        // The import can never land as Approved regardless of who imports or what the
+                        // sheet carries - it lands as Pending (or Draft) with everything else backfilled,
+                        // and a real HR approval always has to happen afterward through the app.
+                        body: JSON.stringify({ rows: [parsed] })
                     });
                     // Refetch directly (rather than fire-and-forget fetchMyPlans()) so we can find the
                     // affected plan's id right away and force its detail (reviews/HR note) to reload too -
