@@ -27,6 +27,9 @@ import enReadingLogPage from './locales/en/readingLogPage.json';
 import enTrainingExternalManager from './locales/en/trainingExternalManager.json';
 import enTrainingInternalList from './locales/en/trainingInternalList.json';
 import enUserManagement from './locales/en/userManagement.json';
+import enCompetencyTemplate from './locales/en/competencyTemplate.json';
+import enCompetencyTeam from './locales/en/competencyTeam.json';
+import enCompetencyApprovals from './locales/en/competencyApprovals.json';
 
 import idCommon from './locales/id/common.json';
 import idLogin from './locales/id/loginPage.json';
@@ -54,6 +57,9 @@ import idReadingLogPage from './locales/id/readingLogPage.json';
 import idTrainingExternalManager from './locales/id/trainingExternalManager.json';
 import idTrainingInternalList from './locales/id/trainingInternalList.json';
 import idUserManagement from './locales/id/userManagement.json';
+import idCompetencyTemplate from './locales/id/competencyTemplate.json';
+import idCompetencyTeam from './locales/id/competencyTeam.json';
+import idCompetencyApprovals from './locales/id/competencyApprovals.json';
 
 export const LANGUAGE_STORAGE_KEY = 'lms_language';
 
@@ -106,6 +112,9 @@ i18n
                 trainingExternalManager: enTrainingExternalManager,
                 trainingInternalList: enTrainingInternalList,
                 userManagement: enUserManagement,
+                competencyTemplate: enCompetencyTemplate,
+                competencyTeam: enCompetencyTeam,
+                competencyApprovals: enCompetencyApprovals,
             },
             id: {
                 common: idCommon,
@@ -134,6 +143,9 @@ i18n
                 trainingExternalManager: idTrainingExternalManager,
                 trainingInternalList: idTrainingInternalList,
                 userManagement: idUserManagement,
+                competencyTemplate: idCompetencyTemplate,
+                competencyTeam: idCompetencyTeam,
+                competencyApprovals: idCompetencyApprovals,
             },
         },
         lng: savedLanguage || detectBrowserLanguage(),

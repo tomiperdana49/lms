@@ -11,6 +11,7 @@ interface PendingActionItem {
     title: string;
     subtitle: string;
     date: string;
+    target: { page: Page; view?: string };
 }
 
 interface LearningStatDetail {
@@ -58,6 +59,7 @@ interface DashboardHomeProps {
 const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName, userEmployeeId, config }: DashboardHomeProps) => {
     const { t } = useTranslation('dashboardHome');
     const [pendingActions, setPendingActions] = useState<PendingActionItem[]>([]);
+    const [isPendingActionsModalOpen, setIsPendingActionsModalOpen] = useState(false);
 
     // "Perlu Tindakan Anda": surfaces items where THIS user is the one who needs to act next -
     // a supervisor's team external-training requests, or HR's employee IDP submissions. Each role
@@ -72,32 +74,43 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
                         id: r.id,
                         title: r.employee_name,
                         subtitle: r.title,
-                        date: r.created_at
+                        date: r.created_at,
+                        target: { page: 'external', view: 'team_approvals' }
                     })));
                 })
                 .catch(err => console.error('Error fetching pending external training:', err));
         } else if (userRole === 'HR' || userRole === 'HR_ADMIN') {
-            fetch(`${API_BASE_URL}/api/idp/all`)
-                .then(res => res.json())
-                .then(data => {
-                    const pending = (Array.isArray(data) ? data : []).filter((p: any) => p.status === 'Pending');
-                    setPendingActions(pending.map((p: any) => ({
+            Promise.all([
+                fetch(`${API_BASE_URL}/api/idp/all`).then(res => res.json()),
+                fetch(`${API_BASE_URL}/api/competency-change-requests?status=PENDING`).then(res => res.json())
+            ])
+                .then(([idpData, competencyData]) => {
+                    const pendingIdp = (Array.isArray(idpData) ? idpData : []).filter((p: any) => p.status === 'Pending');
+                    const idpItems: PendingActionItem[] = pendingIdp.map((p: any) => ({
                         id: p.id,
                         title: p.employee_name,
                         subtitle: t('pendingActions.idpItem', { year: p.period_year }),
-                        date: p.created_by_date
-                    })));
+                        date: p.created_by_date,
+                        target: { page: 'admin-dashboard', view: 'idp' }
+                    }));
+                    const competencyItems: PendingActionItem[] = (Array.isArray(competencyData) ? competencyData : []).map((r: any) => ({
+                        id: 100000 + r.id,
+                        title: r.competencyName,
+                        subtitle: t('pendingActions.competencyItem', { position: r.position }),
+                        date: r.createdAt,
+                        target: { page: 'admin-dashboard', view: 'competency-approvals' }
+                    }));
+                    setPendingActions([...idpItems, ...competencyItems]);
                 })
-                .catch(err => console.error('Error fetching pending IDP plans:', err));
+                .catch(err => console.error('Error fetching pending actions:', err));
         } else {
             setPendingActions([]);
         }
     }, [userRole, isSupervisor, userEmployeeId, t]);
 
-    const goToPendingActions = () => {
-        if (!onNavigate) return;
-        if (isSupervisor) onNavigate('external', 'team_approvals');
-        else onNavigate('admin-dashboard', 'idp');
+    const handlePendingActionClick = (item: PendingActionItem) => {
+        setIsPendingActionsModalOpen(false);
+        onNavigate?.(item.target.page, item.target.view);
     };
     const [learningStats, setLearningStats] = useState<LearningStats>({
         totalJam: 0, totalBiaya: 0,
@@ -276,6 +289,15 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
                 />
             )}
 
+            {isPendingActionsModalOpen && (
+                <PendingActionsModal
+                    items={pendingActions}
+                    onItemClick={handlePendingActionClick}
+                    onClose={() => setIsPendingActionsModalOpen(false)}
+                    t={t}
+                />
+            )}
+
             {/* Perlu Tindakan Anda - only shown to roles that actually approve something */}
             {(isSupervisor || userRole === 'HR' || userRole === 'HR_ADMIN') && (
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 sm:p-6 shrink-0">
@@ -290,7 +312,7 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
                             )}
                         </div>
                         {pendingActions.length > 0 && (
-                            <button onClick={goToPendingActions} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 shrink-0">
+                            <button onClick={() => setIsPendingActionsModalOpen(true)} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 shrink-0">
                                 {t('pendingActions.viewAll')} <ChevronRight size={14} />
                             </button>
                         )}
@@ -300,10 +322,10 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
                         <p className="text-sm text-slate-400">{t('pendingActions.empty')}</p>
                     ) : (
                         <div className="space-y-2">
-                            {pendingActions.slice(0, 5).map(item => (
+                            {pendingActions.slice(0, 2).map(item => (
                                 <button
                                     key={item.id}
-                                    onClick={goToPendingActions}
+                                    onClick={() => handlePendingActionClick(item)}
                                     className="w-full flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors text-left"
                                 >
                                     <div className="min-w-0">
@@ -377,6 +399,57 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
                     </div>
                 </div>
 
+            </div>
+        </div>
+    );
+};
+
+interface PendingActionsModalProps {
+    items: PendingActionItem[];
+    onItemClick: (item: PendingActionItem) => void;
+    onClose: () => void;
+    t: (key: string, opts?: Record<string, unknown>) => string;
+}
+
+const PendingActionsModal = ({ items, onItemClick, onClose, t }: PendingActionsModalProps) => {
+    const formatDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr || '-';
+        return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col animate-in fade-in zoom-in duration-200">
+                <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <AlertCircle size={20} className="text-amber-600" />
+                        {t('pendingActions.title')}
+                    </h3>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+                </div>
+
+                <div className="overflow-y-auto p-6 space-y-2 flex-1">
+                    {items.length === 0 ? (
+                        <p className="text-sm text-slate-400 italic">{t('pendingActions.empty')}</p>
+                    ) : (
+                        items.map(item => (
+                            <button
+                                key={item.id}
+                                onClick={() => onItemClick(item)}
+                                className="w-full flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                            >
+                                <div className="min-w-0">
+                                    <p className="font-bold text-slate-700 text-sm truncate">{item.title}</p>
+                                    <p className="text-xs text-slate-400 truncate">{item.subtitle}</p>
+                                </div>
+                                <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap shrink-0">
+                                    {formatDate(item.date)}
+                                </span>
+                            </button>
+                        ))
+                    )}
+                </div>
             </div>
         </div>
     );

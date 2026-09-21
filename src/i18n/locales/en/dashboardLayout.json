@@ -6,6 +6,9 @@
     "calendar": "Calendar",
     "learningReport": "Learning Report",
     "idp": "IDP",
+    "competency": "Competency",
+    "competencyTeam": "Team Competencies",
+    "competencyMine": "My Competency",
     "incentives": "Incentives",
     "training": "Training",
     "internal": "Internal",
@@ -34,7 +37,11 @@
     "quizReport": "Quiz Report",
     "hrReport": "HR Report",
     "employeeLearningReport": "Employee Learning Report",
-    "idp": "Employee IDP"
+    "idp": "Employee IDP",
+    "settingsHeader": "COMPETENCY",
+    "competencyTemplate": "Competency Dictionary",
+    "competencyApprovals": "Competency Approvals",
+    "competencyOverview": "Employee Competency"
   },
   "notifications": {
     "title": "Notifications",
@@ -86,7 +93,20 @@
     "incentivePaid": "paid",
     "incentiveCanceled": "canceled",
     "incentiveStatusTitle": "Incentive {{status}}",
-    "incentiveStatusMessage": "Your incentive for \"{{title}}\" has been {{statusLabel}}."
+    "incentiveStatusMessage": "Your incentive for \"{{title}}\" has been {{statusLabel}}.",
+    "competencySubmittedTitle": "Competency Change Requested",
+    "competencySubmittedMessage": "A leader proposed a change to \"{{name}}\" ({{position}}), pending your review.",
+    "competencyApproved": "approved",
+    "competencyRejectedWithReason": "rejected with reason: \"{{reason}}\"",
+    "competencyRejected": "rejected",
+    "competencyStatusTitle": "Competency Request {{status}}",
+    "competencyStatusMessage": "Your proposed change to \"{{name}}\" has been {{statusLabel}}.",
+    "competencyStatus": {
+      "APPROVED": "Approved",
+      "REJECTED": "Rejected"
+    },
+    "competencyAssessmentSubmittedTitle": "New Competency Assessment",
+    "competencyAssessmentSubmittedMessage": "{{name}} has submitted your competency assessment for Q{{quarter}} {{year}}."
   },
   "footer": "© 2026 PT Media Antar Nusa",
   "userFallback": "User",

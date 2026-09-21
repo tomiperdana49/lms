@@ -1,0 +1,68 @@
+{
+  "backToDashboard": "Kembali ke Dashboard",
+  "title": "Kamus Kompetensi",
+  "subtitle": "Kelola kamus kompetensi yang digunakan di seluruh LMS ({{count}} data).",
+  "addTemplate": "Tambah Kompetensi",
+  "accessDenied": "Akses Ditolak. Khusus HR.",
+  "loading": "Memuat...",
+  "noData": "Belum ada kamus kompetensi.",
+  "noFilterResults": "Tidak ada kamus kompetensi yang sesuai dengan filter.",
+  "pagination": "Halaman {{current}} dari {{total}}",
+  "filters": {
+    "allTypes": "Semua Jenis Kompetensi",
+    "allPositions": "Semua Posisi",
+    "reset": "Reset Filter"
+  },
+  "table": {
+    "competencyType": "Jenis Kompetensi",
+    "position": "Posisi",
+    "competencyName": "Kompetensi",
+    "operationalDefinition": "Definisi Operasional",
+    "standardLevelIndicator": "Indikator pada Level Standar",
+    "jdReference": "Acuan JD",
+    "standardScore": "Std.",
+    "action": "Aksi"
+  },
+  "modal": {
+    "addTitle": "Tambah Kamus Kompetensi",
+    "editTitle": "Ubah Kamus Kompetensi",
+    "detailTitle": "Detail Kamus Kompetensi",
+    "close": "Tutup",
+    "competencyType": "Jenis Kompetensi",
+    "selectCompetencyType": "-- Pilih jenis kompetensi --",
+    "position": "Posisi",
+    "selectPosition": "Ketik untuk mencari posisi...",
+    "competencyName": "Kompetensi",
+    "operationalDefinition": "Definisi Operasional",
+    "standardLevelIndicator": "Indikator pada Level Standar",
+    "jdReference": "Acuan JD",
+    "standardScore": "Standar Jabatan (Skor Target)",
+    "selectStandardScore": "-- Pilih skor --",
+    "save": "Simpan",
+    "cancel": "Batal"
+  },
+  "scoreLabels": {
+    "1": "Basic",
+    "2": "Autonomous",
+    "3": "Proficient",
+    "4": "Expert"
+  },
+  "actions": {
+    "view": "Lihat Detail",
+    "edit": "Ubah",
+    "delete": "Hapus"
+  },
+  "confirm": {
+    "deleteTitle": "Hapus Kamus Kompetensi",
+    "deleteMessage": "Apakah Anda yakin ingin menghapus kamus kompetensi ini? Tindakan ini tidak dapat dibatalkan."
+  },
+  "notifications": {
+    "loadFailed": "Gagal memuat data.",
+    "createSuccess": "Kamus kompetensi berhasil dibuat!",
+    "createFailed": "Gagal membuat kamus kompetensi.",
+    "updateSuccess": "Kamus kompetensi berhasil diperbarui!",
+    "updateFailed": "Gagal memperbarui kamus kompetensi.",
+    "deleteSuccess": "Kamus kompetensi berhasil dihapus!",
+    "deleteFailed": "Gagal menghapus kamus kompetensi."
+  }
+}

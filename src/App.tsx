@@ -16,6 +16,8 @@ import LearningReport from './components/LearningReport';
 import VerifyCertificate from './components/VerifyCertificate';
 import HelpPage from './components/HelpPage';
 import IDPPage from './components/IDPPage';
+import CompetencyTeamPage from './components/CompetencyTeamPage';
+import CompetencyMyAssessmentPage from './components/CompetencyMyAssessmentPage';
 import PostTrainingEvaluationTeam from './components/PostTrainingEvaluationTeam';
 import PostTrainingEvaluationMine from './components/PostTrainingEvaluationMine';
 import type { Page, Role, User } from './types';
@@ -32,7 +34,7 @@ const LAST_ACTIVITY_KEY = 'lms_last_activity';
 
 // Mirrors the Page union in types.ts - kept as a runtime list so a URL path (typed by hand, or
 // visited via back/forward) can be validated before being cast to Page.
-const VALID_PAGES: Page[] = ['dashboard', 'reading-log', 'courses', 'internal', 'external', 'external-approval', 'pte-team', 'pte-mine', 'calendar', 'users', 'admin-logs', 'admin-dashboard', 'incentives', 'learning-report', 'help', 'idp'];
+const VALID_PAGES: Page[] = ['dashboard', 'reading-log', 'courses', 'internal', 'external', 'external-approval', 'pte-team', 'pte-mine', 'calendar', 'users', 'admin-logs', 'admin-dashboard', 'incentives', 'learning-report', 'help', 'idp', 'competency-team', 'competency-mine'];
 const isValidPage = (value: string): value is Page => (VALID_PAGES as string[]).includes(value);
 
 // These five live under the sidebar's "Training" group, so their URL nests the same way
@@ -41,7 +43,7 @@ const TRAINING_SUB_PAGES: Page[] = ['internal', 'external', 'external-approval',
 
 // Mirrors adminSubItems' `view` values in DashboardLayout.tsx - the Admin Panel's own sidebar
 // group, nested under /admin/<view> (e.g. /admin/calendar) the same way Training nests.
-const ADMIN_VIEWS = ['overview', 'calendar', 'users', 'courses', 'meetings', 'training', 'post-training-evaluation', 'logs', 'quiz-reports', 'reports', 'employee-learning-report', 'idp'];
+const ADMIN_VIEWS = ['overview', 'calendar', 'users', 'courses', 'meetings', 'training', 'post-training-evaluation', 'logs', 'quiz-reports', 'reports', 'employee-learning-report', 'idp', 'competency-template', 'competency-approvals', 'competency-overview'];
 const isValidAdminView = (value: string): boolean => ADMIN_VIEWS.includes(value);
 
 // A couple of internal view ids don't read as their sidebar label (e.g. 'logs' is the "Reading
@@ -96,6 +98,10 @@ function App() {
   // Deep links (e.g. from WhatsApp notifications, or the dashboard's "Perlu Tindakan Anda" widget)
   // can force the External Training tab via ?tab= on load, or via onNavigate('external', tab) later.
   const [deepLinkTab, setDeepLinkTab] = useState<string | null>(() => new URLSearchParams(window.location.search).get('tab'));
+
+  // Clicking a "New Competency Assessment" notification should open My Competency on the quarter
+  // it's about, not whatever quarter is currently selected there - carried as "quarter-year".
+  const [competencyDeepLinkPeriod, setCompetencyDeepLinkPeriod] = useState<string | null>(null);
 
   const [activePage, setActivePage] = useState<Page>(() => {
     // A path like /dashboard, /training/internal or /admin/calendar (typed directly, bookmarked,
@@ -385,6 +391,7 @@ function App() {
           if (view) {
             setAdminView(view);
             if (page === 'external') setDeepLinkTab(view);
+            if (page === 'competency-mine') setCompetencyDeepLinkPeriod(view);
           }
         }}
         userRole={userRole}
@@ -423,6 +430,8 @@ function App() {
         {activePage === 'pte-mine' && <PostTrainingEvaluationMine user={user!} />}
         {activePage === 'help' && <HelpPage />}
         {activePage === 'idp' && <IDPPage currentUser={user} />}
+        {activePage === 'competency-team' && <CompetencyTeamPage currentUser={user} />}
+        {activePage === 'competency-mine' && <CompetencyMyAssessmentPage currentUser={user} initialPeriod={competencyDeepLinkPeriod} />}
 
 
         {/* External Training (Unified Component) */}
@@ -455,7 +464,10 @@ function App() {
         {activePage === 'admin-dashboard' && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
           <AdminDashboard
             user={user!}
-            onNavigate={setActivePage}
+            onNavigate={(page, view) => {
+              setActivePage(page);
+              if (view) setAdminView(view);
+            }}
             initialView={adminView}
           />
         )}

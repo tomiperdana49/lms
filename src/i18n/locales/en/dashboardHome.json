@@ -36,7 +36,8 @@
     "title": "Needs Your Action",
     "empty": "Nothing needs your attention right now.",
     "viewAll": "View all",
-    "idpItem": "IDP for {{year}}"
+    "idpItem": "IDP for {{year}}",
+    "competencyItem": "Competency change - {{position}}"
   },
   "menu": {
     "readingLogTitle": "Reading Log",

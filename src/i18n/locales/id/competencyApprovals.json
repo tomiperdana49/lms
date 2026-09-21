@@ -1,0 +1,54 @@
+{
+  "backToDashboard": "Kembali ke Dashboard",
+  "title": "Persetujuan Kompetensi",
+  "subtitle": "{{count}} permintaan menunggu peninjauan Anda. Tidak ada yang berlaku sebelum Anda menyetujuinya.",
+  "loading": "Memuat...",
+  "noRequests": "Belum ada permintaan yang menunggu.",
+  "accessDenied": "Anda tidak memiliki akses ke halaman ini.",
+  "requestedBy": "Diajukan oleh {{name}}",
+  "approve": "Setujui",
+  "reject": "Tolak",
+  "tabs": {
+    "pending": "Menunggu Persetujuan",
+    "history": "Riwayat"
+  },
+  "noHistory": "Belum ada riwayat persetujuan.",
+  "reviewedBy": "Ditinjau oleh {{name}}",
+  "statusLabel": {
+    "APPROVED": "Disetujui",
+    "REJECTED": "Ditolak"
+  },
+  "rejectionReason": "Alasan: \"{{reason}}\"",
+  "actions": {
+    "ADD": "Tambah",
+    "EDIT": "Ubah",
+    "DELETE": "Hapus",
+    "STANDARD_OVERRIDE": "Standar"
+  },
+  "fields": {
+    "competencyName": "Nama",
+    "standardScore": "Standar",
+    "operationalDefinition": "Definisi Operasional",
+    "standardLevelIndicator": "Indikator pada Level Standar",
+    "jdReference": "Acuan JD"
+  },
+  "summary": {
+    "add": "Kompetensi baru \"{{name}}\" dengan Standar {{standard}}.",
+    "delete": "Hapus \"{{name}}\" (saat ini Standar {{standard}}).",
+    "standard": "Standar: {{from}} → {{to}}",
+    "hrDefault": "Standar HR"
+  },
+  "rejectModal": {
+    "title": "Tolak Permintaan",
+    "message": "Tolak permintaan untuk \"{{name}}\"? Perubahan dari leader tidak akan diterapkan.",
+    "confirm": "Tolak",
+    "reasonPlaceholder": "Opsional: beri tahu alasan ke leader (akan terlihat oleh mereka)"
+  },
+  "notifications": {
+    "loadFailed": "Gagal memuat permintaan.",
+    "approveSuccess": "Permintaan disetujui dan diterapkan.",
+    "approveFailed": "Gagal menyetujui permintaan.",
+    "rejectSuccess": "Permintaan ditolak.",
+    "rejectFailed": "Gagal menolak permintaan."
+  }
+}

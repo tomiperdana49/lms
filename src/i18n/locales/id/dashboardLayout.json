@@ -6,6 +6,9 @@
     "calendar": "Kalender",
     "learningReport": "Laporan Pembelajaran",
     "idp": "IDP",
+    "competency": "Kompetensi",
+    "competencyTeam": "Kompetensi Teams",
+    "competencyMine": "Kompetensi Saya",
     "incentives": "Insentif",
     "training": "Training",
     "internal": "Internal",
@@ -34,7 +37,11 @@
     "quizReport": "Laporan Kuis",
     "hrReport": "Laporan HR",
     "employeeLearningReport": "Laporan Pembelajaran Karyawan",
-    "idp": "IDP Karyawan"
+    "idp": "IDP Karyawan",
+    "settingsHeader": "KOMPETENSI",
+    "competencyTemplate": "Kamus Kompetensi",
+    "competencyApprovals": "Persetujuan Kompetensi",
+    "competencyOverview": "Kompetensi Karyawan"
   },
   "notifications": {
     "title": "Notifikasi",
@@ -86,7 +93,20 @@
     "incentivePaid": "dibayarkan",
     "incentiveCanceled": "dibatalkan",
     "incentiveStatusTitle": "Insentif {{status}}",
-    "incentiveStatusMessage": "Insentif Anda untuk \"{{title}}\" telah {{statusLabel}}."
+    "incentiveStatusMessage": "Insentif Anda untuk \"{{title}}\" telah {{statusLabel}}.",
+    "competencySubmittedTitle": "Ada Pengajuan Perubahan Kompetensi",
+    "competencySubmittedMessage": "Seorang leader mengajukan perubahan untuk \"{{name}}\" ({{position}}), menunggu peninjauan Anda.",
+    "competencyApproved": "disetujui",
+    "competencyRejectedWithReason": "ditolak dengan alasan: \"{{reason}}\"",
+    "competencyRejected": "ditolak",
+    "competencyStatusTitle": "Pengajuan Kompetensi {{status}}",
+    "competencyStatusMessage": "Perubahan yang Anda ajukan untuk \"{{name}}\" telah {{statusLabel}}.",
+    "competencyStatus": {
+      "APPROVED": "Disetujui",
+      "REJECTED": "Ditolak"
+    },
+    "competencyAssessmentSubmittedTitle": "Penilaian Kompetensi Baru",
+    "competencyAssessmentSubmittedMessage": "{{name}} telah mengisi penilaian kompetensi Anda untuk Q{{quarter}} {{year}}."
   },
   "footer": "© 2026 PT Media Antar Nusa",
   "userFallback": "Pengguna",

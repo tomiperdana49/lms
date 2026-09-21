@@ -27,7 +27,9 @@ import {
     PanelLeftOpen,
     Search,
     ArrowLeft,
-    ClipboardList
+    ClipboardList,
+    Settings,
+    BadgeCheck
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Page, Role, User } from '../types';
@@ -69,6 +71,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         // submenus, so close them to avoid clipped, half-visible text.
         if (!isDesktopSidebarOpen) {
             setIsTrainingOpen(false);
+            setIsCompetencyOpen(false);
             setIsAdminOpen(false);
         }
     }, [isDesktopSidebarOpen]);
@@ -90,6 +93,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
     useEffect(() => {
         if (isTrainingOpen) trainingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, [isTrainingOpen]);
+    const [isCompetencyOpen, setIsCompetencyOpen] = useState(() => {
+        return activePage === 'competency-mine' || activePage === 'competency-team';
+    });
+    const competencyRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (isCompetencyOpen) competencyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, [isCompetencyOpen]);
     const [isAdminOpen, setIsAdminOpen] = useState(() => {
         const saved = localStorage.getItem('lms_admin_sidebar_open');
         if (saved !== null) return saved === 'true';
@@ -124,7 +134,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
             try {
                 const isHrViewer = userRole === 'HR' || userRole === 'HR_ADMIN';
 
-                const [meetingsRes, trainingRes, logsRes, myExternalTrainingRes, subordinateExternalTrainingRes, deletedMeetingsRes, deletedExternalTrainingRes, myIdpPlansRes, allIdpPlansRes, pteSubordinatesRes, pteMineRes, incentivesRes] = await Promise.all([
+                const [meetingsRes, trainingRes, logsRes, myExternalTrainingRes, subordinateExternalTrainingRes, deletedMeetingsRes, deletedExternalTrainingRes, myIdpPlansRes, allIdpPlansRes, pteSubordinatesRes, pteMineRes, incentivesRes, myCompetencyRequestsRes, pendingCompetencyRequestsRes, myCompetencyAssessmentPeriodsRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/api/meetings`),
                     fetch(`${API_BASE_URL}/api/training`),
                     fetch(`${API_BASE_URL}/api/logs`),
@@ -139,13 +149,18 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     fetch(`${API_BASE_URL}/api/post-training-evaluations/subordinates?leader_id=${user.employee_id || ''}`),
                     // Only non-supervisors have the "My PTE" page to send this notification to.
                     !user.isSupervisor ? fetch(`${API_BASE_URL}/api/post-training-evaluations/mine?employee_id=${user.employee_id || ''}`) : Promise.resolve(null),
-                    config?.moduleIncentive ? fetch(`${API_BASE_URL}/api/incentives`) : Promise.resolve(null)
+                    config?.moduleIncentive ? fetch(`${API_BASE_URL}/api/incentives`) : Promise.resolve(null),
+                    fetch(`${API_BASE_URL}/api/competency-change-requests?requesterId=${user.employee_id || ''}`),
+                    // Only HR needs to see every pending competency change request awaiting review.
+                    isHrViewer ? fetch(`${API_BASE_URL}/api/competency-change-requests?status=PENDING`) : Promise.resolve(null),
+                    fetch(`${API_BASE_URL}/api/competency-assessments/periods?employee_id=${user.employee_id || ''}`)
                 ]);
 
                 if (!meetingsRes.ok || !trainingRes.ok || !logsRes.ok || !myExternalTrainingRes.ok || !subordinateExternalTrainingRes.ok
                     || !deletedMeetingsRes.ok || !deletedExternalTrainingRes.ok || !myIdpPlansRes.ok
                     || (allIdpPlansRes && !allIdpPlansRes.ok) || !pteSubordinatesRes.ok || (pteMineRes && !pteMineRes.ok)
-                    || (incentivesRes && !incentivesRes.ok)) return;
+                    || (incentivesRes && !incentivesRes.ok) || !myCompetencyRequestsRes.ok
+                    || (pendingCompetencyRequestsRes && !pendingCompetencyRequestsRes.ok) || !myCompetencyAssessmentPeriodsRes.ok) return;
 
                 const meetings = await meetingsRes.json();
                 const training = await trainingRes.json();
@@ -159,6 +174,9 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                 const pteSubordinates = await pteSubordinatesRes.json();
                 const pteMine = pteMineRes ? await pteMineRes.json() : [];
                 const incentives = incentivesRes ? await incentivesRes.json() : [];
+                const myCompetencyRequests = await myCompetencyRequestsRes.json();
+                const pendingCompetencyRequests = pendingCompetencyRequestsRes ? await pendingCompetencyRequestsRes.json() : [];
+                const myCompetencyAssessmentPeriods = await myCompetencyAssessmentPeriodsRes.json();
 
                 // Get already read notification IDs from LocalStorage
                 let readIds: number[] = [];
@@ -174,11 +192,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     .filter((m: any) => m.guests?.emails?.includes(user.email))
                     .map((m: any) => {
                         const notifId = m.id;
+                        const notifDate = new Date(m.date);
                         return {
                             id: notifId,
                             title: t('notifications.upcomingMeeting'),
                             message: t('notifications.meetingMessage', { title: m.title, time: m.time, type: m.type }),
-                            time: new Date(m.date).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
                             type: 'INFO',
                             isRead: readIds.includes(notifId),
                             page: 'calendar'
@@ -190,11 +210,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     .filter((tr: any) => tr.userName === user.name || (user.employee_id && tr.employee_id === user.employee_id))
                     .map((tr: any) => {
                         const notifId = tr.id + 50000;
+                        const notifDate = new Date(tr.submittedAt || Date.now());
                         return {
                             id: notifId,
                             title: t('notifications.trainingStatus', { status: tr.status?.replace('_', ' ') }),
                             message: t('notifications.trainingMessage', { title: tr.title, status: tr.status?.toLowerCase().replace('_', ' ') }),
-                            time: new Date(tr.submittedAt || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
                             type: tr.status === 'APPROVED' ? 'SUCCESS' : tr.status === 'REJECTED' ? 'WARNING' : 'INFO',
                             isRead: readIds.includes(notifId)
                         };
@@ -228,11 +250,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             type = 'WARNING';
                         }
 
+                        const notifDate = new Date(l.approvedAt || l.finishDate || l.date || Date.now());
                         return {
                             id: notifId,
                             title: t('notifications.readingStatusTitle', { status: l.hrApprovalStatus || l.status }),
                             message: t('notifications.readingMessage', { title: l.title, statusLabel }),
-                            time: new Date(l.approvedAt || l.finishDate || l.date || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
                             type,
                             isRead: readIds.includes(notifId),
                             page: 'reading-log'
@@ -248,11 +272,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     })
                     .map((m: any) => {
                         const notifId = m.id + 200000;
+                        const notifDate = new Date(m.date);
                         return {
                             id: notifId,
                             title: t('notifications.internalTrainingApprovedTitle'),
                             message: t('notifications.internalTrainingApprovedMessage', { title: m.title }),
-                            time: new Date(m.date).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
                             type: 'SUCCESS',
                             isRead: readIds.includes(notifId),
                             page: 'internal'
@@ -264,11 +290,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     .filter((r: any) => r.status === 'Pending')
                     .map((r: any) => {
                         const notifId = r.id + 300000;
+                        const notifDate = new Date(r.created_at || Date.now());
                         return {
                             id: notifId,
                             title: t('notifications.externalTrainingNewRequestTitle'),
                             message: t('notifications.externalTrainingNewRequestMessage', { name: r.employee_name, title: r.title }),
-                            time: new Date(r.created_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
                             type: 'INFO',
                             isRead: readIds.includes(notifId),
                             page: 'external',
@@ -300,11 +328,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             type = 'SUCCESS';
                         }
 
+                        const notifDate = new Date(r.updated_at || r.created_at || Date.now());
                         return {
                             id: notifId,
                             title: t('notifications.externalTrainingStatusTitle', { status: r.status }),
                             message: t('notifications.externalTrainingStatusMessage', { title: r.title, statusLabel }),
-                            time: new Date(r.updated_at || r.created_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
                             type,
                             isRead: readIds.includes(notifId),
                             page: 'external',
@@ -318,11 +348,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                          (m.host && user.name && m.host.trim().toLowerCase() === user.name.trim().toLowerCase()))
                     .map((m: any) => {
                         const notifId = m.id + 500000;
+                        const notifDate = new Date(m.deleted_at || Date.now());
                         return {
                             id: notifId,
                             title: t('notifications.internalTrainingDeletedTitle'),
                             message: t('notifications.internalTrainingDeletedMessage', { title: m.title }),
-                            time: new Date(m.deleted_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
                             type: 'WARNING',
                             isRead: readIds.includes(notifId),
                             page: 'internal'
@@ -333,11 +365,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                 const externalTrainingDeletedNotifs = deletedExternalTraining
                     .map((r: any) => {
                         const notifId = r.id + 600000;
+                        const notifDate = new Date(r.deleted_at || Date.now());
                         return {
                             id: notifId,
                             title: t('notifications.externalTrainingDeletedTitle'),
                             message: t('notifications.externalTrainingDeletedMessage', { title: r.title }),
-                            time: new Date(r.deleted_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
                             type: 'WARNING',
                             isRead: readIds.includes(notifId),
                             page: 'external'
@@ -362,11 +396,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             type = 'WARNING';
                         }
 
+                        const notifDate = new Date(p.approved_date || p.updated_at || Date.now());
                         return {
                             id: notifId,
                             title: t('notifications.idpStatusTitle', { status: p.status }),
                             message: t('notifications.idpStatusMessage', { year: p.period_year, statusLabel }),
-                            time: new Date(p.approved_date || p.updated_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
                             type,
                             isRead: readIds.includes(notifId),
                             page: 'idp'
@@ -378,11 +414,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     .filter((p: any) => !!p.hr_note)
                     .map((p: any) => {
                         const notifId = p.id + 900000;
+                        const notifDate = new Date(p.updated_at || Date.now());
                         return {
                             id: notifId,
                             title: t('notifications.idpNoteTitle'),
                             message: t('notifications.idpNoteMessage', { year: p.period_year }),
-                            time: new Date(p.updated_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
                             type: 'INFO',
                             isRead: readIds.includes(notifId),
                             page: 'idp'
@@ -395,11 +433,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                         .filter((p: any) => p.status === 'Pending')
                         .map((p: any) => {
                             const notifId = p.id + 800000;
+                            const notifDate = new Date(p.created_by_date || p.updated_at || Date.now());
                             return {
                                 id: notifId,
                                 title: t('notifications.idpSubmittedTitle'),
                                 message: t('notifications.idpSubmittedMessage', { name: p.employee_name, year: p.period_year }),
-                                time: new Date(p.created_by_date || p.updated_at || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                                time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                                sortTime: notifDate.getTime(),
                                 type: 'INFO',
                                 isRead: readIds.includes(notifId),
                                 page: 'admin-dashboard',
@@ -412,11 +452,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                 const idpReviewNotifs = myIdpPlans.flatMap((p: any) =>
                     (p.reviews || []).map((r: any) => {
                         const notifId = r.id + 1000000;
+                        const notifDate = new Date(r.review_date || Date.now());
                         return {
                             id: notifId,
                             title: t('notifications.idpReviewAddedTitle'),
                             message: t('notifications.idpReviewAddedMessage', { year: p.period_year, name: r.reviewed_by || p.supervisor_name }),
-                            time: new Date(r.review_date || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
                             type: 'INFO',
                             isRead: readIds.includes(notifId),
                             page: 'idp'
@@ -430,11 +472,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     .filter((it: any) => !it.submitted)
                     .map((it: any) => {
                         const notifId = 1100000 + it.formId * 10000000 + Number(it.evaluateeEmployeeId || 0);
+                        const notifDate = new Date(it.meetingDate || Date.now());
                         return {
                             id: notifId,
                             title: t('notifications.pteNewEvaluationTitle'),
                             message: t('notifications.pteNewEvaluationMessage', { name: it.evaluateeName, title: it.meetingTitle }),
-                            time: new Date(it.meetingDate || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
                             type: 'INFO',
                             isRead: readIds.includes(notifId),
                             page: 'pte-team'
@@ -447,11 +491,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     .filter((it: any) => it.submitted)
                     .map((it: any) => {
                         const notifId = 1200000000 + it.formId * 100000 + it.meetingId;
+                        const notifDate = new Date(it.submittedAt || Date.now());
                         return {
                             id: notifId,
                             title: t('notifications.pteEvaluationCompletedTitle'),
                             message: t('notifications.pteEvaluationCompletedMessage', { title: it.meetingTitle }),
-                            time: new Date(it.submittedAt || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
                             type: 'SUCCESS',
                             isRead: readIds.includes(notifId),
                             page: 'pte-mine'
@@ -483,19 +529,94 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             type = 'WARNING';
                         }
 
+                        const notifDate = new Date(i.approvedDate || Date.now());
                         return {
                             id: notifId,
                             title: t('notifications.incentiveStatusTitle', { status: i.status }),
                             message: t('notifications.incentiveStatusMessage', { title: i.courseName, statusLabel }),
-                            time: new Date(i.approvedDate || Date.now()).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
                             type,
                             isRead: readIds.includes(notifId),
                             page: 'incentives'
                         };
                     });
 
-                // Combine and Sort by latest (higher id means more recent)
-                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpStatusNotifs, ...idpNoteNotifs, ...idpSubmittedNotifs, ...idpReviewNotifs, ...pteLeaderNotifs, ...pteMineNotifs, ...incentiveNotifs].sort((a, b) => b.id - a.id);
+                // 13. Competency: notify every HR user when a leader submits a change request
+                // (Add/Edit/Delete on FUNCTIONAL, or a Standard override on CORE) for review.
+                const competencySubmittedNotifs = isHrViewer
+                    ? pendingCompetencyRequests.map((r: any) => {
+                        const notifId = 2000000 + r.id;
+                        const notifDate = new Date(r.createdAt || Date.now());
+                        return {
+                            id: notifId,
+                            title: t('notifications.competencySubmittedTitle'),
+                            message: t('notifications.competencySubmittedMessage', { name: r.competencyName, position: r.position }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
+                            type: 'INFO',
+                            isRead: readIds.includes(notifId),
+                            page: 'admin-dashboard',
+                            view: 'competency-approvals'
+                        };
+                    })
+                    : [];
+
+                // 14. Competency: notify the LEADER when HR approves or rejects their request -
+                // nothing they proposed ever takes effect silently.
+                const competencyStatusNotifs = myCompetencyRequests
+                    .filter((r: any) => r.status === 'APPROVED' || r.status === 'REJECTED')
+                    .map((r: any) => {
+                        const notifId = 2100000 + r.id;
+                        let statusLabel = '';
+                        let type = 'INFO';
+
+                        if (r.status === 'APPROVED') {
+                            statusLabel = t('notifications.competencyApproved');
+                            type = 'SUCCESS';
+                        } else {
+                            statusLabel = r.rejectionReason
+                                ? t('notifications.competencyRejectedWithReason', { reason: r.rejectionReason })
+                                : t('notifications.competencyRejected');
+                            type = 'WARNING';
+                        }
+
+                        const notifDate = new Date(r.reviewedAt || r.updatedAt || Date.now());
+                        return {
+                            id: notifId,
+                            title: t('notifications.competencyStatusTitle', { status: t(`notifications.competencyStatus.${r.status}`) }),
+                            message: t('notifications.competencyStatusMessage', { name: r.competencyName, statusLabel }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
+                            type,
+                            isRead: readIds.includes(notifId),
+                            page: 'competency-team'
+                        };
+                    });
+
+                // 15. Competency: notify the EMPLOYEE when their leader submits a new quarterly
+                // assessment about them - mirrors idpReviewNotifs above.
+                const myCompetencyAssessmentNotifs = myCompetencyAssessmentPeriods.map((p: any) => {
+                    const notifId = 2200000 + p.year * 10 + p.quarter;
+                    const notifDate = new Date(p.assessedAt || Date.now());
+                    return {
+                        id: notifId,
+                        title: t('notifications.competencyAssessmentSubmittedTitle'),
+                        message: t('notifications.competencyAssessmentSubmittedMessage', { name: p.assessedByName, quarter: p.quarter, year: p.year }),
+                        time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                        sortTime: notifDate.getTime(),
+                        type: 'INFO',
+                        isRead: readIds.includes(notifId),
+                        page: 'competency-mine',
+                        view: `${p.quarter}-${p.year}`
+                    };
+                });
+
+                // Combine and sort by actual notification date (sortTime), newest first - the
+                // synthetic `id` above is only for per-category read/unread tracking and is not
+                // comparable across categories (each has its own numeric offset), so it must not
+                // be used for ordering.
+                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpStatusNotifs, ...idpNoteNotifs, ...idpSubmittedNotifs, ...idpReviewNotifs, ...pteLeaderNotifs, ...pteMineNotifs, ...incentiveNotifs, ...competencySubmittedNotifs, ...competencyStatusNotifs, ...myCompetencyAssessmentNotifs].sort((a, b) => b.sortTime - a.sortTime);
                 setNotifications(all);
             } catch (error) {
                 console.error("Failed to fetch header notifications", error);
@@ -581,6 +702,10 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { icon: TrendingUp, label: t('admin.hrReport'), id: 'admin-dashboard', view: 'reports' },
         { icon: UsersRound, label: t('admin.employeeLearningReport'), id: 'admin-dashboard', view: 'employee-learning-report' },
         ...(config?.moduleIDP ? [{ icon: Target, label: t('admin.idp'), id: 'admin-dashboard', view: 'idp' }] : []),
+        { header: t('admin.settingsHeader') },
+        { icon: Settings, label: t('admin.competencyTemplate'), id: 'admin-dashboard', view: 'competency-template' },
+        { icon: BadgeCheck, label: t('admin.competencyApprovals'), id: 'admin-dashboard', view: 'competency-approvals' },
+        { icon: Users, label: t('admin.competencyOverview'), id: 'admin-dashboard', view: 'competency-overview' },
     ];
 
     const menuItems = [
@@ -591,6 +716,11 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { icon: TrendingUp, label: t('menu.learningReport'), id: 'learning-report' },
         ...(config?.moduleIDP ? [{ icon: Target, label: t('menu.idp'), id: 'idp' }] : []),
         ...(config?.moduleIncentive ? [{ icon: Award, label: t('menu.incentives'), id: 'incentives' }] : []),
+    ];
+
+    const competencySubItems = [
+        { icon: BadgeCheck, label: t('menu.competencyMine'), id: 'competency-mine' },
+        ...(user?.isSupervisor ? [{ icon: UsersRound, label: t('menu.competencyTeam'), id: 'competency-team' }] : []),
     ];
 
     const trainingSubItems = [
@@ -777,6 +907,62 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                 )}
                             </div>
                         )}
+
+                        {/* Competency Dropdown */}
+                        <div className="pt-1" ref={competencyRef}>
+                            <button
+                                onClick={() => {
+                                    if (!isDesktopSidebarOpen) {
+                                        setIsDesktopSidebarOpen(true);
+                                        setIsCompetencyOpen(true);
+                                        return;
+                                    }
+                                    setIsCompetencyOpen(!isCompetencyOpen);
+                                }}
+                                title={t('menu.competency')}
+                                className={`
+                                    relative w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors text-left
+                                    ${!isDesktopSidebarOpen ? 'lg:justify-center lg:px-0' : ''}
+                                    ${activePage === 'competency-mine' || activePage === 'competency-team' || isCompetencyOpen
+                                        ? 'bg-slate-800 text-white'
+                                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                    }
+                                `}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <BadgeCheck size={20} className="shrink-0" />
+                                    <span className={`font-medium ${!isDesktopSidebarOpen ? 'lg:hidden' : ''}`}>{t('menu.competency')}</span>
+                                </div>
+                                <span className={!isDesktopSidebarOpen ? 'lg:hidden' : ''}>
+                                    {isCompetencyOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                </span>
+                                {(activePage === 'competency-mine' || activePage === 'competency-team') && (
+                                    <span className="absolute -right-4 top-1/2 -translate-y-1/2 h-8 w-1 rounded-l-full bg-blue-400" />
+                                )}
+                            </button>
+
+                            {isCompetencyOpen && (
+                                <div className="mt-1 ml-4 space-y-1">
+                                    {competencySubItems.map((sub, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => {
+                                                onNavigate(sub.id as Page);
+                                                setIsSidebarOpen(false);
+                                            }}
+                                            className={`w-full flex items-start gap-3 px-6 py-2.5 text-sm rounded-xl transition-all text-left
+                                                ${activePage === sub.id
+                                                    ? 'text-white font-bold bg-blue-600 shadow-md translate-x-1'
+                                                    : 'text-slate-400 hover:text-white hover:bg-slate-800'}
+                                            `}
+                                        >
+                                            <sub.icon size={16} className={`mt-0.5 shrink-0 ${activePage === sub.id ? 'opacity-100' : 'opacity-60'}`} />
+                                            <span className="leading-snug">{sub.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
 
                         {/* Admin Panel Expandable */}
                         {(userRole === 'HR' || userRole === 'HR_ADMIN') && (

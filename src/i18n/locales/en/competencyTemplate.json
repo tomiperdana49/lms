@@ -1,0 +1,68 @@
+{
+  "backToDashboard": "Back to Dashboard",
+  "title": "Competency Dictionary",
+  "subtitle": "Manage the competency dictionary used across the LMS ({{count}} entries total).",
+  "addTemplate": "Add Competency",
+  "accessDenied": "Access Denied. HR Only.",
+  "loading": "Loading...",
+  "noData": "No competency dictionary entries found.",
+  "noFilterResults": "No competency dictionary entries match the selected filters.",
+  "pagination": "Page {{current}} of {{total}}",
+  "filters": {
+    "allTypes": "All Competency Types",
+    "allPositions": "All Positions",
+    "reset": "Reset Filters"
+  },
+  "table": {
+    "competencyType": "Competency Type",
+    "position": "Position",
+    "competencyName": "Competency",
+    "operationalDefinition": "Operational Definition",
+    "standardLevelIndicator": "Indicator at Standard Level",
+    "jdReference": "JD Reference",
+    "standardScore": "Std.",
+    "action": "Action"
+  },
+  "modal": {
+    "addTitle": "Add Competency Dictionary",
+    "editTitle": "Edit Competency Dictionary",
+    "detailTitle": "Competency Dictionary Detail",
+    "close": "Close",
+    "competencyType": "Competency Type",
+    "selectCompetencyType": "-- Select competency type --",
+    "position": "Position",
+    "selectPosition": "Type to search position...",
+    "competencyName": "Competency",
+    "operationalDefinition": "Operational Definition",
+    "standardLevelIndicator": "Indicator at Standard Level",
+    "jdReference": "JD Reference",
+    "standardScore": "Standar Jabatan (Target Score)",
+    "selectStandardScore": "-- Select score --",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "scoreLabels": {
+    "1": "Basic",
+    "2": "Autonomous",
+    "3": "Proficient",
+    "4": "Expert"
+  },
+  "actions": {
+    "view": "View Detail",
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "confirm": {
+    "deleteTitle": "Delete Competency Dictionary",
+    "deleteMessage": "Are you sure you want to delete this competency dictionary? This cannot be undone."
+  },
+  "notifications": {
+    "loadFailed": "Failed to load data.",
+    "createSuccess": "Competency dictionary created successfully!",
+    "createFailed": "Failed to create competency dictionary.",
+    "updateSuccess": "Competency dictionary updated successfully!",
+    "updateFailed": "Failed to update competency dictionary.",
+    "deleteSuccess": "Competency dictionary deleted successfully!",
+    "deleteFailed": "Failed to delete competency dictionary."
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "backToDashboard": "Kembali ke Dashboard",
+  "title": "Kompetensi Teams",
+  "subtitle": "Nilai kompetensi setiap anggota tim terhadap standar jabatannya.",
+  "loading": "Memuat...",
+  "noTeamMembers": "Anda belum memiliki anggota tim.",
+  "teamMembers": "Anggota Tim",
+  "position": "Posisi",
+  "assessmentFor": "Penilaian untuk {{name}}",
+  "employeeId": "Emp. ID",
+  "previousScore": "Skor penilaian sebelumnya",
+  "previousScoreFor": "Skor {{period}}",
+  "noCompetenciesForPosition": "Belum ada kompetensi yang terdaftar untuk posisi ini.",
+  "overview": {
+    "clickToAssess": "Klik nama karyawan untuk mengisi penilaiannya.",
+    "backToOverview": "Kembali ke Kompetensi Teams"
+  },
+  "period": {
+    "name": "Kuartal {{quarter}} {{year}}",
+    "locked": "Terkunci",
+    "lockedNotice": "Kuartal ini sudah disimpan dan tidak dapat diubah lagi."
+  },
+  "sectionHeaders": {
+    "CORE": "KOMPETENSI INTI (CORE)",
+    "FUNCTIONAL": "KOMPETENSI FUNGSIONAL (FUNCTIONAL)",
+    "LEADERSHIP": "KOMPETENSI KEPEMIMPINAN (LEADERSHIP)",
+    "default": "KOMPETENSI {{type}}"
+  },
+  "table": {
+    "no": "No",
+    "competency": "Kompetensi",
+    "standard": "Standar Jabatan",
+    "actual": "Aktual",
+    "gap": "Gap",
+    "operationalDefinition": "Definisi Operasional",
+    "standardLevelIndicator": "Indikator pada Level Standar",
+    "jdReference": "Acuan JD"
+  },
+  "summary": {
+    "totalScore": "Total Skor",
+    "achievementPercent": "% Pencapaian terhadap Standar",
+    "gapCount": "Jumlah Kompetensi Belum Memenuhi Standar",
+    "readinessStatus": "Status Kesiapan pada Jabatan"
+  },
+  "notes": {
+    "label": "Catatan / Rekomendasi Atasan",
+    "placeholder": "Tulis catatan atau rekomendasi untuk karyawan ini...",
+    "empty": "Belum ada catatan."
+  },
+  "status": {
+    "ready": "Siap",
+    "limitedDevelopment": "Perlu pengembangan terbatas",
+    "significantDevelopment": "Perlu pengembangan signifikan"
+  },
+  "actions": {
+    "save": "Simpan Penilaian"
+  },
+  "notifications": {
+    "saveSuccess": "Penilaian berhasil disimpan!",
+    "saveFailed": "Gagal menyimpan penilaian.",
+    "loadFailed": "Gagal memuat data.",
+    "unassessedRemaining": "{{count}} kompetensi belum dinilai",
+    "periodLocked": "Kuartal ini sudah disimpan oleh orang lain dan sekarang terkunci."
+  },
+  "dictionary": {
+    "openButton": "Kamus Kompetensi",
+    "title": "Kamus Kompetensi",
+    "subtitle": "Ajukan kompetensi dan standar untuk posisi di tim Anda. Tidak ada yang berlaku sebelum disetujui HR.",
+    "standardOnlyNotice": "Ditentukan oleh HR. Anda hanya bisa mengajukan perubahan Standar untuk posisi Anda sendiri."
+  },
+  "templateActions": {
+    "add": "Tambah",
+    "edit": "Ubah kompetensi",
+    "delete": "Hapus kompetensi",
+    "editStandard": "Ubah standar",
+    "editStandardTitle": "Ubah Standar",
+    "addTitle": "Tambah Kompetensi",
+    "editTitle": "Ubah Kompetensi",
+    "positionLabel": "Posisi",
+    "competencyType": "Jenis Kompetensi",
+    "competencyName": "Nama Kompetensi",
+    "operationalDefinition": "Definisi Operasional",
+    "standardLevelIndicator": "Indikator pada Level Standar",
+    "jdReference": "Acuan JD",
+    "standardScore": "Standar Jabatan",
+    "standardScoreShort": "Standar",
+    "selectStandardScore": "Pilih standar skor",
+    "cancel": "Batal",
+    "save": "Ajukan Persetujuan",
+    "addSuccess": "Kompetensi berhasil ditambahkan!",
+    "updateSuccess": "Berhasil diperbarui!",
+    "deleteSuccess": "Kompetensi berhasil dihapus!",
+    "submittedForApproval": "Diajukan! Perubahan ini akan berlaku setelah disetujui HR.",
+    "saveFailed": "Gagal menyimpan.",
+    "deleteFailed": "Gagal menghapus kompetensi.",
+    "deleteTitle": "Hapus Kompetensi",
+    "deleteMessage": "Ajukan permintaan hapus \"{{name}}\"? Baru akan terhapus setelah disetujui HR.",
+    "awaitingApproval": "Menunggu persetujuan HR",
+    "pendingStandard": "Standar {{value}} diajukan - menunggu persetujuan HR",
+    "pendingEdit": "Perubahan diajukan - menunggu persetujuan HR",
+    "pendingDelete": "Penghapusan diajukan - menunggu persetujuan HR",
+    "pendingAdd": "Kompetensi baru diajukan - menunggu persetujuan HR",
+    "scoreLabels": {
+      "1": "Basic",
+      "2": "Autonomous",
+      "3": "Proficient",
+      "4": "Expert"
+    }
+  },
+  "mine": {
+    "title": "Kompetensi Saya",
+    "subtitle": "Tinjau hasil penilaian kompetensi Anda dari atasan.",
+    "noAssessmentYet": "Belum ada penilaian dari atasan untuk periode ini.",
+    "assessedBy": "Dinilai oleh {{name}}"
+  },
+  "allEmployees": {
+    "title": "Kompetensi Karyawan",
+    "subtitle": "Lihat hasil penilaian kompetensi karyawan mana pun di seluruh perusahaan.",
+    "accessDenied": "Akses Ditolak. Khusus HR.",
+    "searchPlaceholder": "Cari berdasarkan nama, ID, atau posisi...",
+    "noResults": "Tidak ada karyawan yang sesuai dengan pencarian.",
+    "selectPrompt": "Pilih karyawan dari daftar untuk melihat penilaian kompetensinya."
+  }
+}
