@@ -111,6 +111,7 @@
     "hrNoteLabel": "HR Note for Employee",
     "hrNoteHint": "Let them know what's missing or what needs to be added to this IDP. This note is visible to the employee and their supervisor.",
     "hrNotePlaceholder": "e.g. The career goal is still too generic, please make it more specific...",
-    "saveHrNote": "Save Note"
+    "saveHrNote": "Save Note",
+    "downloadOne": "Download this employee's IDP"
   }
 }

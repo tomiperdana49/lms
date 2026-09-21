@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Target, Search, ChevronDown, Download, Upload, Clock, CheckCircle, XCircle, MessageSquare, Trash2, Pencil, Plus, Lock } from 'lucide-react';
-import * as XLSX from 'xlsx';
+// xlsx-js-style (a styling-capable fork of SheetJS, already used by TrainingInternalList.tsx for
+// its own styled exports) - plain 'xlsx' can't write the fills/borders/merges the IDP export
+// below needs to match the company's original spreadsheet template.
+import * as XLSX from 'xlsx-js-style';
 import { API_BASE_URL } from '../config';
 import type { IDPPlan, IDPActionItem } from '../types';
 import IDPDetailInfoTable from './IDPDetailInfoTable';
@@ -245,8 +248,143 @@ export default function IDPManager({ userName }: IDPManagerProps) {
         );
     };
 
-    // Per-employee export matching the original spreadsheet template layout: one sheet per plan, with
-    // a header block, narrative sections, the action-item table, and the review/HR-verification table.
+    // --- Excel export styling - mirrors the company's original IDP spreadsheet template (gray-filled
+    // bold section/label cells, a thin black grid over every cell, wrapped left-aligned content). ---
+    const THIN_BORDER = { style: 'thin', color: { rgb: '000000' } } as const;
+    const FULL_BORDER = { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER };
+    const HEADER_CELL_STYLE = {
+        font: { bold: true, name: 'Arial', sz: 10 },
+        fill: { patternType: 'solid' as const, fgColor: { rgb: 'CCCCCC' } },
+        alignment: { vertical: 'top' as const, wrapText: true },
+        border: FULL_BORDER
+    };
+    const VALUE_CELL_STYLE = {
+        font: { name: 'Arial', sz: 10 },
+        alignment: { vertical: 'top' as const, wrapText: true },
+        border: FULL_BORDER
+    };
+    const CHECKLIST_CELL_STYLE = {
+        font: { name: 'Arial', sz: 10 },
+        alignment: { vertical: 'center' as const, horizontal: 'center' as const },
+        border: FULL_BORDER
+    };
+    const IDP_SHEET_COL_WIDTHS = [{ wch: 15 }, { wch: 26 }, { wch: 22 }, { wch: 27 }, { wch: 19 }, { wch: 26 } ];
+
+    // Builds one fully-styled worksheet for a single plan, matching the original template's exact
+    // section layout (header block, achievements, career goal, skill/development-area side by side,
+    // the action-plan table, then the supervisor review log). Shared by the bulk export (one sheet
+    // per plan) and the per-employee download.
+    const buildIdpWorksheet = (full: IDPPlan): XLSX.WorkSheet => {
+        const ws: XLSX.WorkSheet = {};
+        const merges: XLSX.Range[] = [];
+
+        const setCell = (r: number, c: number, v: string | number | boolean, style: object) => {
+            const cell: any = typeof v === 'number' ? { t: 'n', v } : typeof v === 'boolean' ? { t: 'b', v } : { t: 's', v: v ?? '' };
+            cell.s = style;
+            ws[XLSX.utils.encode_cell({ r, c })] = cell;
+        };
+        // Fills every cell of the merged region with the same style (the original template borders
+        // each individual cell in a merge, not just its top-left corner) and puts the value in the
+        // top-left one, where Excel expects it for a merged range.
+        const mergeRange = (r1: number, c1: number, r2: number, c2: number, value: string | number | boolean, style: object) => {
+            merges.push({ s: { r: r1, c: c1 }, e: { r: r2, c: c2 } });
+            for (let r = r1; r <= r2; r++) {
+                for (let c = c1; c <= c2; c++) {
+                    setCell(r, c, r === r1 && c === c1 ? value : '', style);
+                }
+            }
+        };
+
+        setCell(0, 0, 'Nama Karyawan:', HEADER_CELL_STYLE);
+        setCell(0, 1, full.employee_name || '', VALUE_CELL_STYLE);
+        setCell(0, 2, 'Jabatan:', HEADER_CELL_STYLE);
+        setCell(0, 3, full.job_position || '', VALUE_CELL_STYLE);
+        setCell(0, 4, 'Atasan Langsung:', HEADER_CELL_STYLE);
+        setCell(0, 5, full.supervisor_name || '', VALUE_CELL_STYLE);
+        setCell(1, 0, 'Periode IDP:', HEADER_CELL_STYLE);
+        setCell(1, 1, full.period_year, VALUE_CELL_STYLE);
+        setCell(1, 2, 'Departemen:', HEADER_CELL_STYLE);
+        setCell(1, 3, full.department || '', VALUE_CELL_STYLE);
+        setCell(1, 4, 'Tanggal Mulai Bekerja:', HEADER_CELL_STYLE);
+        setCell(1, 5, full.join_date_label || '', VALUE_CELL_STYLE);
+
+        mergeRange(2, 0, 2, 5, 'Pencapaian / Prestasi Kerja', HEADER_CELL_STYLE);
+        mergeRange(3, 0, 3, 5, 'Apa pencapaian / prestasi kamu selama 3-12 bulan ke belakang?', HEADER_CELL_STYLE);
+        mergeRange(4, 0, 10, 5, full.achievements || '', VALUE_CELL_STYLE);
+
+        mergeRange(11, 0, 11, 5, 'Tujuan / Aspirasi Karir (Goal)', HEADER_CELL_STYLE);
+        mergeRange(12, 0, 12, 5, 'Apa tujuan karir kamu dalam 1-3 tahun ke depan di perusahaan ini?', HEADER_CELL_STYLE);
+        mergeRange(13, 0, 19, 5, full.career_goal || '', VALUE_CELL_STYLE);
+
+        mergeRange(20, 0, 20, 2, 'Skill yang Dimiliki', HEADER_CELL_STYLE);
+        mergeRange(20, 3, 20, 5, 'Area Pengembangan', HEADER_CELL_STYLE);
+        mergeRange(21, 0, 21, 2, 'Sebutkan bakat, keahlian, dan keterampilan kamu yang membantu mencapai tujuan karir kamu?', HEADER_CELL_STYLE);
+        mergeRange(21, 3, 21, 5, 'Kompetensi apa yang kamu rasa masih perlu kamu kembangkan dan tingkatkan lagi untuk mencapai tujuan karir kamu?', HEADER_CELL_STYLE);
+        mergeRange(22, 0, 29, 2, full.existing_skills || '', VALUE_CELL_STYLE);
+        mergeRange(22, 3, 29, 5, full.development_area || '', VALUE_CELL_STYLE);
+
+        mergeRange(30, 0, 30, 2, 'Rencana Aksi Pengembangan', HEADER_CELL_STYLE);
+        setCell(30, 3, 'Target Waktu', HEADER_CELL_STYLE);
+        setCell(30, 4, 'Checklist Progress', HEADER_CELL_STYLE);
+        setCell(30, 5, 'Keterangan', HEADER_CELL_STYLE);
+        mergeRange(31, 0, 31, 2, 'Tuliskan langkah apa saja yang akan kamu lakukan untuk mencapai pengembangan diri dan tujuan karir kamu!', HEADER_CELL_STYLE);
+        setCell(31, 3, 'Tetapkan target waktu kamu melaksanakan rencana aksi.', HEADER_CELL_STYLE);
+        setCell(31, 4, 'Update progress aksi pengembangan kamu.', HEADER_CELL_STYLE);
+        setCell(31, 5, 'Catatan mengenai aksi yang telah dilaksanakan.', HEADER_CELL_STYLE);
+
+        const actionItems = full.action_items || [];
+        let row = 32;
+        for (const item of actionItems) {
+            mergeRange(row, 0, row, 2, item.action_description || '', VALUE_CELL_STYLE);
+            setCell(row, 3, item.target_time || '', VALUE_CELL_STYLE);
+            setCell(row, 4, !!item.is_completed, CHECKLIST_CELL_STYLE);
+            setCell(row, 5, item.notes || '', VALUE_CELL_STYLE);
+            row++;
+        }
+        if (actionItems.length === 0) {
+            mergeRange(row, 0, row, 2, '-', VALUE_CELL_STYLE);
+            setCell(row, 3, '', VALUE_CELL_STYLE);
+            setCell(row, 4, false, CHECKLIST_CELL_STYLE);
+            setCell(row, 5, '', VALUE_CELL_STYLE);
+            row++;
+        }
+
+        mergeRange(row, 0, row, 1, 'Tanggal IDP Dibuat oleh Karyawan:', HEADER_CELL_STYLE);
+        setCell(row, 2, full.created_by_date ? new Date(full.created_by_date).toLocaleDateString('id-ID') : '', VALUE_CELL_STYLE);
+        mergeRange(row, 3, row, 4, 'Tanggal IDP Disetujui oleh HR:', HEADER_CELL_STYLE);
+        setCell(row, 5, full.approved_date ? new Date(full.approved_date).toLocaleDateString('id-ID') : '', VALUE_CELL_STYLE);
+        row++;
+
+        mergeRange(row, 0, row, 4, 'Evaluasi IDP (diisi oleh atasan langsung)', HEADER_CELL_STYLE);
+        setCell(row, 5, 'Verifikasi IDP (diisi oleh HR)', HEADER_CELL_STYLE);
+        row++;
+        setCell(row, 0, 'Tanggal Review', HEADER_CELL_STYLE);
+        mergeRange(row, 1, row, 4, 'Apakah IDP relevan dan berjalan? Apakah rencana aksi berhasil terlaksanakan hingga target waktu yang ditentukan?', HEADER_CELL_STYLE);
+        setCell(row, 5, '', HEADER_CELL_STYLE);
+        row++;
+
+        const reviews = full.reviews || [];
+        const reviewRowCount = Math.max(reviews.length, 1);
+        const reviewStartRow = row;
+        for (let i = 0; i < reviewRowCount; i++) {
+            const review = reviews[i];
+            setCell(row, 0, review ? new Date(review.review_date).toLocaleDateString('id-ID') : '-', VALUE_CELL_STYLE);
+            mergeRange(row, 1, row, 4, review ? (review.supervisor_note || '') : '-', VALUE_CELL_STYLE);
+            row++;
+        }
+        // The app only carries one overall HR note per plan (not one per review), so it goes in a
+        // single cell spanning the whole review log rather than the original template's ad-hoc,
+        // per-row HR verification entries.
+        const hrNoteText = full.hr_note ? `${full.hr_note}${full.hr_note_by ? `\n— ${full.hr_note_by}` : ''}` : '';
+        mergeRange(reviewStartRow, 5, row - 1, 5, hrNoteText, VALUE_CELL_STYLE);
+
+        ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: row - 1, c: 5 } });
+        ws['!merges'] = merges;
+        ws['!cols'] = IDP_SHEET_COL_WIDTHS;
+        return ws;
+    };
+
+    // Bulk export: one sheet per plan currently matching the search/year/status filters above.
     const exportExcel = async () => {
         const wb = XLSX.utils.book_new();
 
@@ -257,40 +395,7 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                 if (res.ok) full = await res.json();
             } catch (e) { /* fall back to summary row */ }
 
-            const rows: any[][] = [
-                ['Nama Karyawan:', full.employee_name || '', '', 'Jabatan:', full.job_position || ''],
-                ['Atasan Langsung:', full.supervisor_name || '', '', 'Periode IDP:', full.period_year],
-                ['Departemen:', full.department || '', '', 'Tanggal Mulai Bekerja:', full.join_date_label || ''],
-                [],
-                ['Pencapaian / Prestasi Kerja'],
-                [full.achievements || ''],
-                [],
-                ['Tujuan / Aspirasi Karir (Goal)'],
-                [full.career_goal || ''],
-                [],
-                ['Skill yang Dimiliki', '', '', 'Area Pengembangan'],
-                [full.existing_skills || '', '', '', full.development_area || ''],
-                [],
-                ['Rencana Aksi Pengembangan', 'Target Waktu', 'Checklist Progress', 'Keterangan']
-            ];
-
-            for (const item of full.action_items || []) {
-                rows.push([item.action_description, item.target_time || '', item.is_completed ? 'TRUE' : 'FALSE', item.notes || '']);
-            }
-
-            rows.push([]);
-            rows.push(['Tanggal IDP Dibuat oleh Karyawan:', full.created_by_date ? new Date(full.created_by_date).toLocaleDateString('id-ID') : '', '', 'Tanggal IDP Disetujui oleh HR:', full.approved_date ? new Date(full.approved_date).toLocaleDateString('id-ID') : '']);
-            rows.push([]);
-            rows.push(['Tanggal Review', 'Evaluasi IDP (diisi oleh atasan langsung)']);
-            for (const review of full.reviews || []) {
-                rows.push([
-                    new Date(review.review_date).toLocaleDateString('id-ID'),
-                    review.supervisor_note
-                ]);
-            }
-
-            const ws = XLSX.utils.aoa_to_sheet(rows);
-            ws['!cols'] = [{ wch: 30 }, { wch: 35 }, { wch: 18 }, { wch: 22 }, { wch: 35 }];
+            const ws = buildIdpWorksheet(full);
             const sheetName = (full.employee_name || `IDP ${full.id}`).slice(0, 31).replace(/[[\]*/\\?:]/g, '');
             XLSX.utils.book_append_sheet(wb, ws, sheetName);
         }
@@ -301,6 +406,33 @@ export default function IDPManager({ userName }: IDPManagerProps) {
 
         const periodLabel = selectedYear === 'All' ? 'AllYears' : String(selectedYear);
         XLSX.writeFile(wb, `IDP_${periodLabel}.xlsx`);
+    };
+
+    // Per-employee download from the card itself - reuses the already-fetched `detail` when that
+    // card is expanded (avoids a redundant request) and fetches fresh otherwise. Sheet is named
+    // after the period year, matching the original single-employee template.
+    const [downloadingId, setDownloadingId] = useState<number | null>(null);
+    const exportSinglePlan = async (plan: IDPPlan) => {
+        setDownloadingId(plan.id);
+        try {
+            let full = plan;
+            if (expandedId === plan.id && detail) {
+                full = detail;
+            } else {
+                try {
+                    const res = await fetch(`${API_BASE_URL}/api/idp/${plan.id}`);
+                    if (res.ok) full = await res.json();
+                } catch (e) { /* fall back to summary row */ }
+            }
+
+            const wb = XLSX.utils.book_new();
+            const ws = buildIdpWorksheet(full);
+            XLSX.utils.book_append_sheet(wb, ws, String(full.period_year || 'IDP'));
+            const nameLabel = (full.employee_name || `Employee_${full.id}`).replace(/\s+/g, '_');
+            XLSX.writeFile(wb, `IDP ${full.employee_name || nameLabel}.xlsx`);
+        } finally {
+            setDownloadingId(null);
+        }
     };
 
     // --- Bulk import: reads an .xlsx with one sheet per employee (the standard IDP template) and shows
@@ -440,6 +572,14 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                                         <button onClick={() => { setRejectTargetId(plan.id); setRejectModalOpen(true); }} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-rose-200 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-50 transition-colors"><XCircle size={14} /> {t('team.reject')}</button>
                                     </>
                                 )}
+                                <button
+                                    onClick={() => exportSinglePlan(plan)}
+                                    disabled={downloadingId === plan.id}
+                                    title={t('admin.downloadOne')}
+                                    className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 text-gray-400 rounded-xl text-xs font-bold hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Download size={14} className={downloadingId === plan.id ? 'animate-pulse' : ''} />
+                                </button>
                                 <button
                                     onClick={() => setDeleteTargetId(plan.id)}
                                     title="Hapus IDP secara permanen"
