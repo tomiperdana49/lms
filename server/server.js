@@ -5964,11 +5964,11 @@ app.post('/api/idp/bulk-import', async (req, res) => {
             }
 
             const nameMatches = await querySimAsset(
-                'SELECT id_employee, organization_name, join_date FROM employees WHERE full_name = ? LIMIT 1',
+                'SELECT id_employee, full_name, organization_name, join_date FROM employees WHERE full_name = ? LIMIT 1',
                 [row.employee_name.trim()]
             );
             const employee = nameMatches[0] || (await querySimAsset(
-                'SELECT id_employee, organization_name, join_date FROM employees WHERE full_name LIKE ? LIMIT 1',
+                'SELECT id_employee, full_name, organization_name, join_date FROM employees WHERE full_name LIKE ? LIMIT 1',
                 [`%${row.employee_name.trim()}%`]
             ))[0];
 
@@ -5977,8 +5977,15 @@ app.post('/api/idp/bulk-import', async (req, res) => {
                 continue;
             }
             const employeeId = employee.id_employee;
+            // Store the org chart's canonical name/casing ("Januar Ilham") rather than whatever the
+            // sheet had typed ("januar ilham") - the row already matched to this exact employee above.
+            const employeeName = employee.full_name || row.employee_name.trim();
 
-            let supervisorName = row.supervisor_name || null;
+            // Same best-effort match as hrNoteBy below: "fani" -> "Fani Hardianto" only when exactly
+            // one employee matches that text, so a shortened/misspelled name is never silently
+            // attributed to the wrong person. Falls back to the org chart's report-to relationship
+            // when the sheet didn't name a supervisor at all.
+            let supervisorName = row.supervisor_name ? (await matchEmployeeFullName(row.supervisor_name)) || row.supervisor_name.trim() : null;
             if (!supervisorName) {
                 const supervisor = await findReportToEmployee(employeeId);
                 supervisorName = supervisor?.full_name || null;
@@ -5992,7 +5999,7 @@ app.post('/api/idp/bulk-import', async (req, res) => {
             const joinDateLabel = row.join_date_label || formatIndoDate(employee.join_date);
 
             const existing = await query(
-                'SELECT id, hr_note, job_position, department, supervisor_name, join_date_label, created_by_date, approved_date FROM idp_plans WHERE employee_id = ? AND period_year = ?',
+                'SELECT id, hr_note, employee_name, job_position, department, supervisor_name, join_date_label, created_by_date, approved_date FROM idp_plans WHERE employee_id = ? AND period_year = ?',
                 [employeeId, row.period_year]
             );
             if (existing.length > 0) {
@@ -6007,8 +6014,9 @@ app.post('/api/idp/bulk-import', async (req, res) => {
                 // so re-importing the same file is idempotent) and the HR note if none is set yet.
                 const existingPlan = existing[0];
                 await query(
-                    `UPDATE idp_plans SET job_position = ?, department = ?, supervisor_name = ?, join_date_label = ?, created_by_date = ?, approved_date = ? WHERE id = ?`,
+                    `UPDATE idp_plans SET employee_name = ?, job_position = ?, department = ?, supervisor_name = ?, join_date_label = ?, created_by_date = ?, approved_date = ? WHERE id = ?`,
                     [
+                        employeeName || existingPlan.employee_name || '',
                         row.job_position || existingPlan.job_position || '',
                         department || existingPlan.department || '',
                         supervisorName || existingPlan.supervisor_name || null,
@@ -6044,7 +6052,7 @@ app.post('/api/idp/bulk-import', async (req, res) => {
                     noteAdded = true;
                 }
                 result.skipped++;
-                result.duplicates.push({ row: rowLabel, employee_name: row.employee_name, period_year: row.period_year, reviewsAdded, noteAdded });
+                result.duplicates.push({ row: rowLabel, employee_name: employeeName, period_year: row.period_year, reviewsAdded, noteAdded });
                 continue;
             }
 
@@ -6062,7 +6070,7 @@ app.post('/api/idp/bulk-import', async (req, res) => {
                  created_by_date, approved_date, hr_note, hr_note_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
-                employeeId, row.employee_name.trim(), row.job_position || '', department, supervisorName,
+                employeeId, employeeName, row.job_position || '', department, supervisorName,
                 row.period_year, joinDateLabel, row.achievements || '', row.career_goal || '',
                 row.existing_skills || '', row.development_area || '', status,
                 row.created_by_date || null, approvedDateToStore, row.hr_note || null, hrNoteBy
