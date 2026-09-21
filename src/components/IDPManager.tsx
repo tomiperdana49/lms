@@ -25,8 +25,10 @@ const MANDATORY_TARGET_HOURS = 48;
 // the strip (e.g. index 1 is the creation month), so a missing review shows up at its actual month -
 // not just "N months into tracking" - which only holds while created_by_date reflects when the plan
 // was really created (bulk-import now keeps it in sync with the source sheet on re-import; see
-// /api/idp/bulk-import). Falls back to the earliest logged review's month on the rare plan that has
-// reviews but no created_by_date at all, so the strip still renders something rather than nothing.
+// /api/idp/bulk-import). Falls back to January of the period year on a plan that has no
+// created_by_date at all (e.g. an older import that predates that field being backfilled) - NOT to
+// the earliest logged review's month, which would misalign every index (a June/July/August review
+// would land at index 1/2/3 instead of 6/7/8, making months 1-5 look skipped rather than un-reviewed).
 const reviewMonthStrip = (plan: IDPPlan): { index: number; reviewed: boolean }[] => {
     const reviewedSet = new Set((plan.reviewed_year_months || '').split(',').filter(Boolean));
 
@@ -36,11 +38,8 @@ const reviewMonthStrip = (plan: IDPPlan): { index: number; reviewed: boolean }[]
         startY = start.getFullYear();
         startM = start.getMonth();
     } else {
-        const earliestReviewedMonth = [...reviewedSet].sort()[0];
-        if (!earliestReviewedMonth) return [];
-        const [y, m] = earliestReviewedMonth.split('-').map(Number);
-        startY = y;
-        startM = m - 1;
+        startY = plan.period_year;
+        startM = 0;
     }
 
     const now = new Date();
