@@ -1196,6 +1196,11 @@ const findLocalEmployeeByEmailOrId = async (email, employeeId) => {
     return null;
 };
 
+// Only 'Active', 'Resign' and NULL show up in employees.active_status (see the employee sync) - NULL
+// is treated as "not known to be resigned" rather than blocked, matching every other endpoint that
+// filters on this column (e.g. the team-member/directory queries: "active_status IS NULL OR != 'Resign'").
+const isResignedStatus = (activeStatus) => typeof activeStatus === 'string' && activeStatus.toLowerCase() === 'resign';
+
 // Resolves the report-to (supervisor) employee row for a given employee_id.
 // id_report_to_value holds the supervisor's user_id; id_report_to holds their name
 // as a fallback for records where the value link wasn't populated.
@@ -1648,13 +1653,10 @@ app.post('/api/login', async (req, res) => {
 
         console.log(`[LOGIN ATTEMPT] Value: '${loginId}'`);
 
-        // Domain restriction check for email logins
-        if (loginId.includes('@')) {
-            const isCorporate = loginId.endsWith('@nusawork.com') || loginId.endsWith('@nusa.id');
-            if (!isCorporate) {
-                return res.status(403).json({ success: false, message: 'Access Restricted: Only @nusa.id or @nusawork.com emails are allowed.' });
-            }
-        }
+        // No domain whitelist here (unlike /api/auth/google) - whether this identifier is allowed in
+        // is decided below by whether it matches a local account or a real Nusawork-linked employee,
+        // not by its email domain. A hardcoded @nusa.id/@nusawork.com check would otherwise lock out
+        // real accounts on other domains (legacy @nusa.net.id, @gmail.com, vendor domains, etc.).
 
         // 2. First try: Local database check using our helper (handles email domain transitions)
         let user = await findLocalUserByEmailOrId(loginId, null);
@@ -1690,6 +1692,14 @@ app.post('/api/login', async (req, res) => {
             // Reload user info to return updated values
             const updatedUsers = await query('SELECT * FROM users WHERE id = ?', [user.id]);
             const finalUser = updatedUsers[0] || user;
+
+            // Block resigned employees - checked post-sync so a status change in Nusawork takes
+            // effect on their very next login attempt, not only after some later background sync.
+            const finalEmployee = await findLocalEmployeeByEmailOrId(finalUser.email, finalUser.employee_id);
+            if (isResignedStatus(finalEmployee?.active_status)) {
+                console.log(`[LOGIN BLOCKED] ${loginId} is marked Resign in employees.`);
+                return res.status(403).json({ success: false, message: 'This account is no longer active (resigned). Please contact HR if this is a mistake.' });
+            }
 
             const isSupervisor = await checkIsSupervisor(finalUser);
 
@@ -1748,6 +1758,12 @@ app.post('/api/login', async (req, res) => {
                 // Find or Sync local record (it has been created or updated by syncEmployeeFromNusawork)
                 const employeeHelper = await findLocalEmployeeByEmailOrId(loginId, null);
                 const employeeId = employeeHelper ? employeeHelper.id_employee : null;
+
+                if (isResignedStatus(employeeHelper?.active_status)) {
+                    console.log(`[LOGIN BLOCKED] ${loginId} is marked Resign in Nusawork.`);
+                    return res.status(403).json({ success: false, message: 'This account is no longer active (resigned). Please contact HR if this is a mistake.' });
+                }
+
                 let user = await findLocalUserByEmailOrId(loginId, employeeId);
 
                 if (!user) {
