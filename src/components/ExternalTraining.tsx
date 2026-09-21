@@ -15,9 +15,20 @@ import {
  MapPin,
  Award,
  Gift,
- Clock
+ Clock,
+ Users,
+ X,
+ Check,
+ MessageSquare
 } from 'lucide-react';
 import PopupNotification from './PopupNotification';
+import { ANNUAL_LEARNING_BUDGET } from './LearningReport';
+
+interface CcOption {
+    employeeId: string;
+    fullName: string;
+    jobPosition: string;
+}
 
 type TabType = 'my_requests' | 'team_approvals';
 
@@ -57,6 +68,21 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
     const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
     const [rejectionReason, setRejectionReason] = useState('');
 
+    // Optional note a leader can leave on why they approved - separate modal from reject's since
+    // the note isn't required (Approve still needs to work with the field left blank).
+    const [approveModalOpen, setApproveModalOpen] = useState(false);
+    const [approveNoteDraft, setApproveNoteDraft] = useState('');
+
+    // CC picker for the request form - every non-resigned employee company-wide (same source
+    // /api/team-members/Team Competencies already uses), searchable and multi-select.
+    const [ccOptions, setCcOptions] = useState<CcOption[]>([]);
+    const [selectedCcIds, setSelectedCcIds] = useState<string[]>([]);
+    const [ccSearch, setCcSearch] = useState('');
+    const [ccDropdownOpen, setCcDropdownOpen] = useState(false);
+
+    // Personal learning budget so far this year - same figure/cap shown on the Dashboard
+    // (ANNUAL_LEARNING_BUDGET), surfaced here too since it's exactly what a new request eats into.
+    const [personalLearningCost, setPersonalLearningCost] = useState(0);
 
  // Form States for Request
  const [category, setCategory] = useState('Training');
@@ -75,6 +101,25 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  if (activeTab === 'my_requests') fetchMyRequests();
  if (activeTab === 'team_approvals') fetchTeamRequests();
   }, [activeTab, currentUser, isManagementMode]);
+
+ // CC options for the request form - fetched once, not per tab switch.
+ useEffect(() => {
+ fetch(`${API_BASE_URL}/api/employees/directory`)
+ .then(res => res.json())
+ .then((data: CcOption[]) => setCcOptions(Array.isArray(data) ? data : []))
+ .catch(err => console.error('Error fetching CC options:', err));
+ }, []);
+
+ // Personal learning cost for the current calendar year - same query shape (Jan 1-Dec 31,
+ // this year) as the Dashboard's own "Learning Cost" widget, so the two numbers always agree.
+ useEffect(() => {
+ if (!currentUser?.employee_id) return;
+ const currentYear = new Date().getFullYear();
+ fetch(`${API_BASE_URL}/api/learning-stats?employee_id=${currentUser.employee_id}&startDate=${currentYear}-01-01&endDate=${currentYear}-12-31`)
+ .then(res => res.json())
+ .then(data => { if (!data.error) setPersonalLearningCost(data.totalBiaya || 0); })
+ .catch(err => console.error('Error fetching personal learning cost:', err));
+ }, [currentUser?.employee_id]);
 
  const fetchMyRequests = async () => {
  try {
@@ -127,12 +172,13 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  attachment_link: attachmentLink,
  vendor,
  location,
- payment_method: paymentMethod
+ payment_method: paymentMethod,
+ cc_employee_ids: selectedCcIds
  })
  });
  if (res.ok) {
  showNotif('success', t('notifications.submitSuccess'));
- setTitle(''); setVendor(''); setLocation(''); setRegFee(''); setAttachmentFile(null); setStartDate(''); setEndDate(''); setPaymentMethod('Direct Payment');
+ setTitle(''); setVendor(''); setLocation(''); setRegFee(''); setAttachmentFile(null); setStartDate(''); setEndDate(''); setPaymentMethod('Direct Payment'); setSelectedCcIds([]);
  fetchMyRequests();
  } else {
  throw new Error(t('notifications.submitFailed'));
@@ -144,7 +190,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  }
  };
 
- const handleApproveReject = async (id: number, status: 'Approved' | 'Rejected', reason?: string) => {
+ const handleApproveReject = async (id: number, status: 'Approved' | 'Rejected', reason?: string, note?: string) => {
  try {
  const bodyData: any = {
  id,
@@ -153,6 +199,9 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  };
  if (status === 'Rejected' && reason) {
  bodyData.rejection_reason = reason;
+ }
+ if (status === 'Approved' && note && note.trim()) {
+ bodyData.approval_note = note.trim();
  }
 
  const res = await fetch(`${API_BASE_URL}/api/external-training/approve`, {
@@ -168,6 +217,10 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  setRejectModalOpen(false);
  setRejectionReason('');
  setSelectedRequestId(null);
+ } else {
+ setApproveModalOpen(false);
+ setApproveNoteDraft('');
+ setSelectedRequestId(null);
  }
  } catch (error) {
  console.error(error);
@@ -178,6 +231,13 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  const confirmReject = () => {
  if (selectedRequestId !== null && rejectionReason.trim() !== '') {
  handleApproveReject(selectedRequestId, 'Rejected', rejectionReason);
+ }
+ };
+
+ // Leaders must explain why they're approving, same requirement as reject's reason.
+ const confirmApprove = () => {
+ if (selectedRequestId !== null && approveNoteDraft.trim() !== '') {
+ handleApproveReject(selectedRequestId, 'Approved', undefined, approveNoteDraft);
  }
  };
 
@@ -280,6 +340,12 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <div className="flex items-center gap-2 text-gray-600">
  <Gift className="w-4 h-4 text-gray-400 shrink-0" />
  <span>{t('request.detailIncentive')}: <span className="font-semibold text-gray-800">{formatRp(Number(req.incentive_reward))}{req.incentive_payment_type === 'Recurring' ? ` / ${t('request.detailIncentivePerMonth')}` : ''}</span></span>
+ </div>
+ )}
+ {req.cc_employee_ids && req.cc_employee_ids.length > 0 && (
+ <div className="flex items-start gap-2 text-gray-600 sm:col-span-2">
+ <Users className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+ <span>{t('request.detailCc')}: <span className="font-semibold text-gray-800">{req.cc_employee_ids.map(id => ccOptions.find(o => o.employeeId === id)?.fullName || id).join(', ')}</span></span>
  </div>
  )}
  {req.approved_by && (
@@ -389,6 +455,32 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
 
  {/* My Requests Tab */}
  {activeTab === 'my_requests' && (
+ <div className="space-y-6">
+ {/* Personal Learning Budget - same figure/cap as the Dashboard's own widget, shown
+ here since a new request is exactly what eats into it. */}
+ <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+ <div className="flex items-center gap-2 text-gray-500 mb-2">
+ <Wallet className="w-4 h-4" />
+ <span className="text-xs font-bold uppercase tracking-wide">{t('budget.title')}</span>
+ </div>
+ <div className="flex items-baseline gap-2 flex-wrap">
+ <span className={`text-2xl font-black ${personalLearningCost > ANNUAL_LEARNING_BUDGET ? 'text-rose-600' : 'text-gray-800'}`}>
+ {formatRp(personalLearningCost)}
+ </span>
+ <span className="text-sm font-semibold text-gray-400">/ {formatRp(ANNUAL_LEARNING_BUDGET)}</span>
+ </div>
+ <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mt-2">
+ <div
+ className={`h-full rounded-full ${personalLearningCost <= ANNUAL_LEARNING_BUDGET ? 'bg-emerald-500' : 'bg-rose-500'}`}
+ style={{ width: `${Math.min((personalLearningCost / ANNUAL_LEARNING_BUDGET) * 100, 100)}%` }}
+ />
+ </div>
+ <p className={`text-xs font-semibold mt-2 ${personalLearningCost <= ANNUAL_LEARNING_BUDGET ? 'text-gray-500' : 'text-rose-600'}`}>
+ {personalLearningCost <= ANNUAL_LEARNING_BUDGET
+ ? t('budget.remaining', { amount: formatRp(ANNUAL_LEARNING_BUDGET - personalLearningCost) })
+ : t('budget.exceeded', { amount: formatRp(personalLearningCost - ANNUAL_LEARNING_BUDGET) })}
+ </p>
+ </div>
  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
  <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
  <h2 className="text-lg font-semibold text-gray-800 mb-4">{t('form.newRequest')}</h2>
@@ -465,6 +557,66 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
  />
  </div>
+ <div>
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.ccLabel')}</label>
+ {selectedCcIds.length > 0 && (
+ <div className="flex flex-wrap gap-1.5 mb-2">
+ {selectedCcIds.map(id => {
+ const opt = ccOptions.find(o => o.employeeId === id);
+ return (
+ <span key={id} className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 text-xs font-semibold pl-2.5 pr-1 py-1 rounded-full">
+ {opt?.fullName || id}
+ <button type="button" onClick={() => setSelectedCcIds(prev => prev.filter(x => x !== id))} className="hover:bg-indigo-100 rounded-full p-0.5 transition-colors">
+ <X size={11} />
+ </button>
+ </span>
+ );
+ })}
+ </div>
+ )}
+ <div className="relative">
+ <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+ <input
+ type="text"
+ value={ccSearch}
+ onFocus={() => setCcDropdownOpen(true)}
+ onBlur={() => setTimeout(() => setCcDropdownOpen(false), 150)}
+ onChange={e => { setCcSearch(e.target.value); setCcDropdownOpen(true); }}
+ placeholder={t('form.ccPlaceholder')}
+ className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+ />
+ {ccDropdownOpen && (
+ <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-slate-100 rounded-lg shadow-lg divide-y divide-slate-50">
+ {ccOptions
+ .filter(o => o.employeeId !== currentUser?.employee_id)
+ .filter(o => !ccSearch.trim() || o.fullName.toLowerCase().includes(ccSearch.trim().toLowerCase()))
+ .slice(0, 30)
+ .map(o => {
+ const isChecked = selectedCcIds.includes(o.employeeId);
+ return (
+ // A real <label>/<input type="checkbox"> pair would blur this search input on
+ // every pick (the label's click-forwarding focuses the checkbox as part of the
+ // click event, not mousedown, so preventDefault on mousedown can't stop it) -
+ // a plain button with a hand-drawn checkbox avoids that, keeping the dropdown
+ // open across multiple picks.
+ <button
+ key={o.employeeId}
+ type="button"
+ onMouseDown={e => e.preventDefault()}
+ onClick={() => setSelectedCcIds(prev => isChecked ? prev.filter(x => x !== o.employeeId) : [...prev, o.employeeId])}
+ className="w-full flex items-center gap-2.5 text-left px-3 py-2 hover:bg-slate-50 transition-colors text-sm text-slate-700"
+ >
+ <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isChecked ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
+ {isChecked && <Check size={12} className="text-white" strokeWidth={3} />}
+ </span>
+ <span className="truncate">{o.fullName}</span>
+ </button>
+ );
+ })}
+ </div>
+ )}
+ </div>
+ </div>
  <button disabled={isLoading} type="submit" className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
  {isLoading ? t('form.submitting') : t('form.submitRequest')}
  </button>
@@ -525,9 +677,21 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <p>{req.rejection_reason}</p>
  </div>
  )}
+ {req.approval_note && (
+ <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg text-sm text-emerald-700 w-full">
+ <span className="font-semibold block mb-1">{t('request.approvalNoteLabel')}</span>
+ <p>{req.approval_note}</p>
+ </div>
+ )}
+ {req.budget_notice_message && (
+ <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-sm text-amber-700 w-full">
+ <p>{req.budget_notice_message}</p>
+ </div>
+ )}
  </div>
  ))
  )}
+ </div>
  </div>
  </div>
  )}
@@ -613,12 +777,30 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  </button>
 
  {expandedRequestIds.has(req.id) && renderRequestDetail(req)}
+
+ {req.status === 'Rejected' && req.rejection_reason && (
+ <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-700">
+ <span className="font-semibold block mb-1">{t('request.rejectionReasonLabel')}</span>
+ <p>{req.rejection_reason}</p>
+ </div>
+ )}
+ {req.approval_note && (
+ <div className="mt-4 p-3 bg-emerald-50 border border-emerald-100 rounded-lg text-sm text-emerald-700">
+ <span className="font-semibold block mb-1">{t('request.approvalNoteLabel')}</span>
+ <p>{req.approval_note}</p>
+ </div>
+ )}
+ {req.budget_notice_message && (
+ <div className="mt-4 p-3 bg-amber-50 border border-amber-100 rounded-lg text-sm text-amber-700">
+ <p>{req.budget_notice_message}</p>
+ </div>
+ )}
  </div>
 
  <div className="flex flex-row md:flex-col gap-3 md:justify-center items-center md:items-stretch md:pl-6 md:border-l border-slate-100 relative z-10">
  {req.status === 'Pending' ? (
  <>
- <button onClick={() => handleApproveReject(req.id, 'Approved')} className="flex-1 md:flex-none px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-0.5">
+ <button onClick={() => { setSelectedRequestId(req.id); setApproveModalOpen(true); }} className="flex-1 md:flex-none px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-0.5">
  <CheckCircle className="w-5 h-5"/> {t('team.approve')}
  </button>
  <button onClick={() => { setSelectedRequestId(req.id); setRejectModalOpen(true); }} className="flex-1 md:flex-none px-6 py-3 bg-white text-rose-600 hover:bg-rose-50 hover:text-rose-700 border border-rose-200 rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 shadow-sm">
@@ -668,6 +850,40 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
                                 className="flex-1 px-4 py-2.5 rounded-xl bg-rose-600 text-white font-medium hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
                                 {t('rejectModal.confirmReject')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Approve Modal - a note explaining the approval is required, same as reject's reason */}
+            {approveModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+                        <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
+                            <MessageSquare className="w-5 h-5 text-emerald-600" /> {t('approveModal.title')}
+                        </h3>
+                        <p className="text-slate-500 text-sm mb-4">{t('approveModal.subtitle')}</p>
+                        <textarea
+                            className="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none"
+                            rows={4}
+                            placeholder={t('approveModal.placeholder')}
+                            value={approveNoteDraft}
+                            onChange={(e) => setApproveNoteDraft(e.target.value)}
+                        />
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => { setApproveModalOpen(false); setApproveNoteDraft(''); setSelectedRequestId(null); }}
+                                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-colors"
+                            >
+                                {t('approveModal.cancel')}
+                            </button>
+                            <button
+                                onClick={confirmApprove}
+                                disabled={!approveNoteDraft.trim()}
+                                className="flex-1 px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                {t('approveModal.confirmApprove')}
                             </button>
                         </div>
                     </div>

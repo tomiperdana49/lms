@@ -27,6 +27,8 @@
     "paymentMethod": "Payment Method",
     "paymentMethodReimbursement": "Reimbursement",
     "paymentMethodDirectPayment": "Direct Payment",
+    "ccLabel": "CC (Optional)",
+    "ccPlaceholder": "Search employee name...",
     "submitting": "Submitting...",
     "submitRequest": "Submit Request"
   },
@@ -47,6 +49,11 @@
     "Approved": "Approved",
     "Rejected": "Rejected",
     "Processed": "Processed"
+  },
+  "budget": {
+    "title": "Your Personal Learning Budget",
+    "remaining": "Remaining: {{amount}}",
+    "exceeded": "Over budget by {{amount}}"
   },
   "empty": {
     "noRequests": "No external training requests yet.",
@@ -78,9 +85,11 @@
     "detailCertificateOriginal": "Original",
     "detailCertificateRenewed": "Renewed",
     "detailCertificateExpiry": "Certificate Expiry",
+    "detailCc": "CC",
     "detailApprovedBy": "Approved By",
     "detailProcessedByHr": "Approved by HR",
-    "viewLink": "View Link"
+    "viewLink": "View Link",
+    "approvalNoteLabel": "Approval Note:"
   },
   "team": {
     "idLabel": "ID: {{id}}",
@@ -98,6 +107,13 @@
     "placeholder": "Type reason here...",
     "cancel": "Cancel",
     "confirmReject": "Confirm Reject"
+  },
+  "approveModal": {
+    "title": "Approve Training Request",
+    "subtitle": "Please explain why you're approving this request.",
+    "placeholder": "Type your reason here...",
+    "cancel": "Cancel",
+    "confirmApprove": "Confirm Approve"
   },
   "notifications": {
     "submitSuccess": "Request submitted successfully!",

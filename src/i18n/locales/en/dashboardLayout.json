@@ -106,7 +106,8 @@
       "REJECTED": "Rejected"
     },
     "competencyAssessmentSubmittedTitle": "New Competency Assessment",
-    "competencyAssessmentSubmittedMessage": "{{name}} has submitted your competency assessment for Q{{quarter}} {{year}}."
+    "competencyAssessmentSubmittedMessage": "{{name}} has submitted your competency assessment for Q{{quarter}} {{year}}.",
+    "ccBudgetNoticeTitle": "External Training Over Budget"
   },
   "footer": "© 2026 PT Media Antar Nusa",
   "userFallback": "User",

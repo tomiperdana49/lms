@@ -341,6 +341,9 @@ export interface ExternalTrainingRequest {
     training_gr_type?: string;
     participation_type?: string;
     learning_hours?: number;
+    cc_employee_ids?: string[];
+    approval_note?: string;
+    budget_notice_message?: string | null;
 }
 
 export interface IDPActionItem {

@@ -106,7 +106,8 @@
       "REJECTED": "Ditolak"
     },
     "competencyAssessmentSubmittedTitle": "Penilaian Kompetensi Baru",
-    "competencyAssessmentSubmittedMessage": "{{name}} telah mengisi penilaian kompetensi Anda untuk Q{{quarter}} {{year}}."
+    "competencyAssessmentSubmittedMessage": "{{name}} telah mengisi penilaian kompetensi Anda untuk Q{{quarter}} {{year}}.",
+    "ccBudgetNoticeTitle": "Training Eksternal Melebihi Budget"
   },
   "footer": "© 2026 PT Media Antar Nusa",
   "userFallback": "Pengguna",

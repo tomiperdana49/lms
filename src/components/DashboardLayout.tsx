@@ -177,6 +177,11 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                 const myCompetencyRequests = await myCompetencyRequestsRes.json();
                 const pendingCompetencyRequests = pendingCompetencyRequestsRes ? await pendingCompetencyRequestsRes.json() : [];
                 const myCompetencyAssessmentPeriods = await myCompetencyAssessmentPeriodsRes.json();
+                // Fetched independently (not in the Promise.all/guard above) so a hiccup here can
+                // never blank out every other notification category - this one just comes up empty.
+                const ccBudgetNotices = await fetch(`${API_BASE_URL}/api/external-training/cc-budget-notices?employee_id=${user.employee_id || ''}`)
+                    .then(r => r.ok ? r.json() : [])
+                    .catch(() => []);
 
                 // Get already read notification IDs from LocalStorage
                 let readIds: number[] = [];
@@ -612,11 +617,29 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     };
                 });
 
+                // 16. External Training: notify a CC'd employee once the leader's approval pushes the
+                // requester over their personal learning budget - budget_notice_message is already the
+                // full, ready-to-show text (see POST /api/external-training/approve).
+                const ccBudgetNotifs = (Array.isArray(ccBudgetNotices) ? ccBudgetNotices : []).map((notice: any) => {
+                    const notifId = 2300000 + notice.id;
+                    const notifDate = new Date(notice.updated_at || Date.now());
+                    return {
+                        id: notifId,
+                        title: t('notifications.ccBudgetNoticeTitle'),
+                        message: notice.budget_notice_message,
+                        time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                        sortTime: notifDate.getTime(),
+                        type: 'WARNING',
+                        isRead: readIds.includes(notifId),
+                        page: 'external'
+                    };
+                });
+
                 // Combine and sort by actual notification date (sortTime), newest first - the
                 // synthetic `id` above is only for per-category read/unread tracking and is not
                 // comparable across categories (each has its own numeric offset), so it must not
                 // be used for ordering.
-                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpStatusNotifs, ...idpNoteNotifs, ...idpSubmittedNotifs, ...idpReviewNotifs, ...pteLeaderNotifs, ...pteMineNotifs, ...incentiveNotifs, ...competencySubmittedNotifs, ...competencyStatusNotifs, ...myCompetencyAssessmentNotifs].sort((a, b) => b.sortTime - a.sortTime);
+                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpStatusNotifs, ...idpNoteNotifs, ...idpSubmittedNotifs, ...idpReviewNotifs, ...pteLeaderNotifs, ...pteMineNotifs, ...incentiveNotifs, ...competencySubmittedNotifs, ...competencyStatusNotifs, ...myCompetencyAssessmentNotifs, ...ccBudgetNotifs].sort((a, b) => b.sortTime - a.sortTime);
                 setNotifications(all);
             } catch (error) {
                 console.error("Failed to fetch header notifications", error);

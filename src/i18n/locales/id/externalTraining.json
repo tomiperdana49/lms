@@ -27,6 +27,8 @@
     "paymentMethod": "Metode Pembayaran",
     "paymentMethodReimbursement": "Reimbursement",
     "paymentMethodDirectPayment": "Direct Payment",
+    "ccLabel": "CC (Opsional)",
+    "ccPlaceholder": "Cari nama karyawan...",
     "submitting": "Mengirim...",
     "submitRequest": "Kirim Permintaan"
   },
@@ -47,6 +49,11 @@
     "Approved": "Disetujui",
     "Rejected": "Ditolak",
     "Processed": "Diproses"
+  },
+  "budget": {
+    "title": "Budget Pembelajaran Anda",
+    "remaining": "Sisa: {{amount}}",
+    "exceeded": "Melebihi budget sebesar {{amount}}"
   },
   "empty": {
     "noRequests": "Belum ada permintaan pelatihan eksternal.",
@@ -78,9 +85,11 @@
     "detailCertificateOriginal": "Asli",
     "detailCertificateRenewed": "Perpanjangan",
     "detailCertificateExpiry": "Kedaluwarsa Sertifikat",
+    "detailCc": "CC",
     "detailApprovedBy": "Disetujui oleh",
     "detailProcessedByHr": "Disetujui oleh HR",
-    "viewLink": "Lihat Tautan"
+    "viewLink": "Lihat Tautan",
+    "approvalNoteLabel": "Catatan Persetujuan:"
   },
   "team": {
     "idLabel": "ID: {{id}}",
@@ -98,6 +107,13 @@
     "placeholder": "Ketik alasan di sini...",
     "cancel": "Batal",
     "confirmReject": "Konfirmasi Penolakan"
+  },
+  "approveModal": {
+    "title": "Setujui Permintaan Pelatihan",
+    "subtitle": "Mohon jelaskan alasan Anda menyetujui permintaan ini.",
+    "placeholder": "Ketik alasan di sini...",
+    "cancel": "Batal",
+    "confirmApprove": "Konfirmasi Persetujuan"
   },
   "notifications": {
     "submitSuccess": "Permintaan berhasil dikirim!",

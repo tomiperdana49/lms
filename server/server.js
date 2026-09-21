@@ -1224,6 +1224,14 @@ const isInternEmployeeId = async (employeeId) => {
     return rows.length > 0 && isInternStatus(rows[0].status_join);
 };
 
+// cc_employee_ids is stored as a JSON array string (or NULL); every read path needs it back as a
+// real array for the frontend's CC chip list to render.
+const parseExternalTrainingRow = (row) => {
+    let ccEmployeeIds = [];
+    try { ccEmployeeIds = row.cc_employee_ids ? JSON.parse(row.cc_employee_ids) : []; } catch (e) { ccEmployeeIds = []; }
+    return { ...row, cc_employee_ids: ccEmployeeIds };
+};
+
 // Resolves the report-to (supervisor) employee row for a given employee_id.
 // id_report_to_value holds the supervisor's user_id; id_report_to holds their name
 // as a fallback for records where the value link wasn't populated.
@@ -5519,14 +5527,14 @@ app.get('/api/feedback/all', async (req, res) => {
 // 1. Employee creates new request
 app.post('/api/external-training/request', async (req, res) => {
     try {
-        const { employee_id, employee_name, category, title, start_date, end_date, registration_fee, attachment_link, vendor, location, payment_method } = req.body;
+        const { employee_id, employee_name, category, title, start_date, end_date, registration_fee, attachment_link, vendor, location, payment_method, cc_employee_ids } = req.body;
         // datetime-local inputs send "YYYY-MM-DDTHH:MM"; MySQL DATETIME literals need a space instead of "T"
         const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
         const result = await query(`
             INSERT INTO external_training_requests
-            (employee_id, employee_name, category, title, start_date, end_date, registration_fee, attachment_link, vendor, location, payment_method)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [employee_id, employee_name, category, title, toMysqlDatetime(start_date), toMysqlDatetime(end_date), registration_fee || 0, attachment_link || '', vendor || '', location || '', payment_method || 'Reimbursement']);
+            (employee_id, employee_name, category, title, start_date, end_date, registration_fee, attachment_link, vendor, location, payment_method, cc_employee_ids)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [employee_id, employee_name, category, title, toMysqlDatetime(start_date), toMysqlDatetime(end_date), registration_fee || 0, attachment_link || '', vendor || '', location || '', payment_method || 'Reimbursement', Array.isArray(cc_employee_ids) && cc_employee_ids.length > 0 ? JSON.stringify(cc_employee_ids) : null]);
 
         // Notify the requester's supervisor via WhatsApp (best-effort, never blocks the response)
         try {
@@ -5645,7 +5653,7 @@ app.get('/api/external-training/my-requests', async (req, res) => {
             ORDER BY r.created_at DESC
         `;
         const rows = await query(queryStr, [employee_id]);
-        res.json(rows);
+        res.json(rows.map(parseExternalTrainingRow));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -5665,20 +5673,97 @@ app.get('/api/external-training/subordinates', async (req, res) => {
             ORDER BY created_at DESC
         `, subordinateIds);
 
-        res.json(rows);
+        res.json(rows.map(parseExternalTrainingRow));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// Must match ANNUAL_LEARNING_BUDGET in src/components/LearningReport.tsx - the one place this
+// per-person cap is already defined and shown to users (Dashboard, Employee Learning Report).
+const ANNUAL_LEARNING_BUDGET = 2000000;
 
 // 4. Leader approves/rejects
 app.post('/api/external-training/approve', async (req, res) => {
     try {
-        const { id, status, approved_by, rejection_reason } = req.body; // status should be 'Approved' or 'Rejected'
+        const { id, status, approved_by, rejection_reason, approval_note } = req.body; // status should be 'Approved' or 'Rejected'
         if (status === 'Rejected') {
             await query('UPDATE external_training_requests SET status = ?, approved_by = ?, rejection_reason = ? WHERE id = ?', [status, approved_by, rejection_reason || null, id]);
-        } else {
-            await query('UPDATE external_training_requests SET status = ?, approved_by = ? WHERE id = ?', [status, approved_by, id]);
+            return res.json({ success: true });
         }
-        res.json({ success: true });
+        if (status === 'Approved' && !(approval_note && approval_note.trim())) {
+            return res.status(400).json({ error: 'A note explaining the approval is required.' });
+        }
+
+        const requestRows = await query('SELECT * FROM external_training_requests WHERE id = ?', [id]);
+        if (requestRows.length === 0) return res.status(404).json({ error: 'Request not found' });
+        const trainingRequest = parseExternalTrainingRow(requestRows[0]);
+
+        // Whether approving THIS request pushes the requester over their own annual learning budget -
+        // if so, the excess is effectively coming out of the team's pool, so their CC list gets a
+        // heads-up. Uses the same per-employee cost total already shown everywhere else in the app
+        // (computeLearningStats, for the calendar year this training starts in) plus this request's
+        // own cost, which isn't counted yet since it isn't Approved/Processed until this call.
+        const thisRequestCost = Number(trainingRequest.registration_fee || 0) + Number(trainingRequest.travel_flight_cost || 0)
+            + Number(trainingRequest.accommodation_cost || 0) + Number(trainingRequest.miscellaneous_cost || 0)
+            + Number(trainingRequest.additional_cost || 0);
+        const periodYear = trainingRequest.start_date ? new Date(trainingRequest.start_date).getFullYear() : new Date().getFullYear();
+        const existingStats = await computeLearningStats({
+            employee_id: trainingRequest.employee_id,
+            startDate: `${periodYear}-01-01`,
+            endDate: `${periodYear}-12-31`
+        }).catch(() => null);
+        const existingCost = existingStats ? (existingStats.biayaTraining + existingStats.biayaTrainingExternal + existingStats.biayaBuku) : 0;
+        const exceedsPersonalBudget = (existingCost + thisRequestCost) > ANNUAL_LEARNING_BUDGET;
+
+        let budgetNoticeMessage = null;
+        if (exceedsPersonalBudget) {
+            const [employeeRow] = await querySimAsset('SELECT organization_name FROM employees WHERE id_employee = ?', [trainingRequest.employee_id]);
+            const organizationName = employeeRow?.organization_name || '-';
+            budgetNoticeMessage = `Pengajuan training eksternal "${trainingRequest.title}" (${trainingRequest.employee_name}) melebihi budget per-orang dan saat ini menggunakan budget tim "${organizationName}".`;
+        }
+
+        await query(
+            'UPDATE external_training_requests SET status = ?, approved_by = ?, approval_note = ?, budget_notice_message = ? WHERE id = ?',
+            [status, approved_by, approval_note.trim(), budgetNoticeMessage, id]
+        );
+
+        // Notify every CC'd employee via WhatsApp, best-effort, only when the budget notice actually
+        // applies - a request that stays within the requester's own budget has nothing to tell them.
+        if (budgetNoticeMessage && Array.isArray(trainingRequest.cc_employee_ids) && trainingRequest.cc_employee_ids.length > 0) {
+            try {
+                const placeholders = trainingRequest.cc_employee_ids.map(() => '?').join(',');
+                const ccEmployees = await querySimAsset(
+                    `SELECT id_employee, whatsapp, mobile_phone FROM employees WHERE id_employee IN (${placeholders})`,
+                    trainingRequest.cc_employee_ids
+                );
+                for (const cc of ccEmployees) {
+                    const phone = cc.whatsapp || cc.mobile_phone;
+                    if (phone) await sendWhatsAppNotification(phone, budgetNoticeMessage);
+                }
+            } catch (notifyErr) {
+                console.error('[External Training] Failed to notify CC list:', notifyErr.message);
+            }
+        }
+
+        res.json({ success: true, exceedsPersonalBudget });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Header notification feed for a CC'd employee: every approved request that pushed the requester over
+// their personal budget AND lists this employee_id in cc_employee_ids. The candidate set (any row with
+// a budget notice at all) is small, so the cc_employee_ids membership check is done in JS rather than
+// with a JSON_CONTAINS/LIKE clause in SQL.
+app.get('/api/external-training/cc-budget-notices', async (req, res) => {
+    try {
+        const { employee_id } = req.query;
+        if (!employee_id) return res.json([]);
+        const rows = await query(
+            `SELECT id, title, employee_name, cc_employee_ids, budget_notice_message, updated_at
+             FROM external_training_requests WHERE budget_notice_message IS NOT NULL AND deleted_at IS NULL`
+        );
+        const notices = rows
+            .map(parseExternalTrainingRow)
+            .filter(r => r.cc_employee_ids.includes(employee_id));
+        res.json(notices);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -5686,7 +5771,7 @@ app.post('/api/external-training/approve', async (req, res) => {
 app.get('/api/external-training/all', async (req, res) => {
     try {
         const rows = await query(`SELECT * FROM external_training_requests WHERE deleted_at IS NULL ORDER BY created_at DESC`);
-        res.json(rows);
+        res.json(rows.map(parseExternalTrainingRow));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

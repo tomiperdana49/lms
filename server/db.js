@@ -483,6 +483,28 @@ export const initDB = async () => {
             console.log("Added deleted_at column to external_training_requests.");
         } catch (e) { /* Ignore if exists */ }
 
+        // MIGRATION: CC recipients (JSON array of employee_id strings) the requester picks when
+        // submitting - notified if the leader's approval ends up drawing on the team budget.
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN cc_employee_ids TEXT");
+            console.log("Added cc_employee_ids column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
+        // MIGRATION: The leader's optional free-text note on why they approved a request.
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN approval_note TEXT");
+            console.log("Added approval_note column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
+        // MIGRATION: Set once, at approval time, when this request pushed the employee over their
+        // per-person annual learning budget - holds the exact CC notification text so it never needs
+        // recomputing (org chart facts like organization_name can drift after the fact). NULL means
+        // this request never triggered the over-budget notice.
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN budget_notice_message TEXT");
+            console.log("Added budget_notice_message column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
         // MIGRATION: Add internal_certificates table (issued internal training certificates)
         try {
             await connection.query(`
