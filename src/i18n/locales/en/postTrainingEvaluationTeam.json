@@ -1,7 +1,7 @@
 {
   "title": "Post Training Evaluation",
   "subtitle": "Evaluations for your direct reports.",
-  "explanation": "Post Training Evaluation (PTE) is an evaluation carried out by a supervisor on their team's participation in a training program. Its purpose is to find out whether the material delivered has been/is still being implemented/applied in the job, including whether there has been a change in work attitude (PTE is conducted about 1 (one) month after the training ends).",
+  "explanation": "Post Training Evaluation (PTE) is an evaluation carried out by a supervisor on their team's participation in a training program. Its purpose is to find out whether the material delivered has been/is still being implemented/applied in the job, including whether there has been a change in work attitude (available as soon as the training is closed, with 30 days to complete it).",
   "loading": "Loading...",
   "tabs": {
     "active": "Active",

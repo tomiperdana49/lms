@@ -215,8 +215,8 @@
               "description": "Di sidebar, buka Training → Post Training Evaluation. Evaluasi milikmu terbagi jadi Active (belum diisi atasan) dan Closed (sudah diisi)."
             },
             {
-              "title": "Tunggu jendela evaluasinya terbuka",
-              "description": "Evaluasi baru tersedia untuk diisi atasanmu sekitar 1 (satu) bulan setelah tanggal trainingmu, jadi training yang baru selesai biasanya belum menampilkan apa-apa."
+              "title": "Tunggu training-mu ditutup (closed)",
+              "description": "Evaluasi baru tersedia untuk diisi atasanmu begitu sesi trainingmu ditutup (closed) oleh admin — atasanmu diberi waktu 30 hari sejak saat itu untuk mengisinya."
             },
             {
               "title": "Lihat evaluasi yang sudah selesai",
@@ -225,16 +225,16 @@
           ],
           "tips": [
             "Halaman ini bersifat read-only — evaluasi diisi oleh atasanmu, bukan oleh kamu sendiri.",
-            "Belum ada yang muncul sampai sekitar 30 hari setelah tanggal training, meskipun sesi trainingnya sendiri sudah closed/paid."
+            "Kalau training-mu belum ditutup (closed) oleh admin, evaluasi belum akan muncul sama sekali di sisi atasanmu."
           ]
         },
         "supervisor": {
           "label": "Sebagai Atasan Langsung",
-          "purpose": "Evaluasi apakah training internal yang diikuti anak buahmu benar-benar diterapkan di pekerjaan, dan apakah ada perubahan sikap kerja — dilakukan sekitar 1 (satu) bulan setelah training berakhir.",
+          "purpose": "Evaluasi apakah training internal yang diikuti anak buahmu benar-benar diterapkan di pekerjaan, dan apakah ada perubahan sikap kerja — bisa mulai diisi begitu training-nya ditutup (closed), dengan waktu 30 hari untuk mengisinya.",
           "steps": [
             {
               "title": "Buka daftar tim",
-              "description": "Training → Post Training Evaluation menampilkan setiap anak buah yang mengikuti training internal yang sudah closed minimal 30 hari lalu, terbagi jadi Active (belum diisi) dan Closed (sudah diisi)."
+              "description": "Training → Post Training Evaluation menampilkan setiap anak buah yang mengikuti training internal yang sudah closed, terbagi jadi Active (belum diisi) dan Closed (sudah diisi)."
             },
             {
               "title": "Isi evaluasi",
@@ -246,7 +246,7 @@
             }
           ],
           "tips": [
-            "Evaluasi baru tersedia 30 hari setelah tanggal training — training yang baru saja closed belum akan muncul meskipun statusnya sudah Paid.",
+            "Evaluasi langsung tersedia begitu training ditutup (closed) — tidak perlu menunggu 30 hari lagi seperti sebelumnya. Kamu diberi waktu 30 hari sejak training closed untuk mengisinya.",
             "Form evaluasi yang dipakai ulang untuk beberapa sesi training melacak jawaban tiap peserta secara terpisah per sesi."
           ]
         }

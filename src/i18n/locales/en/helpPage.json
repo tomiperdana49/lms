@@ -215,8 +215,8 @@
               "description": "In the sidebar, go to Training → Post Training Evaluation. Your own evaluations are split into Active (not yet submitted by your supervisor) and Closed (already submitted)."
             },
             {
-              "title": "Wait for the evaluation window",
-              "description": "The evaluation only becomes available to your supervisor about 1 (one) month after your training's date, so a recently finished training normally shows nothing yet."
+              "title": "Wait for your training to be closed",
+              "description": "The evaluation only becomes available to your supervisor once the training session is marked closed by admin - your supervisor then has 30 days from that point to fill it in."
             },
             {
               "title": "View a completed evaluation",
@@ -225,16 +225,16 @@
           ],
           "tips": [
             "This page is read-only — the evaluation is filled in by your supervisor, not by you.",
-            "Nothing shows up until about 30 days after the training's date, even if the training session itself is already closed/paid."
+            "If your training hasn't been marked closed by admin yet, the evaluation won't show up on your supervisor's side at all."
           ]
         },
         "supervisor": {
           "label": "As a Direct Supervisor",
-          "purpose": "Evaluate whether the internal training your direct reports attended is actually being applied on the job, and whether it changed their work attitude — done about 1 (one) month after the training ends.",
+          "purpose": "Evaluate whether the internal training your direct reports attended is actually being applied on the job, and whether it changed their work attitude — you can start filling it in as soon as the training is closed, with 30 days to complete it.",
           "steps": [
             {
               "title": "Open your team's list",
-              "description": "Training → Post Training Evaluation lists every direct report who attended an internal training that closed at least 30 days ago, split into Active (not yet filled) and Closed (already filled)."
+              "description": "Training → Post Training Evaluation lists every direct report who attended an internal training that's been closed, split into Active (not yet filled) and Closed (already filled)."
             },
             {
               "title": "Fill an evaluation",
@@ -246,7 +246,7 @@
             }
           ],
           "tips": [
-            "An evaluation only becomes available 30 days after the training date — a training that just closed doesn't show up yet even if it's marked Paid.",
+            "An evaluation becomes available as soon as the training is closed — no more waiting 30 days after the training date like before. You then have 30 days from closing to fill it in.",
             "A reused evaluation form (applied across multiple training sessions) tracks each attendee's answers separately per session."
           ]
         }

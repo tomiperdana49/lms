@@ -1,7 +1,7 @@
 {
   "title": "Post Training Evaluation",
   "subtitle": "Evaluasi pelatihan Anda.",
-  "explanation": "Post Training Evaluation (PTE) adalah evaluasi yang dilakukan oleh Atasan terhadap keikutsertaan timnya dalam suatu program pelatihan. Tujuan dari PTE ini adalah untuk mengetahui apakah materi yang disampaikan telah/masih diimplementasikan/diaplikasikan di dalam suatu pekerjaan termasuk apakah ada perubahan sikap kerja (PTE dilakukan setelah sekitar 1 (satu) bulan dari sejak Pelatihan berakhir).",
+  "explanation": "Post Training Evaluation (PTE) adalah evaluasi yang dilakukan oleh Atasan terhadap keikutsertaan timnya dalam suatu program pelatihan. Tujuan dari PTE ini adalah untuk mengetahui apakah materi yang disampaikan telah/masih diimplementasikan/diaplikasikan di dalam suatu pekerjaan termasuk apakah ada perubahan sikap kerja (tersedia untuk atasan begitu training ditutup/closed, dengan waktu 30 hari untuk mengisinya).",
   "loading": "Memuat...",
   "tabs": {
     "active": "Active",

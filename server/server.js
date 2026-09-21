@@ -1331,13 +1331,14 @@ const getFormMeetings = async (form) => {
             id: form.meeting_id,
             title: form.meeting_title,
             date: form.meeting_date,
+            is_closed: form.meeting_is_closed,
             guests_json: form.guests_json,
             cost_report_json: form.cost_report_json
         });
         seenIds.add(form.meeting_id);
     }
     const reusedMeetings = await query(
-        'SELECT id, title, date, guests_json, cost_report_json FROM meetings WHERE pte_form_id = ? AND deleted_at IS NULL',
+        'SELECT id, title, date, is_closed, guests_json, cost_report_json FROM meetings WHERE pte_form_id = ? AND deleted_at IS NULL',
         [form.id]
     );
     reusedMeetings.forEach(m => {
@@ -4408,7 +4409,7 @@ app.get('/api/post-training-evaluations/subordinates', async (req, res) => {
         if (subordinateIds.length === 0) return res.json([]);
 
         const forms = await query(`
-            SELECT f.*, m.title AS meeting_title, m.date AS meeting_date, m.guests_json, m.cost_report_json
+            SELECT f.*, m.title AS meeting_title, m.date AS meeting_date, m.is_closed AS meeting_is_closed, m.guests_json, m.cost_report_json
             FROM post_training_evaluation_forms f
             LEFT JOIN meetings m ON f.meeting_id = m.id
             WHERE f.status = 'PUBLISHED' AND f.deleted_at IS NULL
@@ -4443,12 +4444,12 @@ app.get('/api/post-training-evaluations/subordinates', async (req, res) => {
             // resolved (and reported with that meeting's own title/date) separately - a subordinate
             // who attended two different sessions using the same template shows up as two items.
             for (const meeting of meetings) {
-                // PTE3 (behavior-change evaluation) only opens to the leader once 30 days have
-                // passed since the training date - gives enough time to observe the trainee back
-                // on the job before judging whether the training changed anything.
-                if (!meeting.date) continue;
-                const daysSinceTraining = (Date.now() - new Date(meeting.date).getTime()) / (24 * 60 * 60 * 1000);
-                if (daysSinceTraining < 30) continue;
+                // PTE3 (behavior-change evaluation) opens to the leader as soon as the training is
+                // marked closed - no longer gated on a fixed 30 days from the training date, so the
+                // leader isn't left waiting once the session has actually wrapped up. The leader then
+                // has 30 days from here to fill it in; a separate, not-yet-built API is responsible
+                // for flagging one that's gone unfilled past that window (GT).
+                if (!meeting.is_closed) continue;
 
                 const attendeeIds = await getMeetingAttendeeEmployeeIds(meeting);
                 const matchingSubordinates = attendeeIds.filter(empId => subordinateIds.includes(empId));
@@ -4498,7 +4499,7 @@ app.get('/api/post-training-evaluations/mine', async (req, res) => {
         if (!employee_id) return res.json([]);
 
         const forms = await query(`
-            SELECT f.*, m.title AS meeting_title, m.date AS meeting_date, m.guests_json, m.cost_report_json
+            SELECT f.*, m.title AS meeting_title, m.date AS meeting_date, m.is_closed AS meeting_is_closed, m.guests_json, m.cost_report_json
             FROM post_training_evaluation_forms f
             LEFT JOIN meetings m ON f.meeting_id = m.id
             WHERE f.status = 'PUBLISHED' AND f.deleted_at IS NULL
@@ -4523,11 +4524,9 @@ app.get('/api/post-training-evaluations/mine', async (req, res) => {
             const scaleQuestionIds = scaleQuestionRows.map(q => String(q.id));
 
             for (const meeting of meetings) {
-                // Same 30-day gate as /subordinates - the evaluation doesn't exist yet from
-                // anyone's perspective until the leader is eligible to fill it.
-                if (!meeting.date) continue;
-                const daysSinceTraining = (Date.now() - new Date(meeting.date).getTime()) / (24 * 60 * 60 * 1000);
-                if (daysSinceTraining < 30) continue;
+                // Same "opens once closed" gate as /subordinates - the evaluation doesn't exist yet
+                // from anyone's perspective until the leader is eligible to fill it.
+                if (!meeting.is_closed) continue;
 
                 const attendeeIds = await getMeetingAttendeeEmployeeIds(meeting);
                 if (!attendeeIds.includes(employee_id)) continue;
