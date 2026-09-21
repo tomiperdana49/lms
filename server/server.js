@@ -1201,6 +1201,29 @@ const findLocalEmployeeByEmailOrId = async (email, employeeId) => {
 // filters on this column (e.g. the team-member/directory queries: "active_status IS NULL OR != 'Resign'").
 const isResignedStatus = (activeStatus) => typeof activeStatus === 'string' && activeStatus.toLowerCase() === 'resign';
 
+// Login-time resign check, given a full employee row (not just active_status). A blank status_join
+// ('', distinct from NULL/unset) shows up only on stale/orphaned records - every one of them today is
+// either already active_status = 'Resign' or has no active_status at all - so it's treated as resigned
+// for login purposes even when active_status alone wouldn't have caught it.
+const isResignedForLogin = (employee) => {
+    if (!employee) return false;
+    if (isResignedStatus(employee.active_status)) return true;
+    if (employee.status_join === '') return true;
+    return false;
+};
+
+// Interns don't get an IDP or a competency assessment - same "no participation at all" rule already
+// applied to /api/employees/directory and /api/team-members (both filter status_join = 'Internship').
+const isInternStatus = (statusJoin) => typeof statusJoin === 'string' && statusJoin.toLowerCase() === 'internship';
+
+// Looks up one employee's status_join directly by id - used to gate IDP/competency writes where we
+// only have the employee_id from the request body, not a full employee row already in hand.
+const isInternEmployeeId = async (employeeId) => {
+    if (!employeeId) return false;
+    const rows = await querySimAsset('SELECT status_join FROM employees WHERE id_employee = ?', [employeeId]);
+    return rows.length > 0 && isInternStatus(rows[0].status_join);
+};
+
 // Resolves the report-to (supervisor) employee row for a given employee_id.
 // id_report_to_value holds the supervisor's user_id; id_report_to holds their name
 // as a fallback for records where the value link wasn't populated.
@@ -1696,7 +1719,7 @@ app.post('/api/login', async (req, res) => {
             // Block resigned employees - checked post-sync so a status change in Nusawork takes
             // effect on their very next login attempt, not only after some later background sync.
             const finalEmployee = await findLocalEmployeeByEmailOrId(finalUser.email, finalUser.employee_id);
-            if (isResignedStatus(finalEmployee?.active_status)) {
+            if (isResignedForLogin(finalEmployee)) {
                 console.log(`[LOGIN BLOCKED] ${loginId} is marked Resign in employees.`);
                 return res.status(403).json({ success: false, message: 'This account is no longer active (resigned). Please contact HR if this is a mistake.' });
             }
@@ -1713,7 +1736,8 @@ app.post('/api/login', async (req, res) => {
                     branch: finalUser.branch,
                     employee_id: finalUser.employee_id,
                     avatar: finalUser.avatar,
-                    isSupervisor
+                    isSupervisor,
+                    isIntern: isInternStatus(finalEmployee?.status_join)
                 }
             });
         }
@@ -1759,7 +1783,7 @@ app.post('/api/login', async (req, res) => {
                 const employeeHelper = await findLocalEmployeeByEmailOrId(loginId, null);
                 const employeeId = employeeHelper ? employeeHelper.id_employee : null;
 
-                if (isResignedStatus(employeeHelper?.active_status)) {
+                if (isResignedForLogin(employeeHelper)) {
                     console.log(`[LOGIN BLOCKED] ${loginId} is marked Resign in Nusawork.`);
                     return res.status(403).json({ success: false, message: 'This account is no longer active (resigned). Please contact HR if this is a mistake.' });
                 }
@@ -1800,7 +1824,8 @@ app.post('/api/login', async (req, res) => {
                         branch: user.branch,
                         employee_id: user.employee_id,
                         avatar: user.avatar,
-                        isSupervisor
+                        isSupervisor,
+                        isIntern: isInternStatus(employeeHelper?.status_join)
                     }
                 });
             } else {
@@ -1888,7 +1913,8 @@ app.post('/api/auth/google', async (req, res) => {
                 branch: user.branch,
                 employee_id: user.employee_id,
                 avatar: user.avatar,
-                isSupervisor
+                isSupervisor,
+                isIntern: isInternStatus(employeeHelper?.status_join)
             }
         });
     } catch (err) {
@@ -1957,7 +1983,8 @@ app.post('/api/auth/refresh', async (req, res) => {
                 branch: user.branch,
                 employee_id: user.employee_id,
                 avatar: user.avatar,
-                isSupervisor
+                isSupervisor,
+                isIntern: isInternStatus(employeeHelper?.status_join)
             }
         });
     } catch (err) {
@@ -5871,6 +5898,9 @@ app.post('/api/idp', async (req, res) => {
         if (!employee_id || !period_year) {
             return res.status(400).json({ error: 'employee_id and period_year are required' });
         }
+        if (await isInternEmployeeId(employee_id)) {
+            return res.status(403).json({ error: 'Interns are not eligible for an Individual Development Plan.' });
+        }
 
         const supervisor = await findReportToEmployee(employee_id);
         const { department, join_date_label } = await findEmployeeIdpFields(employee_id);
@@ -6109,13 +6139,16 @@ app.get('/api/idp/subordinates', async (req, res) => {
         const leaderFullName = leader.full_name;
         const leaderNickName = leader.nickname || leaderFullName;
 
+        // Interns are excluded here too - they're never eligible for an IDP (see the isInternEmployeeId
+        // guard on POST /api/idp), so this list stays consistent even if a stray plan somehow exists.
         const subordinatesResult = await querySimAsset(`
             SELECT id_employee FROM employees
-            WHERE id_report_to_value = ?
+            WHERE (id_report_to_value = ?
                OR id_report_to = ?
                OR id_report_to = ?
                OR id_report_to LIKE ?
-               OR id_report_to LIKE ?
+               OR id_report_to LIKE ?)
+               AND (status_join IS NULL OR status_join != 'Internship')
         `, [leaderUserId, leaderFullName, leaderNickName, `${leaderFullName},%`, `%,${leaderFullName},%`]);
 
         const subordinateIds = subordinatesResult.map(s => s.id_employee);
@@ -6161,7 +6194,8 @@ app.get('/api/team-members', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 4. HR/admin: every IDP.
+// 4. HR/admin: every IDP. Excludes interns (see the isInternEmployeeId guard on POST /api/idp) so a
+// stray plan from before that guard existed doesn't linger in HR's view either.
 app.get('/api/idp/all', async (req, res) => {
     try {
         // reviewed_year_months lets HR see, month by month since the plan was created, which months
@@ -6172,6 +6206,9 @@ app.get('/api/idp/all', async (req, res) => {
                 FROM idp_reviews r WHERE r.idp_id = p.id
             ) AS reviewed_year_months
             FROM idp_plans p
+            WHERE NOT EXISTS (
+                SELECT 1 FROM employees e WHERE e.id_employee = p.employee_id AND e.status_join = 'Internship'
+            )
             ORDER BY p.period_year DESC, p.created_at DESC
         `);
         res.json(plans);
@@ -6897,6 +6934,9 @@ app.post('/api/competency-assessments', async (req, res) => {
         const { employeeId, quarter, year, assessedByEmployeeId, assessedByName, scores, notes } = req.body;
         if (!employeeId || !quarter || !year || !Array.isArray(scores) || scores.length === 0) {
             return res.status(400).json({ error: 'employeeId, quarter, year and scores are required' });
+        }
+        if (await isInternEmployeeId(employeeId)) {
+            return res.status(403).json({ error: 'Interns are not eligible for a competency assessment.' });
         }
 
         const existing = await query(

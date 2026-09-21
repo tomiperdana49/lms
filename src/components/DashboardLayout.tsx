@@ -714,12 +714,16 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { icon: BookOpen, label: t('menu.onlineModules'), id: 'courses' },
         { icon: Calendar, label: t('menu.calendar'), id: 'calendar' },
         { icon: TrendingUp, label: t('menu.learningReport'), id: 'learning-report' },
-        ...(config?.moduleIDP ? [{ icon: Target, label: t('menu.idp'), id: 'idp' }] : []),
+        // Interns get no IDP - same "no participation at all" rule enforced server-side too
+        // (POST /api/idp rejects their employee_id outright).
+        ...(config?.moduleIDP && !user?.isIntern ? [{ icon: Target, label: t('menu.idp'), id: 'idp' }] : []),
         ...(config?.moduleIncentive ? [{ icon: Award, label: t('menu.incentives'), id: 'incentives' }] : []),
     ];
 
+    // "My Competency" is hidden for interns for the same reason as IDP above. "Team Competencies"
+    // stays available to a supervisor regardless - it's about the people THEY manage, not themselves.
     const competencySubItems = [
-        { icon: BadgeCheck, label: t('menu.competencyMine'), id: 'competency-mine' },
+        ...(!user?.isIntern ? [{ icon: BadgeCheck, label: t('menu.competencyMine'), id: 'competency-mine' }] : []),
         ...(user?.isSupervisor ? [{ icon: UsersRound, label: t('menu.competencyTeam'), id: 'competency-team' }] : []),
     ];
 
@@ -908,7 +912,9 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             </div>
                         )}
 
-                        {/* Competency Dropdown */}
+                        {/* Competency Dropdown - hidden entirely for an intern with no direct reports,
+                            since competencySubItems would otherwise be empty */}
+                        {competencySubItems.length > 0 && (
                         <div className="pt-1" ref={competencyRef}>
                             <button
                                 onClick={() => {
@@ -963,6 +969,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                                 </div>
                             )}
                         </div>
+                        )}
 
                         {/* Admin Panel Expandable */}
                         {(userRole === 'HR' || userRole === 'HR_ADMIN') && (
