@@ -70,6 +70,7 @@
     "selectLabel": "Karyawan",
     "searchPlaceholder": "Cari nama atau email karyawan...",
     "allOrganizations": "Semua Organisasi",
+    "organizationsSelected": "{{count}} Organisasi dipilih",
     "allBranches": "Semua Cabang",
     "clearAll": "Hapus semua",
     "rosterHint": "{{count}} karyawan dipilih — klik nama untuk menampilkan/menyembunyikan detailnya",

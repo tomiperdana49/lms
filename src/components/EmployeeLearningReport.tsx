@@ -30,11 +30,13 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
     const [employeesLoading, setEmployeesLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [employeeDropdownOpen, setEmployeeDropdownOpen] = useState(false);
-    const [selectedOrg, setSelectedOrg] = useState('');
-    const [orgQuery, setOrgQuery] = useState('');
+    // Organization is multi-select (an employee can be filtered into the roster by matching ANY
+    // of the picked organizations) - Branch stays single-select below.
+    const [selectedOrgs, setSelectedOrgs] = useState<string[]>([]);
+    const [orgSearchText, setOrgSearchText] = useState('');
     const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
-    const selectedOrgRef = useRef(selectedOrg);
-    useEffect(() => { selectedOrgRef.current = selectedOrg; }, [selectedOrg]);
+    const selectedOrgsRef = useRef(selectedOrgs);
+    useEffect(() => { selectedOrgsRef.current = selectedOrgs; }, [selectedOrgs]);
     const [selectedBranch, setSelectedBranch] = useState('');
     const [branchQuery, setBranchQuery] = useState('');
     const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
@@ -122,10 +124,19 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
     }, [employees]);
 
     const filteredOrganizations = useMemo(() => {
-        const q = orgQuery.trim().toLowerCase();
+        const q = orgSearchText.trim().toLowerCase();
         if (!q) return organizations;
         return organizations.filter(org => org.toLowerCase().includes(q));
-    }, [organizations, orgQuery]);
+    }, [organizations, orgSearchText]);
+
+    // What the org input shows once closed: the org name itself for a single pick, a short
+    // joined list for a couple, and a "{{count}} Organizations selected" summary beyond that -
+    // otherwise a 5+ pick would overflow the input.
+    const orgSummaryLabel = useMemo(() => {
+        if (selectedOrgs.length === 0) return '';
+        if (selectedOrgs.length <= 2) return selectedOrgs.join(', ');
+        return t('employee.organizationsSelected', { count: selectedOrgs.length });
+    }, [selectedOrgs, t]);
 
     const branches = useMemo(() => {
         const names = new Set(employees.map(emp => emp.branch_name).filter(Boolean) as string[]);
@@ -143,12 +154,12 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
         const sorted = [...employees].sort((a, b) => a.full_name.localeCompare(b.full_name));
         return sorted.filter(emp => {
             if (selectedIds.has(emp.id_employee)) return false;
-            const matchesOrg = !selectedOrg || emp.organization_name === selectedOrg;
+            const matchesOrg = selectedOrgs.length === 0 || (!!emp.organization_name && selectedOrgs.includes(emp.organization_name));
             const matchesBranch = !selectedBranch || emp.branch_name === selectedBranch;
             const matchesSearch = !q || emp.full_name?.toLowerCase().includes(q) || emp.email?.toLowerCase().includes(q);
             return matchesOrg && matchesBranch && matchesSearch;
         });
-    }, [employees, search, selectedOrg, selectedBranch, selectedIds]);
+    }, [employees, search, selectedOrgs, selectedBranch, selectedIds]);
 
     const sections = useMemo(() => buildSections(stats, t), [stats, t]);
     const includeEmployeeColumn = selectedEmployees.length > 1;
@@ -171,26 +182,35 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
     };
 
     // Recomputes the employee roster from whichever of org/branch is currently active, so the two
-    // filters combine (AND) instead of one silently overriding the other's selection.
-    const applyRosterFilter = (org: string, branch: string) => {
-        if (!org && !branch) return;
+    // filters combine (AND) instead of one silently overriding the other's selection. Organization
+    // itself is OR'd across every picked org. Bails out when both are cleared so clearing filters
+    // doesn't wipe out employees the user added by hand.
+    const applyRosterFilter = (orgs: string[], branch: string) => {
+        if (orgs.length === 0 && !branch) return;
         setSelectedEmployees(employees.filter(emp =>
-            (!org || emp.organization_name === org) && (!branch || emp.branch_name === branch)
+            (orgs.length === 0 || (!!emp.organization_name && orgs.includes(emp.organization_name))) && (!branch || emp.branch_name === branch)
         ));
     };
 
-    const handleOrgSelect = (org: string) => {
-        setSelectedOrg(org);
-        setOrgQuery(org);
+    // Toggles one organization in/out of the selection - the dropdown stays open so several can
+    // be picked in a row, unlike the single-select Branch filter below.
+    const handleOrgToggle = (org: string) => {
+        const next = selectedOrgs.includes(org) ? selectedOrgs.filter(o => o !== org) : [...selectedOrgs, org];
+        setSelectedOrgs(next);
+        applyRosterFilter(next, selectedBranchRef.current);
+    };
+
+    const handleOrgClearAll = () => {
+        setSelectedOrgs([]);
         setOrgDropdownOpen(false);
-        applyRosterFilter(org, selectedBranchRef.current);
+        applyRosterFilter([], selectedBranchRef.current);
     };
 
     const handleBranchSelect = (branch: string) => {
         setSelectedBranch(branch);
         setBranchQuery(branch);
         setBranchDropdownOpen(false);
-        applyRosterFilter(selectedOrgRef.current, branch);
+        applyRosterFilter(selectedOrgsRef.current, branch);
     };
 
     const handleExport = () => {
@@ -277,8 +297,7 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
                         <button
                             onClick={() => {
                                 setSelectedEmployees([]);
-                                setSelectedOrg('');
-                                setOrgQuery('');
+                                setSelectedOrgs([]);
                                 setSelectedBranch('');
                                 setBranchQuery('');
                             }}
@@ -301,7 +320,7 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
                             placeholder={t('employee.searchPlaceholder')}
                             className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        {employeeDropdownOpen && !employeesLoading && (search.trim() || selectedOrg || selectedBranch) && (
+                        {employeeDropdownOpen && !employeesLoading && (search.trim() || selectedOrgs.length > 0 || selectedBranch) && (
                             <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-slate-100 rounded-lg shadow-lg divide-y divide-slate-50">
                                 {filteredEmployees.length === 0 ? (
                                     <p className="text-sm text-slate-400 italic px-4 py-3">{t('employee.notFound')}</p>
@@ -320,39 +339,54 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
                         )}
                     </div>
                     <div className="relative sm:w-64">
-                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
                         <input
                             type="text"
-                            value={orgQuery}
-                            onFocus={() => setOrgDropdownOpen(true)}
-                            onBlur={() => setTimeout(() => { setOrgDropdownOpen(false); setOrgQuery(selectedOrgRef.current); }, 150)}
-                            onChange={e => { setOrgQuery(e.target.value); setOrgDropdownOpen(true); }}
+                            value={orgDropdownOpen ? orgSearchText : orgSummaryLabel}
+                            onFocus={() => { setOrgDropdownOpen(true); setOrgSearchText(''); }}
+                            onBlur={() => setTimeout(() => setOrgDropdownOpen(false), 150)}
+                            onChange={e => { setOrgSearchText(e.target.value); setOrgDropdownOpen(true); }}
                             placeholder={t('employee.allOrganizations')}
                             className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         {orgDropdownOpen && (
-                            <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-slate-100 rounded-lg shadow-lg divide-y divide-slate-50">
+                            <div className="absolute z-20 mt-1 w-full max-h-72 overflow-y-auto bg-white border border-slate-100 rounded-lg shadow-lg divide-y divide-slate-50">
                                 <button
+                                    type="button"
                                     onMouseDown={e => e.preventDefault()}
-                                    onClick={() => handleOrgSelect('')}
+                                    onClick={handleOrgClearAll}
                                     className="w-full flex items-center justify-between text-left px-4 py-2 hover:bg-slate-50 transition-colors text-sm font-semibold text-slate-700"
                                 >
                                     {t('employee.allOrganizations')}
-                                    {!selectedOrg && <Check size={14} className="text-blue-600" />}
+                                    {selectedOrgs.length === 0 && <Check size={14} className="text-blue-600" />}
                                 </button>
                                 {filteredOrganizations.length === 0 ? (
                                     <p className="text-sm text-slate-400 italic px-4 py-3">{t('employee.notFound')}</p>
-                                ) : filteredOrganizations.map(org => (
-                                    <button
-                                        key={org}
-                                        onMouseDown={e => e.preventDefault()}
-                                        onClick={() => handleOrgSelect(org)}
-                                        className="w-full flex items-center justify-between text-left px-4 py-2 hover:bg-slate-50 transition-colors text-sm text-slate-700"
-                                    >
-                                        {org}
-                                        {selectedOrg === org && <Check size={14} className="text-blue-600" />}
-                                    </button>
-                                ))}
+                                ) : filteredOrganizations.map(org => {
+                                    const isChecked = selectedOrgs.includes(org);
+                                    return (
+                                        <button
+                                            key={org}
+                                            type="button"
+                                            // A real <label>/<input type="checkbox"> pair would blur this
+                                            // dropdown's search input on every click regardless - a
+                                            // label's default click-forwarding (which focuses the
+                                            // checkbox) fires as part of the click event, not mousedown,
+                                            // so preventDefault on mousedown can't stop it. A plain button
+                                            // (same as the row above) doesn't have that native forwarding,
+                                            // so preventDefault here reliably keeps focus - and the
+                                            // dropdown open - across multiple picks.
+                                            onMouseDown={e => e.preventDefault()}
+                                            onClick={() => handleOrgToggle(org)}
+                                            className="w-full flex items-center gap-2.5 text-left px-4 py-2 hover:bg-slate-50 transition-colors text-sm text-slate-700"
+                                        >
+                                            <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isChecked ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
+                                                {isChecked && <Check size={12} className="text-white" strokeWidth={3} />}
+                                            </span>
+                                            {org}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -394,6 +428,26 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
                         )}
                     </div>
                 </div>
+
+                {selectedOrgs.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        {selectedOrgs.map(org => (
+                            <span
+                                key={org}
+                                className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 text-xs font-semibold pl-2.5 pr-1 py-1 rounded-full"
+                            >
+                                {org}
+                                <button
+                                    type="button"
+                                    onClick={() => handleOrgToggle(org)}
+                                    className="hover:bg-indigo-100 rounded-full p-0.5 transition-colors"
+                                >
+                                    <X size={11} />
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+                )}
 
                 <div className="flex items-center gap-2 text-slate-400 pt-2 border-t border-slate-100">
                     <CalendarRange size={16} />
