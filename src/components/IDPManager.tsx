@@ -452,11 +452,23 @@ export default function IDPManager({ userName }: IDPManagerProps) {
             try {
                 const bstr = evt.target?.result;
                 const wb = XLSX.read(bstr, { type: 'binary' });
-                const parsed = wb.SheetNames
-                    .map(name => parseIdpSheet(XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' }) as IdpImportGrid, name))
-                    .filter(p => p.employee_name && p.period_year);
+                const allParsed = wb.SheetNames
+                    .map(name => parseIdpSheet(XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' }) as IdpImportGrid, name));
+                const parsed = allParsed.filter(p => p.employee_name && p.period_year);
                 if (parsed.length === 0) {
-                    setInfoModal({ title: 'Tidak Ada Data', message: 'Tidak ada data IDP yang valid ditemukan di file ini. Pastikan formatnya sesuai template IDP.' });
+                    // Names the specific missing field(s) per sheet instead of a generic "check the
+                    // format" message - "Nama Karyawan" and "Periode IDP" are the two required fields
+                    // (see the .filter above), so a sheet that failed is always missing one of them.
+                    const details = allParsed.map(p => {
+                        const missing: string[] = [];
+                        if (!p.employee_name) missing.push('Nama Karyawan');
+                        if (!p.period_year) missing.push('Periode IDP (tahun)');
+                        return `- Sheet "${p.sheet_name}": ${missing.join(' dan ')} kosong/tidak terbaca`;
+                    }).join('\n');
+                    setInfoModal({
+                        title: 'Tidak Ada Data',
+                        message: `Tidak ada data IDP yang valid ditemukan di file ini.\n\n${details}`
+                    });
                     return;
                 }
                 setImportPreview(parsed);
