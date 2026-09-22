@@ -17,6 +17,8 @@ interface LearningStatDetail {
     postTestScore?: number | null;
     feedbackSubmitted?: boolean;
     feedbackScore?: number | null;
+    // Internal training and External training both
+    pteScore?: number | null;
     // Organizer / certificate metadata (availability varies by category)
     organizer?: string | null;
     certificateLink?: string | null;
@@ -259,7 +261,8 @@ const LearningReport = ({ userEmail, userName, userEmployeeId, isSupervisor }: L
                 [t('export.costColumn')]: item.cost,
                 [t('export.preTestColumn')]: hasTestScores ? (item.preTestScore ?? '') : '',
                 [t('export.postTestColumn')]: hasTestScores ? (item.postTestScore ?? '') : '',
-                [t('export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (item.feedbackScore ?? t('export.submitted')) : '') : ''
+                [t('export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (item.feedbackScore ?? t('export.submitted')) : '') : '',
+                [t('export.pteColumn')]: (section.key === 'training' || section.key === 'trainingExternal') ? (item.pteScore ?? '') : ''
             }));
         });
         rows.push({
@@ -270,11 +273,12 @@ const LearningReport = ({ userEmail, userName, userEmployeeId, isSupervisor }: L
             [t('export.costColumn')]: stats.totalBiaya,
             [t('export.preTestColumn')]: '',
             [t('export.postTestColumn')]: '',
-            [t('export.feedbackColumn')]: ''
+            [t('export.feedbackColumn')]: '',
+            [t('export.pteColumn')]: ''
         });
 
         const ws = XLSX.utils.json_to_sheet(rows);
-        ws['!cols'] = [{ wch: 20 }, { wch: 45 }, { wch: 14 }, { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 14 }];
+        ws['!cols'] = [{ wch: 20 }, { wch: 45 }, { wch: 14 }, { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 10 }];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, t('export.sheetName'));
         XLSX.writeFile(wb, `Learning_Report_${(userName || 'Employee').replace(/\s+/g, '_')}_${startDate}_to_${endDate}.xlsx`);
@@ -297,7 +301,8 @@ const LearningReport = ({ userEmail, userName, userEmployeeId, isSupervisor }: L
                     [t('team.export.preTestColumn')]: item.preTestScore ?? '',
                     [t('team.export.postTestColumn')]: item.postTestScore ?? '',
                     [t('team.export.costColumn')]: item.cost || '',
-                    [t('team.export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (t('export.submitted')) : '') : ''
+                    [t('team.export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (t('export.submitted')) : '') : '',
+                    [t('team.export.pteColumn')]: (section.key === 'training' || section.key === 'trainingExternal') ? (item.pteScore ?? '') : ''
                 }))
             );
         });
@@ -306,7 +311,7 @@ const LearningReport = ({ userEmail, userName, userEmployeeId, isSupervisor }: L
         ws['!cols'] = [
             { wch: 24 }, { wch: 10 }, { wch: 40 }, { wch: 30 }, { wch: 30 },
             { wch: 20 }, { wch: 10 }, { wch: 8 }, { wch: 14 }, { wch: 10 },
-            { wch: 10 }, { wch: 14 }, { wch: 16 }
+            { wch: 10 }, { wch: 14 }, { wch: 16 }, { wch: 10 }
         ];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, t('team.export.sheetName'));
@@ -560,12 +565,19 @@ export const LearningStatsBreakdown = ({ stats, t, canSyncNusawork }: LearningSt
                                                 {formatDate(item.date)}
                                                 {item.employeeName && <span className="text-slate-300"> · {item.employeeName}</span>}
                                             </p>
-                                            {(section.key === 'training' || section.key === 'online') && (
+                                            {(section.key === 'training' || section.key === 'online' || section.key === 'trainingExternal') && (
                                                 <div className="flex flex-wrap gap-1.5 mt-2">
-                                                    <ScoreBadge label={t('assessment.preTest')} score={item.preTestScore} />
-                                                    <ScoreBadge label={t('assessment.postTest')} score={item.postTestScore} />
+                                                    {(section.key === 'training' || section.key === 'online') && (
+                                                        <>
+                                                            <ScoreBadge label={t('assessment.preTest')} score={item.preTestScore} />
+                                                            <ScoreBadge label={t('assessment.postTest')} score={item.postTestScore} />
+                                                        </>
+                                                    )}
                                                     {section.key === 'training' && (
                                                         <FeedbackBadge submitted={!!item.feedbackSubmitted} score={item.feedbackScore} t={t} />
+                                                    )}
+                                                    {(section.key === 'training' || section.key === 'trainingExternal') && (
+                                                        <ScoreBadge label={t('assessment.pte')} score={item.pteScore} />
                                                     )}
                                                 </div>
                                             )}
@@ -615,12 +627,13 @@ const LearningStatsTable = ({ stats, t }: LearningStatsTableProps) => {
                             <th className="text-center font-bold text-slate-500 uppercase tracking-wider text-[11px] px-4 py-3">{t('table.preTest')}</th>
                             <th className="text-center font-bold text-slate-500 uppercase tracking-wider text-[11px] px-4 py-3">{t('table.postTest')}</th>
                             <th className="text-center font-bold text-slate-500 uppercase tracking-wider text-[11px] px-4 py-3">{t('table.feedback')}</th>
+                            <th className="text-center font-bold text-slate-500 uppercase tracking-wider text-[11px] px-4 py-3">{t('table.pte')}</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                         {rows.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="text-center text-slate-400 italic py-8">{t('table.noData')}</td>
+                                <td colSpan={9} className="text-center text-slate-400 italic py-8">{t('table.noData')}</td>
                             </tr>
                         ) : rows.map((item, idx) => (
                             <tr key={idx} className="hover:bg-slate-50/60">
@@ -638,6 +651,7 @@ const LearningStatsTable = ({ stats, t }: LearningStatsTableProps) => {
                                             : <XCircle size={14} className="inline text-slate-300" />
                                     ) : '-'}
                                 </td>
+                                <td className="px-4 py-3 text-center text-slate-500 whitespace-nowrap">{(item.categoryKey === 'training' || item.categoryKey === 'trainingExternal') ? (item.pteScore ?? '-') : '-'}</td>
                             </tr>
                         ))}
                     </tbody>

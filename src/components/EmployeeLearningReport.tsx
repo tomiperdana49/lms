@@ -227,7 +227,8 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
                 [t('export.costColumn')]: item.cost,
                 [t('export.preTestColumn')]: hasTestScores ? (item.preTestScore ?? '') : '',
                 [t('export.postTestColumn')]: hasTestScores ? (item.postTestScore ?? '') : '',
-                [t('export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (item.feedbackScore ?? t('export.submitted')) : '') : ''
+                [t('export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (item.feedbackScore ?? t('export.submitted')) : '') : '',
+                [t('export.pteColumn')]: (section.key === 'training' || section.key === 'trainingExternal') ? (item.pteScore ?? '') : ''
             }));
         });
         rows.push({
@@ -239,13 +240,14 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
             [t('export.costColumn')]: stats.totalBiaya,
             [t('export.preTestColumn')]: '',
             [t('export.postTestColumn')]: '',
-            [t('export.feedbackColumn')]: ''
+            [t('export.feedbackColumn')]: '',
+            [t('export.pteColumn')]: ''
         });
 
         const ws = XLSX.utils.json_to_sheet(rows);
         ws['!cols'] = [
             ...(includeEmployeeColumn ? [{ wch: 24 }] : []),
-            { wch: 20 }, { wch: 45 }, { wch: 14 }, { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 14 }
+            { wch: 20 }, { wch: 45 }, { wch: 14 }, { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 10 }
         ];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, t('export.sheetName'));

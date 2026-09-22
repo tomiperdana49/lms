@@ -19,7 +19,8 @@ import {
  Users,
  X,
  Check,
- MessageSquare
+ MessageSquare,
+ ClipboardCheck
 } from 'lucide-react';
 import PopupNotification from './PopupNotification';
 import { ANNUAL_LEARNING_BUDGET } from './LearningReport';
@@ -63,6 +64,25 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
 
  const [notification, setNotification] = useState({ show: false, type: 'success' as 'success' | 'error', message: '' });
  const [isLoading, setIsLoading] = useState(false);
+
+ // Post Training Evaluation score per request, once the leader has submitted one - keyed by
+ // `${externalTrainingRequestId}-${evaluateeEmployeeId}` since a form can be reused across many
+ // requests. Fetched once; the same flat list backs both My Requests and Team Approvals.
+ const [pteScores, setPteScores] = useState<Record<string, number>>({});
+ useEffect(() => {
+ fetch(`${API_BASE_URL}/api/post-training-evaluations/responses/all`)
+ .then(res => res.ok ? res.json() : [])
+ .then((rows: { externalTrainingRequestId: number | null; evaluateeEmployeeId: string; averageScore: number | null }[]) => {
+ const map: Record<string, number> = {};
+ rows.forEach(r => {
+ if (r.externalTrainingRequestId && r.averageScore !== null) {
+ map[`${r.externalTrainingRequestId}-${r.evaluateeEmployeeId}`] = r.averageScore;
+ }
+ });
+ setPteScores(map);
+ })
+ .catch(err => console.error('Error fetching PTE scores:', err));
+ }, []);
 
     const [rejectModalOpen, setRejectModalOpen] = useState(false);
     const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
@@ -358,6 +378,12 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <div className="flex items-center gap-2 text-gray-600">
  <CheckCircle className="w-4 h-4 text-gray-400 shrink-0" />
  <span>{t('request.detailProcessedByHr')}: <span className="font-semibold text-gray-800">{req.hr_name}</span></span>
+ </div>
+ )}
+ {pteScores[`${req.id}-${req.employee_id}`] !== undefined && (
+ <div className="flex items-center gap-2 text-gray-600">
+ <ClipboardCheck className="w-4 h-4 text-gray-400 shrink-0" />
+ <span>{t('request.detailPteScore')}: <span className="font-semibold text-gray-800">{pteScores[`${req.id}-${req.employee_id}`]}</span></span>
  </div>
  )}
  {req.attachment_link && (

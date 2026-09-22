@@ -2417,6 +2417,43 @@ const computeLearningStats = async ({ email, employee_id, startDate, endDate }) 
         feedbackByMeeting[f.meeting_id] = { submittedAt: f.submitted_at, rating };
     }
 
+    // This employee's Post Training Evaluation scores, across both internal meetings and external
+    // training requests - fetched up front like the quiz/feedback lookups above.
+    const pteByMeeting = {};
+    const pteByExt = {};
+    if (targetEmpId) {
+        const userPteResponses = await query(
+            `SELECT form_id, meeting_id, external_training_request_id, answers FROM post_training_evaluation_responses
+                 WHERE evaluatee_employee_id = ?`,
+            [targetEmpId]
+        );
+        if (userPteResponses.length > 0) {
+            const pteFormIds = [...new Set(userPteResponses.map(r => r.form_id))];
+            const formPlaceholders = pteFormIds.map(() => '?').join(',');
+            const scaleRows = await query(
+                `SELECT form_id, id FROM post_training_evaluation_questions WHERE form_id IN (${formPlaceholders}) AND type = 'SCALE'`,
+                pteFormIds
+            );
+            const scaleIdsByForm = {};
+            scaleRows.forEach(r => {
+                if (!scaleIdsByForm[r.form_id]) scaleIdsByForm[r.form_id] = [];
+                scaleIdsByForm[r.form_id].push(String(r.id));
+            });
+            userPteResponses.forEach(r => {
+                let averageScore = null;
+                try {
+                    const answers = typeof r.answers === 'string' ? JSON.parse(r.answers) : r.answers;
+                    const scaleIds = scaleIdsByForm[r.form_id] || [];
+                    const scores = scaleIds.map(qId => Number(answers?.[qId])).filter(v => !isNaN(v));
+                    if (scores.length > 0) averageScore = Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10;
+                } catch (e) { }
+                if (averageScore === null) return;
+                if (r.meeting_id) pteByMeeting[r.meeting_id] = averageScore;
+                else if (r.external_training_request_id) pteByExt[r.external_training_request_id] = averageScore;
+            });
+        }
+    }
+
     for (const meeting of meetings) {
         // Skip if the user is the host
         if ((targetName && meeting.host === targetName) ||
@@ -2480,6 +2517,7 @@ const computeLearningStats = async ({ email, employee_id, startDate, endDate }) 
                 feedbackSubmitted: !!feedbackEntry,
                 feedbackScore: feedbackEntry ? feedbackEntry.rating : null,
                 feedbackDate: feedbackEntry ? feedbackEntry.submittedAt : null,
+                pteScore: pteByMeeting[meeting.id] ?? null,
                 organizer: meeting.host || null
             });
         }
@@ -2515,7 +2553,8 @@ const computeLearningStats = async ({ email, employee_id, startDate, endDate }) 
                 cost: Math.round(itemCost),
                 organizer: ext.vendor || null,
                 certificateLink: ext.certificate_link || null,
-                nusaworkSynced: !!ext.nusawork_id_group
+                nusaworkSynced: !!ext.nusawork_id_group,
+                pteScore: pteByExt[ext.id] ?? null
             });
         }
     }
@@ -4841,6 +4880,11 @@ app.post('/api/post-training-evaluations/:id/respond', async (req, res) => {
         const { evaluatee_employee_id, evaluator_employee_id, meeting_id, external_training_request_id, answers } = req.body;
         if (!evaluatee_employee_id || !evaluator_employee_id || (!meeting_id && !external_training_request_id) || !answers) {
             return res.status(400).json({ error: 'evaluatee_employee_id, evaluator_employee_id, one of meeting_id/external_training_request_id, and answers are required' });
+        }
+        // A response belongs to exactly one context - accepting both would silently corrupt the row
+        // (it would stop matching either context's lookup, appearing submitted to neither side).
+        if (meeting_id && external_training_request_id) {
+            return res.status(400).json({ error: 'meeting_id and external_training_request_id are mutually exclusive' });
         }
 
         const now = new Date();

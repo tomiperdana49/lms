@@ -34,6 +34,7 @@
     "preTest": "Pre-Test",
     "postTest": "Post-Test",
     "feedback": "Feedback",
+    "pte": "PTE",
     "notSubmitted": "Belum submit"
   },
   "table": {
@@ -45,6 +46,7 @@
     "preTest": "Pre-Test",
     "postTest": "Post-Test",
     "feedback": "Feedback",
+    "pte": "PTE",
     "noData": "Tidak ada catatan pembelajaran pada periode ini.",
     "total": "Total"
   },
@@ -58,6 +60,7 @@
     "preTestColumn": "Pre-Test",
     "postTestColumn": "Post-Test",
     "feedbackColumn": "Feedback",
+    "pteColumn": "PTE",
     "notTaken": "Belum diikuti",
     "submitted": "Sudah submit",
     "notSubmitted": "Belum submit",
@@ -103,6 +106,7 @@
       "postTestColumn": "Post-test",
       "costColumn": "Biaya",
       "feedbackColumn": "Feedback",
+      "pteColumn": "PTE",
       "type": {
         "trainingExternal": "External",
         "training": "Internal",

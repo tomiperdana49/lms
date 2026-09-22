@@ -20,7 +20,8 @@ import {
     Tag,
     ChevronDown,
     ChevronUp,
-    ClipboardList
+    ClipboardList,
+    ClipboardCheck
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useTranslation } from 'react-i18next';
@@ -312,6 +313,25 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
         fetch(`${API_BASE_URL}/api/post-training-evaluations`)
             .then(res => res.ok ? res.json() : [])
             .then(data => setPteFormOptions(Array.isArray(data) ? data : []))
+            .catch(err => console.error(err));
+    }, []);
+
+    // PTE score per request, once the leader has submitted one - keyed by `${requestId}-${employeeId}`
+    // since a form template can be reused across many requests. Mirrors ExternalTraining.tsx's own
+    // fetch of the same endpoint for the employee/supervisor-facing views.
+    const [pteScores, setPteScores] = useState<Record<string, number>>({});
+    useEffect(() => {
+        fetch(`${API_BASE_URL}/api/post-training-evaluations/responses/all`)
+            .then(res => res.ok ? res.json() : [])
+            .then((rows: { externalTrainingRequestId: number | null; evaluateeEmployeeId: string; averageScore: number | null }[]) => {
+                const map: Record<string, number> = {};
+                rows.forEach(r => {
+                    if (r.externalTrainingRequestId && r.averageScore !== null) {
+                        map[`${r.externalTrainingRequestId}-${r.evaluateeEmployeeId}`] = r.averageScore;
+                    }
+                });
+                setPteScores(map);
+            })
             .catch(err => console.error(err));
     }, []);
 
@@ -890,8 +910,9 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
     // Export HR-processed ("APPROVED" in this component's vocabulary, i.e. DB status = 'Processed') requests
     // that are currently visible under the active year/period/branch/search filters, in the company-wide
     // HR training report layout (matches the combined internal+external report template). Columns with no
-    // source in this app (Competencies Type/Detail, Facilitator, PTE/Pre-Test/Post-Test scores used only by
-    // internal training, Action Plan, Detail Participant Type) are left blank for HR to fill in manually.
+    // source in this app (Competencies Type/Detail, Facilitator, Pre-Test/Post-Test/PTE 3 scores used only
+    // by internal training, Action Plan, Detail Participant Type) are left blank for HR to fill in manually.
+    // PTE 1 Score is filled from pteScores when the request's linked evaluation has been submitted.
     const handleExportProcessed = () => {
         const processedRequests = filteredRequests.filter(r => r.status === 'APPROVED');
 
@@ -961,7 +982,8 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                 req.vendor || '',
                 '',
                 totalCost,
-                '', '', '', '', '',
+                pteScores[`${req.id}-${req.employee_id}`] ?? '',
+                '', '', '', '',
                 emp?.age || '',
                 ageGroupFor(emp?.age),
                 emp?.gender || '',
@@ -1236,6 +1258,20 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                                     <p className="leading-none">{req.hrName || t('list.pending')}</p>
                                                 </div>
                                             </div>
+                                            {pteScores[`${req.id}-${req.employee_id}`] !== undefined && (
+                                                <>
+                                                    <div className="w-8 h-px bg-slate-100" />
+                                                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-tighter bg-purple-50 text-purple-700 border-purple-100">
+                                                        <div className="w-4 h-4 rounded-full flex items-center justify-center bg-purple-100">
+                                                            <ClipboardCheck size={10} />
+                                                        </div>
+                                                        <div>
+                                                            <p className="opacity-60 leading-none mb-0.5">{t('list.pteScore')}</p>
+                                                            <p className="leading-none">{pteScores[`${req.id}-${req.employee_id}`]}</p>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                         </>
                                         )}
