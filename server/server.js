@@ -1278,6 +1278,19 @@ const findSubordinateEmployeeIds = async (leaderId) => {
     return subordinatesResult.map(s => s.id_employee);
 };
 
+// Narrows a subordinate id list down to employees who haven't resigned - a leader-facing "needs
+// your approval/evaluation" queue must never keep asking about someone who's already left, even if
+// SimAsset's org chart hasn't been repointed yet. Same guard /api/team-members already applies.
+const filterActiveEmployeeIds = async (employeeIds) => {
+    if (employeeIds.length === 0) return [];
+    const placeholders = employeeIds.map(() => '?').join(',');
+    const rows = await querySimAsset(
+        `SELECT id_employee FROM employees WHERE id_employee IN (${placeholders}) AND (active_status IS NULL OR active_status != 'Resign')`,
+        employeeIds
+    );
+    return rows.map(r => r.id_employee);
+};
+
 // The set of every employee_id/full_name that appears as someone else's id_report_to -
 // membership means "this person has at least one direct report". Shared by /api/team-members and
 // /api/employees/directory so both compute isSupervisor the same way.
@@ -4455,7 +4468,7 @@ app.get('/api/post-training-evaluations/subordinates', async (req, res) => {
         const { leader_id } = req.query;
         if (!leader_id) return res.json([]);
 
-        const subordinateIds = await findSubordinateEmployeeIds(leader_id);
+        const subordinateIds = await filterActiveEmployeeIds(await findSubordinateEmployeeIds(leader_id));
         if (subordinateIds.length === 0) return res.json([]);
 
         const forms = await query(`
@@ -5791,7 +5804,7 @@ app.get('/api/external-training/subordinates', async (req, res) => {
         const { leader_id } = req.query;
         if (!leader_id) return res.json([]);
 
-        const subordinateIds = await findSubordinateEmployeeIds(leader_id);
+        const subordinateIds = await filterActiveEmployeeIds(await findSubordinateEmployeeIds(leader_id));
         if (subordinateIds.length === 0) return res.json([]);
 
         const placeholders = subordinateIds.map(() => '?').join(',');
