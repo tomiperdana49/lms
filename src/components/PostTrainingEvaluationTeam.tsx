@@ -6,16 +6,25 @@ import type { User } from '../types';
 
 interface EvaluationItem {
     formId: number;
-    meetingId: number;
+    meetingId: number | null;
     formTitle: string;
-    meetingTitle: string;
+    meetingTitle: string | null;
     meetingDate: string | null;
+    externalTrainingRequestId: number | null;
+    externalTrainingTitle: string | null;
+    externalTrainingDate: string | null;
     evaluateeEmployeeId: string;
     evaluateeName: string;
     submitted: boolean;
     submittedAt: string | null;
     averageScore: number | null;
 }
+
+// Every item is either meeting-based or external-training-based (never both) - these fall back
+// from one to the other so the rest of the UI doesn't need to know which.
+const contextKey = (item: EvaluationItem) => item.meetingId ? `m${item.meetingId}` : `e${item.externalTrainingRequestId}`;
+const contextTitle = (item: EvaluationItem) => item.meetingTitle ?? item.externalTrainingTitle ?? '';
+const contextDate = (item: EvaluationItem) => item.meetingDate ?? item.externalTrainingDate;
 
 interface EvaluationQuestionDTO {
     id: number;
@@ -100,13 +109,13 @@ const PostTrainingEvaluationTeam = ({ user }: { user: User }) => {
             ) : (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 divide-y divide-slate-50">
                     {visibleItems.map(item => (
-                        <div key={`${item.formId}-${item.meetingId}-${item.evaluateeEmployeeId}`} className="p-4 flex items-center justify-between gap-3">
+                        <div key={`${item.formId}-${contextKey(item)}-${item.evaluateeEmployeeId}`} className="p-4 flex items-center justify-between gap-3">
                             <div className="min-w-0">
                                 <p className="font-bold text-slate-800 truncate">{item.evaluateeName}</p>
                                 <p className="text-sm text-slate-500 truncate">
-                                    {item.meetingTitle} &mdash; {item.formTitle}
-                                    {item.meetingDate && (
-                                        <span className="text-slate-400"> ({new Date(item.meetingDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})</span>
+                                    {contextTitle(item)} &mdash; {item.formTitle}
+                                    {contextDate(item) && (
+                                        <span className="text-slate-400"> ({new Date(contextDate(item)!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})</span>
                                     )}
                                 </p>
                             </div>
@@ -148,7 +157,7 @@ const PostTrainingEvaluationTeam = ({ user }: { user: User }) => {
                     onClose={() => setActiveItem(null)}
                     onSubmitted={() => {
                         setItems(prev => prev.map(i =>
-                            i.formId === activeItem.formId && i.meetingId === activeItem.meetingId && i.evaluateeEmployeeId === activeItem.evaluateeEmployeeId
+                            i.formId === activeItem.formId && contextKey(i) === contextKey(activeItem) && i.evaluateeEmployeeId === activeItem.evaluateeEmployeeId
                                 ? { ...i, submitted: true, submittedAt: new Date().toISOString() }
                                 : i
                         ));
@@ -176,11 +185,12 @@ const ViewModal = ({ item, onClose }: {
     const [detail, setDetail] = useState<EvaluationResponseDetailDTO | null>(null);
 
     useEffect(() => {
-        fetch(`${API_BASE_URL}/api/post-training-evaluations/${item.formId}/response/${encodeURIComponent(item.evaluateeEmployeeId)}?meetingId=${item.meetingId}`)
+        const contextParam = item.meetingId ? `meetingId=${item.meetingId}` : `externalTrainingRequestId=${item.externalTrainingRequestId}`;
+        fetch(`${API_BASE_URL}/api/post-training-evaluations/${item.formId}/response/${encodeURIComponent(item.evaluateeEmployeeId)}?${contextParam}`)
             .then(res => res.json())
             .then(setDetail)
             .catch(err => console.error(err));
-    }, [item.formId, item.meetingId, item.evaluateeEmployeeId]);
+    }, [item.formId, item.meetingId, item.externalTrainingRequestId, item.evaluateeEmployeeId]);
 
     const questions = detail?.questions || [];
 
@@ -277,7 +287,8 @@ const FillModal = ({ pending, evaluatorEmployeeId, onClose, onSubmitted }: {
                 body: JSON.stringify({
                     evaluatee_employee_id: pending.evaluateeEmployeeId,
                     evaluator_employee_id: evaluatorEmployeeId,
-                    meeting_id: pending.meetingId,
+                    meeting_id: pending.meetingId ?? undefined,
+                    external_training_request_id: pending.externalTrainingRequestId ?? undefined,
                     answers
                 })
             });

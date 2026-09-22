@@ -19,7 +19,8 @@ import {
     CreditCard,
     Tag,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    ClipboardList
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useTranslation } from 'react-i18next';
@@ -298,6 +299,32 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
     const [hrEditParticipationType, setHrEditParticipationType] = useState('');
     const [hrEditLearningHours, setHrEditLearningHours] = useState('');
 
+    // Post Training Evaluation template to attach - same combobox/behavior as Internal Training's
+    // (TrainingInternalList.tsx): reused across many requests, the linked form auto-publishes once
+    // this request is HR-processed.
+    const [pteFormOptions, setPteFormOptions] = useState<{ id: number; title: string; category: string | null }[]>([]);
+    const [hrEditPteFormId, setHrEditPteFormId] = useState('');
+    const [pteFormSearch, setPteFormSearch] = useState('');
+    const [showPteFormDropdown, setShowPteFormDropdown] = useState(false);
+    const pteFormDropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        fetch(`${API_BASE_URL}/api/post-training-evaluations`)
+            .then(res => res.ok ? res.json() : [])
+            .then(data => setPteFormOptions(Array.isArray(data) ? data : []))
+            .catch(err => console.error(err));
+    }, []);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (pteFormDropdownRef.current && !pteFormDropdownRef.current.contains(event.target as Node)) {
+                setShowPteFormDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     const toDateValue = (v: any) => {
         if (!v) return '';
         const d = new Date(v);
@@ -331,6 +358,8 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
             setHrEditGriType(selectedRequest._original?.training_gr_type || '');
             setHrEditParticipationType(selectedRequest._original?.participation_type || '');
             setHrEditLearningHours(selectedRequest._original?.learning_hours != null ? String(selectedRequest._original.learning_hours) : '');
+            setHrEditPteFormId(selectedRequest._original?.pte_form_id ? String(selectedRequest._original.pte_form_id) : '');
+            setPteFormSearch('');
         }
     }, [selectedRequest]);
 
@@ -452,6 +481,10 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
             showNotif('error', t('alerts.endDateRequired'));
             return;
         }
+        if (!hrEditPteFormId) {
+            showNotif('error', t('alerts.pteFormRequired'));
+            return;
+        }
         setIsSavingDetails(true);
         try {
             const res = await fetch(`${API_BASE_URL}/api/external-training/hr-update-details`, {
@@ -467,7 +500,8 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                     end_date: hrEditEndDate,
                     training_gr_type: hrEditGriType || null,
                     participation_type: hrEditParticipationType || null,
-                    learning_hours: hrEditLearningHours ? Number(hrEditLearningHours) : null
+                    learning_hours: hrEditLearningHours ? Number(hrEditLearningHours) : null,
+                    pte_form_id: hrEditPteFormId ? Number(hrEditPteFormId) : null
                 })
             });
             if (res.ok) {
@@ -518,6 +552,10 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
             }
             if (!hrEditLearningHours || Number(hrEditLearningHours) <= 0) {
                 showNotif('error', t('alerts.learningHoursRequired'));
+                return;
+            }
+            if (!hrEditPteFormId) {
+                showNotif('error', t('alerts.pteFormRequired'));
                 return;
             }
             let certLink = selectedRequest?._original?.certificate_link;
@@ -571,7 +609,8 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                     end_date: hrEditEndDate,
                     training_gr_type: hrEditGriType || null,
                     participation_type: hrEditParticipationType || null,
-                    learning_hours: hrEditLearningHours ? Number(hrEditLearningHours) : null
+                    learning_hours: hrEditLearningHours ? Number(hrEditLearningHours) : null,
+                    pte_form_id: hrEditPteFormId ? Number(hrEditPteFormId) : null
                 })
             });
             if (res.ok && requiresCertificateProof && hrGrantIncentive) {
@@ -630,6 +669,10 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
 
     const handleSaveSettlement = async () => {
         if (!selectedRequest) return;
+        if (!hrEditPteFormId) {
+            showNotif('error', t('alerts.pteFormRequired'));
+            return;
+        }
         try {
             const newTotal = settleData.training + settleData.transport + settleData.accommodation + settleData.others;
             const excess = Math.max(0, newTotal - (selectedRequest.cost || 0));
@@ -659,7 +702,8 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                     costOthers: settleData.others,
                     additionalCost: excess,
                     settlementNote: settleData.settlementNotes,
-                    certificateLink: certLink
+                    certificateLink: certLink,
+                    pte_form_id: hrEditPteFormId ? Number(hrEditPteFormId) : null
                 })
             });
 
@@ -1354,6 +1398,12 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                             <span>{t('requestModal.learningHours')}: <span className="font-semibold text-slate-800">{Number(selectedRequest._original.learning_hours)}</span></span>
                                         </div>
                                     )}
+                                    {selectedRequest._original?.pte_form_id && (
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <ClipboardList className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <span>{t('requestModal.pteFormLabel')}: <span className="font-semibold text-slate-800">{pteFormOptions.find(f => f.id === selectedRequest._original.pte_form_id)?.title || selectedRequest._original.pte_form_id}</span></span>
+                                        </div>
+                                    )}
                                     {selectedRequest._original?.payment_method && (
                                         <div className="flex items-center gap-2 text-slate-600">
                                             <CreditCard className="w-4 h-4 text-slate-400 shrink-0" />
@@ -1461,6 +1511,64 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                         <div>
                                             <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.learningHours')} <span className="text-red-500">*</span></label>
                                             <input required type="number" min="0" step="0.5" value={hrEditLearningHours} onChange={(e) => setHrEditLearningHours(e.target.value)} placeholder={t('requestModal.learningHoursPlaceholder')} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none" />
+                                        </div>
+                                        {/* Post Training Evaluation - the linked form auto-publishes once this request is Processed */}
+                                        <div>
+                                            <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.pteFormLabel')} <span className="text-red-500">*</span></label>
+                                            <div className="relative" ref={pteFormDropdownRef}>
+                                                <input
+                                                    type="text"
+                                                    title={pteFormOptions.find(f => String(f.id) === hrEditPteFormId)?.title || t('requestModal.selectPteFormPlaceholder')}
+                                                    placeholder={pteFormOptions.find(f => String(f.id) === hrEditPteFormId)?.title || t('requestModal.selectPteFormPlaceholder')}
+                                                    className="w-full pl-4 pr-10 py-2 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none bg-white text-slate-700 truncate"
+                                                    value={pteFormSearch}
+                                                    onFocus={() => setShowPteFormDropdown(true)}
+                                                    onChange={(e) => setPteFormSearch(e.target.value)}
+                                                />
+                                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                                    <ClipboardList size={16} />
+                                                </div>
+
+                                                {showPteFormDropdown && (
+                                                    <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                                                        <button
+                                                            type="button"
+                                                            className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm text-slate-400 italic border-b border-slate-100"
+                                                            onClick={() => {
+                                                                setHrEditPteFormId('');
+                                                                setPteFormSearch('');
+                                                                setShowPteFormDropdown(false);
+                                                            }}
+                                                        >
+                                                            {t('requestModal.selectPteFormPlaceholder')}
+                                                        </button>
+                                                        {(() => {
+                                                            const filtered = pteFormOptions.filter(f =>
+                                                                f.title.toLowerCase().includes(pteFormSearch.toLowerCase()) ||
+                                                                (f.category || '').toLowerCase().includes(pteFormSearch.toLowerCase())
+                                                            );
+                                                            if (filtered.length === 0) {
+                                                                return <div className="p-4 text-center text-xs text-slate-400 italic">{t('requestModal.noMatchingPteForms')}</div>;
+                                                            }
+                                                            return filtered.map(f => (
+                                                                <button
+                                                                    key={f.id}
+                                                                    type="button"
+                                                                    className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm text-slate-700 font-semibold"
+                                                                    onClick={() => {
+                                                                        setHrEditPteFormId(String(f.id));
+                                                                        setPteFormSearch('');
+                                                                        setShowPteFormDropdown(false);
+                                                                    }}
+                                                                >
+                                                                    {f.category && <span className="text-indigo-600">[{f.category}] </span>}
+                                                                    {f.title}
+                                                                </button>
+                                                            ));
+                                                        })()}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="pt-4 border-t border-slate-100">
@@ -1708,6 +1816,66 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                     />
                                 </div>
                             )}
+
+                            {/* Post Training Evaluation - HR can attach or swap the linked form here too, same as
+                                Internal Training letting HR edit it after the session is already Paid. */}
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{t('requestModal.pteFormLabel')} <span className="text-red-500">*</span></label>
+                                <div className="relative" ref={pteFormDropdownRef}>
+                                    <input
+                                        type="text"
+                                        title={pteFormOptions.find(f => String(f.id) === hrEditPteFormId)?.title || t('requestModal.selectPteFormPlaceholder')}
+                                        placeholder={pteFormOptions.find(f => String(f.id) === hrEditPteFormId)?.title || t('requestModal.selectPteFormPlaceholder')}
+                                        className="w-full pl-4 pr-10 py-2.5 rounded-2xl border-2 border-slate-100 focus:border-emerald-500 outline-none text-sm font-black text-slate-700 bg-white transition-all truncate"
+                                        value={pteFormSearch}
+                                        onFocus={() => setShowPteFormDropdown(true)}
+                                        onChange={(e) => setPteFormSearch(e.target.value)}
+                                    />
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                        <ClipboardList size={16} />
+                                    </div>
+
+                                    {showPteFormDropdown && (
+                                        <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                                            <button
+                                                type="button"
+                                                className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm text-slate-400 italic border-b border-slate-100"
+                                                onClick={() => {
+                                                    setHrEditPteFormId('');
+                                                    setPteFormSearch('');
+                                                    setShowPteFormDropdown(false);
+                                                }}
+                                            >
+                                                {t('requestModal.selectPteFormPlaceholder')}
+                                            </button>
+                                            {(() => {
+                                                const filtered = pteFormOptions.filter(f =>
+                                                    f.title.toLowerCase().includes(pteFormSearch.toLowerCase()) ||
+                                                    (f.category || '').toLowerCase().includes(pteFormSearch.toLowerCase())
+                                                );
+                                                if (filtered.length === 0) {
+                                                    return <div className="p-4 text-center text-xs text-slate-400 italic">{t('requestModal.noMatchingPteForms')}</div>;
+                                                }
+                                                return filtered.map(f => (
+                                                    <button
+                                                        key={f.id}
+                                                        type="button"
+                                                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm text-slate-700 font-semibold"
+                                                        onClick={() => {
+                                                            setHrEditPteFormId(String(f.id));
+                                                            setPteFormSearch('');
+                                                            setShowPteFormDropdown(false);
+                                                        }}
+                                                    >
+                                                        {f.category && <span className="text-indigo-600">[{f.category}] </span>}
+                                                        {f.title}
+                                                    </button>
+                                                ));
+                                            })()}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
 
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{t('settlementModal.settlementNotes')}</label>

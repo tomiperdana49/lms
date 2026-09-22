@@ -161,7 +161,7 @@
     "griHse": "HSE (Health, Safety, and Environment)",
     "griOther": "Other",
     "pteFormLabel": "Post Training Evaluation",
-    "selectPteFormPlaceholder": "No evaluation form (optional)",
+    "selectPteFormPlaceholder": "Select evaluation form...",
     "noMatchingPteForms": "No matching evaluation forms found.",
     "locationLabel": "Room / Location",
     "locationPlaceholder": "e.g. Meeting Room A, 2nd Floor",

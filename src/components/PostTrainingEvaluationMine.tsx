@@ -6,14 +6,23 @@ import type { User } from '../types';
 
 interface EvaluationItem {
     formId: number;
-    meetingId: number;
+    meetingId: number | null;
     formTitle: string;
-    meetingTitle: string;
+    meetingTitle: string | null;
     meetingDate: string | null;
+    externalTrainingRequestId: number | null;
+    externalTrainingTitle: string | null;
+    externalTrainingDate: string | null;
     submitted: boolean;
     submittedAt: string | null;
     averageScore: number | null;
 }
+
+// Every item is either meeting-based or external-training-based (never both) - these fall back
+// from one to the other so the rest of the UI doesn't need to know which.
+const contextKey = (item: EvaluationItem) => item.meetingId ? `m${item.meetingId}` : `e${item.externalTrainingRequestId}`;
+const contextTitle = (item: EvaluationItem) => item.meetingTitle ?? item.externalTrainingTitle ?? '';
+const contextDate = (item: EvaluationItem) => item.meetingDate ?? item.externalTrainingDate;
 
 interface EvaluationQuestionDTO {
     id: number;
@@ -89,13 +98,13 @@ const PostTrainingEvaluationMine = ({ user }: { user: User }) => {
             ) : (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 divide-y divide-slate-50">
                     {visibleItems.map(item => (
-                        <div key={`${item.formId}-${item.meetingId}`} className="p-4 flex items-center justify-between gap-3">
+                        <div key={`${item.formId}-${contextKey(item)}`} className="p-4 flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <p className="font-bold text-slate-800 truncate">{item.meetingTitle}</p>
+                                <p className="font-bold text-slate-800 truncate">{contextTitle(item)}</p>
                                 <p className="text-sm text-slate-500 truncate">
                                     {item.formTitle}
-                                    {item.meetingDate && (
-                                        <span className="text-slate-400"> ({new Date(item.meetingDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})</span>
+                                    {contextDate(item) && (
+                                        <span className="text-slate-400"> ({new Date(contextDate(item)!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})</span>
                                     )}
                                 </p>
                             </div>
@@ -144,11 +153,12 @@ const ViewModal = ({ item, employeeId, onClose }: {
     const [detail, setDetail] = useState<EvaluationResponseDetailDTO | null>(null);
 
     useEffect(() => {
-        fetch(`${API_BASE_URL}/api/post-training-evaluations/${item.formId}/response/${encodeURIComponent(employeeId)}?meetingId=${item.meetingId}`)
+        const contextParam = item.meetingId ? `meetingId=${item.meetingId}` : `externalTrainingRequestId=${item.externalTrainingRequestId}`;
+        fetch(`${API_BASE_URL}/api/post-training-evaluations/${item.formId}/response/${encodeURIComponent(employeeId)}?${contextParam}`)
             .then(res => res.json())
             .then(setDetail)
             .catch(err => console.error(err));
-    }, [item.formId, item.meetingId, employeeId]);
+    }, [item.formId, item.meetingId, item.externalTrainingRequestId, employeeId]);
 
     const questions = detail?.questions || [];
 
@@ -159,7 +169,7 @@ const ViewModal = ({ item, employeeId, onClose }: {
                     <div>
                         <span className="text-[10px] font-black uppercase text-purple-500 tracking-widest">{t('formHeader')}</span>
                         <h2 className="font-black text-lg text-slate-800 leading-tight">{detail?.title || item.formTitle}</h2>
-                        <p className="text-xs font-bold text-slate-400 mt-1">{item.meetingTitle}</p>
+                        <p className="text-xs font-bold text-slate-400 mt-1">{contextTitle(item)}</p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400"><X size={20} /></button>
                 </div>

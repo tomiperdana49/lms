@@ -386,6 +386,26 @@ export const initDB = async () => {
             console.log("Added pte_form_id column to meetings.");
         } catch (e) { /* Ignore if exists */ }
 
+        // MIGRATION: post_training_evaluation_responses gains a second, mutually-exclusive context
+        // column so an External Training request can also be evaluated (not just a meeting). This
+        // un-does the "meeting_id NOT NULL" tightening above - an external-training response has no
+        // meeting, so meeting_id must be allowed to stay NULL again. Enforced in the /respond route:
+        // a response row has exactly one of meeting_id / external_training_request_id set, never both.
+        try {
+            await connection.query("ALTER TABLE post_training_evaluation_responses MODIFY COLUMN meeting_id INT NULL");
+            console.log("Relaxed meeting_id back to nullable on post_training_evaluation_responses.");
+        } catch (e) { /* Ignore if already nullable */ }
+
+        try {
+            await connection.query("ALTER TABLE post_training_evaluation_responses ADD COLUMN external_training_request_id INT NULL AFTER meeting_id");
+            console.log("Added external_training_request_id column to post_training_evaluation_responses.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
+            await connection.query("ALTER TABLE post_training_evaluation_responses ADD UNIQUE KEY unique_form_ext_evaluatee (form_id, external_training_request_id, evaluatee_employee_id)");
+            console.log("Added unique_form_ext_evaluatee index on post_training_evaluation_responses.");
+        } catch (e) { /* Ignore if already exists */ }
+
         // MIGRATION: Add external_training_requests table
         try {
             await connection.query(`
@@ -503,6 +523,15 @@ export const initDB = async () => {
         try {
             await connection.query("ALTER TABLE external_training_requests ADD COLUMN budget_notice_message TEXT");
             console.log("Added budget_notice_message column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
+        // MIGRATION: HR picks one existing Post Training Evaluation template to use (same role as
+        // meetings.pte_form_id above - the same template can be reused across many requests). The
+        // linked form is auto-published once the request is HR-processed - see POST
+        // /api/external-training/hr-process.
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN pte_form_id INT NULL");
+            console.log("Added pte_form_id column to external_training_requests.");
         } catch (e) { /* Ignore if exists */ }
 
         // MIGRATION: Add internal_certificates table (issued internal training certificates)

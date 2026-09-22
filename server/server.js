@@ -1350,6 +1350,16 @@ const getFormMeetings = async (form) => {
     return meetings;
 };
 
+// External Training's equivalent of getFormMeetings above - a form template can be reused across
+// many requests via external_training_requests.pte_form_id. Unlike a meeting, a request has no
+// guest list to resolve: its "attendee" is always just its own employee_id.
+const getFormExternalTrainingRequests = async (form) => {
+    return await query(
+        'SELECT * FROM external_training_requests WHERE pte_form_id = ? AND deleted_at IS NULL',
+        [form.id]
+    );
+};
+
 // One-time startup backfill: post_training_evaluation_responses gained a meeting_id column so a
 // reused template no longer collapses one person's evaluations across different meetings into a
 // single row (db.js migration above). Existing rows predate that column, so resolve each one's
@@ -4361,7 +4371,7 @@ app.get('/api/post-training-evaluations/categories', async (req, res) => {
 // AVG FEEDBACK, without the recap view needing to know how a PTE score is computed.
 app.get('/api/post-training-evaluations/responses/all', async (req, res) => {
     try {
-        const responses = await query('SELECT form_id, meeting_id, evaluatee_employee_id, answers, submitted_at FROM post_training_evaluation_responses');
+        const responses = await query('SELECT form_id, meeting_id, external_training_request_id, evaluatee_employee_id, answers, submitted_at FROM post_training_evaluation_responses');
         if (responses.length === 0) return res.json([]);
 
         const formIds = [...new Set(responses.map(r => r.form_id))];
@@ -4387,6 +4397,7 @@ app.get('/api/post-training-evaluations/responses/all', async (req, res) => {
             return {
                 formId: r.form_id,
                 meetingId: r.meeting_id,
+                externalTrainingRequestId: r.external_training_request_id,
                 evaluateeEmployeeId: r.evaluatee_employee_id,
                 averageScore,
                 submittedAt: r.submitted_at
@@ -4421,16 +4432,21 @@ app.get('/api/post-training-evaluations/subordinates', async (req, res) => {
         const items = [];
         for (const form of forms) {
             const meetings = await getFormMeetings(form);
-            if (meetings.length === 0) continue;
+            const externalTrainingRequests = await getFormExternalTrainingRequests(form);
+            if (meetings.length === 0 && externalTrainingRequests.length === 0) continue;
 
             const responses = await query(
-                'SELECT meeting_id, evaluatee_employee_id, submitted_at, answers FROM post_training_evaluation_responses WHERE form_id = ?',
+                'SELECT meeting_id, external_training_request_id, evaluatee_employee_id, submitted_at, answers FROM post_training_evaluation_responses WHERE form_id = ?',
                 [form.id]
             );
             // Keyed by meeting_id + evaluatee, not evaluatee alone - a reused template means the
             // same person can have one response per meeting, and each must stay independent.
             const responseByMeetingAndEvaluatee = {};
-            responses.forEach(r => { responseByMeetingAndEvaluatee[`${r.meeting_id}-${r.evaluatee_employee_id}`] = r; });
+            const responseByExtAndEvaluatee = {};
+            responses.forEach(r => {
+                if (r.meeting_id) responseByMeetingAndEvaluatee[`${r.meeting_id}-${r.evaluatee_employee_id}`] = r;
+                else if (r.external_training_request_id) responseByExtAndEvaluatee[`${r.external_training_request_id}-${r.evaluatee_employee_id}`] = r;
+            });
 
             // Only SCALE questions count toward the average score shown for a closed evaluation -
             // an open-text answer has no numeric value to average in.
@@ -4439,6 +4455,14 @@ app.get('/api/post-training-evaluations/subordinates', async (req, res) => {
                 [form.id]
             );
             const scaleQuestionIds = scaleQuestionRows.map(q => String(q.id));
+            const averageScoreOf = (response) => {
+                if (!response) return null;
+                try {
+                    const answers = typeof response.answers === 'string' ? JSON.parse(response.answers) : response.answers;
+                    const scores = scaleQuestionIds.map(qId => Number(answers?.[qId])).filter(v => !isNaN(v));
+                    return scores.length > 0 ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null;
+                } catch (e) { return null; }
+            };
 
             // A reused form template spans multiple meetings, so each meeting's attendees are
             // resolved (and reported with that meeting's own title/date) separately - a subordinate
@@ -4462,26 +4486,46 @@ app.get('/api/post-training-evaluations/subordinates', async (req, res) => {
 
                 matchingSubordinates.forEach(empId => {
                     const response = responseByMeetingAndEvaluatee[`${meeting.id}-${empId}`];
-                    let averageScore = null;
-                    if (response) {
-                        try {
-                            const answers = typeof response.answers === 'string' ? JSON.parse(response.answers) : response.answers;
-                            const scores = scaleQuestionIds.map(qId => Number(answers?.[qId])).filter(v => !isNaN(v));
-                            if (scores.length > 0) averageScore = Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10;
-                        } catch (e) { }
-                    }
                     items.push({
                         formId: form.id,
                         formTitle: form.title,
                         meetingId: meeting.id,
                         meetingTitle: meeting.title,
                         meetingDate: meeting.date,
+                        externalTrainingRequestId: null,
+                        externalTrainingTitle: null,
+                        externalTrainingDate: null,
                         evaluateeEmployeeId: empId,
                         evaluateeName: nameByEmployeeId[empId] || empId,
                         submitted: !!response,
                         submittedAt: response ? response.submitted_at : null,
-                        averageScore
+                        averageScore: averageScoreOf(response)
                     });
+                });
+            }
+
+            // External Training equivalent of the meeting loop above - an ETR always has exactly one
+            // "attendee" (the requester), and "closed" is the request being fully Processed by HR
+            // (there's no separate close step like a meeting's is_closed).
+            for (const etr of externalTrainingRequests) {
+                if (etr.status !== 'Processed') continue;
+                if (!subordinateIds.includes(etr.employee_id)) continue;
+
+                const response = responseByExtAndEvaluatee[`${etr.id}-${etr.employee_id}`];
+                items.push({
+                    formId: form.id,
+                    formTitle: form.title,
+                    meetingId: null,
+                    meetingTitle: null,
+                    meetingDate: null,
+                    externalTrainingRequestId: etr.id,
+                    externalTrainingTitle: etr.title,
+                    externalTrainingDate: etr.end_date,
+                    evaluateeEmployeeId: etr.employee_id,
+                    evaluateeName: etr.employee_name || etr.employee_id,
+                    submitted: !!response,
+                    submittedAt: response ? response.submitted_at : null,
+                    averageScore: averageScoreOf(response)
                 });
             }
         }
@@ -4508,20 +4552,33 @@ app.get('/api/post-training-evaluations/mine', async (req, res) => {
         const items = [];
         for (const form of forms) {
             const meetings = await getFormMeetings(form);
-            if (meetings.length === 0) continue;
+            const externalTrainingRequests = await getFormExternalTrainingRequests(form);
+            if (meetings.length === 0 && externalTrainingRequests.length === 0) continue;
 
             const responses = await query(
-                'SELECT meeting_id, submitted_at, answers FROM post_training_evaluation_responses WHERE form_id = ? AND evaluatee_employee_id = ?',
+                'SELECT meeting_id, external_training_request_id, submitted_at, answers FROM post_training_evaluation_responses WHERE form_id = ? AND evaluatee_employee_id = ?',
                 [form.id, employee_id]
             );
             const responseByMeeting = {};
-            responses.forEach(r => { responseByMeeting[r.meeting_id] = r; });
+            const responseByExt = {};
+            responses.forEach(r => {
+                if (r.meeting_id) responseByMeeting[r.meeting_id] = r;
+                else if (r.external_training_request_id) responseByExt[r.external_training_request_id] = r;
+            });
 
             const scaleQuestionRows = await query(
                 "SELECT id FROM post_training_evaluation_questions WHERE form_id = ? AND type = 'SCALE'",
                 [form.id]
             );
             const scaleQuestionIds = scaleQuestionRows.map(q => String(q.id));
+            const averageScoreOf = (response) => {
+                if (!response) return null;
+                try {
+                    const answers = typeof response.answers === 'string' ? JSON.parse(response.answers) : response.answers;
+                    const scores = scaleQuestionIds.map(qId => Number(answers?.[qId])).filter(v => !isNaN(v));
+                    return scores.length > 0 ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null;
+                } catch (e) { return null; }
+            };
 
             for (const meeting of meetings) {
                 // Same "opens once closed" gate as /subordinates - the evaluation doesn't exist yet
@@ -4532,23 +4589,39 @@ app.get('/api/post-training-evaluations/mine', async (req, res) => {
                 if (!attendeeIds.includes(employee_id)) continue;
 
                 const response = responseByMeeting[meeting.id];
-                let averageScore = null;
-                if (response) {
-                    try {
-                        const answers = typeof response.answers === 'string' ? JSON.parse(response.answers) : response.answers;
-                        const scores = scaleQuestionIds.map(qId => Number(answers?.[qId])).filter(v => !isNaN(v));
-                        if (scores.length > 0) averageScore = Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10;
-                    } catch (e) { }
-                }
                 items.push({
                     formId: form.id,
                     formTitle: form.title,
                     meetingId: meeting.id,
                     meetingTitle: meeting.title,
                     meetingDate: meeting.date,
+                    externalTrainingRequestId: null,
+                    externalTrainingTitle: null,
+                    externalTrainingDate: null,
                     submitted: !!response,
                     submittedAt: response ? response.submitted_at : null,
-                    averageScore
+                    averageScore: averageScoreOf(response)
+                });
+            }
+
+            // External Training equivalent - same "closed" gate as /subordinates (status Processed).
+            for (const etr of externalTrainingRequests) {
+                if (etr.status !== 'Processed') continue;
+                if (etr.employee_id !== employee_id) continue;
+
+                const response = responseByExt[etr.id];
+                items.push({
+                    formId: form.id,
+                    formTitle: form.title,
+                    meetingId: null,
+                    meetingTitle: null,
+                    meetingDate: null,
+                    externalTrainingRequestId: etr.id,
+                    externalTrainingTitle: etr.title,
+                    externalTrainingDate: etr.end_date,
+                    submitted: !!response,
+                    submittedAt: response ? response.submitted_at : null,
+                    averageScore: averageScoreOf(response)
                 });
             }
         }
@@ -4639,9 +4712,10 @@ app.get('/api/post-training-evaluations/:id', async (req, res) => {
 app.get('/api/post-training-evaluations/:id/response/:employeeId', async (req, res) => {
     try {
         const { id, employeeId } = req.params;
-        // A reused template can hold one response per meeting for the same person - without this,
-        // an ambiguous row could be picked and show the wrong meeting's answer to the participant.
-        const { meetingId } = req.query;
+        // A reused template can hold one response per meeting (or per external training request)
+        // for the same person - without this, an ambiguous row could be picked and show the wrong
+        // context's answer to the participant.
+        const { meetingId, externalTrainingRequestId } = req.query;
         const forms = await query(
             'SELECT id, title, description, scale_min_label, scale_max_label FROM post_training_evaluation_forms WHERE id = ? AND deleted_at IS NULL',
             [id]
@@ -4654,15 +4728,23 @@ app.get('/api/post-training-evaluations/:id/response/:employeeId', async (req, r
             [id]
         );
 
-        const responseRows = meetingId
-            ? await query(
+        let responseRows;
+        if (meetingId) {
+            responseRows = await query(
                 'SELECT answers, submitted_at FROM post_training_evaluation_responses WHERE form_id = ? AND evaluatee_employee_id = ? AND meeting_id = ?',
                 [id, employeeId, meetingId]
-            )
-            : await query(
+            );
+        } else if (externalTrainingRequestId) {
+            responseRows = await query(
+                'SELECT answers, submitted_at FROM post_training_evaluation_responses WHERE form_id = ? AND evaluatee_employee_id = ? AND external_training_request_id = ?',
+                [id, employeeId, externalTrainingRequestId]
+            );
+        } else {
+            responseRows = await query(
                 'SELECT answers, submitted_at FROM post_training_evaluation_responses WHERE form_id = ? AND evaluatee_employee_id = ?',
                 [id, employeeId]
             );
+        }
         const response = responseRows[0] || null;
         let answers = null;
         if (response) {
@@ -4756,19 +4838,22 @@ app.delete('/api/post-training-evaluations/:id', async (req, res) => {
 app.post('/api/post-training-evaluations/:id/respond', async (req, res) => {
     try {
         const { id } = req.params;
-        const { evaluatee_employee_id, evaluator_employee_id, meeting_id, answers } = req.body;
-        if (!evaluatee_employee_id || !evaluator_employee_id || !meeting_id || !answers) {
-            return res.status(400).json({ error: 'evaluatee_employee_id, evaluator_employee_id, meeting_id and answers are required' });
+        const { evaluatee_employee_id, evaluator_employee_id, meeting_id, external_training_request_id, answers } = req.body;
+        if (!evaluatee_employee_id || !evaluator_employee_id || (!meeting_id && !external_training_request_id) || !answers) {
+            return res.status(400).json({ error: 'evaluatee_employee_id, evaluator_employee_id, one of meeting_id/external_training_request_id, and answers are required' });
         }
 
         const now = new Date();
-        // Unique on (form_id, meeting_id, evaluatee_employee_id) - a reused template evaluated for
-        // the same person across two different meetings must not collapse into one response.
+        // Unique on (form_id, meeting_id, evaluatee_employee_id) or (form_id,
+        // external_training_request_id, evaluatee_employee_id) - a reused template evaluated for the
+        // same person across two different meetings/requests must not collapse into one response.
+        // Exactly one of meeting_id/external_training_request_id is set per row, so only the
+        // matching unique key ever conflicts.
         await query(
-            `INSERT INTO post_training_evaluation_responses (form_id, meeting_id, evaluatee_employee_id, evaluator_employee_id, answers, submitted_at)
-             VALUES (?, ?, ?, ?, ?, ?)
+            `INSERT INTO post_training_evaluation_responses (form_id, meeting_id, external_training_request_id, evaluatee_employee_id, evaluator_employee_id, answers, submitted_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE evaluator_employee_id = ?, answers = ?, submitted_at = ?`,
-            [id, meeting_id, evaluatee_employee_id, evaluator_employee_id, JSON.stringify(answers), now, evaluator_employee_id, JSON.stringify(answers), now]
+            [id, meeting_id || null, external_training_request_id || null, evaluatee_employee_id, evaluator_employee_id, JSON.stringify(answers), now, evaluator_employee_id, JSON.stringify(answers), now]
         );
 
         res.json({ success: true });
@@ -5798,7 +5883,7 @@ app.get('/api/external-training/deleted', async (req, res) => {
 // 6. HR processes payment
 app.post('/api/external-training/hr-process', async (req, res) => {
     try {
-        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date, category, title, vendor, location, start_date, end_date, certification_result, incentive_reward, incentive_payment_type, hr_name, training_gr_type, participation_type, learning_hours } = req.body;
+        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date, category, title, vendor, location, start_date, end_date, certification_result, incentive_reward, incentive_payment_type, hr_name, training_gr_type, participation_type, learning_hours, pte_form_id } = req.body;
         // datetime-local inputs send "YYYY-MM-DDTHH:MM"; MySQL DATETIME literals need a space instead of "T"
         const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
 
@@ -5865,11 +5950,27 @@ app.post('/api/external-training/hr-process', async (req, res) => {
             sql += `, learning_hours = ?`;
             params.push(learning_hours || null);
         }
+        if (pte_form_id !== undefined) {
+            sql += `, pte_form_id = ?`;
+            params.push(pte_form_id || null);
+        }
         sql += ` WHERE id = ?`;
         params.push(id);
 
         await query(sql, params);
         reconcileExternalTrainingNusawork(id);
+
+        // The linked Post Training Evaluation template only goes live once this request is
+        // Processed by HR - mirrors the "Paid" gate for meetings (see PUT /api/meetings/:id).
+        // Read back the final value rather than trusting the request body alone, since the form
+        // may have been attached earlier via hr-update-details (Save) without being resent here.
+        const [updatedRow] = await query('SELECT pte_form_id FROM external_training_requests WHERE id = ?', [id]);
+        if (updatedRow?.pte_form_id) {
+            query("UPDATE post_training_evaluation_forms SET status = 'PUBLISHED' WHERE id = ? AND deleted_at IS NULL", [updatedRow.pte_form_id])
+                .then(() => console.log(`[PTE] Published form ${updatedRow.pte_form_id} - external training request ${id} is Processed.`))
+                .catch(e => console.error('[PTE] Failed to publish linked form on Processed:', e.message));
+        }
+
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -5878,7 +5979,7 @@ app.post('/api/external-training/hr-process', async (req, res) => {
 // running the full approval flow — status and cost/incentive fields are left untouched.
 app.post('/api/external-training/hr-update-details', async (req, res) => {
     try {
-        const { id, category, title, vendor, location, start_date, end_date, training_gr_type, participation_type, learning_hours } = req.body;
+        const { id, category, title, vendor, location, start_date, end_date, training_gr_type, participation_type, learning_hours, pte_form_id } = req.body;
         if (!id) return res.status(400).json({ error: 'id is required' });
         const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
 
@@ -5898,6 +5999,7 @@ app.post('/api/external-training/hr-update-details', async (req, res) => {
         if (training_gr_type !== undefined) set('training_gr_type = ?', training_gr_type || null);
         if (participation_type !== undefined) set('participation_type = ?', participation_type || null);
         if (learning_hours !== undefined) set('learning_hours = ?', learning_hours ? Number(learning_hours) : null);
+        if (pte_form_id !== undefined) set('pte_form_id = ?', pte_form_id || null);
 
         if (params.length === 0) return res.json({ success: true });
 
@@ -7161,18 +7263,27 @@ app.put('/api/training/:id', async (req, res) => {
 app.put('/api/external-training/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { cost, costTraining, costTransport, costAccommodation, costOthers, additionalCost, settlementNote, certificateLink } = req.body;
+        const { cost, costTraining, costTransport, costAccommodation, costOthers, additionalCost, settlementNote, certificateLink, pte_form_id } = req.body;
 
         if (certificateLink) {
             await query(
-                'UPDATE external_training_requests SET registration_fee = ?, travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, additional_cost = ?, settlement_note = ?, certificate_link = ? WHERE id = ?',
-                [costTraining || 0, costTransport || 0, costAccommodation || 0, costOthers || 0, additionalCost || 0, settlementNote || '', certificateLink, id]
+                'UPDATE external_training_requests SET registration_fee = ?, travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, additional_cost = ?, settlement_note = ?, certificate_link = ?, pte_form_id = ? WHERE id = ?',
+                [costTraining || 0, costTransport || 0, costAccommodation || 0, costOthers || 0, additionalCost || 0, settlementNote || '', certificateLink, pte_form_id || null, id]
             );
         } else {
             await query(
-                'UPDATE external_training_requests SET registration_fee = ?, travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, additional_cost = ?, settlement_note = ? WHERE id = ?',
-                [costTraining || 0, costTransport || 0, costAccommodation || 0, costOthers || 0, additionalCost || 0, settlementNote || '', id]
+                'UPDATE external_training_requests SET registration_fee = ?, travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, additional_cost = ?, settlement_note = ?, pte_form_id = ? WHERE id = ?',
+                [costTraining || 0, costTransport || 0, costAccommodation || 0, costOthers || 0, additionalCost || 0, settlementNote || '', pte_form_id || null, id]
             );
+        }
+
+        // Settlement happens after the request is already Processed - HR can attach or swap the PTE
+        // form at this point too (mirrors Internal Training letting HR edit pte_form_id via Edit
+        // Session even after the meeting was already marked Paid - see PUT /api/meetings/:id).
+        if (pte_form_id) {
+            query("UPDATE post_training_evaluation_forms SET status = 'PUBLISHED' WHERE id = ? AND deleted_at IS NULL", [pte_form_id])
+                .then(() => console.log(`[PTE] Published form ${pte_form_id} - external training request ${id} settlement updated.`))
+                .catch(e => console.error('[PTE] Failed to publish linked form on settlement update:', e.message));
         }
 
         const updated = await query('SELECT * FROM external_training_requests WHERE id = ?', [id]);

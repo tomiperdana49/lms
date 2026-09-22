@@ -1333,6 +1333,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             (!formData.startTime || !formData.endTime) && t('notifications.timeFieldLabel'),
             !formData.host && t('createModal.hostNameLabel'),
             !formData.type && t('createModal.eventTypeLabel'),
+            !formData.pte_form_id && t('createModal.pteFormLabel'),
         ].filter(Boolean);
         if (missingFields.length > 0) {
             setNotification({ show: true, type: 'error', message: t('notifications.fillRequiredFields', { fields: missingFields.join(', ') }) });
@@ -3687,7 +3688,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                 {/* Post Training Evaluation - the linked form auto-publishes once this session is marked Paid */}
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.pteFormLabel')}</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.pteFormLabel')} <span className="text-red-500">*</span></label>
                                     <div className="relative" ref={pteFormDropdownRef}>
                                         <input
                                             type="text"
