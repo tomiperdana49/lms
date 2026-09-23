@@ -64,5 +64,9 @@
     "updateFailed": "Gagal memperbarui kamus kompetensi.",
     "deleteSuccess": "Kamus kompetensi berhasil dihapus!",
     "deleteFailed": "Gagal menghapus kamus kompetensi."
+  },
+  "export": {
+    "button": "Export",
+    "sheetName": "Kamus Kompetensi"
   }
 }

@@ -64,5 +64,9 @@
     "updateFailed": "Failed to update competency dictionary.",
     "deleteSuccess": "Competency dictionary deleted successfully!",
     "deleteFailed": "Failed to delete competency dictionary."
+  },
+  "export": {
+    "button": "Export",
+    "sheetName": "Competency Dictionary"
   }
 }

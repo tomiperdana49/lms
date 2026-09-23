@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { Settings, Plus, Edit, Trash2, ArrowLeft, Eye, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Settings, Plus, Edit, Trash2, ArrowLeft, Eye, ChevronLeft, ChevronRight, X, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { Role, CompetencyTemplate } from '../types';
@@ -168,6 +169,26 @@ const CompetencyTemplateManager = ({ userRole, onBack }: CompetencyTemplateManag
 
     if (isLoading) return <div className="p-8 text-center">{t('loading')}</div>;
 
+    // Exports what's currently shown (honours the type/position filters), using the table's own
+    // column headers so the file reads the same as the screen.
+    const exportExcel = () => {
+        const rows = visibleTemplates.map(item => ({
+            [t('table.competencyType')]: item.competencyType,
+            [t('table.position')]: item.position,
+            [t('table.competencyName')]: item.competencyName,
+            [t('table.operationalDefinition')]: item.operationalDefinition,
+            [t('table.standardLevelIndicator')]: item.standardLevelIndicator,
+            [t('table.jdReference')]: item.jdReference,
+            [t('table.standardScore')]: item.standardScore ?? ''
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws['!cols'] = [{ wch: 14 }, { wch: 28 }, { wch: 32 }, { wch: 60 }, { wch: 60 }, { wch: 40 }, { wch: 8 }];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, t('export.sheetName'));
+        const filterLabel = [filterType, filterPosition].filter(Boolean).join('_').replace(/[\\/:*?"<>|\s]+/g, '_');
+        XLSX.writeFile(wb, `Kamus_Kompetensi${filterLabel ? `_${filterLabel}` : ''}.xlsx`);
+    };
+
     return (
         <div className="max-w-6xl mx-auto py-6">
             <PopupNotification
@@ -187,6 +208,14 @@ const CompetencyTemplateManager = ({ userRole, onBack }: CompetencyTemplateManag
                     </h1>
                     <p className="text-sm text-slate-500 mt-1">{t('subtitle', { count: templates.length })}</p>
                 </div>
+                <div className="flex flex-wrap gap-3">
+                <button
+                    onClick={exportExcel}
+                    disabled={visibleTemplates.length === 0}
+                    className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg shadow-emerald-900/20 flex items-center gap-2 whitespace-nowrap"
+                >
+                    <Download size={18} /> {t('export.button')}
+                </button>
                 <button
                     onClick={() => {
                         setEditingTemplate(null);
@@ -198,6 +227,7 @@ const CompetencyTemplateManager = ({ userRole, onBack }: CompetencyTemplateManag
                 >
                     <Plus size={18} /> {t('addTemplate')}
                 </button>
+                </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 mb-4">
