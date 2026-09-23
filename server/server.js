@@ -2707,6 +2707,16 @@ const computeLearningStats = async ({ email, employee_id, startDate, endDate }) 
         }
     }
 
+    // Interns carry no learning cost - same rule the Internal Training cost report already applies
+    // (an intern's per-participant share is 0). Hours still count; only the cost is zeroed, on every
+    // item as well as the totals, so the detail lists add up to the Rp 0 total.
+    if (await isInternEmployeeId(targetEmpId)) {
+        biayaTraining = 0;
+        biayaTrainingExternal = 0;
+        biayaBuku = 0;
+        [trainingDetails, trainingExternalDetails, bookDetails].forEach(list => list.forEach(item => { item.cost = 0; }));
+    }
+
     const byDateAsc = (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime();
     trainingDetails.sort(byDateAsc);
     trainingExternalDetails.sort(byDateAsc);
