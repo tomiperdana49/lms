@@ -6848,8 +6848,8 @@ const authorizeTemplateWrite = async (requesterId, position) => {
     return null;
 };
 
-// Every non-HR write (a team leader's Add/Edit/Delete on FUNCTIONAL, or Standard override on
-// CORE) is queued here instead of touching real data - HR approving the request is what actually
+// Every write from a team leader's dictionary (Add/Edit/Delete on FUNCTIONAL, or Standard override
+// on CORE - HR leaders included) is queued here instead of touching real data - HR approving the request is what actually
 // applies it (see the /approve handler below), and rejecting it just marks the row REJECTED.
 const mapChangeRequest = (row) => ({
     id: row.id,
@@ -6919,8 +6919,10 @@ app.post('/api/competency-templates', async (req, res) => {
             jdReference: c.jdReference || '',
             standardScore: c.standardScore || null
         };
-        const role = await getRequesterRole(c.requesterId);
-        if (c.requesterId && role !== 'HR') {
+        // Anything sent from the leader's dictionary (it always carries requesterId) is queued for
+        // HR approval - even when that leader is HR themselves, since that menu sits outside the
+        // Admin Panel. Only the Admin Panel's Kamus Kompetensi (no requesterId) writes directly.
+        if (c.requesterId) {
             const request = await createChangeRequest({
                 requesterId: c.requesterId,
                 position: payload.position,
@@ -6959,8 +6961,8 @@ app.put('/api/competency-templates/:id', async (req, res) => {
             jdReference: c.jdReference || '',
             standardScore: c.standardScore || null
         };
-        const role = await getRequesterRole(c.requesterId);
-        if (c.requesterId && role !== 'HR') {
+        // Queued even for an HR leader - see the POST handler above.
+        if (c.requesterId) {
             const existing = mapCompetencyTemplate(existingRows[0]);
             const request = await createChangeRequest({
                 requesterId: c.requesterId,
@@ -6991,8 +6993,8 @@ app.delete('/api/competency-templates/:id', async (req, res) => {
         if (existingRows.length === 0) return res.status(404).json({ error: 'Template not found' });
         const authError = await authorizeTemplateWrite(requesterId, existingRows[0].posisi);
         if (authError) return res.status(403).json({ error: authError });
-        const role = await getRequesterRole(requesterId);
-        if (requesterId && role !== 'HR') {
+        // Queued even for an HR leader - see the POST handler above.
+        if (requesterId) {
             const existing = mapCompetencyTemplate(existingRows[0]);
             const request = await createChangeRequest({
                 requesterId,
@@ -7030,8 +7032,8 @@ app.put('/api/competency-standard-overrides', async (req, res) => {
         const { position, competencyType, competencyName, standardScore, requesterId } = req.body;
         const authError = await authorizeTemplateWrite(requesterId, position);
         if (authError) return res.status(403).json({ error: authError });
-        const role = await getRequesterRole(requesterId);
-        if (requesterId && role !== 'HR') {
+        // Queued even for an HR leader - see POST /api/competency-templates.
+        if (requesterId) {
             const existingRows = await query(
                 'SELECT * FROM competency_standard_overrides WHERE position = ? AND competency_type = ? AND competency_name = ?',
                 [position, competencyType, competencyName]
