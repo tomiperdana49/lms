@@ -68,6 +68,9 @@ export const idpValueRightOf = (grid: IdpImportGrid, r: number, c: number): stri
     const row = grid[r] || [];
     for (let cc = c + 1; cc < row.length; cc++) {
         const v = idpCellStr(row[cc]);
+        // Reaching the next label ("Jabatan:") means this field's own value cell was left empty -
+        // don't read the neighbouring label as the value.
+        if (v.endsWith(':')) return '';
         if (v) return v;
     }
     return '';
@@ -95,6 +98,43 @@ const idpFindSectionText = (grid: IdpImportGrid, headerPattern: RegExp, stopPatt
         }
     }
     return '';
+};
+
+// A format problem that stops a sheet from importing. `label` is the template's own cell text (the
+// file is always the Indonesian template), so the user can find the exact cell to fix.
+export interface IdpImportIssue {
+    label: string;
+    reason: 'missingLabel' | 'emptyValue' | 'invalidYear';
+}
+
+// Labels every IDP template sheet must carry - without them the parser silently reads the section
+// as empty, so a sheet with a renamed/deleted header would otherwise "import" with blank fields.
+const IDP_REQUIRED_SECTIONS: { label: string; pattern: RegExp }[] = [
+    { label: 'Pencapaian / Prestasi Kerja', pattern: /pencapaian/i },
+    { label: 'Tujuan / Aspirasi Karir (Goal)', pattern: /tujuan.*karir|aspirasi/i },
+    { label: 'Skill yang Dimiliki', pattern: /skill yang dimiliki/i },
+    { label: 'Area Pengembangan', pattern: /area pengembangan/i },
+    { label: 'Rencana Aksi Pengembangan', pattern: /rencana aksi pengembangan/i }
+];
+
+// Checks one sheet against the template: the identity cells the import can't do without (name,
+// period year) and the section headers the parser locates fields by. Empty answers are allowed -
+// the employee can still fill them in after importing.
+export const validateIdpSheet = (grid: IdpImportGrid, parsed: IdpImportRow): IdpImportIssue[] => {
+    const issues: IdpImportIssue[] = [];
+
+    if (!idpFindCell(grid, /nama karyawan/i)) issues.push({ label: 'Nama Karyawan', reason: 'missingLabel' });
+    else if (!parsed.employee_name) issues.push({ label: 'Nama Karyawan', reason: 'emptyValue' });
+
+    const periodPos = idpFindCell(grid, /periode idp/i);
+    if (!periodPos) issues.push({ label: 'Periode IDP', reason: 'missingLabel' });
+    else if (!idpValueRightOf(grid, periodPos.r, periodPos.c)) issues.push({ label: 'Periode IDP', reason: 'emptyValue' });
+    else if (!parsed.period_year || parsed.period_year < 2000 || parsed.period_year > 2100) issues.push({ label: 'Periode IDP', reason: 'invalidYear' });
+
+    for (const section of IDP_REQUIRED_SECTIONS) {
+        if (!idpFindCell(grid, section.pattern)) issues.push({ label: section.label, reason: 'missingLabel' });
+    }
+    return issues;
 };
 
 // Parses one sheet of the standard IDP Excel template into a structured import row.

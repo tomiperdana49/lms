@@ -94,7 +94,14 @@
     "importSuccess": "Fields filled in from the file. Review them before saving.",
     "importNoData": "No valid IDP data found in this file. Make sure it matches the IDP template.",
     "importNameMismatch": "This file contains IDP data for \"{{name}}\", not you. You can only import your own IDP data.",
-    "importFailed": "Failed to read file: {{message}}"
+    "importFailed": "Failed to read file: {{message}}",
+    "importInvalidFormat": "The file doesn't match the IDP template (sheet \"{{sheet}}\"):",
+    "importIssue": {
+      "missingLabel": "\"{{label}}\" field not found",
+      "emptyValue": "\"{{label}}\" is empty",
+      "invalidYear": "\"{{label}}\" must be a year, e.g. 2026"
+    },
+    "importBackfillFailed": "The form was filled in, but the IDP history couldn't be saved:\n{{message}}"
   },
   "admin": {
     "title": "Individual Development Plan",

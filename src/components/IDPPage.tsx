@@ -17,8 +17,8 @@ import {
     Search
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { parseIdpSheet } from './idpImportParser';
-import type { IdpImportGrid } from './idpImportParser';
+import { parseIdpSheet, validateIdpSheet } from './idpImportParser';
+import type { IdpImportGrid, IdpImportIssue } from './idpImportParser';
 import { API_BASE_URL } from '../config';
 import type { User, IDPPlan, Employee, IDPActionItem } from '../types';
 import PopupNotification from './PopupNotification';
@@ -220,12 +220,28 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
             try {
                 const bstr = evt.target?.result;
                 const wb = XLSX.read(bstr, { type: 'binary' });
-                const parsedSheets = wb.SheetNames
-                    .map(name => parseIdpSheet(XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' }) as IdpImportGrid, name))
-                    .filter(p => p.employee_name);
+                const allSheets = wb.SheetNames.map(name => {
+                    const grid = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' }) as IdpImportGrid;
+                    const row = parseIdpSheet(grid, name);
+                    return { row, issues: validateIdpSheet(grid, row) };
+                });
+                const parsedSheets = allSheets.filter(s => s.row.employee_name);
+
+                // Lists each format problem on its own line, naming the template cell to fix.
+                const describeIssues = (sheetName: string, issues: IdpImportIssue[]) =>
+                    t('notifications.importInvalidFormat', { sheet: sheetName }) + '\n' +
+                    issues.map(i => `• ${t(`notifications.importIssue.${i.reason}`, { label: i.label })}`).join('\n');
 
                 if (parsedSheets.length === 0) {
-                    setNotification({ show: true, type: 'error', message: t('notifications.importNoData') });
+                    // No sheet even has a name - report the closest-to-valid sheet's problems, since
+                    // that's most likely the one the employee meant to fill in.
+                    const closest = [...allSheets].sort((a, b) => a.issues.length - b.issues.length)[0];
+                    setNotification({
+                        show: true, type: 'error',
+                        message: closest && closest.issues.length > 0
+                            ? describeIssues(closest.row.sheet_name, closest.issues)
+                            : t('notifications.importNoData')
+                    });
                     return;
                 }
 
@@ -233,14 +249,19 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                 // this employee's own name. An employee may only import their own IDP data - never fall
                 // back to someone else's sheet just because the file didn't contain theirs.
                 const ownName = (currentUser?.name || '').trim().toLowerCase();
-                const parsed = parsedSheets.find(p => p.employee_name.trim().toLowerCase() === ownName);
-                if (!parsed) {
+                const match = parsedSheets.find(s => s.row.employee_name.trim().toLowerCase() === ownName);
+                if (!match) {
                     setNotification({
                         show: true, type: 'warning',
-                        message: t('notifications.importNameMismatch', { name: parsedSheets[0].employee_name })
+                        message: t('notifications.importNameMismatch', { name: parsedSheets[0].row.employee_name })
                     });
                     return;
                 }
+                if (match.issues.length > 0) {
+                    setNotification({ show: true, type: 'error', message: describeIssues(match.row.sheet_name, match.issues) });
+                    return;
+                }
+                const parsed = match.row;
 
                 setDraft({
                     achievements: parsed.achievements,
@@ -255,7 +276,7 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                 setNotification({ show: true, type: 'success', message: t('notifications.importSuccess') });
 
                 try {
-                    await fetch(`${API_BASE_URL}/api/idp/bulk-import`, {
+                    const importRes = await fetch(`${API_BASE_URL}/api/idp/bulk-import`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         // The import can never land as Approved regardless of who imports or what the
@@ -263,6 +284,15 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                         // and a real HR approval always has to happen afterward through the app.
                         body: JSON.stringify({ rows: [parsed] })
                     });
+                    // The server rejects rows it can't match (e.g. a name not in the org chart) per
+                    // row, with a 200 - surface that instead of leaving the success message up.
+                    const importResult: { errors?: { error: string }[] } = importRes.ok ? await importRes.json() : {};
+                    if (importResult.errors && importResult.errors.length > 0) {
+                        setNotification({
+                            show: true, type: 'warning',
+                            message: t('notifications.importBackfillFailed', { message: importResult.errors.map(e => e.error).join('\n') })
+                        });
+                    }
                     // Refetch directly (rather than fire-and-forget fetchMyPlans()) so we can find the
                     // affected plan's id right away and force its detail (reviews/HR note) to reload too -
                     // the effect that normally does this only fires when currentYearPlan.id itself

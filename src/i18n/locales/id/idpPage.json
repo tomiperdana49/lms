@@ -94,7 +94,14 @@
     "importSuccess": "Data berhasil diisi dari file. Periksa kembali sebelum menyimpan.",
     "importNoData": "Tidak ada data IDP yang valid ditemukan di file ini. Pastikan formatnya sesuai template IDP.",
     "importNameMismatch": "File ini berisi data IDP milik \"{{name}}\", bukan milik kamu. Kamu hanya bisa mengimpor data IDP milikmu sendiri.",
-    "importFailed": "Gagal membaca file: {{message}}"
+    "importFailed": "Gagal membaca file: {{message}}",
+    "importInvalidFormat": "Format file tidak sesuai template IDP (sheet \"{{sheet}}\"):",
+    "importIssue": {
+      "missingLabel": "Kolom \"{{label}}\" tidak ditemukan",
+      "emptyValue": "\"{{label}}\" masih kosong",
+      "invalidYear": "\"{{label}}\" harus berisi tahun, contoh: 2026"
+    },
+    "importBackfillFailed": "Data sudah diisi ke form, tapi tidak bisa disimpan ke riwayat IDP:\n{{message}}"
   },
   "admin": {
     "title": "Rencana Pengembangan Individu",
