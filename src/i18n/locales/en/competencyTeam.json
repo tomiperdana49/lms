@@ -120,5 +120,32 @@
     "searchPlaceholder": "Search by name, ID or position...",
     "noResults": "No employees match your search.",
     "selectPrompt": "Select an employee from the list to view their competency assessment."
+  },
+  "scaleLegend": {
+    "title": "Proficiency Scale",
+    "show": "View explanation",
+    "hide": "Hide",
+    "scale": "Scale",
+    "name": "Level",
+    "definition": "Definition",
+    "evidence": "Minimum Evidence Expected",
+    "levels": {
+      "1": {
+        "definition": "Knows the theory, but still needs full guidance / close supervision.",
+        "evidence": "All work output is still re-checked by the supervisor before it is used."
+      },
+      "2": {
+        "definition": "Can do standard work independently.",
+        "evidence": "Completes routine tasks according to SOP without significant corrections."
+      },
+      "3": {
+        "definition": "Skilled, can solve complex problems in their field.",
+        "evidence": "Handles non-routine cases and is the go-to person for teammates."
+      },
+      "4": {
+        "definition": "Highly expert, can teach / mentor others.",
+        "evidence": "Writes SOPs or training materials and trains other employees."
+      }
+    }
   }
 }

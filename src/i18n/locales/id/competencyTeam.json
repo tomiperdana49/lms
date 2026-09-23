@@ -120,5 +120,32 @@
     "searchPlaceholder": "Cari berdasarkan nama, ID, atau posisi...",
     "noResults": "Tidak ada karyawan yang sesuai dengan pencarian.",
     "selectPrompt": "Pilih karyawan dari daftar untuk melihat penilaian kompetensinya."
+  },
+  "scaleLegend": {
+    "title": "Skala Keahlian",
+    "show": "Lihat penjelasan",
+    "hide": "Sembunyikan",
+    "scale": "Skala",
+    "name": "Sebutan",
+    "definition": "Definisi",
+    "evidence": "Bukti Minimal yang Harus Terlihat",
+    "levels": {
+      "1": {
+        "definition": "Tahu teorinya, tapi masih butuh bimbingan penuh / supervisi ketat.",
+        "evidence": "Seluruh hasil kerja masih diperiksa ulang oleh atasan sebelum digunakan."
+      },
+      "2": {
+        "definition": "Bisa melakukan pekerjaan standar sendiri secara mandiri.",
+        "evidence": "Menyelesaikan tugas rutin sesuai SOP tanpa koreksi berarti."
+      },
+      "3": {
+        "definition": "Mahir, bisa menyelesaikan masalah kompleks di bidangnya.",
+        "evidence": "Menangani kasus non-rutin dan menjadi tempat bertanya rekan satu tim."
+      },
+      "4": {
+        "definition": "Sangat ahli, bisa mengajarkan / menjadi mentor bagi orang lain.",
+        "evidence": "Menyusun SOP atau materi pelatihan dan melatih karyawan lain."
+      }
+    }
   }
 }

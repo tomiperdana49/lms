@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { CompetencyTemplate, CompetencyStandardOverride } from '../types';
+import CompetencyScaleLegend from './CompetencyScaleLegend';
 import { KNOWN_SECTION_TYPES, buildPeriodOptions, getMatchedCompetencies, groupByType, computeSummary, type Period } from '../utils/competency';
 
 export const parsePeriodString = (value?: string | null): Period | null => {
@@ -180,6 +181,8 @@ const CompetencyAssessmentView = ({ employeeId, isSupervisor, initialPeriod, onL
                             <span className="font-semibold text-slate-800">{previousTotal ?? '-'}</span>
                         </div>
                     </div>
+
+                    <CompetencyScaleLegend />
 
                     {Object.entries(groupedCompetencies).map(([type, comps]) => (
                         <div key={type} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
