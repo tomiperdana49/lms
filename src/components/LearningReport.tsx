@@ -157,9 +157,11 @@ interface LearningReportProps {
     userName?: string;
     userEmployeeId?: string;
     isSupervisor?: boolean;
+    // Interns get no annual learning budget - their cost is shown without a budget cap.
+    isIntern?: boolean;
 }
 
-const LearningReport = ({ userEmail, userName, userEmployeeId, isSupervisor }: LearningReportProps) => {
+const LearningReport = ({ userEmail, userName, userEmployeeId, isSupervisor, isIntern }: LearningReportProps) => {
     const { t } = useTranslation('learningReport');
     const [stats, setStats] = useState<LearningStats>(EMPTY_STATS);
     const [loading, setLoading] = useState(true);
@@ -401,7 +403,7 @@ const LearningReport = ({ userEmail, userName, userEmployeeId, isSupervisor }: L
                     <p>{t('loading')}</p>
                 </div>
             ) : (
-                <LearningStatsBreakdown stats={stats} t={t} />
+                <LearningStatsBreakdown stats={stats} t={t} employeeCount={isIntern ? 0 : 1} />
             )}
         </div>
     );
@@ -409,10 +411,12 @@ const LearningReport = ({ userEmail, userName, userEmployeeId, isSupervisor }: L
 
 interface LearningStatsBreakdownProps {
     stats: LearningStats;
-    t: (key: string) => string;
+    t: (key: string, options?: Record<string, unknown>) => string;
     // Only HR can retry a Nusawork push, and only the admin-facing Employee Learning Report passes
     // this - the employee's own "Learning Report" view never sets it, so the button never shows there.
     canSyncNusawork?: boolean;
+    // Employees with a learning budget (see LearningStatsSummaryCards) - 0 for a resigned/intern employee.
+    employeeCount?: number;
 }
 
 type SyncState = 'idle' | 'loading' | 'error';
@@ -462,17 +466,20 @@ const SyncNusaworkButton = ({ requestId, t }: { requestId: number; t: (key: stri
 
 interface LearningStatsSummaryCardsProps {
     stats: LearningStats;
-    t: (key: string) => string;
-    // Number of employees the stats cover, so the learning budget (flat per employee, per year)
-    // scales accordingly. Defaults to a single employee.
+    t: (key: string, options?: Record<string, unknown>) => string;
+    // Number of employees the stats cover who have a learning budget, so the budget (flat per
+    // employee, per year) scales accordingly. Defaults to a single employee; 0 means no budget at
+    // all (only resigned/intern employees), which shows the cost on its own.
     employeeCount?: number;
+    // Employees in the stats who were left out of the budget (resigned/interns), for the note under it.
+    noBudgetCount?: number;
 }
 
 // Grand-total + per-category summary cards, with no item-level detail. Used on its own for a
 // combined overview (e.g. multiple employees at once) and reused inside LearningStatsBreakdown.
-export const LearningStatsSummaryCards = ({ stats, t, employeeCount = 1 }: LearningStatsSummaryCardsProps) => {
+export const LearningStatsSummaryCards = ({ stats, t, employeeCount = 1, noBudgetCount = 0 }: LearningStatsSummaryCardsProps) => {
     const sections = buildSections(stats, t);
-    const totalBudget = ANNUAL_LEARNING_BUDGET * Math.max(employeeCount, 1);
+    const totalBudget = ANNUAL_LEARNING_BUDGET * Math.max(employeeCount, 0);
     const remainingBudget = totalBudget - stats.totalBiaya;
 
     return (
@@ -492,19 +499,30 @@ export const LearningStatsSummaryCards = ({ stats, t, employeeCount = 1 }: Learn
                         <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">{t('totalCost')}</div>
                         <div className="flex items-baseline gap-1.5 flex-wrap">
                             <span className="text-3xl font-black tracking-tight text-slate-800">Rp {stats.totalBiaya.toLocaleString('id-ID')}</span>
-                            <span className="text-sm font-bold text-slate-400">/ Rp {totalBudget.toLocaleString('id-ID')}</span>
+                            {totalBudget > 0 && (
+                                <span className="text-sm font-bold text-slate-400">/ Rp {totalBudget.toLocaleString('id-ID')}</span>
+                            )}
                         </div>
-                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mt-3">
-                            <div
-                                className={`h-full rounded-full ${remainingBudget >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}
-                                style={{ width: `${Math.min((stats.totalBiaya / totalBudget) * 100, 100)}%` }}
-                            />
-                        </div>
-                        <p className={`text-xs font-bold mt-2 ${remainingBudget >= 0 ? 'text-slate-400' : 'text-rose-600'}`}>
-                            {remainingBudget >= 0
-                                ? `${t('remainingBudget')}: Rp ${remainingBudget.toLocaleString('id-ID')}`
-                                : `${t('budgetExceeded')}: Rp ${Math.abs(remainingBudget).toLocaleString('id-ID')}`}
-                        </p>
+                        {totalBudget > 0 ? (
+                            <>
+                                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mt-3">
+                                    <div
+                                        className={`h-full rounded-full ${remainingBudget >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                                        style={{ width: `${Math.min((stats.totalBiaya / totalBudget) * 100, 100)}%` }}
+                                    />
+                                </div>
+                                <p className={`text-xs font-bold mt-2 ${remainingBudget >= 0 ? 'text-slate-400' : 'text-rose-600'}`}>
+                                    {remainingBudget >= 0
+                                        ? `${t('remainingBudget')}: Rp ${remainingBudget.toLocaleString('id-ID')}`
+                                        : `${t('budgetExceeded')}: Rp ${Math.abs(remainingBudget).toLocaleString('id-ID')}`}
+                                </p>
+                                {noBudgetCount > 0 && (
+                                    <p className="text-[11px] text-slate-400 mt-1">{t('budgetExcludedNote', { count: noBudgetCount })}</p>
+                                )}
+                            </>
+                        ) : (
+                            <p className="text-xs font-bold mt-3 text-slate-400">{t('noBudget')}</p>
+                        )}
                     </div>
                 </div>
             </div>
@@ -528,12 +546,12 @@ export const LearningStatsSummaryCards = ({ stats, t, employeeCount = 1 }: Learn
     );
 };
 
-export const LearningStatsBreakdown = ({ stats, t, canSyncNusawork }: LearningStatsBreakdownProps) => {
+export const LearningStatsBreakdown = ({ stats, t, canSyncNusawork, employeeCount = 1 }: LearningStatsBreakdownProps) => {
     const sections = buildSections(stats, t);
 
     return (
         <>
-            <LearningStatsSummaryCards stats={stats} t={t} />
+            <LearningStatsSummaryCards stats={stats} t={t} employeeCount={employeeCount} />
 
             {/* Detail Sections */}
             <div className="space-y-6">

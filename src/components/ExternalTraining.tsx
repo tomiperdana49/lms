@@ -42,6 +42,8 @@ interface ExternalTrainingProps {
 export default function ExternalTraining({ currentUser, isManagementMode, defaultTab }: ExternalTrainingProps) {
  const { t } = useTranslation('externalTraining');
  const isSupervisor = !!currentUser?.isSupervisor;
+ // Interns get no annual learning budget - the personal budget card shows their spend without a cap.
+ const isIntern = !!currentUser?.isIntern;
  const [activeTab, setActiveTab] = useState<TabType>(defaultTab || 'my_requests');
 
  useEffect(() => {
@@ -490,11 +492,15 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <span className="text-xs font-bold uppercase tracking-wide">{t('budget.title')}</span>
  </div>
  <div className="flex items-baseline gap-2 flex-wrap">
- <span className={`text-2xl font-black ${personalLearningCost > ANNUAL_LEARNING_BUDGET ? 'text-rose-600' : 'text-gray-800'}`}>
+ <span className={`text-2xl font-black ${!isIntern && personalLearningCost > ANNUAL_LEARNING_BUDGET ? 'text-rose-600' : 'text-gray-800'}`}>
  {formatRp(personalLearningCost)}
  </span>
- <span className="text-sm font-semibold text-gray-400">/ {formatRp(ANNUAL_LEARNING_BUDGET)}</span>
+ {!isIntern && <span className="text-sm font-semibold text-gray-400">/ {formatRp(ANNUAL_LEARNING_BUDGET)}</span>}
  </div>
+ {isIntern ? (
+ <p className="text-xs font-semibold mt-2 text-gray-500">{t('budget.none')}</p>
+ ) : (
+ <>
  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mt-2">
  <div
  className={`h-full rounded-full ${personalLearningCost <= ANNUAL_LEARNING_BUDGET ? 'bg-emerald-500' : 'bg-rose-500'}`}
@@ -506,6 +512,8 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  ? t('budget.remaining', { amount: formatRp(ANNUAL_LEARNING_BUDGET - personalLearningCost) })
  : t('budget.exceeded', { amount: formatRp(personalLearningCost - ANNUAL_LEARNING_BUDGET) })}
  </p>
+ </>
+ )}
  </div>
  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
  <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-gray-100 p-6">

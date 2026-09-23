@@ -53,10 +53,12 @@ interface DashboardHomeProps {
     userEmail?: string;
     userName?: string;
     userEmployeeId?: string;
+    // Interns get no annual learning budget - the cost widget shows their spend without a cap.
+    isIntern?: boolean;
     config?: { moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean };
 }
 
-const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName, userEmployeeId, config }: DashboardHomeProps) => {
+const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName, userEmployeeId, isIntern, config }: DashboardHomeProps) => {
     const { t } = useTranslation('dashboardHome');
     const [pendingActions, setPendingActions] = useState<PendingActionItem[]>([]);
     const [isPendingActionsModalOpen, setIsPendingActionsModalOpen] = useState(false);
@@ -259,21 +261,29 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
                                     <span className="text-lg sm:text-xl font-black tracking-tighter text-emerald-300 whitespace-nowrap">
                                         Rp {learningStats.totalBiaya.toLocaleString('id-ID')}
                                     </span>
-                                    <span className="text-[11px] font-bold text-blue-100/60 whitespace-nowrap">
-                                        / Rp {ANNUAL_LEARNING_BUDGET.toLocaleString('id-ID')}
-                                    </span>
+                                    {!isIntern && (
+                                        <span className="text-[11px] font-bold text-blue-100/60 whitespace-nowrap">
+                                            / Rp {ANNUAL_LEARNING_BUDGET.toLocaleString('id-ID')}
+                                        </span>
+                                    )}
                                 </div>
-                                <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                    <div
-                                        className={`h-full rounded-full ${remainingBudget > 0 ? 'bg-emerald-400' : 'bg-rose-400'}`}
-                                        style={{ width: `${Math.min((learningStats.totalBiaya / ANNUAL_LEARNING_BUDGET) * 100, 100)}%` }}
-                                    />
-                                </div>
-                                <p className={`text-[10px] font-bold whitespace-nowrap ${remainingBudget > 0 ? 'text-blue-100/70' : 'text-rose-300'}`}>
-                                    {remainingBudget > 0
-                                        ? `${t('remainingBudget')}: Rp ${remainingBudget.toLocaleString('id-ID')}`
-                                        : t('budgetExceeded')}
-                                </p>
+                                {isIntern ? (
+                                    <p className="text-[10px] font-bold text-blue-100/70">{t('noBudget')}</p>
+                                ) : (
+                                    <>
+                                        <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full ${remainingBudget > 0 ? 'bg-emerald-400' : 'bg-rose-400'}`}
+                                                style={{ width: `${Math.min((learningStats.totalBiaya / ANNUAL_LEARNING_BUDGET) * 100, 100)}%` }}
+                                            />
+                                        </div>
+                                        <p className={`text-[10px] font-bold whitespace-nowrap ${remainingBudget > 0 ? 'text-blue-100/70' : 'text-rose-300'}`}>
+                                            {remainingBudget > 0
+                                                ? `${t('remainingBudget')}: Rp ${remainingBudget.toLocaleString('id-ID')}`
+                                                : t('budgetExceeded')}
+                                        </p>
+                                    </>
+                                )}
                             </div>
                         </button>
                     </div>
@@ -286,6 +296,7 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
                     stats={learningStats}
                     onClose={() => setDetailModal(null)}
                     t={t}
+                    hasBudget={!isIntern}
                 />
             )}
 
@@ -460,9 +471,11 @@ interface LearningStatsDetailModalProps {
     stats: LearningStats;
     onClose: () => void;
     t: (key: string) => string;
+    // False for interns - hides the annual budget footer, since they don't have one.
+    hasBudget: boolean;
 }
 
-const LearningStatsDetailModal = ({ mode, stats, onClose, t }: LearningStatsDetailModalProps) => {
+const LearningStatsDetailModal = ({ mode, stats, onClose, t, hasBudget }: LearningStatsDetailModalProps) => {
     const isHours = mode === 'hours';
 
     const formatDate = (dateStr: string) => {
@@ -553,7 +566,7 @@ const LearningStatsDetailModal = ({ mode, stats, onClose, t }: LearningStatsDeta
                     ))}
                 </div>
 
-                {!isHours && (
+                {!isHours && hasBudget && (
                     <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 space-y-2 shrink-0">
                         <div className="flex items-center justify-between text-xs font-bold text-slate-500">
                             <span>{t('detailModal.annualBudget')}</span>

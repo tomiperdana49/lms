@@ -79,7 +79,11 @@
     "rosterHint": "{{count}} karyawan dipilih — klik nama untuk menampilkan/menyembunyikan detailnya",
     "topRankingTitle": "Top 3 Jam Belajar Terbanyak",
     "notFound": "Karyawan tidak ditemukan",
-    "noSelection": "Pilih satu atau beberapa karyawan untuk melihat laporan pembelajarannya."
+    "noSelection": "Pilih satu atau beberapa karyawan untuk melihat laporan pembelajarannya.",
+    "budgetExclusion": {
+      "resign": "Resign",
+      "internship": "Internship"
+    }
   },
   "team": {
     "title": "Tim Saya",
@@ -114,5 +118,7 @@
         "reading": "Reading"
       }
     }
-  }
+  },
+  "noBudget": "Tidak ada budget belajar (karyawan resign / internship).",
+  "budgetExcludedNote": "{{count}} karyawan resign / internship tidak mendapat budget."
 }

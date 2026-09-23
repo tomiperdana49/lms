@@ -415,6 +415,7 @@ function App() {
             userEmail={user?.email}
             userName={user?.name}
             userEmployeeId={user?.employee_id}
+            isIntern={user?.isIntern}
             config={config}
           />
         )}
@@ -451,6 +452,7 @@ function App() {
             userName={user?.name}
             userEmployeeId={user?.employee_id}
             isSupervisor={user?.isSupervisor}
+            isIntern={user?.isIntern}
           />
         )}
         {/* User Management Route - Only for HR */}

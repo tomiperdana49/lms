@@ -53,7 +53,8 @@
   "budget": {
     "title": "Budget Pembelajaran Anda",
     "remaining": "Sisa: {{amount}}",
-    "exceeded": "Melebihi budget sebesar {{amount}}"
+    "exceeded": "Melebihi budget sebesar {{amount}}",
+    "none": "Internship tidak mendapat budget belajar."
   },
   "empty": {
     "noRequests": "Belum ada permintaan pelatihan eksternal.",

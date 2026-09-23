@@ -79,7 +79,11 @@
     "rosterHint": "{{count}} employees selected — click a name to show or hide their detail",
     "topRankingTitle": "Top 3 by Learning Hours",
     "notFound": "No employees found",
-    "noSelection": "Select one or more employees to view their learning report."
+    "noSelection": "Select one or more employees to view their learning report.",
+    "budgetExclusion": {
+      "resign": "Resigned",
+      "internship": "Intern"
+    }
   },
   "team": {
     "title": "My Team",
@@ -114,5 +118,7 @@
         "reading": "Reading"
       }
     }
-  }
+  },
+  "noBudget": "No learning budget (resigned / intern employee).",
+  "budgetExcludedNote": "{{count}} resigned / intern employee(s) have no budget."
 }

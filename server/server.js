@@ -5860,7 +5860,9 @@ app.post('/api/external-training/approve', async (req, res) => {
             endDate: `${periodYear}-12-31`
         }).catch(() => null);
         const existingCost = existingStats ? (existingStats.biayaTraining + existingStats.biayaTrainingExternal + existingStats.biayaBuku) : 0;
-        const exceedsPersonalBudget = (existingCost + thisRequestCost) > ANNUAL_LEARNING_BUDGET;
+        // Interns get no personal learning budget, so any cost of theirs comes from the team's pool.
+        const personalBudget = await isInternEmployeeId(trainingRequest.employee_id) ? 0 : ANNUAL_LEARNING_BUDGET;
+        const exceedsPersonalBudget = (existingCost + thisRequestCost) > personalBudget;
 
         let budgetNoticeMessage = null;
         if (exceedsPersonalBudget) {

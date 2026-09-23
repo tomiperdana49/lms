@@ -13,6 +13,7 @@ import {
     LearningStatsSummaryCards
 } from './LearningReport';
 import type { LearningStats, TeamMemberSummary } from './LearningReport';
+import { learningBudgetExclusion } from '../utils/learningBudget';
 
 interface EmployeeOption {
     id_employee: string;
@@ -21,6 +22,8 @@ interface EmployeeOption {
     organization_name?: string;
     branch_name?: string;
     photo_profile?: string;
+    active_status?: string | null;
+    status_join?: string | null;
 }
 
 const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
@@ -117,6 +120,17 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
     }, [selectedEmployees, startDate, endDate]);
 
     const selectedIds = useMemo(() => new Set(selectedEmployees.map(emp => emp.id_employee)), [selectedEmployees]);
+    // Resigned employees and interns get no learning budget - kept out of the budget total, and
+    // labelled in the roster so HR can see why.
+    const budgetExclusionById = useMemo(() => {
+        const map = new Map<string, 'resign' | 'internship'>();
+        selectedEmployees.forEach(emp => {
+            const exclusion = learningBudgetExclusion(emp);
+            if (exclusion) map.set(emp.id_employee, exclusion);
+        });
+        return map;
+    }, [selectedEmployees]);
+    const budgetEmployeeCount = selectedEmployees.length - budgetExclusionById.size;
 
     const organizations = useMemo(() => {
         const names = new Set(employees.map(emp => emp.organization_name).filter(Boolean) as string[]);
@@ -491,10 +505,10 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
                     <p>{t('loading')}</p>
                 </div>
             ) : selectedEmployees.length === 1 ? (
-                <LearningStatsBreakdown stats={stats} t={t} canSyncNusawork={canSyncNusawork} />
+                <LearningStatsBreakdown stats={stats} t={t} canSyncNusawork={canSyncNusawork} employeeCount={budgetEmployeeCount} />
             ) : (
                 <>
-                    <LearningStatsSummaryCards stats={stats} t={t} employeeCount={selectedEmployees.length} />
+                    <LearningStatsSummaryCards stats={stats} t={t} employeeCount={budgetEmployeeCount} noBudgetCount={budgetExclusionById.size} />
                     {topThreeByHours.length > 1 && (
                         <PodiumRanking members={topThreeByHours} onSelect={selectEmployeeInRoster} t={t} />
                     )}
@@ -505,6 +519,7 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
                         members={perEmployeeStats}
                         expandedIds={expandedEmployeeIds}
                         onToggle={toggleEmployeeExpanded}
+                        budgetExclusionById={budgetExclusionById}
                         canSyncNusawork={canSyncNusawork}
                         t={t}
                     />
@@ -518,15 +533,17 @@ interface EmployeeRosterProps {
     members: TeamMemberSummary[];
     expandedIds: Set<string>;
     onToggle: (employeeId: string) => void;
+    budgetExclusionById: Map<string, 'resign' | 'internship'>;
     canSyncNusawork?: boolean;
     t: (key: string, options?: Record<string, unknown>) => string;
 }
 
-const EmployeeRoster = ({ members, expandedIds, onToggle, canSyncNusawork, t }: EmployeeRosterProps) => (
+const EmployeeRoster = ({ members, expandedIds, onToggle, budgetExclusionById, canSyncNusawork, t }: EmployeeRosterProps) => (
     <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
         <div className="divide-y divide-slate-50">
             {members.map(member => {
                 const isExpanded = expandedIds.has(member.employeeId);
+                const budgetExclusion = budgetExclusionById.get(member.employeeId);
                 return (
                     <div key={member.employeeId} id={`employee-roster-row-${member.employeeId}`} className="scroll-mt-24">
                         <button
@@ -534,11 +551,18 @@ const EmployeeRoster = ({ members, expandedIds, onToggle, canSyncNusawork, t }: 
                             onClick={() => onToggle(member.employeeId)}
                             className="w-full flex items-center justify-between gap-4 px-6 py-4 hover:bg-slate-50 transition-colors text-left"
                         >
-                            <p className="font-semibold text-slate-700 text-sm truncate">{member.name}</p>
+                            <div className="flex items-center gap-2 min-w-0">
+                                <p className="font-semibold text-slate-700 text-sm truncate">{member.name}</p>
+                                {budgetExclusion && (
+                                    <span className="shrink-0 px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                        {t(`employee.budgetExclusion.${budgetExclusion}`)}
+                                    </span>
+                                )}
+                            </div>
                             <div className="flex items-center gap-3 shrink-0">
                                 <div className="text-right">
                                     <p className="font-bold text-slate-700 text-sm">{member.stats.totalJam} {t('hours')}</p>
-                                    <p className={`text-[11px] ${member.stats.totalBiaya > ANNUAL_LEARNING_BUDGET ? 'text-red-600 font-bold' : 'text-slate-400'}`}>
+                                    <p className={`text-[11px] ${!budgetExclusion && member.stats.totalBiaya > ANNUAL_LEARNING_BUDGET ? 'text-red-600 font-bold' : 'text-slate-400'}`}>
                                         Rp {member.stats.totalBiaya.toLocaleString('id-ID')}
                                     </p>
                                 </div>
@@ -547,7 +571,7 @@ const EmployeeRoster = ({ members, expandedIds, onToggle, canSyncNusawork, t }: 
                         </button>
                         {isExpanded && (
                             <div className="bg-slate-50 px-6 py-6 border-t border-slate-100 space-y-6">
-                                <LearningStatsBreakdown stats={member.stats} t={t} canSyncNusawork={canSyncNusawork} />
+                                <LearningStatsBreakdown stats={member.stats} t={t} canSyncNusawork={canSyncNusawork} employeeCount={budgetExclusion ? 0 : 1} />
                             </div>
                         )}
                     </div>

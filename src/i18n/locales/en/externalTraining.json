@@ -53,7 +53,8 @@
   "budget": {
     "title": "Your Personal Learning Budget",
     "remaining": "Remaining: {{amount}}",
-    "exceeded": "Over budget by {{amount}}"
+    "exceeded": "Over budget by {{amount}}",
+    "none": "Interns have no learning budget."
   },
   "empty": {
     "noRequests": "No external training requests yet.",
