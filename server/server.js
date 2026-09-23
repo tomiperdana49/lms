@@ -1377,10 +1377,17 @@ const getFormExternalTrainingRequests = async (form) => {
 // reused template no longer collapses one person's evaluations across different meetings into a
 // single row (db.js migration above). Existing rows predate that column, so resolve each one's
 // meeting by checking which of the form's meetings the evaluatee actually attended. Safe to run
-// on every restart - it only ever touches rows still missing a meeting_id.
+// on every restart - it only ever touches rows with neither context set. External Training
+// responses legitimately have a NULL meeting_id and must be left alone.
 const backfillPteResponseMeetingIds = async () => {
     try {
-        const orphanRows = await query('SELECT id, form_id, evaluatee_employee_id FROM post_training_evaluation_responses WHERE meeting_id IS NULL');
+        // Repair rows an earlier version of this backfill corrupted: it treated External Training
+        // responses as orphans and stamped a meeting_id onto them, so they carried both contexts
+        // and matched neither lookup (the evaluation looked unsubmitted to leader and staff alike).
+        const repaired = await query('UPDATE post_training_evaluation_responses SET meeting_id = NULL WHERE meeting_id IS NOT NULL AND external_training_request_id IS NOT NULL');
+        if (repaired.affectedRows > 0) console.log(`[PTE] Cleared stray meeting_id on ${repaired.affectedRows} External Training response(s).`);
+
+        const orphanRows = await query('SELECT id, form_id, evaluatee_employee_id FROM post_training_evaluation_responses WHERE meeting_id IS NULL AND external_training_request_id IS NULL');
         if (orphanRows.length === 0) return;
 
         const formIds = [...new Set(orphanRows.map(r => r.form_id))];
