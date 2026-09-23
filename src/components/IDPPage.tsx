@@ -571,7 +571,7 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                                                 <td colSpan={2} className={idpSectionHeaderCell}>
                                                     <div className="flex items-center justify-between">
                                                         <span>{t('form.notes')}</span>
-                                                        <button type="button" onClick={addActionRow} className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-700"><Plus size={14} /> {t('form.addRow')}</button>
+                                                        <button type="button" onClick={addActionRow} className="flex items-center gap-1 text-xs font-bold text-white hover:text-indigo-100"><Plus size={14} /> {t('form.addRow')}</button>
                                                     </div>
                                                 </td>
                                             </tr>

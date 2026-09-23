@@ -247,12 +247,26 @@ export default function IDPManager({ userName }: IDPManagerProps) {
         );
     };
 
-    // --- Excel export styling - mirrors the company's original IDP spreadsheet template (gray-filled
+    // --- Excel export styling - mirrors the company's original IDP spreadsheet template (navy section titles, gray-filled
     // bold section/label cells, a thin black grid over every cell, wrapped left-aligned content). ---
     const THIN_BORDER = { style: 'thin', color: { rgb: '000000' } } as const;
     const FULL_BORDER = { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER };
     const HEADER_CELL_STYLE = {
         font: { bold: true, name: 'Arial', sz: 10 },
+        fill: { patternType: 'solid' as const, fgColor: { rgb: 'CCCCCC' } },
+        alignment: { vertical: 'top' as const, wrapText: true },
+        border: FULL_BORDER
+    };
+    // Section titles (Pencapaian, Tujuan, Skill, Rencana Aksi, Evaluasi) - navy fill, white bold text.
+    const SECTION_CELL_STYLE = {
+        font: { bold: true, name: 'Arial', sz: 10, color: { rgb: 'FFFFFF' } },
+        fill: { patternType: 'solid' as const, fgColor: { rgb: '474C8B' } },
+        alignment: { vertical: 'top' as const, wrapText: true },
+        border: FULL_BORDER
+    };
+    // The guiding question under each section title - gray fill like labels, but not bold.
+    const QUESTION_CELL_STYLE = {
+        font: { name: 'Arial', sz: 10 },
         fill: { patternType: 'solid' as const, fgColor: { rgb: 'CCCCCC' } },
         alignment: { vertical: 'top' as const, wrapText: true },
         border: FULL_BORDER
@@ -307,29 +321,29 @@ export default function IDPManager({ userName }: IDPManagerProps) {
         setCell(1, 4, 'Tanggal Mulai Bekerja:', HEADER_CELL_STYLE);
         setCell(1, 5, full.join_date_label || '', VALUE_CELL_STYLE);
 
-        mergeRange(2, 0, 2, 5, 'Pencapaian / Prestasi Kerja', HEADER_CELL_STYLE);
-        mergeRange(3, 0, 3, 5, 'Apa pencapaian / prestasi kamu selama 3-12 bulan ke belakang?', HEADER_CELL_STYLE);
+        mergeRange(2, 0, 2, 5, 'Pencapaian / Prestasi Kerja', SECTION_CELL_STYLE);
+        mergeRange(3, 0, 3, 5, 'Apa pencapaian / prestasi kamu selama 3-12 bulan ke belakang?', QUESTION_CELL_STYLE);
         mergeRange(4, 0, 10, 5, full.achievements || '', VALUE_CELL_STYLE);
 
-        mergeRange(11, 0, 11, 5, 'Tujuan / Aspirasi Karir (Goal)', HEADER_CELL_STYLE);
-        mergeRange(12, 0, 12, 5, 'Apa tujuan karir kamu dalam 1-3 tahun ke depan di perusahaan ini?', HEADER_CELL_STYLE);
+        mergeRange(11, 0, 11, 5, 'Tujuan / Aspirasi Karir (Goal)', SECTION_CELL_STYLE);
+        mergeRange(12, 0, 12, 5, 'Apa tujuan karir kamu dalam 1-3 tahun ke depan di perusahaan ini?', QUESTION_CELL_STYLE);
         mergeRange(13, 0, 19, 5, full.career_goal || '', VALUE_CELL_STYLE);
 
-        mergeRange(20, 0, 20, 2, 'Skill yang Dimiliki', HEADER_CELL_STYLE);
-        mergeRange(20, 3, 20, 5, 'Area Pengembangan', HEADER_CELL_STYLE);
-        mergeRange(21, 0, 21, 2, 'Sebutkan bakat, keahlian, dan keterampilan kamu yang membantu mencapai tujuan karir kamu?', HEADER_CELL_STYLE);
-        mergeRange(21, 3, 21, 5, 'Kompetensi apa yang kamu rasa masih perlu kamu kembangkan dan tingkatkan lagi untuk mencapai tujuan karir kamu?', HEADER_CELL_STYLE);
+        mergeRange(20, 0, 20, 2, 'Skill yang Dimiliki', SECTION_CELL_STYLE);
+        mergeRange(20, 3, 20, 5, 'Area Pengembangan', SECTION_CELL_STYLE);
+        mergeRange(21, 0, 21, 2, 'Sebutkan bakat, keahlian, dan keterampilan kamu yang membantu mencapai tujuan karir kamu?', QUESTION_CELL_STYLE);
+        mergeRange(21, 3, 21, 5, 'Kompetensi apa yang kamu rasa masih perlu kamu kembangkan dan tingkatkan lagi untuk mencapai tujuan karir kamu?', QUESTION_CELL_STYLE);
         mergeRange(22, 0, 29, 2, full.existing_skills || '', VALUE_CELL_STYLE);
         mergeRange(22, 3, 29, 5, full.development_area || '', VALUE_CELL_STYLE);
 
-        mergeRange(30, 0, 30, 2, 'Rencana Aksi Pengembangan', HEADER_CELL_STYLE);
-        setCell(30, 3, 'Target Waktu', HEADER_CELL_STYLE);
-        setCell(30, 4, 'Checklist Progress', HEADER_CELL_STYLE);
-        setCell(30, 5, 'Keterangan', HEADER_CELL_STYLE);
-        mergeRange(31, 0, 31, 2, 'Tuliskan langkah apa saja yang akan kamu lakukan untuk mencapai pengembangan diri dan tujuan karir kamu!', HEADER_CELL_STYLE);
-        setCell(31, 3, 'Tetapkan target waktu kamu melaksanakan rencana aksi.', HEADER_CELL_STYLE);
-        setCell(31, 4, 'Update progress aksi pengembangan kamu.', HEADER_CELL_STYLE);
-        setCell(31, 5, 'Catatan mengenai aksi yang telah dilaksanakan.', HEADER_CELL_STYLE);
+        mergeRange(30, 0, 30, 2, 'Rencana Aksi Pengembangan', SECTION_CELL_STYLE);
+        setCell(30, 3, 'Target Waktu', SECTION_CELL_STYLE);
+        setCell(30, 4, 'Checklist Progress', SECTION_CELL_STYLE);
+        setCell(30, 5, 'Keterangan', SECTION_CELL_STYLE);
+        mergeRange(31, 0, 31, 2, 'Tuliskan langkah apa saja yang akan kamu lakukan untuk mencapai pengembangan diri dan tujuan karir kamu!', QUESTION_CELL_STYLE);
+        setCell(31, 3, 'Tetapkan target waktu kamu melaksanakan rencana aksi.', QUESTION_CELL_STYLE);
+        setCell(31, 4, 'Update progress aksi pengembangan kamu.', QUESTION_CELL_STYLE);
+        setCell(31, 5, 'Catatan mengenai aksi yang telah dilaksanakan.', QUESTION_CELL_STYLE);
 
         const actionItems = full.action_items || [];
         let row = 32;
@@ -354,12 +368,12 @@ export default function IDPManager({ userName }: IDPManagerProps) {
         setCell(row, 5, full.approved_date ? new Date(full.approved_date).toLocaleDateString('id-ID') : '', VALUE_CELL_STYLE);
         row++;
 
-        mergeRange(row, 0, row, 4, 'Evaluasi IDP (diisi oleh atasan langsung)', HEADER_CELL_STYLE);
-        setCell(row, 5, 'Verifikasi IDP (diisi oleh HR)', HEADER_CELL_STYLE);
+        mergeRange(row, 0, row, 4, 'Evaluasi IDP (diisi oleh atasan langsung)', SECTION_CELL_STYLE);
+        setCell(row, 5, 'Verifikasi IDP (diisi oleh HR)', SECTION_CELL_STYLE);
         row++;
         setCell(row, 0, 'Tanggal Review', HEADER_CELL_STYLE);
-        mergeRange(row, 1, row, 4, 'Apakah IDP relevan dan berjalan? Apakah rencana aksi berhasil terlaksanakan hingga target waktu yang ditentukan?', HEADER_CELL_STYLE);
-        setCell(row, 5, '', HEADER_CELL_STYLE);
+        mergeRange(row, 1, row, 4, 'Apakah IDP relevan dan berjalan? Apakah rencana aksi berhasil terlaksanakan hingga target waktu yang ditentukan?', QUESTION_CELL_STYLE);
+        setCell(row, 5, '', QUESTION_CELL_STYLE);
         row++;
 
         const reviews = full.reviews || [];
@@ -685,7 +699,7 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                                                         <td colSpan={2} className={idpSectionHeaderCell}>
                                                             <div className="flex items-center justify-between">
                                                                 <span>{t('form.notes')}</span>
-                                                                <button type="button" onClick={addEditActionRow} className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-700"><Plus size={14} /> {t('form.addRow')}</button>
+                                                                <button type="button" onClick={addEditActionRow} className="flex items-center gap-1 text-xs font-bold text-white hover:text-indigo-100"><Plus size={14} /> {t('form.addRow')}</button>
                                                             </div>
                                                         </td>
                                                     </tr>
