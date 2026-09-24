@@ -19,39 +19,32 @@ interface IDPManagerProps {
 
 const MANDATORY_TARGET_HOURS = 48;
 
-// Builds the monthly review strip: one entry per calendar month from when the employee created the
-// IDP through the current month (or through December if the plan's period year has already fully
-// elapsed), marking whether a supervisor review landed in that month. Index N is calendar month N of
-// the strip (e.g. index 1 is the creation month), so a missing review shows up at its actual month -
-// not just "N months into tracking" - which only holds while created_by_date reflects when the plan
-// was really created (bulk-import now keeps it in sync with the source sheet on re-import; see
-// /api/idp/bulk-import). Falls back to January of the period year on a plan that has no
-// created_by_date at all (e.g. an older import that predates that field being backfilled) - NOT to
-// the earliest logged review's month, which would misalign every index (a June/July/August review
-// would land at index 1/2/3 instead of 6/7/8, making months 1-5 look skipped rather than un-reviewed).
-const reviewMonthStrip = (plan: IDPPlan): { index: number; reviewed: boolean }[] => {
+// Builds the monthly review strip: one entry per calendar month of the plan's period year, from
+// January - or from the employee's join month when they joined during that year - through the
+// current month (or through December once the period year has fully elapsed), marking whether a
+// supervisor review landed in that month. Each entry is labelled with its calendar month number.
+// Starts from the join date rather than the IDP's created_by_date: reviews can predate that date
+// (e.g. a plan filled in on paper first), and a later created_by_date would hide them.
+const reviewMonthStrip = (plan: IDPPlan): { key: string; month: number; reviewed: boolean }[] => {
     const reviewedSet = new Set((plan.reviewed_year_months || '').split(',').filter(Boolean));
 
-    let startY: number, startM: number;
-    if (plan.created_by_date && !isNaN(new Date(plan.created_by_date).getTime())) {
-        const start = new Date(plan.created_by_date);
-        startY = start.getFullYear();
-        startM = start.getMonth();
-    } else {
-        startY = plan.period_year;
-        startM = 0;
+    let startY = plan.period_year, startM = 0;
+    const joined = plan.employee_join_date ? new Date(plan.employee_join_date) : null;
+    if (joined && !isNaN(joined.getTime()) && joined.getFullYear() >= plan.period_year) {
+        startY = joined.getFullYear();
+        startM = joined.getMonth();
     }
 
     const now = new Date();
     const endY = plan.period_year < now.getFullYear() ? plan.period_year : now.getFullYear();
     const endM = plan.period_year < now.getFullYear() ? 11 : now.getMonth();
 
-    const months: { index: number; reviewed: boolean }[] = [];
-    let y = startY, m = startM, index = 1;
-    while ((y < endY || (y === endY && m <= endM)) && index <= 36) {
+    const months: { key: string; month: number; reviewed: boolean }[] = [];
+    let y = startY, m = startM, count = 0;
+    while ((y < endY || (y === endY && m <= endM)) && count < 36) {
         const key = `${y}-${String(m + 1).padStart(2, '0')}`;
-        months.push({ index, reviewed: reviewedSet.has(key) });
-        index++;
+        months.push({ key, month: m + 1, reviewed: reviewedSet.has(key) });
+        count++;
         m++;
         if (m > 11) { m = 0; y++; }
     }
@@ -620,13 +613,13 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                             return strip.length > 0 && (
                                 <div className="mt-3 flex items-center flex-wrap gap-2">
                                     <span className="text-xs font-semibold text-gray-400">{t('admin.reviewStripLabel')}</span>
-                                    {strip.map(({ index, reviewed }) => (
+                                    {strip.map(({ key, month, reviewed }) => (
                                         <span
-                                            key={index}
+                                            key={key}
                                             title={reviewed ? t('admin.reviewedThisMonth') : t('admin.notReviewedThisMonth')}
                                             className={`w-6 h-6 flex items-center justify-center rounded-full text-[11px] font-bold text-white shrink-0 ${reviewed ? 'bg-emerald-500' : 'bg-rose-500'}`}
                                         >
-                                            {index}
+                                            {month}
                                         </span>
                                     ))}
                                 </div>

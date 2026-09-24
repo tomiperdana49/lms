@@ -397,6 +397,8 @@ export interface IDPPlan {
     // Present only on the HR list endpoint (GET /api/idp/all) — comma-separated "YYYY-MM" values for
     // every calendar month that has at least one supervisor review logged against this plan.
     reviewed_year_months?: string;
+    // SimAsset join date (raw, e.g. "2026-04-26") - the monthly review strip starts no earlier than this.
+    employee_join_date?: string | null;
     created_at?: string;
     updated_at?: string;
     // Present only on the single-plan detail endpoint (GET /api/idp/:id)

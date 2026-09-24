@@ -6474,7 +6474,10 @@ app.get('/api/idp/all', async (req, res) => {
             SELECT p.*, (
                 SELECT GROUP_CONCAT(DISTINCT DATE_FORMAT(r.review_date, '%Y-%m') ORDER BY r.review_date)
                 FROM idp_reviews r WHERE r.idp_id = p.id
-            ) AS reviewed_year_months
+            ) AS reviewed_year_months,
+            -- The monthly review strip starts no earlier than the employee's join month, so a
+            -- mid-year joiner isn't shown as missing reviews for months before they started.
+            (SELECT e.join_date FROM employees e WHERE e.id_employee = p.employee_id LIMIT 1) AS employee_join_date
             FROM idp_plans p
             WHERE NOT EXISTS (
                 SELECT 1 FROM employees e WHERE e.id_employee = p.employee_id AND e.status_join = 'Internship'
