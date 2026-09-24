@@ -2111,7 +2111,11 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 return false;
             };
 
+            // Invited guests are listed too (same as the recap table), not only those with a quiz or
+            // feedback record - otherwise sessions without tests (e.g. Role Play) export no rows at all.
             const allParticipantEmails = Array.from(new Set([
+                ...((m.guests as any)?.employee_ids || []).filter(Boolean).map((id: string) => String(id).toLowerCase().trim()),
+                ...(m.guests?.emails || []).filter(Boolean).map((email: string) => email.toLowerCase().trim()),
                 ...meetingResults.map(r => r.employee_id || r.employeeId || r.userEmail || r.user_email || r.email || r.studentId || r.student_id || r.userId || r.user_id || r.id).filter(Boolean).map(id => String(id).toLowerCase().trim()),
                 ...meetingFeedback.map(f => f.employee_id || f.employeeId || f.userEmail || f.user_email || f.userId || f.user_id || f.email || f.studentId || f.student_id || f.id).filter(Boolean).map(id => String(id).toLowerCase().trim())
             ])).reduce((acc: string[], id) => {
@@ -2121,8 +2125,17 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 return acc;
             }, []);
 
-            // Filter participants: exclude Internship/PKL from cost calculation
+            // Present = marked in the attendance report, or has any pre/post-test or feedback record
+            const attendedIdsSet = new Set((m.costReport?.attendee_ids || []).map(id => String(id).toLowerCase().trim()));
+            const isPresent = (id: string) => {
+                const emp = employees.find(e => e.email?.toLowerCase() === id || String(e.id_employee).toLowerCase() === id);
+                if (attendedIdsSet.has(id) || (emp && attendedIdsSet.has(String(emp.id_employee).toLowerCase().trim()))) return true;
+                return meetingResults.some(r => isParticipantMatch(r, id)) || meetingFeedback.some(f => isParticipantMatch(f, id));
+            };
+
+            // Cost is split among present participants only, excluding Internship/PKL
             const validParticipantIds = allParticipantEmails.filter(id => {
+                if (!isPresent(id)) return false;
                 const emp = employees.find(e => e.email?.toLowerCase() === id || String(e.id_employee).toLowerCase() === id || String(e.id).toLowerCase() === id);
                 if (emp && (emp.status_join === 'Internship' || emp.status_join === 'PKL')) {
                     return false; // Exclude Internship/PKL
@@ -2195,9 +2208,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 const validCount = validParticipantIds.length;
                 const totalCostPerParticipant = validCount > 0 ? (totalCost / validCount) : 0;
 
-                // Check if current employee is Internship/PKL - if so, cost = 0
-                const isInternshipOrPKL = emp && (emp.status_join === 'Internship' || emp.status_join === 'PKL');
-                const participantCost = isInternshipOrPKL ? 0 : Math.round(totalCostPerParticipant);
+                // Internship/PKL and absent participants carry no cost
+                const participantCost = validParticipantIds.includes(email) ? Math.round(totalCostPerParticipant) : 0;
 
                 dataRows.push([
                     globalIndex++,
@@ -2240,7 +2252,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                     esc((m as any).competency_name || '-'),
                     esc((m as any).training_gr_type || 'Other'),  // ESG, HSE, Other - posisi sesuai template
                     esc(m.title),
-                    (avgPre !== '-' || avgPost !== '-' || avgFB !== '-') ? 'Present' : 'Absent',
+                    isPresent(email) ? 'Present' : 'Absent',
                     (() => {
                         // Get participation type for this employee from costReport.participationTypesByEmployee
                         const participationTypes = (m as any).costReport?.participationTypesByEmployee;
