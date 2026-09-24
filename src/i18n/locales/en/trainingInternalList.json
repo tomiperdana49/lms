@@ -68,7 +68,8 @@
     "colPostTest": "Post-Test",
     "colFeedback": "Feedback",
     "colPte": "PTE",
-    "noData": "No participant data available."
+    "noData": "No participant data available.",
+    "viewDetail": "View participant's answers"
   },
   "hero": {
     "badge": "Professional Training",

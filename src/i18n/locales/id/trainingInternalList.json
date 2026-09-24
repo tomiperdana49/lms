@@ -68,7 +68,8 @@
     "colPostTest": "Post-Test",
     "colFeedback": "Feedback",
     "colPte": "PTE",
-    "noData": "Tidak ada data peserta."
+    "noData": "Tidak ada data peserta.",
+    "viewDetail": "Lihat jawaban peserta"
   },
   "hero": {
     "badge": "Professional Training",

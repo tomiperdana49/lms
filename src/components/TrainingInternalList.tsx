@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Role, Meeting, CostReport, Employee, QuizResult, QuizAnswerReview, User } from '../types';
+import { PteResponseViewModal } from './PostTrainingEvaluationMine';
 import PopupNotification from './PopupNotification';
 import ConfirmationModal from './ConfirmationModal';
 import InternalCertificateTemplate from './InternalCertificateTemplate';
@@ -230,6 +231,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [showQuiz, setShowQuiz] = useState<'PRE' | 'POST' | null>(null);
     // A submitted pre/post-test the participant opened to review their answers.
     const [reviewingQuiz, setReviewingQuiz] = useState<QuizResult | null>(null);
+    // Trainer/HR drilling into one participant's answers from the participant status modal.
+    const [participantDetail, setParticipantDetail] = useState<
+        | { kind: 'QUIZ'; name: string; result: QuizResult }
+        | { kind: 'FEEDBACK'; name: string; data: Record<string, unknown> }
+        | { kind: 'PTE'; name: string; employeeId: string; formId: number }
+        | null
+    >(null);
     // Clicking a pre/post-test the participant already finished opens the review of their answers.
     // Attempts submitted before answers were stored only have a score, so explain that instead.
     const openQuizReview = (result: QuizResult) => {
@@ -2392,6 +2400,57 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 variant="danger"
             />
 
+            {/* One participant's answers, opened from a score in the participant status modal below. */}
+            {participantDetail && selectedMeeting && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                    {participantDetail.kind === 'QUIZ' && (participantDetail.result.answers && participantDetail.result.answers.length > 0 ? (
+                        <QuizAnswerReviewModal
+                            type={participantDetail.result.quizType === 'POST' ? 'POST' : 'PRE'}
+                            meetingTitle={selectedMeeting.title}
+                            participantName={participantDetail.name}
+                            score={participantDetail.result.score}
+                            answers={participantDetail.result.answers}
+                            onClose={() => setParticipantDetail(null)}
+                        />
+                    ) : (
+                        <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 text-center space-y-4">
+                            <p className="font-black text-slate-800">{participantDetail.name}</p>
+                            <p className="text-sm text-slate-500">{t('notifications.answersNotStored')}</p>
+                            <button onClick={() => setParticipantDetail(null)} className="w-full py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black rounded-2xl transition-all">
+                                {t('quiz.close')}
+                            </button>
+                        </div>
+                    ))}
+                    {participantDetail.kind === 'FEEDBACK' && (
+                        <FeedbackAnswersModal
+                            meetingTitle={selectedMeeting.title}
+                            participantName={participantDetail.name}
+                            data={participantDetail.data}
+                            onClose={() => setParticipantDetail(null)}
+                        />
+                    )}
+                    {participantDetail.kind === 'PTE' && (
+                        <PteResponseViewModal
+                            item={{
+                                formId: participantDetail.formId,
+                                formTitle: '',
+                                meetingId: selectedMeeting.id,
+                                meetingTitle: `${participantDetail.name} · ${selectedMeeting.title}`,
+                                meetingDate: null,
+                                externalTrainingRequestId: null,
+                                externalTrainingTitle: null,
+                                externalTrainingDate: null,
+                                submitted: true,
+                                submittedAt: null,
+                                averageScore: null
+                            }}
+                            employeeId={participantDetail.employeeId}
+                            onClose={() => setParticipantDetail(null)}
+                        />
+                    )}
+                </div>
+            )}
+
             {showParticipantModal && selectedMeeting && meetingSummary && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowParticipantModal(null)} />
@@ -2532,6 +2591,12 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             return false;
                                         };
 
+                                        // Anyone can open this list, but only the trainer (host) and HR may drill
+                                        // into another participant's answers.
+                                        const canViewAnswers = effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' ||
+                                            !!(user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id) ||
+                                            !!(selectedMeeting.host && user.name && selectedMeeting.host === user.name);
+
                                         const renderedRows = participants.map((participantId: string) => {
                                             // Get quiz results for this participant
                                             console.log('[RenderRow] Processing participantID:', participantId, '(type:', typeof participantId + ')');
@@ -2648,6 +2713,17 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
                                             const preScore = hasPreTest ? Math.max(...preScores) : '-';
                                             const postScore = hasPostTest ? Math.max(...postScores) : '-';
+                                            // The attempt behind each shown score (post-test can have several - the
+                                            // best one is what the column shows), opened when the trainer clicks it.
+                                            const bestAttempt = (type: 'PRE' | 'POST') => matchedResults
+                                                .filter(r => ((r.quizType || r.quiz_type || "")).toUpperCase().includes(type))
+                                                .sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0))[0];
+                                            const toReviewResult = (r: QuizResult & { answers_json?: string | null }): QuizResult => {
+                                                let answers: QuizAnswerReview[] | null = null;
+                                                try { answers = r.answers_json ? JSON.parse(r.answers_json) : (r.answers || null); } catch { answers = null; }
+                                                return { ...r, quizType: (r.quizType || r.quiz_type || '').toUpperCase().includes('POST') ? 'POST' : 'PRE', answers };
+                                            };
+                                            let feedbackAnswers: Record<string, unknown> | null = null;
 
                                             let fbScore: any = '-';
                                             // Find the matching feedback using same logic as hasFeedback
@@ -2684,6 +2760,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                             const data = typeof fData === 'string' ? JSON.parse(fData) : fData;
                                                             const scores = Object.values(data || {}).filter(v => typeof v === 'number' || !isNaN(Number(v as any))).map(v => Number(v as any));
                                                             if (scores.length > 0) fbScore = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
+                                                            feedbackAnswers = data || null;
                                                         } catch(e) {}
                                                     }
                                                 }
@@ -2693,6 +2770,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                             // Post Training Evaluation form; matched by employee_id, resolving
                                             // participantId (which may be an email) via the employees lookup.
                                             let pteScore: any = '-';
+                                            let pteEmployeeIdForView: string | null = null;
                                             if (selectedMeeting.pte_form_id) {
                                                 const pteEmployeeId = String(emp?.id_employee || matchingGuest?.employee_id || participantId).toLowerCase().trim();
                                                 const pteResp = allPteResponses.find(r =>
@@ -2700,16 +2778,40 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     r.meetingId === selectedMeeting.id &&
                                                     String(r.evaluateeEmployeeId).toLowerCase().trim() === pteEmployeeId
                                                 );
-                                                if (pteResp && pteResp.averageScore !== null) pteScore = pteResp.averageScore;
+                                                if (pteResp && pteResp.averageScore !== null) {
+                                                    pteScore = pteResp.averageScore;
+                                                    pteEmployeeIdForView = String(pteResp.evaluateeEmployeeId);
+                                                }
                                             }
 
                                             return (
                                                 <tr key={participantId} className="hover:bg-slate-50/50 transition-colors">
                                                     <td className="px-6 py-4 font-bold text-slate-700">{name}</td>
-                                                    <td className="px-6 py-4 text-center font-black text-slate-600">{preScore}</td>
-                                                    <td className="px-6 py-4 text-center font-black text-slate-600">{postScore}</td>
-                                                    <td className="px-6 py-4 text-center font-black text-emerald-600">{fbScore}</td>
-                                                    <td className="px-6 py-4 text-center font-black text-purple-600">{pteScore}</td>
+                                                    {/* Each filled-in score opens that participant's actual answers. */}
+                                                    <td className="px-6 py-4 text-center font-black text-slate-600">
+                                                        <ParticipantScoreCell value={preScore} clickable={canViewAnswers} title={t('participantModal.viewDetail')} onClick={() => {
+                                                            const r = bestAttempt('PRE');
+                                                            if (r) setParticipantDetail({ kind: 'QUIZ', name, result: toReviewResult(r) });
+                                                        }} />
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center font-black text-slate-600">
+                                                        <ParticipantScoreCell value={postScore} clickable={canViewAnswers} title={t('participantModal.viewDetail')} onClick={() => {
+                                                            const r = bestAttempt('POST');
+                                                            if (r) setParticipantDetail({ kind: 'QUIZ', name, result: toReviewResult(r) });
+                                                        }} />
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center font-black text-emerald-600">
+                                                        <ParticipantScoreCell value={fbScore} clickable={canViewAnswers} title={t('participantModal.viewDetail')} onClick={() => {
+                                                            if (feedbackAnswers) setParticipantDetail({ kind: 'FEEDBACK', name, data: feedbackAnswers });
+                                                        }} />
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center font-black text-purple-600">
+                                                        <ParticipantScoreCell value={pteScore} clickable={canViewAnswers} title={t('participantModal.viewDetail')} onClick={() => {
+                                                            if (pteEmployeeIdForView && selectedMeeting.pte_form_id) {
+                                                                setParticipantDetail({ kind: 'PTE', name, employeeId: pteEmployeeIdForView, formId: selectedMeeting.pte_form_id });
+                                                            }
+                                                        }} />
+                                                    </td>
                                                 </tr>
                                             );
                                         }).filter(Boolean);
@@ -5664,9 +5766,11 @@ const TrainingQuiz = ({ type, questions: sourceQuestions, onClose, onSubmit, mee
 
 // Read-only review of a submitted pre/post-test: every question with the participant's answer, whether
 // it was right, and the correct answer.
-const QuizAnswerReviewModal = ({ type, meetingTitle, score, answers, onClose }: {
+const QuizAnswerReviewModal = ({ type, meetingTitle, participantName, score, answers, onClose }: {
     type: 'PRE' | 'POST';
     meetingTitle: string;
+    // Set when a trainer/HR views someone else's answers.
+    participantName?: string;
     score: number;
     answers: QuizAnswerReview[];
     onClose: () => void;
@@ -5680,6 +5784,7 @@ const QuizAnswerReviewModal = ({ type, meetingTitle, score, answers, onClose }: 
                 <div>
                     <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">{type} {t('quiz.reviewTitle')}</span>
                     <h2 className="font-black text-xl text-slate-800 leading-tight">{meetingTitle}</h2>
+                    {participantName && <p className="text-sm font-bold text-slate-600 mt-1">{participantName}</p>}
                     <p className="text-xs font-bold text-slate-400 mt-1">
                         {t('detailModal.score', { score })} · {t('quiz.correctCount', { correct: correctCount, total: answers.length })}
                     </p>
@@ -5727,6 +5832,81 @@ const QuizAnswerReviewModal = ({ type, meetingTitle, score, answers, onClose }: 
                         </div>
                     );
                 })}
+            </div>
+
+            <div className="p-6 bg-slate-50 border-t border-slate-100">
+                <button onClick={onClose} className="w-full py-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black rounded-2xl transition-all">
+                    {t('quiz.close')}
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// A score in the participant status table - clickable for the trainer/HR (opens that participant's
+// answers) whenever there's something to show; plain text for everyone else, and "-" when empty.
+const ParticipantScoreCell = ({ value, clickable, title, onClick }: { value: string | number; clickable: boolean; title: string; onClick: () => void }) => (
+    value === '-' || value === null || value === undefined
+        ? <span>-</span>
+        : !clickable
+        ? <span>{value}</span>
+        : <button type="button" onClick={onClick} title={title} className="underline decoration-dotted underline-offset-4 hover:opacity-70 transition-opacity">{value}</button>
+);
+
+const FEEDBACK_SCALE_QUESTIONS = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9', 'q10'];
+const FEEDBACK_TEXT_QUESTIONS = ['q11', 'q12'];
+
+// Read-only view of one participant's organizer feedback (same questions as TrainingFeedbackForm).
+const FeedbackAnswersModal = ({ meetingTitle, participantName, data, onClose }: {
+    meetingTitle: string;
+    participantName: string;
+    data: Record<string, unknown>;
+    onClose: () => void;
+}) => {
+    const { t } = useTranslation('trainingInternalList');
+    const scaleLabels = ['', t('feedbackForm.scaleStronglyDisagree'), t('feedbackForm.scaleDisagree'), t('feedbackForm.scaleAgree'), t('feedbackForm.scaleStronglyAgree')];
+
+    return (
+        <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+                <div>
+                    <span className="text-[10px] font-black uppercase text-emerald-600 tracking-widest">{t('feedbackForm.header')}</span>
+                    <h2 className="font-black text-xl text-slate-800 leading-tight">{meetingTitle}</h2>
+                    <p className="text-sm font-bold text-slate-600 mt-1">{participantName}</p>
+                </div>
+                <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400"><X size={20} /></button>
+            </div>
+
+            <div className="p-6 overflow-y-auto custom-scrollbar space-y-5">
+                {FEEDBACK_SCALE_QUESTIONS.map((qId, idx) => {
+                    const value = Number(data[qId]);
+                    return (
+                        <div key={qId}>
+                            <p className="text-sm font-bold text-slate-700 mb-2">{idx + 1}. {t(`feedbackForm.${qId}`)}</p>
+                            <div className="flex gap-2">
+                                {[1, 2, 3, 4].map(v => (
+                                    <div
+                                        key={v}
+                                        className={`flex-1 py-2 rounded-xl border-2 text-center text-[11px] font-black leading-tight px-1 ${value === v
+                                            ? 'bg-emerald-600 border-emerald-600 text-white'
+                                            : 'bg-white border-slate-100 text-slate-300'
+                                            }`}
+                                    >
+                                        {scaleLabels[v]}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })}
+                {FEEDBACK_TEXT_QUESTIONS.map((qId, idx) => (
+                    <div key={qId}>
+                        <p className="text-sm font-bold text-slate-700 mb-2">{FEEDBACK_SCALE_QUESTIONS.length + idx + 1}. {t(`feedbackForm.${qId}`)}</p>
+                        <p className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-semibold text-slate-700 whitespace-pre-wrap">
+                            {String(data[qId] ?? '').trim() || '-'}
+                        </p>
+                    </div>
+                ))}
             </div>
 
             <div className="p-6 bg-slate-50 border-t border-slate-100">

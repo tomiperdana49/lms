@@ -144,6 +144,8 @@ const PostTrainingEvaluationMine = ({ user }: { user: User }) => {
     );
 };
 
+// Read-only view of one evaluatee's PTE answers - also used by the Internal Training trainer view
+// (TrainingInternalList's participant status modal), exported as PteResponseViewModal.
 const ViewModal = ({ item, employeeId, onClose }: {
     item: EvaluationItem;
     employeeId: string;
@@ -223,4 +225,6 @@ const ViewModal = ({ item, employeeId, onClose }: {
     );
 };
 
+export { ViewModal as PteResponseViewModal };
+export type { EvaluationItem as PteEvaluationItem };
 export default PostTrainingEvaluationMine;
