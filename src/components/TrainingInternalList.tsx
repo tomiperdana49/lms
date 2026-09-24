@@ -30,10 +30,11 @@ import {
     Download,
     Award,
     Copy,
-    ClipboardList
+    ClipboardList,
+    XCircle
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
-import type { Role, Meeting, CostReport, Employee, QuizResult, User } from '../types';
+import type { Role, Meeting, CostReport, Employee, QuizResult, QuizAnswerReview, User } from '../types';
 import PopupNotification from './PopupNotification';
 import ConfirmationModal from './ConfirmationModal';
 import InternalCertificateTemplate from './InternalCertificateTemplate';
@@ -227,6 +228,14 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
     // Interactive Quiz/Feedback State
     const [showQuiz, setShowQuiz] = useState<'PRE' | 'POST' | null>(null);
+    // A submitted pre/post-test the participant opened to review their answers.
+    const [reviewingQuiz, setReviewingQuiz] = useState<QuizResult | null>(null);
+    // Clicking a pre/post-test the participant already finished opens the review of their answers.
+    // Attempts submitted before answers were stored only have a score, so explain that instead.
+    const openQuizReview = (result: QuizResult) => {
+        if (result.answers && result.answers.length > 0) setReviewingQuiz(result);
+        else setNotification({ show: true, type: 'info', message: t('notifications.answersNotStored') });
+    };
     const [showFeedback, setShowFeedback] = useState(false);
     const [meetingQuizResults, setMeetingQuizResults] = useState<QuizResult[]>([]);
     const [meetingSummary, setMeetingSummary] = useState<{ quiz: { quiz_type: string, count: number }[], feedback: number, allQuizResults?: any[], allFeedbackResults?: any[] } | null>(null);
@@ -4971,6 +4980,8 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     <button
                                                         onClick={() => {
                                                             if (isHostOrHR) return; // Host doesn't take the test here
+                                                            const preResult = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('PRE'));
+                                                            if (preResult) { openQuizReview(preResult); return; }
                                                             if (selectedMeeting.is_closed) {
                                                                 setNotification({ show: true, type: 'info', message: t('notifications.sessionClosedByHost') });
                                                                 return;
@@ -4979,12 +4990,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 setNotification({ show: true, type: 'info', message: t('notifications.preTestNotOpen') });
                                                                 return;
                                                             }
-                                                            if (meetingQuizResults.find(r => r.quizType === 'PRE')) return;
                                                             setShowQuiz('PRE');
                                                         }}
                                                         className={`w-full group bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between transition-all 
-                                                            ${(meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('PRE')) || isHostOrHR) 
-                                                                ? 'cursor-default' 
+                                                            ${isHostOrHR
+                                                                ? 'cursor-default'
+                                                                : meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('PRE'))
+                                                                ? 'hover:border-indigo-300 cursor-pointer' 
                                                                 : (selectedMeeting.is_pre_test_active && !selectedMeeting.is_closed) ? 'hover:border-indigo-300 cursor-pointer' : 'opacity-60 cursor-not-allowed'}`}
                                                     >
                                                         <div className="flex items-center gap-3">
@@ -5042,6 +5054,13 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                     <button
                                                         onClick={() => {
                                                             if (isHostOrHR) return;
+                                                            // A passed post-test - or any attempt once the test can no longer be
+                                                            // retaken - opens the review; a failed one that's still open is retaken.
+                                                            const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
+                                                            if (postRes && ((Number(postRes.score) || 0) >= 80 || selectedMeeting.is_closed || !selectedMeeting.is_post_test_active)) {
+                                                                openQuizReview(postRes);
+                                                                return;
+                                                            }
                                                             if (selectedMeeting.is_closed) {
                                                                 setNotification({ show: true, type: 'info', message: t('notifications.sessionClosedByHost') });
                                                                 return;
@@ -5055,18 +5074,17 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 setNotification({ show: true, type: 'info', message: t('notifications.completePreTestFirst') });
                                                                 return;
                                                             }
-                                                            const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
-                                                            if (postRes && (Number(postRes.score) || 0) >= 80) return;
                                                             setShowQuiz('POST');
                                                         }}
                                                         className={`w-full group bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between transition-all 
                                                             ${(() => {
                                                                 if (isHostOrHR) return 'cursor-default';
+                                                                const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
+                                                                if (postRes) return 'hover:border-indigo-300 cursor-pointer';
                                                                 if (selectedMeeting.is_closed || !selectedMeeting.is_post_test_active) return 'opacity-60 cursor-not-allowed';
                                                                 const preRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('PRE'));
-                                                                const postRes = meetingQuizResults.find(r => (r.quizType || "").toUpperCase().includes('POST'));
                                                                 if (!preRes) return 'opacity-60 cursor-not-allowed';
-                                                                return (postRes && (Number(postRes.score) || 0) >= 80) ? 'cursor-default' : 'hover:border-indigo-300 cursor-pointer';
+                                                                return 'hover:border-indigo-300 cursor-pointer';
                                                             })()}`}
                                                     >
                                                         <div className="flex items-center gap-3">
@@ -5285,6 +5303,18 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 )}
             </div>
 
+            {reviewingQuiz?.answers && selectedMeeting && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <QuizAnswerReviewModal
+                        type={(reviewingQuiz.quizType || 'PRE').toUpperCase().includes('POST') ? 'POST' : 'PRE'}
+                        meetingTitle={selectedMeeting.title}
+                        score={reviewingQuiz.score}
+                        answers={reviewingQuiz.answers}
+                        onClose={() => setReviewingQuiz(null)}
+                    />
+                </div>
+            )}
+
             {/* Quiz Modal */}
             {showQuiz && selectedMeeting && (
                 <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
@@ -5292,7 +5322,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         type={showQuiz}
                         questions={showQuiz === 'PRE' ? (selectedMeeting.pre_test_data?.questions || []) : (selectedMeeting.post_test_data?.questions || [])}
                         onClose={() => setShowQuiz(null)}
-                        onSubmit={async (score: number) => {
+                        onSubmit={async (score: number, answers: QuizAnswerReview[]) => {
                             try {
                                 const response = await fetch(`${API_BASE_URL}/api/quiz/submit`, {
                                     method: 'POST',
@@ -5308,6 +5338,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         meetingId: selectedMeeting.id,
                                         meeting_id: selectedMeeting.id,
                                         score: score,
+                                        answers,
                                         quizType: showQuiz,
                                         quiz_type: showQuiz,
                                         type: showQuiz
@@ -5475,8 +5506,46 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 
 // --- Sub-components for Interactive Training ---
 
-const TrainingQuiz = ({ type, questions, onClose, onSubmit, meetingTitle }: any) => {
+// Fisher-Yates shuffle into a new array - used so every pre/post-test attempt gets its own question order.
+const shuffled = <T,>(items: T[]): T[] => {
+    const copy = [...items];
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+};
+
+type TrainingQuizQuestion = { question: string; options: string[]; correctAnswer: number };
+
+// Options whose meaning depends on the other options' positions ("Semua jawaban benar", "a dan b benar",
+// a lettered "d. ...") - shuffling would make them misleading, so such a question keeps its option order.
+const POSITION_DEPENDENT_OPTION_RE = [
+    /^\s*semua\s+(jawaban\s+)?(benar|salah|di\s*atas)/i,
+    /^\s*tidak\s+ada\s+(jawaban\s+)?yang\s+(benar|salah)/i,
+    /\b(all|none)\s+of\s+the\s+above\b/i,
+    /\bdi\s*atas\b/i,
+    /\b[a-e]\s*(dan|&|,)\s*[a-e]\b/i,
+    /^\s*[a-e][.)]\s/i
+];
+const hasPositionDependentOption = (options: string[]) =>
+    options.some(opt => !!opt && POSITION_DEPENDENT_OPTION_RE.some(re => re.test(opt)));
+
+// Shuffles one question's options and moves the answer key to wherever the correct option landed, so
+// scoring and the review snapshot stay right. Questions with position-dependent options are left as-is.
+const shuffleQuestionOptions = (q: TrainingQuizQuestion): TrainingQuizQuestion => {
+    if (!Array.isArray(q.options) || hasPositionDependentOption(q.options)) return q;
+    const order = shuffled(q.options.map((_, i) => i));
+    return { ...q, options: order.map(i => q.options[i]), correctAnswer: order.indexOf(q.correctAnswer) };
+};
+
+const TrainingQuiz = ({ type, questions: sourceQuestions, onClose, onSubmit, meetingTitle }: any) => {
     const { t } = useTranslation('trainingInternalList');
+    // Question order (and each question's option order, see shuffleQuestionOptions) is randomised once
+    // when the test opens and then held for the whole attempt (the meeting data refreshes in the
+    // background, which mustn't reshuffle mid-test). Scoring and the stored answer snapshot both use
+    // this same order.
+    const [questions] = useState<TrainingQuizQuestion[]>(() => shuffled<TrainingQuizQuestion>(sourceQuestions || []).map(shuffleQuestionOptions));
     const [currentStep, setCurrentStep] = useState(0);
     const [answers, setAnswers] = useState<number[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -5495,8 +5564,15 @@ const TrainingQuiz = ({ type, questions, onClose, onSubmit, meetingTitle }: any)
                 if (answers[i] === q.correctAnswer) correct++;
             });
             const score = Math.round((correct / questions.length) * 100);
+            // Snapshot of each question as answered, stored with the result so it can be reviewed later.
+            const review: QuizAnswerReview[] = questions.map((q, i) => ({
+                question: q.question,
+                options: q.options,
+                selected: answers[i] ?? null,
+                correctAnswer: q.correctAnswer
+            }));
             setIsSubmitting(true);
-            onSubmit(score);
+            onSubmit(score, review);
         }
     };
 
@@ -5561,13 +5637,101 @@ const TrainingQuiz = ({ type, questions, onClose, onSubmit, meetingTitle }: any)
                 </div>
             </div>
 
-            <div className="p-6 bg-slate-50 border-t border-slate-100">
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
+                {/* Back to review/change an earlier answer - answers are kept per question, so the
+                    previous choice is still selected when the participant returns to it. */}
+                {currentStep > 0 && (
+                    <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={() => setCurrentStep(currentStep - 1)}
+                        className="px-6 py-4 bg-white border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-100 disabled:opacity-50 text-slate-600 font-black rounded-2xl transition-all flex items-center justify-center gap-2 shrink-0"
+                    >
+                        {t('quiz.previousQuestion')}
+                    </button>
+                )}
                 <button
                     disabled={answers[currentStep] === undefined || isSubmitting}
                     onClick={handleNext}
-                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-black rounded-2xl shadow-xl shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
+                    className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-black rounded-2xl shadow-xl shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
                 >
                     {isSubmitting ? t('quiz.sending') : (currentStep === questions.length - 1 ? t('quiz.finishTest') : t('quiz.nextQuestion'))}
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// Read-only review of a submitted pre/post-test: every question with the participant's answer, whether
+// it was right, and the correct answer.
+const QuizAnswerReviewModal = ({ type, meetingTitle, score, answers, onClose }: {
+    type: 'PRE' | 'POST';
+    meetingTitle: string;
+    score: number;
+    answers: QuizAnswerReview[];
+    onClose: () => void;
+}) => {
+    const { t } = useTranslation('trainingInternalList');
+    const correctCount = answers.filter(a => a.selected === a.correctAnswer).length;
+
+    return (
+        <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+                <div>
+                    <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">{type} {t('quiz.reviewTitle')}</span>
+                    <h2 className="font-black text-xl text-slate-800 leading-tight">{meetingTitle}</h2>
+                    <p className="text-xs font-bold text-slate-400 mt-1">
+                        {t('detailModal.score', { score })} · {t('quiz.correctCount', { correct: correctCount, total: answers.length })}
+                    </p>
+                </div>
+                <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400"><X size={20} /></button>
+            </div>
+
+            <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
+                {answers.map((a, qIdx) => {
+                    const isCorrect = a.selected === a.correctAnswer;
+                    return (
+                        <div key={qIdx}>
+                            <div className="flex items-start gap-2 mb-3">
+                                {isCorrect
+                                    ? <CheckCircle size={18} className="text-emerald-500 shrink-0 mt-0.5" />
+                                    : <XCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />}
+                                <h3 className="font-bold text-slate-800 leading-relaxed">{qIdx + 1}. {a.question}</h3>
+                            </div>
+                            <div className="space-y-2">
+                                {a.options.map((opt, i) => {
+                                    if (!opt || opt.trim() === '') return null;
+                                    const isSelected = a.selected === i;
+                                    const isAnswer = a.correctAnswer === i;
+                                    return (
+                                        <div
+                                            key={i}
+                                            className={`w-full px-4 py-3 rounded-2xl border-2 flex justify-between items-center gap-3 text-sm font-bold ${isAnswer
+                                                ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                                                : isSelected
+                                                    ? 'border-rose-400 bg-rose-50 text-rose-700'
+                                                    : 'border-slate-100 text-slate-500'
+                                                }`}
+                                        >
+                                            <span>{opt}</span>
+                                            <span className="text-[10px] font-black uppercase tracking-wider shrink-0">
+                                                {isAnswer && isSelected ? t('quiz.yourAnswerCorrect') : isAnswer ? t('quiz.correctAnswer') : isSelected ? t('quiz.yourAnswer') : ''}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                                {a.selected === null && (
+                                    <p className="text-xs italic text-slate-400 px-1">{t('quiz.notAnswered')}</p>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            <div className="p-6 bg-slate-50 border-t border-slate-100">
+                <button onClick={onClose} className="w-full py-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black rounded-2xl transition-all">
+                    {t('quiz.close')}
                 </button>
             </div>
         </div>

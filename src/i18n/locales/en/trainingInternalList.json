@@ -41,7 +41,8 @@
     "sessionReopenError": "Failed to reopen session.",
     "reportUnlocked": "Report unlocked for editing.",
     "reportUnlockError": "Failed to unlock report.",
-    "certificateGenerationError": "Failed to generate certificate. Please try again."
+    "certificateGenerationError": "Failed to generate certificate. Please try again.",
+    "answersNotStored": "Answers for this test weren't saved because it was taken before answer review was available. Only the score was recorded."
   },
   "cancelMeetingModal": {
     "title": "Cancel Meeting",
@@ -279,7 +280,14 @@
     "percentFilled": "{{progress}}% Filled",
     "sending": "Sending...",
     "finishTest": "FINISH TEST",
-    "nextQuestion": "NEXT QUESTION"
+    "nextQuestion": "NEXT QUESTION",
+    "previousQuestion": "BACK",
+    "reviewTitle": "ANSWER REVIEW",
+    "correctCount": "{{correct}} of {{total}} correct",
+    "yourAnswer": "Your answer",
+    "correctAnswer": "Correct answer",
+    "notAnswered": "Not answered",
+    "yourAnswerCorrect": "Your answer · Correct"
   },
   "feedbackForm": {
     "header": "ORGANIZER FEEDBACK",

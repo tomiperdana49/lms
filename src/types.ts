@@ -108,6 +108,17 @@ export interface QuizResult {
     employee_id?: string;
     quizType?: 'PRE' | 'POST';
     quiz_type?: 'PRE' | 'POST';
+    // Internal Training pre/post-test only, and only for attempts submitted since answers were stored.
+    answers?: QuizAnswerReview[] | null;
+}
+
+// One question of a submitted quiz as the participant answered it - a snapshot, so it still reads
+// correctly after the meeting's questions are edited.
+export interface QuizAnswerReview {
+    question: string;
+    options: string[];
+    selected: number | null;
+    correctAnswer: number;
 }
 
 export interface TrainingRequest {

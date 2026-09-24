@@ -41,7 +41,8 @@
     "sessionReopenError": "Gagal membuka kembali sesi.",
     "reportUnlocked": "Laporan dibuka kembali untuk diedit.",
     "reportUnlockError": "Gagal membuka kunci laporan.",
-    "certificateGenerationError": "Gagal membuat sertifikat. Silakan coba lagi."
+    "certificateGenerationError": "Gagal membuat sertifikat. Silakan coba lagi.",
+    "answersNotStored": "Jawaban untuk tes ini tidak tersimpan karena dikerjakan sebelum fitur review jawaban tersedia. Hanya nilainya yang tercatat."
   },
   "cancelMeetingModal": {
     "title": "Batalkan Pertemuan",
@@ -279,7 +280,14 @@
     "percentFilled": "{{progress}}% Terisi",
     "sending": "Mengirim...",
     "finishTest": "SELESAIKAN TES",
-    "nextQuestion": "PERTANYAAN BERIKUTNYA"
+    "nextQuestion": "PERTANYAAN BERIKUTNYA",
+    "previousQuestion": "KEMBALI",
+    "reviewTitle": "REVIEW JAWABAN",
+    "correctCount": "{{correct}} dari {{total}} benar",
+    "yourAnswer": "Jawaban kamu",
+    "correctAnswer": "Jawaban benar",
+    "notAnswered": "Tidak dijawab",
+    "yourAnswerCorrect": "Jawaban kamu · Benar"
   },
   "feedbackForm": {
     "header": "FEEDBACK PENYELENGGARA",

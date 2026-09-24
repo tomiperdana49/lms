@@ -5483,9 +5483,11 @@ app.post('/api/quiz/submit', async (req, res) => {
         const employeeId = userRows.length > 0 ? userRows[0].employee_id : null;
 
         // 1. Save Result
+        // answers: the Internal Training quiz's per-question review snapshot (see quiz_results.answers_json).
+        const answersJson = Array.isArray(req.body.answers) ? JSON.stringify(req.body.answers) : null;
         const insertResult = await query(
-            'INSERT INTO quiz_results (student_id, student_name, course_id, module_id, meeting_id, score, date, quiz_type, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [studentId, studentName, courseId || null, moduleId || null, req.body.meetingId || null, score, now, quizType, employeeId]
+            'INSERT INTO quiz_results (student_id, student_name, course_id, module_id, meeting_id, score, date, quiz_type, employee_id, answers_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [studentId, studentName, courseId || null, moduleId || null, req.body.meetingId || null, score, now, quizType, employeeId, answersJson]
         );
         const quizResultId = insertResult.insertId;
 
@@ -5613,15 +5615,20 @@ app.get('/api/quiz/results/meeting/:userId/:meetingId', async (req, res) => {
         const employeeId = userRows.length > 0 ? userRows[0].employee_id : null;
 
         const results = await query(
-            'SELECT id, student_id, student_name, course_id, module_id as moduleId, meeting_id as meetingId, score, date, quiz_type as quizType FROM quiz_results WHERE (student_id = ? OR (employee_id IS NOT NULL AND employee_id = ?)) AND meeting_id = ? ORDER BY date DESC',
+            'SELECT id, student_id, student_name, course_id, module_id as moduleId, meeting_id as meetingId, score, date, quiz_type as quizType, answers_json FROM quiz_results WHERE (student_id = ? OR (employee_id IS NOT NULL AND employee_id = ?)) AND meeting_id = ? ORDER BY date DESC',
             [userId, employeeId, meetingId]
         );
-        const mapped = results.map(r => ({
-            ...r,
-            studentId: r.student_id,
-            studentName: r.student_name,
-            courseId: r.course_id,
-        }));
+        const mapped = results.map(({ answers_json, ...r }) => {
+            let answers = null;
+            try { answers = answers_json ? JSON.parse(answers_json) : null; } catch (e) { answers = null; }
+            return {
+                ...r,
+                studentId: r.student_id,
+                studentName: r.student_name,
+                courseId: r.course_id,
+                answers
+            };
+        });
         res.json(mapped);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });

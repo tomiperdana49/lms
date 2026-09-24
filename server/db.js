@@ -167,6 +167,14 @@ export const initDB = async () => {
         } catch (e) { /* Ignore if exists */ }
 
         try {
+            // Per-question snapshot of what the participant picked (question, options, selected,
+            // correctAnswer) so they can review a submitted Internal Training pre/post-test later -
+            // a snapshot rather than just indices, since the meeting's questions can be edited after.
+            await connection.query("ALTER TABLE quiz_results ADD COLUMN answers_json LONGTEXT NULL");
+            console.log("Added answers_json column to quiz_results.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
             // Nusawork's note API returns { data: { id_group } } on success - stored here against the
             // completing quiz_results row so a future update/delete of that note can reference it.
             await connection.query("ALTER TABLE quiz_results ADD COLUMN nusawork_id_group INT");
