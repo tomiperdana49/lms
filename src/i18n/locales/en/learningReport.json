@@ -120,5 +120,5 @@
     }
   },
   "noBudget": "No learning budget (resigned / intern employee).",
-  "budgetExcludedNote": "{{count}} resigned / intern employee(s) have no budget."
+  "budgetExcludedNote": "Resigned / intern employees have no budget."
 }

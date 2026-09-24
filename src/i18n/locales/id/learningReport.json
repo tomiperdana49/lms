@@ -120,5 +120,5 @@
     }
   },
   "noBudget": "Tidak ada budget belajar (karyawan resign / internship).",
-  "budgetExcludedNote": "{{count}} karyawan resign / internship tidak mendapat budget."
+  "budgetExcludedNote": "Karyawan resign / internship tidak mendapat budget."
 }

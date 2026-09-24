@@ -517,7 +517,7 @@ export const LearningStatsSummaryCards = ({ stats, t, employeeCount = 1, noBudge
                                         : `${t('budgetExceeded')}: Rp ${Math.abs(remainingBudget).toLocaleString('id-ID')}`}
                                 </p>
                                 {noBudgetCount > 0 && (
-                                    <p className="text-[11px] text-slate-400 mt-1">{t('budgetExcludedNote', { count: noBudgetCount })}</p>
+                                    <p className="text-[11px] text-slate-400 mt-1">{t('budgetExcludedNote')}</p>
                                 )}
                             </>
                         ) : (
