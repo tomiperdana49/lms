@@ -76,6 +76,12 @@
     "organizationsSelected": "{{count}} Organizations selected",
     "allBranches": "All Branches",
     "clearAll": "Clear all",
+    "status": {
+      "all": "All Statuses",
+      "active": "Active",
+      "resign": "Resigned",
+      "internship": "Internship"
+    },
     "rosterHint": "{{count}} employees selected — click a name to show or hide their detail",
     "topRankingTitle": "Top 3 by Learning Hours",
     "notFound": "No employees found",

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { Search, Download, Loader2, CalendarRange, UsersRound, Building2, MapPin, Check, X, ChevronDown, Trophy, Crown, User } from 'lucide-react';
+import { Search, Download, Loader2, CalendarRange, UsersRound, Building2, MapPin, Check, X, ChevronDown, Trophy, Crown, User, UserCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import {
@@ -26,6 +26,11 @@ interface EmployeeOption {
     status_join?: string | null;
 }
 
+type EmployeeStatusFilter = '' | 'active' | 'resign' | 'internship';
+
+// Same buckets as the learning budget: resign wins over internship, and anyone who is neither is active.
+const employeeStatus = (emp: EmployeeOption): Exclude<EmployeeStatusFilter, ''> => learningBudgetExclusion(emp) ?? 'active';
+
 const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
     const canSyncNusawork = userRole === 'HR' || userRole === 'HR_ADMIN';
     const { t } = useTranslation('learningReport');
@@ -45,6 +50,7 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
     const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
     const selectedBranchRef = useRef(selectedBranch);
     useEffect(() => { selectedBranchRef.current = selectedBranch; }, [selectedBranch]);
+    const [selectedStatus, setSelectedStatus] = useState<EmployeeStatusFilter>('');
     const [selectedEmployees, setSelectedEmployees] = useState<EmployeeOption[]>([]);
     // Once employees load, default the report to everyone (All Organizations + All Branches) instead
     // of an empty "select employees" state. Only fires once - after that, an explicit "Clear all" is
@@ -170,10 +176,11 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
             if (selectedIds.has(emp.id_employee)) return false;
             const matchesOrg = selectedOrgs.length === 0 || (!!emp.organization_name && selectedOrgs.includes(emp.organization_name));
             const matchesBranch = !selectedBranch || emp.branch_name === selectedBranch;
+            const matchesStatus = !selectedStatus || employeeStatus(emp) === selectedStatus;
             const matchesSearch = !q || emp.full_name?.toLowerCase().includes(q) || emp.email?.toLowerCase().includes(q);
-            return matchesOrg && matchesBranch && matchesSearch;
+            return matchesOrg && matchesBranch && matchesStatus && matchesSearch;
         });
-    }, [employees, search, selectedOrgs, selectedBranch, selectedIds]);
+    }, [employees, search, selectedOrgs, selectedBranch, selectedStatus, selectedIds]);
 
     const sections = useMemo(() => buildSections(stats, t), [stats, t]);
     const includeEmployeeColumn = selectedEmployees.length > 1;
@@ -195,15 +202,22 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
         setSelectedEmployees(prev => prev.filter(emp => emp.id_employee !== id));
     };
 
-    // Recomputes the employee roster from whichever of org/branch is currently active, so the two
-    // filters combine (AND) instead of one silently overriding the other's selection. Organization
-    // itself is OR'd across every picked org. Bails out when both are cleared so clearing filters
+    // Recomputes the employee roster from whichever of org/branch/status is currently active, so the
+    // filters combine (AND) instead of one silently overriding another's selection. Organization
+    // itself is OR'd across every picked org. Bails out when all are cleared so clearing filters
     // doesn't wipe out employees the user added by hand.
-    const applyRosterFilter = (orgs: string[], branch: string) => {
-        if (orgs.length === 0 && !branch) return;
+    const applyRosterFilter = (orgs: string[], branch: string, status: EmployeeStatusFilter = selectedStatus) => {
+        if (orgs.length === 0 && !branch && !status) return;
         setSelectedEmployees(employees.filter(emp =>
-            (orgs.length === 0 || (!!emp.organization_name && orgs.includes(emp.organization_name))) && (!branch || emp.branch_name === branch)
+            (orgs.length === 0 || (!!emp.organization_name && orgs.includes(emp.organization_name)))
+            && (!branch || emp.branch_name === branch)
+            && (!status || employeeStatus(emp) === status)
         ));
+    };
+
+    const handleStatusSelect = (status: EmployeeStatusFilter) => {
+        setSelectedStatus(status);
+        applyRosterFilter(selectedOrgsRef.current, selectedBranchRef.current, status);
     };
 
     // Toggles one organization in/out of the selection - the dropdown stays open so several can
@@ -289,9 +303,25 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
 
             {/* Employee + Date Range Filter */}
             <div className="bg-white border border-slate-100 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center gap-2 text-slate-400">
-                    <UsersRound size={16} />
-                    <span className="text-xs font-black uppercase tracking-widest">{t('employee.selectLabel')}</span>
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-slate-400">
+                        <UsersRound size={16} />
+                        <span className="text-xs font-black uppercase tracking-widest">{t('employee.selectLabel')}</span>
+                    </div>
+                    {selectedEmployees.length > 0 && (
+                        <button
+                            onClick={() => {
+                                setSelectedEmployees([]);
+                                setSelectedOrgs([]);
+                                setSelectedBranch('');
+                                setBranchQuery('');
+                                setSelectedStatus('');
+                            }}
+                            className="text-xs font-bold text-slate-400 hover:text-red-600 px-2 py-1"
+                        >
+                            {t('employee.clearAll')}
+                        </button>
+                    )}
                 </div>
 
                 {selectedEmployees.length > 0 && (
@@ -310,17 +340,6 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
                                 </button>
                             </span>
                         ))}
-                        <button
-                            onClick={() => {
-                                setSelectedEmployees([]);
-                                setSelectedOrgs([]);
-                                setSelectedBranch('');
-                                setBranchQuery('');
-                            }}
-                            className="text-xs font-bold text-slate-400 hover:text-red-600 px-2 py-1.5"
-                        >
-                            {t('employee.clearAll')}
-                        </button>
                     </div>
                 )}
 
@@ -336,7 +355,7 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
                             placeholder={t('employee.searchPlaceholder')}
                             className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        {employeeDropdownOpen && !employeesLoading && (search.trim() || selectedOrgs.length > 0 || selectedBranch) && (
+                        {employeeDropdownOpen && !employeesLoading && (search.trim() || selectedOrgs.length > 0 || selectedBranch || selectedStatus) && (
                             <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-slate-100 rounded-lg shadow-lg divide-y divide-slate-50">
                                 {filteredEmployees.length === 0 ? (
                                     <p className="text-sm text-slate-400 italic px-4 py-3">{t('employee.notFound')}</p>
@@ -442,6 +461,20 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
                                 ))}
                             </div>
                         )}
+                    </div>
+                    <div className="relative sm:w-48">
+                        <UserCheck className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                        <select
+                            value={selectedStatus}
+                            onChange={e => handleStatusSelect(e.target.value as EmployeeStatusFilter)}
+                            className="w-full appearance-none pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="">{t('employee.status.all')}</option>
+                            <option value="active">{t('employee.status.active')}</option>
+                            <option value="resign">{t('employee.status.resign')}</option>
+                            <option value="internship">{t('employee.status.internship')}</option>
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
                     </div>
                 </div>
 

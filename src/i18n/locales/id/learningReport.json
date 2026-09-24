@@ -76,6 +76,12 @@
     "organizationsSelected": "{{count}} Organisasi dipilih",
     "allBranches": "Semua Cabang",
     "clearAll": "Hapus semua",
+    "status": {
+      "all": "Semua Status",
+      "active": "Aktif",
+      "resign": "Resign",
+      "internship": "Internship"
+    },
     "rosterHint": "{{count}} karyawan dipilih — klik nama untuk menampilkan/menyembunyikan detailnya",
     "topRankingTitle": "Top 3 Jam Belajar Terbanyak",
     "notFound": "Karyawan tidak ditemukan",
