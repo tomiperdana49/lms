@@ -29,7 +29,8 @@ import {
     ArrowLeft,
     ClipboardList,
     Settings,
-    BadgeCheck
+    BadgeCheck,
+    History
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Page, Role, User } from '../types';
@@ -729,6 +730,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { icon: Settings, label: t('admin.competencyTemplate'), id: 'admin-dashboard', view: 'competency-template' },
         { icon: BadgeCheck, label: t('admin.competencyApprovals'), id: 'admin-dashboard', view: 'competency-approvals' },
         { icon: Users, label: t('admin.competencyOverview'), id: 'admin-dashboard', view: 'competency-overview' },
+        { header: t('admin.systemHeader') },
+        { icon: History, label: t('admin.activityLogs'), id: 'admin-dashboard', view: 'activity-logs' },
     ];
 
     const menuItems = [

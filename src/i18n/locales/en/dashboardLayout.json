@@ -41,7 +41,9 @@
     "settingsHeader": "COMPETENCY",
     "competencyTemplate": "Competency Dictionary",
     "competencyApprovals": "Competency Approvals",
-    "competencyOverview": "Employee Competency"
+    "competencyOverview": "Employee Competency",
+    "systemHeader": "SYSTEM",
+    "activityLogs": "Logs"
   },
   "notifications": {
     "title": "Notifications",

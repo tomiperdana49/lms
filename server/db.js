@@ -846,6 +846,38 @@ export const initDB = async () => {
             console.log("Verified competency_change_requests table exists.");
         } catch (e) { console.error("Failed to create competency_change_requests:", e.message); }
 
+        // Audit trail behind the Admin Panel's "Logs" menu - one row per successful write request
+        // (and per login), recorded by the activityLogger middleware in server.js.
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS activity_logs (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    actor_user_id VARCHAR(50),
+                    actor_employee_id VARCHAR(50),
+                    actor_name VARCHAR(255),
+                    actor_email VARCHAR(255),
+                    actor_role VARCHAR(20),
+                    module VARCHAR(50) NOT NULL,
+                    action VARCHAR(50) NOT NULL,
+                    target_id VARCHAR(100),
+                    target_label VARCHAR(500),
+                    method VARCHAR(10),
+                    path VARCHAR(500),
+                    status_code INT,
+                    ip_address VARCHAR(100),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_activity_logs_created (created_at),
+                    INDEX idx_activity_logs_module (module, created_at)
+                )
+            `);
+            console.log("Verified activity_logs table exists.");
+        } catch (e) { console.error("Failed to create activity_logs:", e.message); }
+        // Field-level before/after diff for updates: JSON array of { field, from, to }.
+        try {
+            await connection.query("ALTER TABLE activity_logs ADD COLUMN changes MEDIUMTEXT");
+            console.log("Added changes column to activity_logs.");
+        } catch (e) { /* Ignore if exists */ }
+
         connection.release();
     } catch (err) {
         console.error('Database initialization failed:', err);

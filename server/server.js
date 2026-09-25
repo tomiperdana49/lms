@@ -114,6 +114,268 @@ const query = async (sql, params) => {
     return results;
 };
 
+// --- ACTIVITY LOG (Admin Panel > Logs) ---
+// Every successful write request under /api is recorded to activity_logs. The frontend stamps each
+// API call with X-Actor-* headers (see src/utils/actorFetch.ts). Rules map a route to a module/action pair
+// the Logs page can filter on; `lookup` resolves a human-readable label for the affected record
+// BEFORE the handler runs, so a DELETE can still name what it deleted.
+const approvalAction = (status) => {
+    const s = String(status || '').toLowerCase();
+    if (s === 'approved') return 'approve';
+    if (s === 'rejected') return 'reject';
+    return 'update';
+};
+
+const ACTIVITY_RULES = [
+    ['POST', /^\/api\/logs$/, 'reading_log', 'create', { label: (b) => b.title }],
+    ['PATCH', /^\/api\/logs\/([^/]+)\/cancel$/, 'reading_log', 'cancel', { lookup: ['reading_logs', 'title'] }],
+    ['DELETE', /^\/api\/logs\/([^/]+)$/, 'reading_log', 'delete', { lookup: ['reading_logs', 'title'] }],
+    ['PUT', /^\/api\/logs\/([^/]+)$/, 'reading_log', (b) => {
+        if (b.hrApprovalStatus === 'Pending') return 'claim_incentive';
+        return b.hrApprovalStatus ? approvalAction(b.hrApprovalStatus) : 'update';
+    }, { lookup: ['reading_logs', 'title'] }],
+    ['POST', /^\/api\/books\/borrow$/, 'reading_log', 'borrow', { label: (b) => b.title }],
+    ['POST', /^\/api\/books\/return$/, 'reading_log', 'return', { lookup: ['reading_logs', 'title'], id: (b) => b.id }],
+
+    ['POST', /^\/api\/courses$/, 'online_module', 'create', { label: (b) => b.title }],
+    ['PUT', /^\/api\/courses\/([^/]+)$/, 'online_module', 'update', { lookup: ['courses', 'title'] }],
+    ['DELETE', /^\/api\/courses\/([^/]+)$/, 'online_module', 'delete', { lookup: ['courses', 'title'] }],
+    ['DELETE', /^\/api\/progress\/[^/]+\/([^/]+)$/, 'online_module', 'reset_progress', { lookup: ['courses', 'title'] }],
+    ['POST', /^\/api\/progress\/complete$/, 'online_module', 'complete_module', { lookup: ['courses', 'title'], id: (b) => b.courseId }],
+    ['POST', /^\/api\/quiz\/submit$/, 'online_module', 'submit_quiz', { lookup: ['courses', 'title'], id: (b) => b.courseId }],
+    ['POST', /^\/api\/online-certificates\/issue$/, 'online_module', 'issue_certificate', { lookup: ['courses', 'title'], id: (b) => b.courseId }],
+
+    ['POST', /^\/api\/meetings$/, 'internal_training', 'create', { label: (b) => b.title }],
+    ['POST', /^\/api\/meetings\/bulk$/, 'internal_training', 'import'],
+    ['PUT', /^\/api\/meetings\/([^/]+)$/, 'internal_training', 'update', { lookup: ['meetings', 'title'] }],
+    ['DELETE', /^\/api\/meetings\/([^/]+)$/, 'internal_training', 'delete', { lookup: ['meetings', 'title'] }],
+    ['POST', /^\/api\/internal-certificates\/issue$/, 'internal_training', 'issue_certificate', { lookup: ['meetings', 'title'], id: (b) => b.meetingId }],
+
+    ['POST', /^\/api\/training$/, 'external_training', 'create', { label: (b) => b.title }],
+    ['POST', /^\/api\/training\/([^/]+)\/approve$/, 'external_training', (b) => approvalAction(b.action === 'approve' ? 'approved' : b.action === 'reject' ? 'rejected' : b.action), { lookup: ['training_requests', 'title'] }],
+    ['PUT', /^\/api\/training\/([^/]+)$/, 'external_training', 'update', { lookup: ['training_requests', 'title'] }],
+    ['DELETE', /^\/api\/training\/([^/]+)$/, 'external_training', 'delete', { lookup: ['training_requests', 'title'] }],
+    ['POST', /^\/api\/external-training\/request$/, 'external_training', 'create', { label: (b) => b.title }],
+    ['POST', /^\/api\/external-training\/bulk-import$/, 'external_training', 'import'],
+    ['POST', /^\/api\/external-training\/approve$/, 'external_training', (b) => approvalAction(b.status), { lookup: ['external_training_requests', 'title'], id: (b) => b.id }],
+    ['POST', /^\/api\/external-training\/hr-process$/, 'external_training', 'process', { lookup: ['external_training_requests', 'title'], id: (b) => b.id }],
+    ['POST', /^\/api\/external-training\/hr-update-details$/, 'external_training', 'update', { lookup: ['external_training_requests', 'title'], id: (b) => b.id }],
+    ['POST', /^\/api\/external-training\/renew-certificate$/, 'external_training', 'renew_certificate', { lookup: ['external_training_requests', 'title'], id: (b) => b.id }],
+    ['POST', /^\/api\/external-training\/([^/]+)\/sync-nusawork$/, 'external_training', 'sync', { lookup: ['external_training_requests', 'title'] }],
+    ['PUT', /^\/api\/external-training\/([^/]+)$/, 'external_training', 'update', { lookup: ['external_training_requests', 'title'] }],
+    ['DELETE', /^\/api\/external-training\/([^/]+)$/, 'external_training', 'delete', { lookup: ['external_training_requests', 'title'] }],
+
+    ['POST', /^\/api\/post-training-evaluations$/, 'pte', 'create', { label: (b) => b.title }],
+    ['PUT', /^\/api\/post-training-evaluations\/([^/]+)$/, 'pte', 'update', { lookup: ['post_training_evaluation_forms', 'title'] }],
+    ['POST', /^\/api\/post-training-evaluations\/([^/]+)\/publish$/, 'pte', 'publish', { lookup: ['post_training_evaluation_forms', 'title'] }],
+    ['DELETE', /^\/api\/post-training-evaluations\/([^/]+)$/, 'pte', 'delete', { lookup: ['post_training_evaluation_forms', 'title'] }],
+    ['POST', /^\/api\/post-training-evaluations\/([^/]+)\/respond$/, 'pte', 'submit_response', { lookup: ['post_training_evaluation_forms', 'title'] }],
+
+    ['POST', /^\/api\/idp$/, 'idp', 'create', { label: (b) => b.employee_name }],
+    ['POST', /^\/api\/idp\/bulk-import$/, 'idp', 'import'],
+    ['PATCH', /^\/api\/idp\/action-items\/([^/]+)$/, 'idp', 'update_action_item'],
+    ['PUT', /^\/api\/idp\/([^/]+)$/, 'idp', 'update', { lookup: ['idp_plans', 'employee_name'] }],
+    ['POST', /^\/api\/idp\/([^/]+)\/submit$/, 'idp', 'submit', { lookup: ['idp_plans', 'employee_name'] }],
+    ['POST', /^\/api\/idp\/([^/]+)\/approve$/, 'idp', (b) => approvalAction(b.status), { lookup: ['idp_plans', 'employee_name'] }],
+    ['POST', /^\/api\/idp\/([^/]+)\/hr-note$/, 'idp', 'add_note', { lookup: ['idp_plans', 'employee_name'] }],
+    ['POST', /^\/api\/idp\/([^/]+)\/review$/, 'idp', 'review', { lookup: ['idp_plans', 'employee_name'] }],
+    ['DELETE', /^\/api\/idp\/([^/]+)$/, 'idp', 'delete', { lookup: ['idp_plans', 'employee_name'] }],
+
+    ['POST', /^\/api\/incentives$/, 'incentive', 'create', { label: (b) => b.courseName }],
+    ['PUT', /^\/api\/incentives\/([^/]+)$/, 'incentive', (b) => b.status ? approvalAction(b.status) : 'update', { lookup: ['incentives', 'course_name'] }],
+    ['DELETE', /^\/api\/incentives\/([^/]+)$/, 'incentive', 'delete', { lookup: ['incentives', 'course_name'] }],
+
+    ['POST', /^\/api\/competency-templates$/, 'competency', (b) => b.requesterId ? 'request_change' : 'create', { label: (b) => b.kompetensi }],
+    ['PUT', /^\/api\/competency-templates\/([^/]+)$/, 'competency', (b) => b.requesterId ? 'request_change' : 'update', { lookup: ['competency_templates', 'kompetensi'] }],
+    ['DELETE', /^\/api\/competency-templates\/([^/]+)$/, 'competency', (b, q) => q.requesterId ? 'request_change' : 'delete', { lookup: ['competency_templates', 'kompetensi'] }],
+    ['PUT', /^\/api\/competency-standard-overrides$/, 'competency', 'update_standard'],
+    ['PUT', /^\/api\/competency-change-requests\/([^/]+)\/approve$/, 'competency', 'approve', { lookup: ['competency_change_requests', 'competency_name'] }],
+    ['PUT', /^\/api\/competency-change-requests\/([^/]+)\/reject$/, 'competency', 'reject', { lookup: ['competency_change_requests', 'competency_name'] }],
+    ['POST', /^\/api\/competency-assessments$/, 'competency', 'assess', { label: (b) => b.quarter && b.year ? `${b.employeeId} · Q${b.quarter} ${b.year}` : b.employeeId }],
+
+    ['POST', /^\/api\/users$/, 'user', 'create', { label: (b) => b.name || b.email }],
+    ['PUT', /^\/api\/users\/([^/]+)$/, 'user', 'update', { lookup: ['users', 'name'] }],
+    ['DELETE', /^\/api\/users\/([^/]+)$/, 'user', 'delete', { lookup: ['users', 'name'] }],
+    ['POST', /^\/api\/admin\/sync-all-nusawork$/, 'user', 'sync'],
+    ['POST', /^\/api\/simas\/sync$/, 'user', 'sync'],
+
+    ['POST', /^\/api\/feedback\/submit$/, 'feedback', 'submit', { lookup: (b) => b.meetingId ? ['meetings', 'title'] : ['courses', 'title'], id: (b) => b.meetingId || b.courseId }],
+    ['POST', /^\/api\/feedback$/, 'feedback', 'submit'],
+    ['POST', /^\/api\/utils\/import-gform$/, 'other', 'import'],
+];
+
+// Write endpoints that aren't user activity: logins, token plumbing, heartbeats and read-only lookups sent as POST.
+const ACTIVITY_SKIP = [
+    /^\/api\/login$/, /^\/api\/auth\/google$/,
+    /^\/api\/upload$/, /^\/api\/auth\/refresh$/, /^\/api\/oauth\/token$/, /^\/api\/progress\/time$/,
+    /^\/api\/learning-stats\/bulk$/, /^\/api\/employees\/resolve$/,
+];
+
+// Columns never shown in a change diff - secrets and bookkeeping that change on every write.
+const DIFF_IGNORED_FIELDS = new Set(['password', 'session_epoch', 'googleId', 'updated_at', 'created_at']);
+const DIFF_VALUE_MAX = 300;
+
+const DIFF_MAX_CHANGES = 40;
+const DIFF_MAX_DEPTH = 4;
+
+const normalizeDiffValue = (value) => {
+    if (value === null || value === undefined) return null;
+    if (value instanceof Date) return isNaN(value.getTime()) ? null : value.toISOString();
+    if (Buffer.isBuffer(value)) return null;
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+};
+
+const clipDiffValue = (v) => (v != null && v.length > DIFF_VALUE_MAX ? `${v.slice(0, DIFF_VALUE_MAX)}…` : v);
+
+// Several columns hold JSON as text (cost_report_json, guests_json...) - parse those so they diff
+// field by field instead of as one unreadable blob.
+const parseJsonColumn = (value) => {
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return value;
+    try { return JSON.parse(trimmed); } catch { return value; }
+};
+
+const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date) && !Buffer.isBuffer(v);
+
+// How a list element is named in the log: a person/record by its name, otherwise its raw value.
+const listItemLabel = (item) => {
+    if (isPlainObject(item)) return String(item.name || item.title || item.employee_name || item.email || item.employee_id || item.id || JSON.stringify(item));
+    return normalizeDiffValue(item) ?? '';
+};
+
+const listItemKey = (item) => {
+    if (isPlainObject(item)) {
+        const key = item.employee_id ?? item.id ?? item.email;
+        if (key != null) return `k:${key}`;
+    }
+    return `v:${JSON.stringify(item)}`;
+};
+
+// Pushes { field, path, from, to } for scalar changes and { field, path, added, removed } for list
+// membership changes. `path` segments are raw keys; list elements matched by identity appear as
+// "[Name]" segments so the UI can show which participant's score changed.
+const diffValues = (path, before, after, out, depth) => {
+    if (out.length >= DIFF_MAX_CHANGES) return;
+    const field = path.join('.');
+
+    if (depth < DIFF_MAX_DEPTH && isPlainObject(before) && isPlainObject(after)) {
+        const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+        for (const key of keys) diffValues([...path, key], before[key], after[key], out, depth + 1);
+        return;
+    }
+
+    if (depth < DIFF_MAX_DEPTH && Array.isArray(before) && Array.isArray(after)) {
+        if (JSON.stringify(before) === JSON.stringify(after)) return;
+        const beforeByKey = new Map(before.map((item) => [listItemKey(item), item]));
+        const afterByKey = new Map(after.map((item) => [listItemKey(item), item]));
+        const removed = [...beforeByKey].filter(([k]) => !afterByKey.has(k)).map(([, item]) => clipDiffValue(listItemLabel(item)));
+        const added = [...afterByKey].filter(([k]) => !beforeByKey.has(k)).map(([, item]) => clipDiffValue(listItemLabel(item)));
+        if (added.length || removed.length) out.push({ field, path, added, removed });
+        // Elements present on both sides but edited in place (e.g. a participant's test score).
+        for (const [key, afterItem] of afterByKey) {
+            const beforeItem = beforeByKey.get(key);
+            if (beforeItem === undefined || !isPlainObject(afterItem)) continue;
+            diffValues([...path, `[${listItemLabel(afterItem)}]`], beforeItem, afterItem, out, depth + 1);
+        }
+        return;
+    }
+
+    const from = normalizeDiffValue(before);
+    const to = normalizeDiffValue(after);
+    if (from === to) return;
+    out.push({ field, path, from: clipDiffValue(from), to: clipDiffValue(to) });
+};
+
+const diffRows = (before, after) => {
+    if (!before || !after) return [];
+    const changes = [];
+    for (const field of Object.keys(after)) {
+        if (DIFF_IGNORED_FIELDS.has(field)) continue;
+        diffValues([field], parseJsonColumn(before[field]), parseJsonColumn(after[field]), changes, 0);
+    }
+    return changes.slice(0, DIFF_MAX_CHANGES);
+};
+
+const decodeActorHeader = (value) => {
+    if (!value) return null;
+    try { return decodeURIComponent(String(value)).slice(0, 255); } catch { return String(value).slice(0, 255); }
+};
+
+app.use(async (req, res, next) => {
+    const method = req.method.toUpperCase();
+    const reqPath = req.path;
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) || !reqPath.startsWith('/api/') || ACTIVITY_SKIP.some((re) => re.test(reqPath))) {
+        return next();
+    }
+
+    const body = (req.body && typeof req.body === 'object') ? req.body : {};
+    let module = 'other';
+    let action = method.toLowerCase();
+    let targetId = null;
+    let targetLabel = null;
+    // Set when the matched rule points at a single row that this request edits in place - that row
+    // is re-read after the handler finishes and diffed against this snapshot.
+    let diffSource = null;
+    let beforeRow = null;
+    try {
+        for (const [ruleMethod, pattern, ruleModule, ruleAction, opts = {}] of ACTIVITY_RULES) {
+            if (ruleMethod !== method) continue;
+            const match = reqPath.match(pattern);
+            if (!match) continue;
+            module = ruleModule;
+            action = typeof ruleAction === 'function' ? ruleAction(body, req.query || {}) : ruleAction;
+            targetId = opts.id ? opts.id(body) : (match[1] ? decodeURIComponent(match[1]) : null);
+            if (opts.label) targetLabel = opts.label(body) || null;
+            if (opts.lookup && targetId != null && targetId !== '') {
+                const [table, column] = typeof opts.lookup === 'function' ? opts.lookup(body) : opts.lookup;
+                const rows = await query(`SELECT * FROM \`${table}\` WHERE id = ? LIMIT 1`, [targetId]);
+                targetLabel = rows[0]?.[column] || targetLabel;
+                if (rows[0] && method !== 'DELETE' && action !== 'create' && action !== 'request_change') {
+                    diffSource = { table, id: targetId };
+                    beforeRow = rows[0];
+                }
+            }
+            break;
+        }
+    } catch (e) {
+        console.error('[ACTIVITY LOG] Failed to resolve target:', e.message);
+    }
+
+    res.on('finish', async () => {
+        if (res.statusCode >= 400) return;
+        let changes = [];
+        if (diffSource) {
+            try {
+                const afterRows = await query(`SELECT * FROM \`${diffSource.table}\` WHERE id = ? LIMIT 1`, [diffSource.id]);
+                changes = diffRows(beforeRow, afterRows[0]);
+            } catch (e) {
+                console.error('[ACTIVITY LOG] Failed to diff:', e.message);
+            }
+        }
+        const actor = {
+            id: decodeActorHeader(req.headers['x-actor-id']),
+            employeeId: decodeActorHeader(req.headers['x-actor-employee-id']),
+            name: decodeActorHeader(req.headers['x-actor-name']),
+            email: decodeActorHeader(req.headers['x-actor-email']),
+            role: decodeActorHeader(req.headers['x-actor-role']),
+        };
+        const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
+        query(
+            `INSERT INTO activity_logs (actor_user_id, actor_employee_id, actor_name, actor_email, actor_role, module, action, target_id, target_label, changes, method, path, status_code, ip_address)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [actor.id, actor.employeeId, actor.name, actor.email, actor.role, module, action,
+             targetId != null ? String(targetId).slice(0, 100) : null,
+             targetLabel != null ? String(targetLabel).slice(0, 500) : null,
+             changes.length ? JSON.stringify(changes) : null,
+             method, req.originalUrl.slice(0, 500), res.statusCode, ip.slice(0, 100)]
+        ).catch((e) => console.error('[ACTIVITY LOG] Failed to write:', e.message));
+    });
+
+    next();
+});
+
 // Reading-log incentive claims are capped at 5 (Approved + Pending) per calendar year per employee -
 // matches the frontend's claim-button gating in ReadingLogPage.tsx. Enforced here too since the
 // frontend check can't stop a direct API call from bypassing it.
@@ -1959,6 +2221,49 @@ app.post('/api/auth/google', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Database error' });
+    }
+});
+
+// --- ACTIVITY LOG LISTING (Admin Panel > Logs) ---
+app.get('/api/activity-logs', async (req, res) => {
+    try {
+        const { module, role, action, search, startDate, endDate } = req.query;
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const pageSize = Math.min(200, Math.max(1, parseInt(req.query.pageSize, 10) || 50));
+
+        const where = [];
+        const params = [];
+        if (module) { where.push('module = ?'); params.push(module); }
+        if (action) { where.push('action = ?'); params.push(action); }
+        if (role === 'HR') where.push("actor_role IN ('HR', 'HR_ADMIN')");
+        else if (role === 'STAFF') where.push("(actor_role IS NULL OR actor_role NOT IN ('HR', 'HR_ADMIN'))");
+        if (startDate) { where.push('created_at >= ?'); params.push(`${startDate} 00:00:00`); }
+        if (endDate) { where.push('created_at <= ?'); params.push(`${endDate} 23:59:59`); }
+        if (search) {
+            const like = `%${search}%`;
+            where.push('(actor_name LIKE ? OR actor_email LIKE ? OR actor_employee_id LIKE ? OR target_label LIKE ?)');
+            params.push(like, like, like, like);
+        }
+        const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+        const [countRow] = await query(`SELECT COUNT(*) AS total FROM activity_logs ${whereSql}`, params);
+        const rows = await query(
+            `SELECT id, actor_user_id, actor_employee_id, actor_name, actor_email, actor_role, module, action,
+                    target_id, target_label, changes, method, path, ip_address, created_at
+             FROM activity_logs ${whereSql}
+             ORDER BY created_at DESC, id DESC
+             LIMIT ? OFFSET ?`,
+            [...params, pageSize, (page - 1) * pageSize]
+        );
+        const parsed = rows.map((r) => {
+            let changes = null;
+            try { changes = r.changes ? JSON.parse(r.changes) : null; } catch { changes = null; }
+            return { ...r, changes };
+        });
+        res.json({ rows: parsed, total: countRow?.total || 0, page, pageSize });
+    } catch (err) {
+        console.error('[ACTIVITY LOG] List failed:', err);
+        res.status(500).json({ error: err.message });
     }
 });
 

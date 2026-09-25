@@ -1,0 +1,77 @@
+{
+  "header": {
+    "title": "Activity Logs",
+    "subtitle": "Activity history of every user, employees and HR alike."
+  },
+  "refresh": "Refresh",
+  "filters": {
+    "searchPlaceholder": "Search name, email, employee ID, or detail...",
+    "allModules": "All Modules",
+    "allRoles": "All Users",
+    "startDate": "Start date",
+    "endDate": "End date"
+  },
+  "roles": {
+    "HR": "HR",
+    "STAFF": "Employee"
+  },
+  "table": {
+    "time": "Time",
+    "user": "User",
+    "module": "Module",
+    "action": "Activity",
+    "detail": "Detail"
+  },
+  "modules": {
+    "reading_log": "Reading Log",
+    "online_module": "Online Modules",
+    "internal_training": "Internal Training",
+    "external_training": "External Training",
+    "pte": "Post Training Evaluation",
+    "idp": "IDP",
+    "incentive": "Incentive",
+    "competency": "Competency",
+    "user": "User Management",
+    "feedback": "Feedback",
+    "other": "Other"
+  },
+  "actions": {
+    "create": "Created",
+    "update": "Updated",
+    "delete": "Deleted",
+    "approve": "Approved",
+    "reject": "Rejected",
+    "cancel": "Cancelled",
+    "claim_incentive": "Claimed incentive",
+    "borrow": "Borrowed book",
+    "return": "Returned book",
+    "reset_progress": "Reset progress",
+    "complete_module": "Completed module",
+    "submit_quiz": "Submitted quiz",
+    "issue_certificate": "Issued certificate",
+    "import": "Imported data",
+    "process": "Processed",
+    "renew_certificate": "Renewed certificate",
+    "sync": "Synced",
+    "publish": "Published",
+    "submit_response": "Submitted evaluation",
+    "submit": "Submitted",
+    "add_note": "Added note",
+    "review": "Reviewed",
+    "update_action_item": "Updated action item",
+    "update_standard": "Updated standard",
+    "assess": "Assessed",
+    "request_change": "Requested change"
+  },
+  "unknownUser": "Unknown",
+  "empty": "No activity for these filters yet.",
+  "totalCount": "{{count}} activities",
+  "pagination": "Page {{current}} of {{total}}",
+  "changes": {
+    "empty": "empty",
+    "showMore": "+{{count}} more changes",
+    "showLess": "Show less",
+    "added": "+ added: {{items}}",
+    "removed": "− removed: {{items}}"
+  }
+}

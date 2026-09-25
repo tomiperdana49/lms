@@ -30,6 +30,7 @@ import enUserManagement from './locales/en/userManagement.json';
 import enCompetencyTemplate from './locales/en/competencyTemplate.json';
 import enCompetencyTeam from './locales/en/competencyTeam.json';
 import enCompetencyApprovals from './locales/en/competencyApprovals.json';
+import enActivityLog from './locales/en/activityLog.json';
 
 import idCommon from './locales/id/common.json';
 import idLogin from './locales/id/loginPage.json';
@@ -60,6 +61,7 @@ import idUserManagement from './locales/id/userManagement.json';
 import idCompetencyTemplate from './locales/id/competencyTemplate.json';
 import idCompetencyTeam from './locales/id/competencyTeam.json';
 import idCompetencyApprovals from './locales/id/competencyApprovals.json';
+import idActivityLog from './locales/id/activityLog.json';
 
 export const LANGUAGE_STORAGE_KEY = 'lms_language';
 
@@ -115,6 +117,7 @@ i18n
                 competencyTemplate: enCompetencyTemplate,
                 competencyTeam: enCompetencyTeam,
                 competencyApprovals: enCompetencyApprovals,
+                activityLog: enActivityLog,
             },
             id: {
                 common: idCommon,
@@ -146,6 +149,7 @@ i18n
                 competencyTemplate: idCompetencyTemplate,
                 competencyTeam: idCompetencyTeam,
                 competencyApprovals: idCompetencyApprovals,
+                activityLog: idActivityLog,
             },
         },
         lng: savedLanguage || detectBrowserLanguage(),

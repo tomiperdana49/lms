@@ -43,7 +43,7 @@ const TRAINING_SUB_PAGES: Page[] = ['internal', 'external', 'external-approval',
 
 // Mirrors adminSubItems' `view` values in DashboardLayout.tsx - the Admin Panel's own sidebar
 // group, nested under /admin/<view> (e.g. /admin/calendar) the same way Training nests.
-const ADMIN_VIEWS = ['overview', 'calendar', 'users', 'courses', 'meetings', 'training', 'post-training-evaluation', 'logs', 'quiz-reports', 'reports', 'employee-learning-report', 'idp', 'competency-template', 'competency-approvals', 'competency-overview'];
+const ADMIN_VIEWS = ['overview', 'calendar', 'users', 'courses', 'meetings', 'training', 'post-training-evaluation', 'logs', 'quiz-reports', 'reports', 'employee-learning-report', 'idp', 'competency-template', 'competency-approvals', 'competency-overview', 'activity-logs'];
 const isValidAdminView = (value: string): boolean => ADMIN_VIEWS.includes(value);
 
 // A couple of internal view ids don't read as their sidebar label (e.g. 'logs' is the "Reading

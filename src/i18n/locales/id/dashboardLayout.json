@@ -41,7 +41,9 @@
     "settingsHeader": "KOMPETENSI",
     "competencyTemplate": "Kamus Kompetensi",
     "competencyApprovals": "Persetujuan Kompetensi",
-    "competencyOverview": "Kompetensi Karyawan"
+    "competencyOverview": "Kompetensi Karyawan",
+    "systemHeader": "SISTEM",
+    "activityLogs": "Logs"
   },
   "notifications": {
     "title": "Notifikasi",

@@ -1,0 +1,77 @@
+{
+  "header": {
+    "title": "Log Aktivitas",
+    "subtitle": "Riwayat aktivitas seluruh pengguna, baik karyawan maupun HR."
+  },
+  "refresh": "Muat Ulang",
+  "filters": {
+    "searchPlaceholder": "Cari nama, email, ID karyawan, atau detail...",
+    "allModules": "Semua Modul",
+    "allRoles": "Semua Pengguna",
+    "startDate": "Tanggal mulai",
+    "endDate": "Tanggal akhir"
+  },
+  "roles": {
+    "HR": "HR",
+    "STAFF": "Karyawan"
+  },
+  "table": {
+    "time": "Waktu",
+    "user": "Pengguna",
+    "module": "Modul",
+    "action": "Aktivitas",
+    "detail": "Detail"
+  },
+  "modules": {
+    "reading_log": "Log Bacaan",
+    "online_module": "Modul Online",
+    "internal_training": "Training Internal",
+    "external_training": "Training Eksternal",
+    "pte": "Post Training Evaluation",
+    "idp": "IDP",
+    "incentive": "Insentif",
+    "competency": "Kompetensi",
+    "user": "Manajemen Pengguna",
+    "feedback": "Feedback",
+    "other": "Lainnya"
+  },
+  "actions": {
+    "create": "Menambahkan",
+    "update": "Mengubah",
+    "delete": "Menghapus",
+    "approve": "Menyetujui",
+    "reject": "Menolak",
+    "cancel": "Membatalkan",
+    "claim_incentive": "Klaim insentif",
+    "borrow": "Meminjam buku",
+    "return": "Mengembalikan buku",
+    "reset_progress": "Reset progres",
+    "complete_module": "Menyelesaikan modul",
+    "submit_quiz": "Mengerjakan kuis",
+    "issue_certificate": "Menerbitkan sertifikat",
+    "import": "Impor data",
+    "process": "Memproses",
+    "renew_certificate": "Perpanjang sertifikat",
+    "sync": "Sinkronisasi",
+    "publish": "Mempublikasikan",
+    "submit_response": "Mengisi evaluasi",
+    "submit": "Mengajukan",
+    "add_note": "Menambahkan catatan",
+    "review": "Review",
+    "update_action_item": "Update action item",
+    "update_standard": "Mengubah standar",
+    "assess": "Menilai",
+    "request_change": "Mengajukan perubahan"
+  },
+  "unknownUser": "Tidak diketahui",
+  "empty": "Belum ada aktivitas untuk filter ini.",
+  "totalCount": "{{count}} aktivitas",
+  "pagination": "Halaman {{current}} dari {{total}}",
+  "changes": {
+    "empty": "kosong",
+    "showMore": "+{{count}} perubahan lainnya",
+    "showLess": "Tampilkan lebih sedikit",
+    "added": "+ ditambahkan: {{items}}",
+    "removed": "− dihapus: {{items}}"
+  }
+}

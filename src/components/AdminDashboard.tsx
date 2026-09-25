@@ -25,6 +25,7 @@ import PostTrainingEvaluationManager from './PostTrainingEvaluationManager';
 import CompetencyTemplateManager from './CompetencyTemplateManager';
 import CompetencyApprovalManager from './CompetencyApprovalManager';
 import CompetencyOverviewPage from './CompetencyOverviewPage';
+import ActivityLogList from './ActivityLogList';
 
 interface AdminDashboardProps {
     user: User;
@@ -32,7 +33,7 @@ interface AdminDashboardProps {
     initialView?: string;
 }
 
-type AdminView = 'overview' | 'users' | 'logs' | 'training' | 'meetings' | 'courses' | 'reports' | 'calendar' | 'quiz-reports' | 'employee-learning-report' | 'idp' | 'post-training-evaluation' | 'competency-template' | 'competency-approvals' | 'competency-overview';
+type AdminView = 'overview' | 'users' | 'logs' | 'training' | 'meetings' | 'courses' | 'reports' | 'calendar' | 'quiz-reports' | 'employee-learning-report' | 'idp' | 'post-training-evaluation' | 'competency-template' | 'competency-approvals' | 'competency-overview' | 'activity-logs';
 
 interface StatCardProps {
     label: string;
@@ -165,6 +166,8 @@ const AdminDashboard = ({ user, onNavigate, initialView }: AdminDashboardProps) 
                 return <CompetencyApprovalManager userRole={user.role} reviewerId={user.employee_id} onBack={() => setCurrentView('overview')} />;
             case 'competency-overview':
                 return <CompetencyOverviewPage userRole={user.role} onBack={() => setCurrentView('overview')} />;
+            case 'activity-logs':
+                return <ActivityLogList onBack={() => setCurrentView('overview')} />;
             case 'calendar':
                 return <LMSCalendar compact={false} userEmail={user.email} userRole={user.role} />;
             case 'overview':
