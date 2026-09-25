@@ -161,7 +161,6 @@ const ACTIVITY_RULES = [
     ['POST', /^\/api\/external-training\/hr-process$/, 'external_training', 'process', { lookup: ['external_training_requests', 'title'], id: (b) => b.id }],
     ['POST', /^\/api\/external-training\/hr-update-details$/, 'external_training', 'update', { lookup: ['external_training_requests', 'title'], id: (b) => b.id }],
     ['POST', /^\/api\/external-training\/renew-certificate$/, 'external_training', 'renew_certificate', { lookup: ['external_training_requests', 'title'], id: (b) => b.id }],
-    ['POST', /^\/api\/external-training\/([^/]+)\/sync-nusawork$/, 'external_training', 'sync', { lookup: ['external_training_requests', 'title'] }],
     ['PUT', /^\/api\/external-training\/([^/]+)$/, 'external_training', 'update', { lookup: ['external_training_requests', 'title'] }],
     ['DELETE', /^\/api\/external-training\/([^/]+)$/, 'external_training', 'delete', { lookup: ['external_training_requests', 'title'] }],
 
@@ -196,17 +195,17 @@ const ACTIVITY_RULES = [
     ['POST', /^\/api\/users$/, 'user', 'create', { label: (b) => b.name || b.email }],
     ['PUT', /^\/api\/users\/([^/]+)$/, 'user', 'update', { lookup: ['users', 'name'] }],
     ['DELETE', /^\/api\/users\/([^/]+)$/, 'user', 'delete', { lookup: ['users', 'name'] }],
-    ['POST', /^\/api\/admin\/sync-all-nusawork$/, 'user', 'sync'],
-    ['POST', /^\/api\/simas\/sync$/, 'user', 'sync'],
 
     ['POST', /^\/api\/feedback\/submit$/, 'feedback', 'submit_feedback', { lookup: (b) => b.meetingId ? ['meetings', 'title'] : ['courses', 'title'], id: (b) => b.meetingId || b.courseId }],
     ['POST', /^\/api\/feedback$/, 'feedback', 'submit_feedback'],
     ['POST', /^\/api\/utils\/import-gform$/, 'other', 'import'],
 ];
 
-// Write endpoints that aren't user activity: logins, token plumbing, heartbeats and read-only lookups sent as POST.
+// Write endpoints that aren't user activity: logins, token plumbing, heartbeats, read-only lookups sent as POST,
+// and data syncs (SIMAS/Nusawork) - pages fire those automatically on load, so they'd only flood the log.
 const ACTIVITY_SKIP = [
     /^\/api\/login$/, /^\/api\/auth\/google$/,
+    /^\/api\/simas\/sync$/, /^\/api\/admin\/sync-all-nusawork$/, /^\/api\/external-training\/[^/]+\/sync-nusawork$/,
     /^\/api\/upload$/, /^\/api\/auth\/refresh$/, /^\/api\/oauth\/token$/, /^\/api\/progress\/time$/,
     /^\/api\/learning-stats\/bulk$/, /^\/api\/employees\/resolve$/,
 ];
