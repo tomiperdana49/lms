@@ -199,8 +199,8 @@ const ACTIVITY_RULES = [
     ['POST', /^\/api\/admin\/sync-all-nusawork$/, 'user', 'sync'],
     ['POST', /^\/api\/simas\/sync$/, 'user', 'sync'],
 
-    ['POST', /^\/api\/feedback\/submit$/, 'feedback', 'submit', { lookup: (b) => b.meetingId ? ['meetings', 'title'] : ['courses', 'title'], id: (b) => b.meetingId || b.courseId }],
-    ['POST', /^\/api\/feedback$/, 'feedback', 'submit'],
+    ['POST', /^\/api\/feedback\/submit$/, 'feedback', 'submit_feedback', { lookup: (b) => b.meetingId ? ['meetings', 'title'] : ['courses', 'title'], id: (b) => b.meetingId || b.courseId }],
+    ['POST', /^\/api\/feedback$/, 'feedback', 'submit_feedback'],
     ['POST', /^\/api\/utils\/import-gform$/, 'other', 'import'],
 ];
 
@@ -212,7 +212,12 @@ const ACTIVITY_SKIP = [
 ];
 
 // Columns never shown in a change diff - secrets and bookkeeping that change on every write.
-const DIFF_IGNORED_FIELDS = new Set(['password', 'session_epoch', 'googleId', 'updated_at', 'created_at']);
+// DIFF_HIDDEN_KEYS applies at any depth inside JSON columns: id lists that just shadow the names
+// shown next to them. DIFF_OPAQUE_FIELDS are question banks and form definitions - far too large
+// to list field by field, so the log only says they were edited.
+const DIFF_IGNORED_FIELDS = new Set(['password', 'session_epoch', 'googleId', 'updated_at', 'created_at', 'user_uuid', 'nusawork_id_group', 'last_login_at', 'last_login_ip']);
+const DIFF_HIDDEN_KEYS = new Set(['employee_ids', 'attendee_ids']);
+const DIFF_OPAQUE_FIELDS = new Set(['pre_test_data', 'post_test_data', 'feedback_data', 'assessment_data', 'pre_assessment_data', 'entry_pre_test_data', 'payload_json', 'previous_json']);
 const DIFF_VALUE_MAX = 300;
 
 const DIFF_MAX_CHANGES = 40;
@@ -260,9 +265,20 @@ const diffValues = (path, before, after, out, depth) => {
     if (out.length >= DIFF_MAX_CHANGES) return;
     const field = path.join('.');
 
+    // A JSON column filled in for the first time (or cleared) still diffs per sub-field / list item.
+    const isEmpty = (v) => v === null || v === undefined || v === '';
+    if (isEmpty(before) && isEmpty(after)) return;
+    if (isEmpty(before) && isPlainObject(after)) before = {};
+    if (isEmpty(after) && isPlainObject(before)) after = {};
+    if (isEmpty(before) && Array.isArray(after)) before = [];
+    if (isEmpty(after) && Array.isArray(before)) after = [];
+
     if (depth < DIFF_MAX_DEPTH && isPlainObject(before) && isPlainObject(after)) {
         const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
-        for (const key of keys) diffValues([...path, key], before[key], after[key], out, depth + 1);
+        for (const key of keys) {
+            if (DIFF_HIDDEN_KEYS.has(key)) continue;
+            diffValues([...path, key], before[key], after[key], out, depth + 1);
+        }
         return;
     }
 
@@ -285,6 +301,9 @@ const diffValues = (path, before, after, out, depth) => {
     const from = normalizeDiffValue(before);
     const to = normalizeDiffValue(after);
     if (from === to) return;
+    // A blank field being initialised to 0/false (e.g. a fresh cost report) isn't a real change.
+    const isZeroish = (v) => v === '0' || v === 'false';
+    if ((from === null && isZeroish(to)) || (to === null && isZeroish(from))) return;
     out.push({ field, path, from: clipDiffValue(from), to: clipDiffValue(to) });
 };
 
@@ -293,6 +312,10 @@ const diffRows = (before, after) => {
     const changes = [];
     for (const field of Object.keys(after)) {
         if (DIFF_IGNORED_FIELDS.has(field)) continue;
+        if (DIFF_OPAQUE_FIELDS.has(field)) {
+            if (normalizeDiffValue(before[field]) !== normalizeDiffValue(after[field])) changes.push({ field, path: [field], opaque: true });
+            continue;
+        }
         diffValues([field], parseJsonColumn(before[field]), parseJsonColumn(after[field]), changes, 0);
     }
     return changes.slice(0, DIFF_MAX_CHANGES);

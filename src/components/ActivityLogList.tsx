@@ -30,6 +30,7 @@ interface FieldChange {
     to?: string | null;
     added?: string[];
     removed?: string[];
+    opaque?: boolean; // question banks / form definitions - only "it changed" is recorded
 }
 
 interface ActivityLogListProps {
@@ -56,16 +57,21 @@ const MODULE_COLORS: Record<string, string> = {
 const PAGE_SIZE = 50;
 const COLLAPSED_CHANGES = 3;
 
-// Column names come straight from the DB (hr_approval_status, planned_finish_date...) - make them readable.
+// Fallback for a column without a label in activityLog.json's `fields` - still better than snake_case.
 const humanizeField = (field: string) => {
     const words = field.replace(/_json$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').trim();
     return words.charAt(0).toUpperCase() + words.slice(1);
 };
 
-// "[Name]" segments identify a list element (e.g. one participant) and are shown as-is.
-const formatPath = (change: FieldChange) => (change.path || [change.field])
-    .map((segment) => (segment.startsWith('[') && segment.endsWith(']') ? segment.slice(1, -1) : humanizeField(segment)))
-    .join(' › ');
+const isListElementSegment = (segment: string) => segment.startsWith('[') && segment.endsWith(']');
+
+// The key a value belongs to (e.g. snackCost), skipping "[Name]" list-element segments.
+const leafKey = (change: FieldChange) => [...(change.path || [change.field])].reverse().find((seg) => !isListElementSegment(seg)) || change.field;
+
+const MONEY_KEY = /(cost|fee|reward|incentive|amount)|^(trainer|snack|lunch|other|total)$/i;
+const BOOLEAN_KEY = /^is(_|[A-Z])/;
+const FILE_VALUE = /^(\/api)?\/uploads\/|^https?:\/\//;
+const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
 
@@ -134,9 +140,22 @@ const ActivityLogList = ({ onBack }: ActivityLogListProps) => {
         day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
     });
 
-    const formatValue = (value: string | null | undefined) => {
+    // "[Name]" segments identify a list element (e.g. one participant) and are shown as-is.
+    const formatPath = (change: FieldChange) => (change.path || [change.field])
+        .map((segment) => (isListElementSegment(segment) ? segment.slice(1, -1) : t(`fields.${segment}`, { defaultValue: humanizeField(segment) })))
+        .join(' › ');
+
+    const formatValue = (value: string | null | undefined, key: string) => {
         if (value === null || value === undefined || value === '') return <span className="italic text-slate-400">{t('changes.empty')}</span>;
+        if (key === 'role' || key === 'actor_role') return t(`roleValues.${value}`, { defaultValue: value });
+        if (value === 'true' || (BOOLEAN_KEY.test(key) && value === '1')) return t('changes.yes');
+        if (value === 'false' || (BOOLEAN_KEY.test(key) && value === '0')) return t('changes.no');
+        if (MONEY_KEY.test(key) && value.trim() !== '' && !isNaN(Number(value))) return rupiah.format(Number(value));
         if (ISO_DATE.test(value)) return formatTime(value);
+        if (FILE_VALUE.test(value)) {
+            const href = value.startsWith('/') ? `${API_BASE_URL}${value}` : value;
+            return <a href={href} target="_blank" rel="noreferrer" className="underline hover:opacity-80" title={value}>{t('changes.viewFile')}</a>;
+        }
         return value;
     };
 
@@ -243,7 +262,9 @@ const ActivityLogList = ({ onBack }: ActivityLogListProps) => {
                                                 {(expanded.has(log.id) ? log.changes : log.changes.slice(0, COLLAPSED_CHANGES)).map((c) => (
                                                     <li key={c.field} className="break-words">
                                                         <span className="font-semibold text-slate-700">{formatPath(c)}:</span>{' '}
-                                                        {c.added || c.removed ? (
+                                                        {c.opaque ? (
+                                                            <span className="text-slate-600">{t('changes.opaque')}</span>
+                                                        ) : c.added || c.removed ? (
                                                             <>
                                                                 {c.added && c.added.length > 0 && <span className="text-emerald-700">{t('changes.added', { items: c.added.join(', ') })}</span>}
                                                                 {c.added && c.added.length > 0 && c.removed && c.removed.length > 0 && <span className="text-slate-400 mx-1">·</span>}
@@ -251,9 +272,9 @@ const ActivityLogList = ({ onBack }: ActivityLogListProps) => {
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <span className="text-rose-600 line-through decoration-rose-300">{formatValue(c.from)}</span>
+                                                                <span className="text-rose-600 line-through decoration-rose-300">{formatValue(c.from, leafKey(c))}</span>
                                                                 <span className="text-slate-400 mx-1">→</span>
-                                                                <span className="text-emerald-700">{formatValue(c.to)}</span>
+                                                                <span className="text-emerald-700">{formatValue(c.to, leafKey(c))}</span>
                                                             </>
                                                         )}
                                                     </li>
