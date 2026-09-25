@@ -385,6 +385,7 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
 
     const [isSettlementOpen, setIsSettlementOpen] = useState(false);
     const [settleCertificate, setSettleCertificate] = useState<File | null>(null);
+    const [settleRemoveCertificate, setSettleRemoveCertificate] = useState(false);
     const [settleData, setSettleData] = useState({
         training: 0,
         transport: 0,
@@ -685,6 +686,7 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
         });
         setIsSettlementOpen(true);
         setSettleCertificate(null);
+        setSettleRemoveCertificate(false);
     };
 
     const handleSaveSettlement = async () => {
@@ -697,7 +699,8 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
             const newTotal = settleData.training + settleData.transport + settleData.accommodation + settleData.others;
             const excess = Math.max(0, newTotal - (selectedRequest.cost || 0));
 
-            let certLink = undefined;
+            // undefined keeps the current certificate, null tells the server to remove it
+            let certLink: string | null | undefined = settleRemoveCertificate ? null : undefined;
             if (settleCertificate) {
                 const formData = new FormData();
                 formData.append('file', settleCertificate);
@@ -1653,7 +1656,7 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                             ))}
                                         </div>
                                     </div>
-                                    {selectedRequest.employeeRole === 'Sertifikat' && (
+                                    {hrEditCategory === 'Sertifikat' && (
                                         <div className="mt-4 space-y-4">
                                             <div>
                                                 <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.certificationResult')}</label>
@@ -1762,6 +1765,20 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                             )}
                                         </div>
                                     )}
+                                    {hrEditCategory !== 'Sertifikat' && (
+                                        <div className="mt-4">
+                                            <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.uploadCertificateOptional')}</label>
+                                            <input
+                                                type="file"
+                                                accept="image/*,.pdf"
+                                                onChange={(e) => setHrCertificateFile(e.target.files ? e.target.files[0] : null)}
+                                                className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none text-sm"
+                                            />
+                                            {selectedRequest._original?.certificate_link && !hrCertificateFile && (
+                                                <p className="text-xs text-emerald-600 mt-1">{t('requestModal.certificateAlreadyUploaded')}</p>
+                                            )}
+                                        </div>
+                                    )}
                                 </>
                             )}
 
@@ -1841,17 +1858,34 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                 </div>
                             </div>
 
-                            {selectedRequest?.employeeRole === 'Sertifikat' && (
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{t('settlementModal.uploadCertificateEvidenceOptional')}</label>
-                                    <input
-                                        type="file"
-                                        accept="image/*,.pdf"
-                                        onChange={(e) => setSettleCertificate(e.target.files ? e.target.files[0] : null)}
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm text-slate-600 bg-white"
-                                    />
-                                </div>
-                            )}
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{t('settlementModal.uploadCertificateEvidenceOptional')}</label>
+                                {selectedRequest?._original?.certificate_link && !settleCertificate && (
+                                    <div className="flex items-center justify-between gap-3 mb-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50">
+                                        {settleRemoveCertificate ? (
+                                            <>
+                                                <span className="text-xs font-semibold text-rose-600">{t('settlementModal.certificateWillBeRemoved')}</span>
+                                                <button type="button" onClick={() => setSettleRemoveCertificate(false)} className="text-xs font-bold text-indigo-600 hover:underline">{t('settlementModal.undoRemoveCertificate')}</button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <a href={resolveFileUrl(selectedRequest._original.certificate_link)} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs font-bold text-emerald-600 hover:underline truncate">
+                                                    <Award size={14} /> {t('settlementModal.viewCurrentCertificate')}
+                                                </a>
+                                                <button type="button" onClick={() => setSettleRemoveCertificate(true)} className="flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700">
+                                                    <Trash2 size={14} /> {t('settlementModal.removeCertificate')}
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                                <input
+                                    type="file"
+                                    accept="image/*,.pdf"
+                                    onChange={(e) => setSettleCertificate(e.target.files ? e.target.files[0] : null)}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm text-slate-600 bg-white"
+                                />
+                            </div>
 
                             {/* Post Training Evaluation - HR can attach or swap the linked form here too, same as
                                 Internal Training letting HR edit it after the session is already Paid. */}

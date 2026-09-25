@@ -7680,11 +7680,16 @@ app.put('/api/external-training/:id', async (req, res) => {
         const { id } = req.params;
         const { cost, costTraining, costTransport, costAccommodation, costOthers, additionalCost, settlementNote, certificateLink, pte_form_id } = req.body;
 
-        if (certificateLink) {
+        // certificateLink: a URL replaces the certificate, null removes it, undefined leaves it untouched.
+        if (certificateLink !== undefined) {
+            const prev = await query('SELECT certificate_link FROM external_training_requests WHERE id = ?', [id]);
             await query(
                 'UPDATE external_training_requests SET registration_fee = ?, travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, additional_cost = ?, settlement_note = ?, certificate_link = ?, pte_form_id = ? WHERE id = ?',
-                [costTraining || 0, costTransport || 0, costAccommodation || 0, costOthers || 0, additionalCost || 0, settlementNote || '', certificateLink, pte_form_id || null, id]
+                [costTraining || 0, costTransport || 0, costAccommodation || 0, costOthers || 0, additionalCost || 0, settlementNote || '', certificateLink || null, pte_form_id || null, id]
             );
+            if (prev[0]?.certificate_link && prev[0].certificate_link !== certificateLink) {
+                deleteLocalUpload(prev[0].certificate_link);
+            }
         } else {
             await query(
                 'UPDATE external_training_requests SET registration_fee = ?, travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, additional_cost = ?, settlement_note = ?, pte_form_id = ? WHERE id = ?',
