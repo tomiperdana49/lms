@@ -1,6 +1,6 @@
 {
   "backToDashboard": "Kembali ke Dashboard",
-  "title": "Kompetensi Teams",
+  "title": "Kompetensi Tim",
   "subtitle": "Nilai kompetensi setiap anggota tim terhadap standar jabatannya.",
   "loading": "Memuat...",
   "noTeamMembers": "Anda belum memiliki anggota tim.",
@@ -13,7 +13,7 @@
   "noCompetenciesForPosition": "Belum ada kompetensi yang terdaftar untuk posisi ini.",
   "overview": {
     "clickToAssess": "Klik nama karyawan untuk mengisi penilaiannya.",
-    "backToOverview": "Kembali ke Kompetensi Teams"
+    "backToOverview": "Kembali ke Kompetensi Tim"
   },
   "period": {
     "name": "Kuartal {{quarter}} {{year}}",

@@ -3,7 +3,7 @@
   "stats": {
     "totalStaff": "Total Staff",
     "booksRead": "Books Read",
-    "trainingInternal": "Training Internal",
+    "trainingInternal": "Internal Training",
     "pendingRequests": "Pending Requests",
     "trendVsLastMonth": "{{trend}} vs last month"
   },

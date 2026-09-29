@@ -32,7 +32,7 @@
     "statusApproved": "Approved",
     "statusPending": "Under Review",
     "statusRejected": "Rejected",
-    "statusCancelled": "Cancel",
+    "statusCancelled": "Cancelled",
     "noLogsFound": "No logs found.",
     "start": "Start: {{date}}",
     "finish": "Finish: {{date}}",

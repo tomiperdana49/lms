@@ -12,8 +12,8 @@
   "nav": {
     "readingLog": "Reading Log",
     "onlineModules": "Online Modules",
-    "trainingInternal": "Training Internal",
-    "trainingExternal": "Training External",
+    "trainingInternal": "Internal Training",
+    "trainingExternal": "External Training",
     "postTrainingEvaluation": "Post Training Evaluation",
     "idp": "IDP"
   },
@@ -93,7 +93,7 @@
       ]
     },
     "trainingInternal": {
-      "title": "Training Internal",
+      "title": "Internal Training",
       "audiences": {
         "participant": {
           "label": "As a Participant",
@@ -121,7 +121,7 @@
             }
           ],
           "tips": [
-            "There's no self-enrollment button for Training Internal sessions — sessions and their participants are set by HR/the Host; you just complete whatever session already shows up on your list.",
+            "There's no self-enrollment button for Internal Training sessions — sessions and their participants are set by HR/the Host; you just complete whatever session already shows up on your list.",
             "If a button still looks greyed out/locked, it's almost always because the Host/HR hasn't opened that step yet — not something you're doing wrong.",
             "The certificate only becomes downloadable after HR closes the session, not right after you finish submitting feedback."
           ]
@@ -136,7 +136,7 @@
             },
             {
               "title": "Open Host controls on your session",
-              "description": "If you're listed as a session's Host, a \"HOST CONTROL\" badge appears when you open that session's detail on the regular Training Internal page — you don't need to be HR for this."
+              "description": "If you're listed as a session's Host, a \"HOST CONTROL\" badge appears when you open that session's detail on the regular Internal Training page — you don't need to be HR for this."
             },
             {
               "title": "Open each stage for participants",
@@ -164,7 +164,7 @@
             }
           ],
           "tips": [
-            "You don't need to be HR to run a session — if you're listed as its Host, the controls automatically appear for you on the regular Training Internal page, not just in the Admin Panel.",
+            "You don't need to be HR to run a session — if you're listed as its Host, the controls automatically appear for you on the regular Internal Training page, not just in the Admin Panel.",
             "Creating new sessions and bulk-importing data both remain HR/HR_ADMIN-only, via the Admin Panel.",
             "If a session needs reopening after being closed, only HR/HR_ADMIN have a \"REOPEN SESSION\" button.",
             "The cost report can only be submitted once the session is closed — if the button is still locked with \"Session Still Open\", close the session first.",
@@ -174,7 +174,7 @@
       }
     },
     "trainingExternal": {
-      "title": "Training External",
+      "title": "External Training",
       "purpose": "Submit a request for training outside the company, and — if you have direct reports — approve your team's requests.",
       "steps": [
         {
@@ -183,7 +183,7 @@
         },
         {
           "title": "Wait for your supervisor's approval",
-          "description": "Your request shows status \"Pending (Supervisor)\" — your supervisor will see and approve/reject it on their \"Team Approvals\" tab."
+          "description": "Your request shows status \"Pending (your supervisor's name)\" — your supervisor will see and approve/reject it on their \"Team Approvals\" tab."
         },
         {
           "title": "HR processes it",
