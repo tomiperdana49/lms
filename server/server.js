@@ -1722,44 +1722,6 @@ const matchEmployeeFullName = async (rawName) => {
     return partial.length === 1 ? partial[0].full_name : null;
 };
 
-// Normalizes a local ID phone number to the "62..." format expected by the WhatsApp API.
-const normalizeIndonesianPhone = (phone) => {
-    if (!phone) return null;
-    let digits = String(phone).replace(/\D/g, '');
-    if (!digits) return null;
-    if (digits.startsWith('0')) digits = '62' + digits.slice(1);
-    else if (!digits.startsWith('62')) digits = '62' + digits;
-    return digits;
-};
-
-// --- WHATSAPP NOTIFICATION INTEGRATION (NusaContact) ---
-const sendWhatsAppNotification = async (toPhone, text) => {
-    const waUrl = process.env.WHATSAPP_API_URL;
-    const waToken = process.env.WHATSAPP_API_TOKEN;
-    const to = normalizeIndonesianPhone(toPhone);
-    if (!waUrl || !to) return;
-
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
-        const response = await fetch(waUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': waToken ? `Bearer ${waToken}` : '',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ to, body: 'text', text }),
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        if (!response.ok) {
-            console.error(`[WhatsApp] Notification failed (${response.status}):`, await response.text());
-        }
-    } catch (waErr) {
-        console.error('[WhatsApp] Failed to send notification:', waErr.message);
-    }
-};
-
 // Nusawork's employee filter API restricts results to employees active within
 // this window (e.g. excludes past employees who already resigned). Fixed start
 // at 2026-01-01, end always follows today so resigned employees stay findable.
@@ -6028,21 +5990,6 @@ app.post('/api/external-training/request', async (req, res) => {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [employee_id, employee_name, category, title, toMysqlDatetime(start_date), toMysqlDatetime(end_date), registration_fee || 0, attachment_link || '', vendor || '', location || '', payment_method || 'Reimbursement', Array.isArray(cc_employee_ids) && cc_employee_ids.length > 0 ? JSON.stringify(cc_employee_ids) : null]);
 
-        // Notify the requester's supervisor via WhatsApp (best-effort, never blocks the response)
-        try {
-            const supervisor = await findReportToEmployee(employee_id);
-            const supervisorPhone = supervisor?.whatsapp || supervisor?.mobile_phone;
-            if (supervisorPhone) {
-                const approvalLink = `${process.env.APP_BASE_URL || ''}/?page=external&tab=team_approvals`;
-                await sendWhatsAppNotification(
-                    supervisorPhone,
-                    `Halo ${supervisor.full_name}, ada pengajuan training eksternal baru dari ${employee_name} ("${title}") yang menunggu persetujuan Anda di LMS.\n\nCek di sini: ${approvalLink}`
-                );
-            }
-        } catch (notifyErr) {
-            console.error('[External Training] Failed to notify supervisor:', notifyErr.message);
-        }
-
         res.json({ success: true, id: result.insertId });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -6219,24 +6166,6 @@ app.post('/api/external-training/approve', async (req, res) => {
             'UPDATE external_training_requests SET status = ?, approved_by = ?, approval_note = ?, budget_notice_message = ? WHERE id = ?',
             [status, approved_by, approval_note.trim(), budgetNoticeMessage, id]
         );
-
-        // Notify every CC'd employee via WhatsApp, best-effort, only when the budget notice actually
-        // applies - a request that stays within the requester's own budget has nothing to tell them.
-        if (budgetNoticeMessage && Array.isArray(trainingRequest.cc_employee_ids) && trainingRequest.cc_employee_ids.length > 0) {
-            try {
-                const placeholders = trainingRequest.cc_employee_ids.map(() => '?').join(',');
-                const ccEmployees = await querySimAsset(
-                    `SELECT id_employee, whatsapp, mobile_phone FROM employees WHERE id_employee IN (${placeholders})`,
-                    trainingRequest.cc_employee_ids
-                );
-                for (const cc of ccEmployees) {
-                    const phone = cc.whatsapp || cc.mobile_phone;
-                    if (phone) await sendWhatsAppNotification(phone, budgetNoticeMessage);
-                }
-            } catch (notifyErr) {
-                console.error('[External Training] Failed to notify CC list:', notifyErr.message);
-            }
-        }
 
         res.json({ success: true, exceedsPersonalBudget });
     } catch (err) { res.status(500).json({ error: err.message }); }

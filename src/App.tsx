@@ -95,7 +95,7 @@ function App() {
 
   const [sessionExpiredReason, setSessionExpiredReason] = useState<'idle' | 'absolute' | null>(null);
 
-  // Deep links (e.g. from WhatsApp notifications, or the dashboard's "Perlu Tindakan Anda" widget)
+  // Deep links (e.g. from the dashboard's "Perlu Tindakan Anda" widget)
   // can force the External Training tab via ?tab= on load, or via onNavigate('external', tab) later.
   const [deepLinkTab, setDeepLinkTab] = useState<string | null>(() => new URLSearchParams(window.location.search).get('tab'));
 
