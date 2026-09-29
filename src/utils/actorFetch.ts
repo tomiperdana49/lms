@@ -1,34 +1,32 @@
 import { API_BASE_URL } from '../config';
 
-// Stamps every call to our own API with who is making it, so the server's activity log (Admin
-// Panel > Logs) can attribute write requests without each component passing the user along.
-// Values are URI-encoded because header values must be Latin-1 and names often aren't.
+// Where the session token from /api/login or /api/auth/google is kept (see App.tsx).
+export const AUTH_TOKEN_KEY = 'lms_token';
+// Fired when the server rejects the stored token (expired, revoked by a session-epoch bump, or
+// the account was removed) - App.tsx listens and logs the user out.
+export const SESSION_INVALID_EVENT = 'lms:session-invalid';
+
+// Attaches the session token to every call to our own API, so components don't each have to.
+// The server identifies the caller (including for the Admin Panel > Logs activity log) from it.
 export const installActorFetch = () => {
     const originalFetch = window.fetch.bind(window);
 
-    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = typeof input === 'string' ? input : input instanceof URL ? input.href : null;
         if (!url || !url.startsWith(API_BASE_URL)) return originalFetch(input, init);
 
-        let user: Record<string, unknown> | null = null;
+        let token: string | null = null;
         try {
-            const saved = localStorage.getItem('lms_user');
-            user = saved ? JSON.parse(saved) : null;
+            token = localStorage.getItem(AUTH_TOKEN_KEY);
         } catch {
-            user = null;
+            token = null;
         }
-        if (!user) return originalFetch(input, init);
+        if (!token) return originalFetch(input, init);
 
         const headers = new Headers(init?.headers);
-        const setActor = (name: string, value: unknown) => {
-            if (value !== undefined && value !== null && value !== '') headers.set(name, encodeURIComponent(String(value)));
-        };
-        setActor('X-Actor-Id', user.id);
-        setActor('X-Actor-Employee-Id', user.employee_id);
-        setActor('X-Actor-Name', user.name);
-        setActor('X-Actor-Email', user.email);
-        setActor('X-Actor-Role', user.role);
-
-        return originalFetch(input, { ...init, headers });
+        headers.set('Authorization', `Bearer ${token}`);
+        const response = await originalFetch(input, { ...init, headers });
+        if (response.status === 401) window.dispatchEvent(new Event(SESSION_INVALID_EVENT));
+        return response;
     };
 };

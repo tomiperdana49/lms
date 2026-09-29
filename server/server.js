@@ -89,6 +89,12 @@ initDB().then(async () => {
     // backfillPteResponseMeetingIds is defined further down this module - safe to reference here
     // since this callback only fires once the whole module has finished loading.
     await backfillPteResponseMeetingIds();
+
+    try {
+        await migrateLocalPasswords();
+    } catch (e) {
+        console.error('[AUTH] Password migration failed:', e.message);
+    }
 });
 
 // Multer Config
@@ -114,9 +120,134 @@ const query = async (sql, params) => {
     return results;
 };
 
+// --- AUTHENTICATION ---
+// Login issues a signed session token (HMAC-SHA256 over a small JSON payload), which the frontend
+// sends as "Authorization: Bearer <token>" on every API call (see src/utils/actorFetch.ts). The
+// middleware below rejects any /api request without a valid one, except the routes that must work
+// logged-out. The token only carries the user id - role and profile are re-read from `users` on
+// every request, so a role change or deleted account takes effect immediately.
+const AUTH_SECRET = process.env.AUTH_SECRET || (() => {
+    console.warn('[AUTH] AUTH_SECRET is not set - using a random per-process secret. Every restart will log all users out.');
+    return crypto.randomBytes(32).toString('hex');
+})();
+// Matches the frontend's absolute session timeout (src/App.tsx), which also enforces the 30-minute idle timeout.
+const AUTH_TOKEN_TTL_MS = 8 * 60 * 60 * 1000;
+const getSessionEpoch = () => process.env.SESSION_EPOCH || 'v1';
+
+const signAuthPayload = (payload) => crypto.createHmac('sha256', AUTH_SECRET).update(payload).digest('base64url');
+
+const issueAuthToken = (userId) => {
+    const payload = Buffer.from(JSON.stringify({
+        uid: String(userId),
+        epoch: getSessionEpoch(),
+        exp: Date.now() + AUTH_TOKEN_TTL_MS
+    })).toString('base64url');
+    return `${payload}.${signAuthPayload(payload)}`;
+};
+
+// Returns the token's user id, or null if it is malformed, tampered with, expired, or from an older session epoch.
+const verifyAuthToken = (token) => {
+    const [payload, signature] = String(token || '').split('.');
+    if (!payload || !signature) return null;
+    const expected = Buffer.from(signAuthPayload(payload));
+    const actual = Buffer.from(signature);
+    if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) return null;
+    try {
+        const { uid, epoch, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString());
+        if (!uid || epoch !== getSessionEpoch() || !(exp > Date.now())) return null;
+        return uid;
+    } catch {
+        return null;
+    }
+};
+
+// Local passwords are stored as "scrypt$<salt>$<hash>". UNUSABLE_PASSWORD marks accounts that
+// can only sign in through Nusawork or Google - it never matches, since it isn't a valid hash.
+const UNUSABLE_PASSWORD = '!';
+// The shared default every seeded account had - see migrateLocalPasswords below.
+const SHARED_DEFAULT_PASSWORDS = new Set(['nusanet', 'nusanet-oauth-placeholder', 'google-oauth-placeholder', '123', '']);
+
+const scryptAsync = (password, salt) => new Promise((resolve, reject) => {
+    crypto.scrypt(password, salt, 64, (err, key) => err ? reject(err) : resolve(key));
+});
+
+const hashPassword = async (password) => {
+    const salt = crypto.randomBytes(16);
+    const key = await scryptAsync(password, salt);
+    return `scrypt$${salt.toString('base64')}$${key.toString('base64')}`;
+};
+
+const verifyPassword = async (password, stored) => {
+    if (!password || typeof stored !== 'string' || !stored.startsWith('scrypt$')) return false;
+    const [, saltB64, keyB64] = stored.split('$');
+    const expected = Buffer.from(keyB64 || '', 'base64');
+    if (!saltB64 || expected.length === 0) return false;
+    const actual = await scryptAsync(password, Buffer.from(saltB64, 'base64'));
+    return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+};
+
+// One-time, idempotent: hashes any plaintext password left in `users`, and disables the shared
+// seeded default ("nusanet") and the OAuth placeholders instead of hashing them - those accounts
+// sign in through Nusawork (their real password) or Google.
+const migrateLocalPasswords = async () => {
+    const rows = await query(`SELECT id, password FROM users WHERE password NOT LIKE 'scrypt$%' AND password <> ?`, [UNUSABLE_PASSWORD]);
+    let disabled = 0;
+    for (const row of rows) {
+        if (SHARED_DEFAULT_PASSWORDS.has(row.password)) {
+            await query('UPDATE users SET password = ? WHERE id = ?', [UNUSABLE_PASSWORD, row.id]);
+            disabled++;
+        } else {
+            await query('UPDATE users SET password = ? WHERE id = ?', [await hashPassword(row.password), row.id]);
+        }
+    }
+    if (rows.length > 0) {
+        console.log(`[AUTH] Password migration: ${rows.length - disabled} hashed, ${disabled} shared/placeholder passwords disabled.`);
+    }
+};
+
+// Reachable without a session: sign-in itself, what the login page needs before sign-in, public
+// certificate verification (the /verify/:serial page), and the external API, which has its own
+// OAuth client-credentials check (authenticateExternalApi).
+const PUBLIC_API_ROUTES = [
+    ['POST', /^\/api\/login$/],
+    ['POST', /^\/api\/auth\/google$/],
+    ['GET', /^\/api\/config$/],
+    ['GET', /^\/api\/auth\/session-epoch$/],
+    ['GET', /^\/api\/(internal|online)-certificates\/verify\/[^/]+$/],
+    ['POST', /^\/api\/oauth\/token$/],
+    [null, /^\/api\/external\//],
+];
+
+app.use(async (req, res, next) => {
+    if (!req.path.startsWith('/api/') || req.method === 'OPTIONS') return next();
+    if (PUBLIC_API_ROUTES.some(([method, pattern]) => (!method || method === req.method) && pattern.test(req.path))) return next();
+
+    const header = String(req.headers.authorization || '');
+    const userId = header.startsWith('Bearer ') ? verifyAuthToken(header.slice(7)) : null;
+    if (!userId) return res.status(401).json({ success: false, message: 'Authentication required' });
+
+    try {
+        const [user] = await query('SELECT id, email, name, role, employee_id FROM users WHERE id = ?', [userId]);
+        if (!user) return res.status(401).json({ success: false, message: 'Authentication required' });
+        req.user = user;
+        next();
+    } catch (err) {
+        console.error('[AUTH] Failed to load session user:', err.message);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+const isHRRole = (role) => role === 'HR' || role === 'HR_ADMIN';
+
+// Admin Panel only: user management, the activity log, admin tools and debug dumps.
+app.use(['/api/users', '/api/admin', '/api/activity-logs', '/api/debug'], (req, res, next) => {
+    if (!isHRRole(req.user?.role)) return res.status(403).json({ success: false, message: 'HR access required' });
+    next();
+});
+
 // --- ACTIVITY LOG (Admin Panel > Logs) ---
-// Every successful write request under /api is recorded to activity_logs. The frontend stamps each
-// API call with X-Actor-* headers (see src/utils/actorFetch.ts). Rules map a route to a module/action pair
+// Every successful write request under /api is recorded to activity_logs, attributed to the
+// signed-in user from the session token (see the auth middleware above). Rules map a route to a module/action pair
 // the Logs page can filter on; `lookup` resolves a human-readable label for the affected record
 // BEFORE the handler runs, so a DELETE can still name what it deleted.
 const approvalAction = (status) => {
@@ -320,11 +451,6 @@ const diffRows = (before, after) => {
     return changes.slice(0, DIFF_MAX_CHANGES);
 };
 
-const decodeActorHeader = (value) => {
-    if (!value) return null;
-    try { return decodeURIComponent(String(value)).slice(0, 255); } catch { return String(value).slice(0, 255); }
-};
-
 app.use(async (req, res, next) => {
     const method = req.method.toUpperCase();
     const reqPath = req.path;
@@ -376,12 +502,14 @@ app.use(async (req, res, next) => {
                 console.error('[ACTIVITY LOG] Failed to diff:', e.message);
             }
         }
+        // req.user is set by the auth middleware from the verified session token; it is absent only
+        // on the public routes (e.g. login), which are logged without an actor.
         const actor = {
-            id: decodeActorHeader(req.headers['x-actor-id']),
-            employeeId: decodeActorHeader(req.headers['x-actor-employee-id']),
-            name: decodeActorHeader(req.headers['x-actor-name']),
-            email: decodeActorHeader(req.headers['x-actor-email']),
-            role: decodeActorHeader(req.headers['x-actor-role']),
+            id: req.user?.id ?? null,
+            employeeId: req.user?.employee_id ?? null,
+            name: req.user?.name ?? null,
+            email: req.user?.email ?? null,
+            role: req.user?.role ?? null,
         };
         const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
         query(
@@ -1972,15 +2100,16 @@ app.post('/api/login', async (req, res) => {
         // Fallback for custom / demo accounts without proper email formats if not found by helper
         if (!user) {
             const localUsers = await query(
-                'SELECT * FROM users WHERE (email = ? OR employee_id = ?) AND password = ?',
-                [loginId, loginId, cleanPassword]
+                'SELECT * FROM users WHERE email = ? OR employee_id = ?',
+                [loginId, loginId]
             );
             if (localUsers.length > 0) {
                 user = localUsers[0];
             }
         }
 
-        if (user && user.password === cleanPassword) {
+        // Accounts without a usable local password (UNUSABLE_PASSWORD) fall through to Nusawork below.
+        if (user && await verifyPassword(cleanPassword, user.password)) {
             console.log(`[LOGIN SUCCESS] Local user found for ${loginId}`);
 
             // Sync/update user details from Nusawork in background
@@ -2013,6 +2142,7 @@ app.post('/api/login', async (req, res) => {
 
             return res.json({
                 success: true,
+                token: issueAuthToken(finalUser.id),
                 user: {
                     id: finalUser.id,
                     name: finalUser.name,
@@ -2052,7 +2182,6 @@ app.post('/api/login', async (req, res) => {
             });
 
             const authData = await authResponse.json();
-            console.log(`[NUSANET AUTH] Response for ${loginId}:`, authData);
 
             if (authResponse.ok && authData.access_token) {
                 console.log(`[NUSANET AUTH] Success for ${loginId}`);
@@ -2091,7 +2220,7 @@ app.post('/api/login', async (req, res) => {
                     const initialRole = determineInitialRole(employeeHelper);
 
                     await query('INSERT INTO users (id, email, password, name, role, avatar, branch, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                        [id, loginId, 'nusanet-oauth-placeholder', fullName, initialRole, avatar, branch, employeeId]);
+                        [id, loginId, UNUSABLE_PASSWORD, fullName, initialRole, avatar, branch, employeeId]);
 
                     const newUsers = await query('SELECT * FROM users WHERE email = ?', [loginId]);
                     user = newUsers[0];
@@ -2101,6 +2230,7 @@ app.post('/api/login', async (req, res) => {
 
                 return res.json({
                     success: true,
+                    token: issueAuthToken(user.id),
                     user: {
                         id: user.id,
                         name: user.name,
@@ -2127,10 +2257,34 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+// Must match the client ID the login page's Google button uses (VITE_GOOGLE_CLIENT_ID, same fallback as src/App.tsx).
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '735607886412-vgmgsm981577uhg72etjeoh30jjp8trs.apps.googleusercontent.com';
+
+// Verifies a Google Sign-In ID token with Google and returns its verified email, or null. The
+// email must come from here, never from the request body - otherwise anyone could claim any address.
+const verifyGoogleCredential = async (credential) => {
+    if (!credential) return null;
+    try {
+        const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+        if (!response.ok) return null;
+        const info = await response.json();
+        const validIssuer = info.iss === 'accounts.google.com' || info.iss === 'https://accounts.google.com';
+        const verified = info.email_verified === true || info.email_verified === 'true';
+        if (info.aud !== GOOGLE_CLIENT_ID || !validIssuer || !verified || !(Number(info.exp) * 1000 > Date.now())) return null;
+        return info.email || null;
+    } catch (err) {
+        console.error('[GOOGLE AUTH] Failed to verify credential:', err.message);
+        return null;
+    }
+};
+
 app.post('/api/auth/google', async (req, res) => {
     try {
-        const { email } = req.body;
-        if (!email || (!email.endsWith('@nusawork.com') && !email.endsWith('@nusa.id'))) {
+        const email = await verifyGoogleCredential(req.body?.credential);
+        if (!email) {
+            return res.status(401).json({ success: false, message: 'Google sign-in could not be verified. Please try again.' });
+        }
+        if (!email.endsWith('@nusawork.com') && !email.endsWith('@nusa.id')) {
             return res.status(403).json({ success: false, message: 'Access Restricted: Only @nusa.id or @nusawork.com emails are allowed.' });
         }
 
@@ -2169,7 +2323,7 @@ app.post('/api/auth/google', async (req, res) => {
 
             console.log(`[GOOGLE AUTH] Creating new user ${email} with default role ${initialRole}`);
             await query('INSERT INTO users (id, email, password, name, role, avatar, branch, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [id, email, 'google-oauth-placeholder', name, initialRole, avatar, branch, employeeId]);
+                [id, email, UNUSABLE_PASSWORD, name, initialRole, avatar, branch, employeeId]);
 
             user = { id, email, name, role: initialRole, avatar, branch, employee_id: employeeId };
         } else {
@@ -2190,6 +2344,7 @@ app.post('/api/auth/google', async (req, res) => {
 
         res.json({
             success: true,
+            token: issueAuthToken(user.id),
             user: {
                 id: user.id,
                 name: user.name,
@@ -2268,18 +2423,15 @@ app.get('/api/auth/session-epoch', (req, res) => {
 });
 
 // --- AUTH SESSION REFRESH ENDPOINT ---
+// Re-reads the signed-in user (from the session token, via the auth middleware) on page reload.
 app.post('/api/auth/refresh', async (req, res) => {
     try {
-        const { email } = req.body;
-        if (!email) {
-            return res.status(400).json({ success: false, message: 'Email is required' });
-        }
-
-        let users = await query('SELECT * FROM users WHERE email = ?', [email]);
-        let user = users[0];
+        const users = await query('SELECT * FROM users WHERE id = ?', [req.user.id]);
+        const user = users[0];
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
+        const { email } = user;
 
         const employees = await querySimAsset('SELECT * FROM employees WHERE email = ?', [email]);
         const employeeHelper = employees.length > 0 ? employees[0] : null;
@@ -3402,10 +3554,14 @@ app.get('/api/online-certificates/verify/:serial', async (req, res) => {
     }
 });
 
+// Strips credentials from a users row before it leaves the server - the password column is never
+// needed client-side (the edit form always starts it empty and only sends a new one).
+const toPublicUser = ({ password, ...rest }) => rest;
+
 app.get('/api/users', async (req, res) => {
     try {
         const users = await query('SELECT * FROM users');
-        res.json(users);
+        res.json(users.map(toPublicUser));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -3528,10 +3684,12 @@ app.post('/api/users', async (req, res) => {
         const existing = await query('SELECT * FROM users WHERE email = ?', [newUser.email]);
         if (existing.length > 0) return res.status(400).json({ message: 'User already exists' });
 
+        // Without a password the account signs in through Nusawork or Google only.
+        const storedPassword = newUser.password ? await hashPassword(newUser.password) : UNUSABLE_PASSWORD;
         await query('INSERT INTO users (id, email, password, name, role, employee_id) VALUES (?, ?, ?, ?, ?, ?)',
-            [newUser.id, newUser.email, newUser.password || '123', newUser.name, newUser.role, newUser.employee_id || null]);
+            [newUser.id, newUser.email, storedPassword, newUser.name, newUser.role, newUser.employee_id || null]);
 
-        res.json(newUser);
+        res.json(toPublicUser(newUser));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -3556,6 +3714,9 @@ app.put('/api/users/:id', async (req, res) => {
         if (Object.keys(filteredUpdates).length === 0) {
             return res.json({ message: 'No valid fields to update' });
         }
+        if (filteredUpdates.password) {
+            filteredUpdates.password = await hashPassword(filteredUpdates.password);
+        }
 
         // Construct dynamic update query
         const fields = Object.keys(filteredUpdates).map(k => `${k} = ?`).join(', ');
@@ -3564,7 +3725,7 @@ app.put('/api/users/:id', async (req, res) => {
         await query(`UPDATE users SET ${fields} WHERE id = ?`, [...values, id]);
 
         const updated = await query('SELECT * FROM users WHERE id = ?', [id]);
-        res.json(updated[0]);
+        res.json(updated[0] ? toPublicUser(updated[0]) : null);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

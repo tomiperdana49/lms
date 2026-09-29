@@ -1,7 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { Lock, Mail, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
-import { jwtDecode } from "jwt-decode";
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { User } from '../types';
@@ -9,7 +8,7 @@ import PopupNotification from './PopupNotification';
 import LanguageSwitcher from './LanguageSwitcher';
 
 interface LoginPageProps {
-    onLogin: (user: User) => void;
+    onLogin: (user: User, token: string) => void;
     sessionExpiredReason?: 'idle' | 'absolute' | null;
     onSessionExpiredReasonShown?: () => void;
 }
@@ -46,20 +45,17 @@ const LoginPage = ({ onLogin, sessionExpiredReason, onSessionExpiredReasonShown 
         setIsLoading(true);
 
         try {
-            console.log("Attempting login with:", { identifier, password }); // DEBUG
             const response = await fetch(`${API_BASE_URL}/api/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ identifier, password })
             });
 
-            console.log("Response status:", response.status); // DEBUG
             const data = await response.json();
-            console.log("Response data:", data); // DEBUG
 
             if (data.success) {
                 // If login success, go straight to dashboard without showing popup
-                onLogin(data.user);
+                onLogin(data.user, data.token);
             } else {
                 setNotification({
                     show: true,
@@ -84,21 +80,18 @@ const LoginPage = ({ onLogin, sessionExpiredReason, onSessionExpiredReasonShown 
 
         try {
             setIsLoading(true);
-            const decoded = jwtDecode<{ email: string }>(credentialResponse.credential);
-            const googleEmail = decoded.email;
-
-            // Call Backend to verify/create user
+            // The backend verifies the Google ID token itself and takes the email from it
             const response = await fetch(`${API_BASE_URL}/api/auth/google`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: googleEmail })
+                body: JSON.stringify({ credential: credentialResponse.credential })
             });
 
             const data = await response.json();
 
             if (data.success) {
                 // Google login success - go straight to dashboard
-                onLogin(data.user);
+                onLogin(data.user, data.token);
             } else {
                 setNotification({ show: true, type: 'error', message: data.message || t('googleLoginFailed') });
                 setIsLoading(false);

@@ -23,6 +23,7 @@ import PostTrainingEvaluationMine from './components/PostTrainingEvaluationMine'
 import type { Page, Role, User } from './types';
 
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { AUTH_TOKEN_KEY, SESSION_INVALID_EVENT } from './utils/actorFetch';
 
 // Session policy: 30 min idle timeout, 8 hour absolute timeout, renewed on every user activity.
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
@@ -90,7 +91,9 @@ function App() {
 
   const [user, setUser] = useState<User | null>(() => {
     const savedUser = localStorage.getItem('lms_user');
-    return savedUser ? JSON.parse(savedUser) : null;
+    // A saved user without a session token (e.g. logged in before tokens existed) can't call the
+    // API anymore, so treat it as logged out.
+    return savedUser && localStorage.getItem(AUTH_TOKEN_KEY) ? JSON.parse(savedUser) : null;
   });
 
   const [sessionExpiredReason, setSessionExpiredReason] = useState<'idle' | 'absolute' | null>(null);
@@ -177,6 +180,7 @@ function App() {
     setUser(null);
     setActivePage('dashboard');
     localStorage.removeItem('lms_user');
+    localStorage.removeItem(AUTH_TOKEN_KEY);
     localStorage.removeItem('lms_active_page');
     localStorage.removeItem(LOGIN_AT_KEY);
     localStorage.removeItem(LAST_ACTIVITY_KEY);
@@ -289,22 +293,14 @@ function App() {
   // Refresh user profile/supervisor status on page load (reload)
   useEffect(() => {
     const refreshUserSession = async () => {
-      const savedUser = localStorage.getItem('lms_user');
-      if (savedUser) {
+      if (localStorage.getItem('lms_user') && localStorage.getItem(AUTH_TOKEN_KEY)) {
         try {
-          const parsed = JSON.parse(savedUser);
-          if (parsed && parsed.email) {
-            const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email: parsed.email })
-            });
-            if (res.ok) {
-              const data = await res.json();
-              if (data.success && data.user) {
-                console.log('[AUTH] Session refreshed on reload:', data.user);
-                setUser(data.user);
-              }
+          const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, { method: 'POST' });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.user) {
+              console.log('[AUTH] Session refreshed on reload:', data.user);
+              setUser(data.user);
             }
           }
         } catch (err) {
@@ -313,6 +309,16 @@ function App() {
       }
     };
     refreshUserSession();
+  }, []);
+
+  // The server rejected our session token (expired, revoked, or the account is gone) - log out
+  // the same way as an absolute timeout, so the login page explains why.
+  useEffect(() => {
+    const onSessionInvalid = () => {
+      if (localStorage.getItem('lms_user')) forceLogout('absolute');
+    };
+    window.addEventListener(SESSION_INVALID_EVENT, onSessionInvalid);
+    return () => window.removeEventListener(SESSION_INVALID_EVENT, onSessionInvalid);
   }, []);
 
   // Session Epoch Check (Force logout if version mismatches)
@@ -331,6 +337,7 @@ function App() {
             setUser(null);
             setActivePage('dashboard');
             localStorage.removeItem('lms_user');
+            localStorage.removeItem(AUTH_TOKEN_KEY);
             localStorage.removeItem('lms_active_page');
           }
           localStorage.setItem('lms_session_epoch', serverEpoch);
@@ -356,7 +363,8 @@ function App() {
     return (
       <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
         <LoginPage
-          onLogin={(loggedInUser) => {
+          onLogin={(loggedInUser, token) => {
+            localStorage.setItem(AUTH_TOKEN_KEY, token);
             localStorage.setItem(LOGIN_AT_KEY, String(Date.now()));
             localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
             setUser(loggedInUser);
@@ -373,6 +381,7 @@ function App() {
     setUser(null);
     setActivePage('dashboard');
     localStorage.removeItem('lms_user');
+    localStorage.removeItem(AUTH_TOKEN_KEY);
     localStorage.removeItem('lms_active_page');
     localStorage.removeItem(LOGIN_AT_KEY);
     localStorage.removeItem(LAST_ACTIVITY_KEY);
