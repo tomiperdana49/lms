@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../config';
 import type { Role, CompetencyTemplate } from '../types';
 import PopupNotification from './PopupNotification';
 import ConfirmationModal from './ConfirmationModal';
+import SearchableSelect from './SearchableSelect';
 
 interface CompetencyTemplateManagerProps {
     userRole: Role;
@@ -241,16 +242,15 @@ const CompetencyTemplateManager = ({ userRole, onBack }: CompetencyTemplateManag
                         <option key={type} value={type}>{type}</option>
                     ))}
                 </select>
-                <select
+                <SearchableSelect
                     value={filterPosition}
-                    onChange={e => { setFilterPosition(e.target.value); setCurrentPage(1); }}
-                    className="px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-sm text-slate-700"
-                >
-                    <option value="">{t('filters.allPositions')}</option>
-                    {filterPositionOptions.map(pos => (
-                        <option key={pos} value={pos}>{pos}</option>
-                    ))}
-                </select>
+                    onChange={value => { setFilterPosition(value); setCurrentPage(1); }}
+                    options={filterPositionOptions}
+                    allLabel={t('filters.allPositions')}
+                    searchPlaceholder={t('filters.searchPosition')}
+                    noResultsLabel={t('filters.noPositionMatch')}
+                    className="sm:w-72"
+                />
                 {(filterType || filterPosition) && (
                     <button
                         onClick={() => { setFilterType(''); setFilterPosition(''); setCurrentPage(1); }}

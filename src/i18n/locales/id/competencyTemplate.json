@@ -11,7 +11,9 @@
   "filters": {
     "allTypes": "Semua Jenis Kompetensi",
     "allPositions": "Semua Posisi",
-    "reset": "Reset Filter"
+    "reset": "Reset Filter",
+    "searchPosition": "Cari posisi...",
+    "noPositionMatch": "Posisi tidak ditemukan"
   },
   "table": {
     "competencyType": "Jenis Kompetensi",

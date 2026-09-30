@@ -11,7 +11,9 @@
   "filters": {
     "allTypes": "All Competency Types",
     "allPositions": "All Positions",
-    "reset": "Reset Filters"
+    "reset": "Reset Filters",
+    "searchPosition": "Search position...",
+    "noPositionMatch": "No matching position"
   },
   "table": {
     "competencyType": "Competency Type",
