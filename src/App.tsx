@@ -164,11 +164,12 @@ function App() {
     return localStorage.getItem('lms_admin_view') || 'overview';
   });
 
-  const [config, setConfig] = useState<{ moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean; moduleIDP: boolean }>({
+  const [config, setConfig] = useState<{ moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean; moduleIDP: boolean; moduleLeaderboard: boolean }>({
     moduleInternal: false,
     moduleExternal: false,
     moduleIncentive: false,
-    moduleIDP: false
+    moduleIDP: false,
+    moduleLeaderboard: false
   });
 
   useEffect(() => {
@@ -181,7 +182,8 @@ function App() {
             moduleInternal: !!data.moduleInternal,
             moduleExternal: !!data.moduleExternal,
             moduleIncentive: !!data.moduleIncentive,
-            moduleIDP: !!data.moduleIDP
+            moduleIDP: !!data.moduleIDP,
+            moduleLeaderboard: !!data.moduleLeaderboard
           });
         }
       } catch (err) {
@@ -496,7 +498,7 @@ function App() {
 
         {activePage === 'calendar' && <LMSCalendar userEmail={user?.email} />}
 
-        {activePage === 'leaderboard' && <LeaderboardPage currentUser={user} />}
+        {activePage === 'leaderboard' && config.moduleLeaderboard && <LeaderboardPage currentUser={user} />}
 
         {activePage === 'learning-report' && (
           <LearningReport

@@ -2449,6 +2449,8 @@ const LEADERBOARD_DUTY_KEYS = ['idp', 'competency', 'pte'];
 // Points for a completed module or attended training that has no post-test to score it by.
 const LEADERBOARD_NO_POST_TEST_POINTS = 8;
 const LEADERBOARD_CACHE_MS = 10 * 60 * 1000;
+// Off unless module_leaderboard=true in .env - hides the menu (via /api/config) and the endpoint.
+const isLeaderboardEnabled = () => process.env.module_leaderboard === 'true';
 
 // Reading log points follow the incentive category (see AdminReadingLog.tsx): Rp100.000 books earn
 // 10, Rp50.000 business comics 5, and fiction/magazines - no incentive - still earn 3.
@@ -2677,6 +2679,7 @@ const getLeaderboard = async (year, { refresh = false } = {}) => {
 // viewer's own row (and for everyone when HR is looking), so colleagues see scores, not details.
 app.get('/api/leaderboard', async (req, res) => {
     try {
+        if (!isLeaderboardEnabled()) return res.status(404).json({ error: 'Leaderboard is not enabled' });
         const currentYear = nowInWib().getUTCFullYear();
         const year = Number(req.query.year) || currentYear;
         if (year < 2020 || year > currentYear) return res.status(400).json({ error: 'Invalid year' });
@@ -2700,7 +2703,8 @@ app.get('/api/config', (req, res) => {
         moduleInternal: process.env.module_internal === 'true',
         moduleExternal: process.env.module_external === 'true',
         moduleIncentive: process.env.module_incentive_certification === 'true',
-        moduleIDP: process.env.module_IDP !== 'false'
+        moduleIDP: process.env.module_IDP !== 'false',
+        moduleLeaderboard: isLeaderboardEnabled()
     });
 });
 
