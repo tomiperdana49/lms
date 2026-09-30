@@ -3819,9 +3819,9 @@ const logGeneralTicket = async ({ kind, reference, ticketPic, ticketId = null, s
     }
 };
 
-// Master switch for every IS5 general ticket (fitur_general_ticket=true in .env). Off - or unset -
+// Master switch for every IS5 general ticket (FITUR_GENERAL_TICKET=true in .env). Off - or unset -
 // means no ticket is sent from any flow; the per-reminder *_ENABLED flags only apply when it's on.
-const isGeneralTicketEnabled = () => process.env.fitur_general_ticket === 'true';
+const isGeneralTicketEnabled = () => process.env.FITUR_GENERAL_TICKET === 'true';
 
 // Creates a General Ticket (GT) in IS5. `ticketPic` is the employee the ticket is for; the followers
 // come from IS5_TICKET_FOLLOW. `kind` and `reference` only label the attempt in general_ticket_logs
@@ -3841,8 +3841,8 @@ const createGeneralTicket = async ({ kind = 'manual', reference = null, subject,
 
     // Callers check isGeneralTicketEnabled() first; this only catches one that doesn't.
     if (!isGeneralTicketEnabled()) {
-        await log({ status: 'FAILED', errorMessage: 'General tickets are disabled (fitur_general_ticket is not true)' });
-        throw new Error('General tickets are disabled (fitur_general_ticket is not true)');
+        await log({ status: 'FAILED', errorMessage: 'General tickets are disabled (FITUR_GENERAL_TICKET is not true)' });
+        throw new Error('General tickets are disabled (FITUR_GENERAL_TICKET is not true)');
     }
     if (!apiKey) {
         await log({ status: 'FAILED', errorMessage: 'IS5_API_KEY is not configured' });
@@ -3912,7 +3912,7 @@ const sendReminderTicketOnce = async ({ kind, recipientEmployeeId, period, refId
 const REMINDER_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 const scheduleReminderJob = (label, job) => {
     if (!isGeneralTicketEnabled()) {
-        console.warn(`[${label}] Enabled, but fitur_general_ticket is not true - reminders are disabled.`);
+        console.warn(`[${label}] Enabled, but FITUR_GENERAL_TICKET is not true - reminders are disabled.`);
         return;
     }
     if (!process.env.IS5_API_KEY) {
@@ -3933,7 +3933,7 @@ const TICKET_DATETIME_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 app.post('/api/general-tickets', async (req, res) => {
     try {
         if (!isGeneralTicketEnabled()) {
-            return res.status(503).json({ success: false, message: 'General tickets are disabled (fitur_general_ticket is not true)' });
+            return res.status(503).json({ success: false, message: 'General tickets are disabled (FITUR_GENERAL_TICKET is not true)' });
         }
         const { subject, comment, time_expired, priority_id, ticket_pic } = req.body || {};
         if (!subject || !comment) {
