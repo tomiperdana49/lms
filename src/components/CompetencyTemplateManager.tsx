@@ -232,16 +232,15 @@ const CompetencyTemplateManager = ({ userRole, onBack }: CompetencyTemplateManag
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                <select
+                <SearchableSelect
                     value={filterType}
-                    onChange={e => { setFilterType(e.target.value); setCurrentPage(1); }}
-                    className="px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-sm text-slate-700"
-                >
-                    <option value="">{t('filters.allTypes')}</option>
-                    {filterTypeOptions.map(type => (
-                        <option key={type} value={type}>{type}</option>
-                    ))}
-                </select>
+                    onChange={value => { setFilterType(value); setCurrentPage(1); }}
+                    options={filterTypeOptions}
+                    allLabel={t('filters.allTypes')}
+                    searchPlaceholder={t('filters.searchType')}
+                    noResultsLabel={t('filters.noTypeMatch')}
+                    className="sm:w-64"
+                />
                 <SearchableSelect
                     value={filterPosition}
                     onChange={value => { setFilterPosition(value); setCurrentPage(1); }}
