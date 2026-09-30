@@ -2438,6 +2438,262 @@ app.get('/api/activity-logs', async (req, res) => {
     }
 });
 
+// --- LEADERBOARD (points 1-100 per employee and per team) ---
+// Every active, non-intern employee earns capped points per component for the year; leaders also
+// earn points for their leader duties, measured as the share of those tasks they completed. The
+// score is total / the maximum they could have earned, scaled to 1-100. A team is a leader plus
+// their direct reports, scored as the average of its members.
+const LEADERBOARD_CAPS = { reading: 30, module: 5, internal: 20, host: 10, external: 15, idp: 10, competency: 5, pte: 5 };
+const LEADERBOARD_BASE_KEYS = ['reading', 'module', 'internal', 'host', 'external'];
+const LEADERBOARD_DUTY_KEYS = ['idp', 'competency', 'pte'];
+// Points for a completed module or attended training that has no post-test to score it by.
+const LEADERBOARD_NO_POST_TEST_POINTS = 8;
+const LEADERBOARD_CACHE_MS = 10 * 60 * 1000;
+
+// Reading log points follow the incentive category (see AdminReadingLog.tsx): Rp100.000 books earn
+// 10, Rp50.000 business comics 5, and fiction/magazines - no incentive - still earn 3.
+const readingLogPoints = (category) => {
+    const cat = (category || '').trim().toLowerCase();
+    if (cat === 'buku fiksi/novel' || cat === 'majalah' || cat === 'fiction') return 3;
+    if (cat.includes('komik') || cat.startsWith('comic')) return 5;
+    return 10;
+};
+
+const computeLeaderboard = async (year) => {
+    const today = nowInWib();
+    const isCurrentYear = today.getUTCFullYear() === year;
+    const lastMonth = isCurrentYear ? today.getUTCMonth() + 1 : 12;
+    const lastQuarter = isCurrentYear ? Math.floor(today.getUTCMonth() / 3) + 1 : 4;
+    const yearOf = (v) => v ? new Date(v).getFullYear() : null;
+
+    const employees = (await querySimAsset(
+        `SELECT id_employee, user_id, full_name, nickname, job_position, organization_name, id_report_to, id_report_to_value,
+                active_status, status_join, deleted_at
+         FROM employees`
+    )).filter(e => e.id_employee && !e.deleted_at && isActiveNonIntern(e));
+    const points = new Map(employees.map(e => [String(e.id_employee), Object.fromEntries(Object.keys(LEADERBOARD_CAPS).map(k => [k, 0]))]));
+    const add = (employeeId, key, value) => { const p = points.get(String(employeeId)); if (p) p[key] += value; };
+
+    // Reading logs - only HR-Approved ones count; Rejected/Cancelled/Pending/Draft earn nothing.
+    for (const r of await query(
+        `SELECT employee_id, category FROM reading_logs
+         WHERE hr_approval_status = 'Approved' AND YEAR(COALESCE(finish_date, date)) = ?`, [year]
+    )) add(r.employee_id, 'reading', readingLogPoints(r.category));
+
+    // Online modules - a course counts once every module is completed: average best post-test / 10.
+    const moduleCount = new Map((await query('SELECT course_id, COUNT(*) AS n FROM course_modules GROUP BY course_id')).map(r => [r.course_id, r.n]));
+    const coursePostScores = new Map();
+    for (const r of await query(
+        `SELECT employee_id, course_id, module_id, MAX(score) AS score, MAX(date) AS date FROM quiz_results
+         WHERE course_id IS NOT NULL AND quiz_type = 'POST' AND employee_id IS NOT NULL
+         GROUP BY employee_id, course_id, module_id`
+    )) {
+        const key = `${r.employee_id}|${r.course_id}`;
+        if (!coursePostScores.has(key)) coursePostScores.set(key, { scores: [], lastDate: null });
+        const entry = coursePostScores.get(key);
+        entry.scores.push(Number(r.score));
+        if (!entry.lastDate || new Date(r.date) > new Date(entry.lastDate)) entry.lastDate = r.date;
+    }
+    for (const p of await query('SELECT employee_id, course_id, completed_module_ids, last_access FROM progress WHERE employee_id IS NOT NULL')) {
+        let done = [];
+        try { done = JSON.parse(p.completed_module_ids || '[]'); } catch { done = []; }
+        const total = moduleCount.get(p.course_id) || 0;
+        if (!total || new Set(done).size < total) continue;
+        const post = coursePostScores.get(`${p.employee_id}|${p.course_id}`);
+        // Completion has no timestamp of its own - the latest post-test (or last access) dates it.
+        if (yearOf(post?.lastDate || p.last_access) !== year) continue;
+        add(p.employee_id, 'module', post ? post.scores.reduce((a, b) => a + b, 0) / post.scores.length / 10 : LEADERBOARD_NO_POST_TEST_POINTS);
+    }
+
+    // Internal training - closed sessions, attendees only: their own post-test / 10, or the
+    // session's average if they skipped it, or a flat 8 when the session has no post-test at all.
+    // The host earns the session average too.
+    const meetings = await query(
+        `SELECT id, employee_id, guests_json, cost_report_json FROM meetings
+         WHERE is_closed = 1 AND deleted_at IS NULL AND YEAR(date) = ?`, [year]
+    );
+    const meetingPostScores = new Map();
+    if (meetings.length > 0) {
+        for (const r of await query(
+            `SELECT meeting_id, employee_id, MAX(score) AS score FROM quiz_results
+             WHERE meeting_id IN (${meetings.map(() => '?').join(',')}) AND quiz_type = 'POST' AND employee_id IS NOT NULL
+             GROUP BY meeting_id, employee_id`, meetings.map(m => m.id)
+        )) {
+            if (!meetingPostScores.has(r.meeting_id)) meetingPostScores.set(r.meeting_id, new Map());
+            meetingPostScores.get(r.meeting_id).set(String(r.employee_id), Number(r.score));
+        }
+    }
+    for (const meeting of meetings) {
+        const post = meetingPostScores.get(meeting.id) || new Map();
+        const sessionPoints = post.size ? [...post.values()].reduce((a, b) => a + b, 0) / post.size / 10 : LEADERBOARD_NO_POST_TEST_POINTS;
+        for (const id of await getMeetingAttendeeEmployeeIds(meeting)) {
+            add(id, 'internal', post.has(String(id)) ? post.get(String(id)) / 10 : sessionPoints);
+        }
+        if (meeting.employee_id) add(meeting.employee_id, 'host', sessionPoints);
+    }
+
+    // External training - 10 once HR has Processed (paid) it.
+    for (const r of await query(
+        `SELECT employee_id FROM external_training_requests
+         WHERE status = 'Processed' AND deleted_at IS NULL AND YEAR(COALESCE(end_date, start_date)) = ?`, [year]
+    )) add(r.employee_id, 'external', 10);
+
+    // Teams: every active employee with at least one active direct report leads one.
+    const teams = new Map();
+    for (const leader of employees) {
+        const members = employees.filter(e => e.id_employee !== leader.id_employee && reportsToLeader(e, leader));
+        if (members.length > 0) teams.set(String(leader.id_employee), members.map(m => String(m.id_employee)));
+    }
+    const leadersOf = new Map();
+    for (const [leaderId, members] of teams) for (const m of members) {
+        if (!leadersOf.has(m)) leadersOf.set(m, []);
+        leadersOf.get(m).push(leaderId);
+    }
+
+    // Leader duties as { due, done } - scored by the share completed; a duty with nothing due is
+    // left out of that leader's maximum instead of counting against them.
+    const duty = new Map([...teams.keys()].map(l => [l, Object.fromEntries(LEADERBOARD_DUTY_KEYS.map(k => [k, { due: 0, done: 0 }]))]));
+    const task = (employeeId, key, isDone) => {
+        for (const l of leadersOf.get(String(employeeId)) || []) {
+            const d = duty.get(l)[key];
+            d.due++;
+            if (isDone) d.done++;
+        }
+    };
+
+    // IDP - each month of each Approved plan, from approval to now, is one monthly review to log.
+    const reviewedMonths = new Set((await query(`SELECT idp_id, DATE_FORMAT(review_date, '%Y-%m') AS ym FROM idp_reviews`)).map(r => `${r.idp_id}|${r.ym}`));
+    for (const plan of await query(
+        `SELECT id, employee_id, COALESCE(approved_date, created_by_date) AS start FROM idp_plans
+         WHERE status = 'Approved' AND period_year = ?`, [year]
+    )) {
+        const firstMonth = plan.start && yearOf(plan.start) === year ? new Date(plan.start).getMonth() + 1 : 1;
+        for (let m = firstMonth; m <= lastMonth; m++) task(plan.employee_id, 'idp', reviewedMonths.has(`${plan.id}|${year}-${pad2(m)}`));
+    }
+
+    // Competency - each team member, in each quarter the company has run assessments for so far.
+    const assessedPairs = new Set((await query(
+        'SELECT DISTINCT employee_id, quarter FROM competency_assessments WHERE year = ? AND quarter <= ?', [year, lastQuarter]
+    )).map(r => `${r.employee_id}|${r.quarter}`));
+    const activeQuarters = [...new Set([...assessedPairs].map(k => Number(k.split('|')[1])))];
+    for (const members of teams.values()) for (const m of members) for (const qtr of activeQuarters) {
+        task(m, 'competency', assessedPairs.has(`${m}|${qtr}`));
+    }
+
+    // Post Training Evaluation - the same (form, training, attendee) items the leader's PTE page lists.
+    const forms = await query(
+        `SELECT f.*, m.title AS meeting_title, m.date AS meeting_date, m.is_closed AS meeting_is_closed, m.guests_json, m.cost_report_json
+         FROM post_training_evaluation_forms f LEFT JOIN meetings m ON f.meeting_id = m.id
+         WHERE f.status = 'PUBLISHED' AND f.deleted_at IS NULL`
+    );
+    for (const form of forms) {
+        const responses = await query(
+            'SELECT meeting_id, external_training_request_id, evaluatee_employee_id FROM post_training_evaluation_responses WHERE form_id = ?', [form.id]
+        );
+        const submitted = new Set(responses.map(r => r.meeting_id
+            ? `m${r.meeting_id}-${r.evaluatee_employee_id}`
+            : `e${r.external_training_request_id}-${r.evaluatee_employee_id}`));
+        for (const meeting of await getFormMeetings(form)) {
+            if (!meeting.is_closed || yearOf(meeting.date) !== year) continue;
+            for (const id of await getMeetingAttendeeEmployeeIds(meeting)) task(id, 'pte', submitted.has(`m${meeting.id}-${id}`));
+        }
+        for (const etr of await getFormExternalTrainingRequests(form)) {
+            if (etr.status !== 'Processed' || yearOf(etr.end_date || etr.start_date) !== year) continue;
+            task(etr.employee_id, 'pte', submitted.has(`e${etr.id}-${etr.employee_id}`));
+        }
+    }
+
+    // Scores.
+    const round1 = (v) => Math.round(v * 10) / 10;
+    const individuals = employees.map(e => {
+        const id = String(e.id_employee);
+        const raw = points.get(id);
+        const isLeader = teams.has(id);
+        const components = {};
+        let total = 0;
+        let max = 0;
+        for (const k of LEADERBOARD_BASE_KEYS) {
+            const value = Math.min(raw[k], LEADERBOARD_CAPS[k]);
+            components[k] = { points: round1(value), max: LEADERBOARD_CAPS[k] };
+            total += value;
+            max += LEADERBOARD_CAPS[k];
+        }
+        for (const k of LEADERBOARD_DUTY_KEYS) {
+            const d = isLeader ? duty.get(id)[k] : null;
+            if (!d || d.due === 0) continue;
+            const share = d.done / d.due;
+            // IDP reviews swing both ways: all months reviewed +10, half 0, none -10.
+            const value = k === 'idp' ? (2 * share - 1) * LEADERBOARD_CAPS.idp : share * LEADERBOARD_CAPS[k];
+            components[k] = { points: round1(value), max: LEADERBOARD_CAPS[k], done: d.done, due: d.due };
+            total += value;
+            max += LEADERBOARD_CAPS[k];
+        }
+        return {
+            employeeId: id,
+            name: e.full_name,
+            jobPosition: e.job_position || null,
+            department: e.organization_name || null,
+            isLeader,
+            teamLeaderIds: leadersOf.get(id) || [],
+            score: Math.max(1, Math.min(100, Math.round(total / max * 100))),
+            components
+        };
+    }).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+
+    // Standard competition ranking: equal scores share a rank (1, 2, 2, 4).
+    individuals.forEach((row, i) => { row.rank = i > 0 && row.score === individuals[i - 1].score ? individuals[i - 1].rank : i + 1; });
+
+    const scoreById = new Map(individuals.map(r => [r.employeeId, r.score]));
+    const employeeById = new Map(employees.map(e => [String(e.id_employee), e]));
+    const teamRows = [...teams.entries()].map(([leaderId, members]) => {
+        const memberScores = [leaderId, ...members].map(id => scoreById.get(id)).filter(v => v != null);
+        const leader = employeeById.get(leaderId);
+        return {
+            leaderId,
+            leaderName: leader.full_name,
+            department: leader.organization_name || null,
+            size: memberScores.length,
+            memberIds: [leaderId, ...members],
+            score: round1(memberScores.reduce((a, b) => a + b, 0) / memberScores.length)
+        };
+    }).sort((a, b) => b.score - a.score || a.leaderName.localeCompare(b.leaderName));
+    teamRows.forEach((row, i) => { row.rank = i > 0 && row.score === teamRows[i - 1].score ? teamRows[i - 1].rank : i + 1; });
+
+    return { year, generatedAt: new Date().toISOString(), individuals, teams: teamRows };
+};
+
+const leaderboardCache = new Map();
+const getLeaderboard = async (year, { refresh = false } = {}) => {
+    const cached = leaderboardCache.get(year);
+    if (!refresh && cached && cached.expiresAt > Date.now()) return cached.promise;
+    // Cache the in-flight promise, so concurrent visitors share one computation.
+    const promise = computeLeaderboard(year);
+    leaderboardCache.set(year, { promise, expiresAt: Date.now() + LEADERBOARD_CACHE_MS });
+    promise.catch(() => leaderboardCache.delete(year));
+    return promise;
+};
+
+// Everyone signed in sees both rankings; the per-component breakdown is only included for the
+// viewer's own row (and for everyone when HR is looking), so colleagues see scores, not details.
+app.get('/api/leaderboard', async (req, res) => {
+    try {
+        const currentYear = nowInWib().getUTCFullYear();
+        const year = Number(req.query.year) || currentYear;
+        if (year < 2020 || year > currentYear) return res.status(400).json({ error: 'Invalid year' });
+        const isHR = isHRRole(req.user.role);
+        const data = await getLeaderboard(year, { refresh: isHR && req.query.refresh === '1' });
+        const viewerId = req.user.employee_id ? String(req.user.employee_id) : null;
+        res.json({
+            ...data,
+            viewerEmployeeId: viewerId,
+            individuals: data.individuals.map(row => (isHR || row.employeeId === viewerId) ? row : { ...row, components: undefined })
+        });
+    } catch (err) {
+        console.error('[LEADERBOARD] Failed to compute:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- APP CONFIG ENDPOINT ---
 app.get('/api/config', (req, res) => {
     res.json({

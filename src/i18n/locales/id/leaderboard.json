@@ -1,0 +1,65 @@
+{
+  "title": "Leaderboard",
+  "subtitle": "Peringkat poin pembelajaran karyawan dan tim",
+  "year": "Tahun",
+  "updatedAt": "Diperbarui {{time}}",
+  "loading": "Menghitung poin...",
+  "loadError": "Gagal memuat leaderboard.",
+  "retry": "Coba lagi",
+  "tabs": {
+    "individual": "Perorangan",
+    "team": "Tim"
+  },
+  "searchPlaceholder": "Cari nama, posisi, atau departemen...",
+  "empty": "Tidak ada data yang cocok.",
+  "myScore": {
+    "title": "Skor Saya",
+    "rankOf": "Peringkat #{{rank}} dari {{total}}",
+    "notRanked": "Akun Anda belum terhubung ke data karyawan aktif, jadi belum masuk peringkat.",
+    "myTeam": "Tim {{name}}: #{{rank}} · skor {{score}}",
+    "breakdown": "Rincian poin"
+  },
+  "columns": {
+    "rank": "#",
+    "name": "Nama",
+    "department": "Departemen",
+    "score": "Skor",
+    "team": "Tim",
+    "members": "Anggota"
+  },
+  "leaderBadge": "Leader",
+  "you": "Anda",
+  "yourTeam": "Tim Anda",
+  "teamOf": "Tim {{name}}",
+  "membersCount": "{{count}} orang",
+  "category": {
+    "excellent": "Sangat Baik",
+    "good": "Baik",
+    "fair": "Cukup",
+    "low": "Perlu Ditingkatkan"
+  },
+  "components": {
+    "reading": "Reading Log",
+    "module": "Online Module",
+    "internal": "Training Internal",
+    "host": "Host Training",
+    "external": "Training Eksternal",
+    "idp": "Review IDP Tim",
+    "competency": "Penilaian Kompetensi Tim",
+    "pte": "Post Training Evaluation Tim"
+  },
+  "dutyProgress": "{{done}}/{{due}} selesai",
+  "showDetail": "Lihat rincian",
+  "hideDetail": "Sembunyikan rincian",
+  "howTitle": "Cara penilaian",
+  "how": {
+    "intro": "Skor 1–100 dihitung dari aktivitas tahun berjalan. Setiap komponen punya batas maksimum, dan skor = total poin ÷ poin maksimum yang bisa Anda raih × 100.",
+    "reading": "Reading Log (maks 30): buku Approved oleh HR. Non-fiksi 10, komik bisnis 5, fiksi/majalah 3. Buku yang ditolak tidak dihitung.",
+    "module": "Online Module (maks 5): modul yang selesai, poin = nilai post-test ÷ 10 (8 bila tanpa post-test).",
+    "internal": "Training Internal (maks 20): training yang sudah closed dan Anda hadir. Poin = nilai post-test ÷ 10; tanpa post-test memakai rata-rata peserta, atau 8 bila training tidak punya post-test.",
+    "host": "Host Training (maks 10): sebagai host, poin = rata-rata nilai post-test peserta ÷ 10 (8 bila tanpa post-test).",
+    "external": "Training Eksternal (maks 15): 10 poin per training yang sudah diproses (dibayar) HR.",
+    "leader": "Khusus leader: Review IDP tim (maks 10, bisa minus bila review tidak diisi), Penilaian Kompetensi tim (maks 5), dan Post Training Evaluation tim (maks 5), dihitung dari persentase tugas yang diselesaikan. Tugas yang belum ada di periode ini tidak mengurangi skor.",
+    "team": "Skor tim = rata-rata skor leader dan bawahan langsungnya."
+  }
+}

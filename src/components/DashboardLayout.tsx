@@ -14,6 +14,7 @@ import {
     ChevronDown,
     ChevronUp,
     TrendingUp,
+    Trophy,
     GraduationCap,
     MessageSquarePlus,
     CheckCircle,
@@ -740,6 +741,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
         { icon: BookOpen, label: t('menu.onlineModules'), id: 'courses' },
         { icon: Calendar, label: t('menu.calendar'), id: 'calendar' },
         { icon: TrendingUp, label: t('menu.learningReport'), id: 'learning-report' },
+        { icon: Trophy, label: t('menu.leaderboard'), id: 'leaderboard' },
         // Interns get no IDP - same "no participation at all" rule enforced server-side too
         // (POST /api/idp rejects their employee_id outright).
         ...(config?.moduleIDP && !user?.isIntern ? [{ icon: Target, label: t('menu.idp'), id: 'idp' }] : []),

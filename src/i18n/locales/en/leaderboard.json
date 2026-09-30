@@ -1,0 +1,65 @@
+{
+  "title": "Leaderboard",
+  "subtitle": "Learning points ranking for employees and teams",
+  "year": "Year",
+  "updatedAt": "Updated {{time}}",
+  "loading": "Calculating points...",
+  "loadError": "Failed to load the leaderboard.",
+  "retry": "Try again",
+  "tabs": {
+    "individual": "Individual",
+    "team": "Team"
+  },
+  "searchPlaceholder": "Search name, position or department...",
+  "empty": "No matching data.",
+  "myScore": {
+    "title": "My Score",
+    "rankOf": "Rank #{{rank}} of {{total}}",
+    "notRanked": "Your account isn't linked to an active employee record, so it isn't ranked yet.",
+    "myTeam": "Team {{name}}: #{{rank}} · score {{score}}",
+    "breakdown": "Points breakdown"
+  },
+  "columns": {
+    "rank": "#",
+    "name": "Name",
+    "department": "Department",
+    "score": "Score",
+    "team": "Team",
+    "members": "Members"
+  },
+  "leaderBadge": "Leader",
+  "you": "You",
+  "yourTeam": "Your team",
+  "teamOf": "Team {{name}}",
+  "membersCount": "{{count}} people",
+  "category": {
+    "excellent": "Excellent",
+    "good": "Good",
+    "fair": "Fair",
+    "low": "Needs Improvement"
+  },
+  "components": {
+    "reading": "Reading Log",
+    "module": "Online Module",
+    "internal": "Internal Training",
+    "host": "Training Host",
+    "external": "External Training",
+    "idp": "Team IDP Reviews",
+    "competency": "Team Competency Assessments",
+    "pte": "Team Post Training Evaluations"
+  },
+  "dutyProgress": "{{done}}/{{due}} done",
+  "showDetail": "Show breakdown",
+  "hideDetail": "Hide breakdown",
+  "howTitle": "How it's scored",
+  "how": {
+    "intro": "The 1–100 score comes from this year's activity. Each component is capped, and score = total points ÷ the maximum you could earn × 100.",
+    "reading": "Reading Log (max 30): books Approved by HR. Non-fiction 10, business comics 5, fiction/magazines 3. Rejected books don't count.",
+    "module": "Online Module (max 5): completed modules, points = post-test score ÷ 10 (8 without a post-test).",
+    "internal": "Internal Training (max 20): closed sessions you attended. Points = post-test score ÷ 10; without your own post-test, the session average, or 8 if the session has no post-test.",
+    "host": "Training Host (max 10): as host, points = the attendees' average post-test ÷ 10 (8 without a post-test).",
+    "external": "External Training (max 15): 10 points per training Processed (paid) by HR.",
+    "leader": "Leaders only: team IDP reviews (max 10, can go negative when reviews are missed), team competency assessments (max 5) and team Post Training Evaluations (max 5), scored by the share of tasks completed. Duties with nothing due in the period don't lower the score.",
+    "team": "Team score = the average score of the leader and their direct reports."
+  }
+}
