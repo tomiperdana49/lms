@@ -2282,17 +2282,21 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE
 // email must come from here, never from the request body - otherwise anyone could claim any address.
 const verifyGoogleCredential = async (credential) => {
     if (!credential) return null;
+    // Every rejection is logged with its reason - the login page only ever shows a generic error.
+    const reject = (reason) => { console.warn(`[GOOGLE AUTH] Credential rejected: ${reason}`); return null; };
     try {
         const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
-        if (!response.ok) return null;
+        if (!response.ok) return reject(`Google tokeninfo answered ${response.status} (invalid or expired token)`);
         const info = await response.json();
-        const validIssuer = info.iss === 'accounts.google.com' || info.iss === 'https://accounts.google.com';
-        const verified = info.email_verified === true || info.email_verified === 'true';
-        if (info.aud !== GOOGLE_CLIENT_ID || !validIssuer || !verified || !(Number(info.exp) * 1000 > Date.now())) return null;
+        if (info.aud !== GOOGLE_CLIENT_ID) {
+            return reject(`client ID mismatch - token is for "${info.aud}", server expects "${GOOGLE_CLIENT_ID}" (GOOGLE_CLIENT_ID / VITE_GOOGLE_CLIENT_ID must match the one the frontend was built with)`);
+        }
+        if (info.iss !== 'accounts.google.com' && info.iss !== 'https://accounts.google.com') return reject(`unexpected issuer "${info.iss}"`);
+        if (info.email_verified !== true && info.email_verified !== 'true') return reject(`email ${info.email} is not verified by Google`);
+        if (!(Number(info.exp) * 1000 > Date.now())) return reject(`token expired at ${new Date(Number(info.exp) * 1000).toISOString()} (check the server clock)`);
         return info.email || null;
     } catch (err) {
-        console.error('[GOOGLE AUTH] Failed to verify credential:', err.message);
-        return null;
+        return reject(`could not reach Google to verify the token: ${err.cause?.code || err.cause?.message || err.message}`);
     }
 };
 
