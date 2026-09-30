@@ -3819,6 +3819,10 @@ const logGeneralTicket = async ({ kind, reference, ticketPic, ticketId = null, s
     }
 };
 
+// Master switch for every IS5 general ticket (fitur_general_ticket=true in .env). Off - or unset -
+// means no ticket is sent from any flow; the per-reminder *_ENABLED flags only apply when it's on.
+const isGeneralTicketEnabled = () => process.env.fitur_general_ticket === 'true';
+
 // Creates a General Ticket (GT) in IS5. `ticketPic` is the employee the ticket is for; the followers
 // come from IS5_TICKET_FOLLOW. `kind` and `reference` only label the attempt in general_ticket_logs
 // (e.g. 'idp_import' / 'idp:57'). Throws with IS5's response message if the ticket is rejected.
@@ -3835,6 +3839,11 @@ const createGeneralTicket = async ({ kind = 'manual', reference = null, subject,
     };
     const log = (fields) => logGeneralTicket({ kind, reference, ticketPic, subject, requestBody, ...fields });
 
+    // Callers check isGeneralTicketEnabled() first; this only catches one that doesn't.
+    if (!isGeneralTicketEnabled()) {
+        await log({ status: 'FAILED', errorMessage: 'General tickets are disabled (fitur_general_ticket is not true)' });
+        throw new Error('General tickets are disabled (fitur_general_ticket is not true)');
+    }
     if (!apiKey) {
         await log({ status: 'FAILED', errorMessage: 'IS5_API_KEY is not configured' });
         throw new Error('IS5_API_KEY is not configured');
@@ -3902,6 +3911,10 @@ const sendReminderTicketOnce = async ({ kind, recipientEmployeeId, period, refId
 // initDB above), so a dev machine on a copy of production data never sends real tickets.
 const REMINDER_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 const scheduleReminderJob = (label, job) => {
+    if (!isGeneralTicketEnabled()) {
+        console.warn(`[${label}] Enabled, but fitur_general_ticket is not true - reminders are disabled.`);
+        return;
+    }
     if (!process.env.IS5_API_KEY) {
         console.warn(`[${label}] Enabled, but IS5_API_KEY is not set - reminders are disabled.`);
         return;
@@ -3919,6 +3932,9 @@ const TICKET_DATETIME_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 // followers always come from IS5_TICKET_FOLLOW.
 app.post('/api/general-tickets', async (req, res) => {
     try {
+        if (!isGeneralTicketEnabled()) {
+            return res.status(503).json({ success: false, message: 'General tickets are disabled (fitur_general_ticket is not true)' });
+        }
         const { subject, comment, time_expired, priority_id, ticket_pic } = req.body || {};
         if (!subject || !comment) {
             return res.status(400).json({ success: false, message: 'subject and comment are required' });
@@ -6471,6 +6487,7 @@ const findApprovingLeaders = async (employeeId) => {
 // An employee submitted an external training request -> a general ticket for each leader who has
 // to approve it, followed by IS5_TICKET_FOLLOW. Skipped when the employee has no leader on the org chart.
 const notifyLeaderExternalTrainingRequest = async ({ requestId, employee_id, employee_name, category, title, start_date, end_date, registration_fee, vendor }) => {
+    if (!isGeneralTicketEnabled()) return;
     const leaders = await findApprovingLeaders(employee_id);
     if (leaders.length === 0) {
         console.warn(`[EXTERNAL TRAINING GT] No leader found for ${employee_name} (${employee_id}) - skipping the ticket.`);
@@ -7185,6 +7202,7 @@ app.post('/api/idp/bulk-import', async (req, res) => {
 // --- IDP GENERAL TICKETS (IS5) ---
 // An employee imported their own IDP -> a general ticket for the HR PIC in IS5_TICKET_PIC_HR.
 const notifyHRImportedIdp = async ({ planId, employeeId, employeeName, periodYear }) => {
+    if (!isGeneralTicketEnabled()) return;
     const hrPic = (process.env.IS5_TICKET_PIC_HR || '').trim();
     if (!hrPic) {
         console.warn('[IDP GT] IS5_TICKET_PIC_HR is not set - skipping the HR ticket for an imported IDP.');
