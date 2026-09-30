@@ -284,7 +284,13 @@ const ACTIVITY_RULES = [
     ['DELETE', /^\/api\/courses\/([^/]+)$/, 'online_module', 'delete', { lookup: ['courses', 'title'] }],
     ['DELETE', /^\/api\/progress\/[^/]+\/([^/]+)$/, 'online_module', 'reset_progress', { lookup: ['courses', 'title'] }],
     ['POST', /^\/api\/progress\/complete$/, 'online_module', 'complete_module', { lookup: ['courses', 'title'], id: (b) => b.courseId }],
-    ['POST', /^\/api\/quiz\/submit$/, 'online_module', 'submit_quiz', { lookup: ['courses', 'title'], id: (b) => b.courseId }],
+    // One endpoint serves both Online Module quizzes (courseId) and Internal Training pre/post-tests
+    // (meetingId), so the module and the table the title comes from follow whichever id was sent.
+    ['POST', /^\/api\/quiz\/submit$/, (b) => b.meetingId ? 'internal_training' : 'online_module', 'submit_quiz', {
+        id: (b) => b.meetingId || b.courseId,
+        lookup: (b) => b.meetingId ? ['meetings', 'title'] : ['courses', 'title'],
+        suffix: (b) => [b.quizType ? `${String(b.quizType).toUpperCase()}-test` : null, b.score != null ? `Nilai ${b.score}` : null].filter(Boolean).join(' · ')
+    }],
     ['POST', /^\/api\/online-certificates\/issue$/, 'online_module', 'issue_certificate', { lookup: ['courses', 'title'], id: (b) => b.courseId }],
 
     ['POST', /^\/api\/meetings$/, 'internal_training', 'create', { label: (b) => b.title }],
@@ -326,7 +332,8 @@ const ACTIVITY_RULES = [
     ['PUT', /^\/api\/incentives\/([^/]+)$/, 'incentive', (b) => b.status ? approvalAction(b.status) : 'update', { lookup: ['incentives', 'course_name'] }],
     ['DELETE', /^\/api\/incentives\/([^/]+)$/, 'incentive', 'delete', { lookup: ['incentives', 'course_name'] }],
 
-    ['POST', /^\/api\/competency-templates$/, 'competency', (b) => b.requesterId ? 'request_change' : 'create', { label: (b) => b.kompetensi }],
+    // The request body uses the camelCase API names (competencyName/position), not the DB columns.
+    ['POST', /^\/api\/competency-templates$/, 'competency', (b) => b.requesterId ? 'request_change' : 'create', { label: (b) => [b.competencyName, b.position].filter(Boolean).join(' · ') }],
     ['PUT', /^\/api\/competency-templates\/([^/]+)$/, 'competency', (b) => b.requesterId ? 'request_change' : 'update', { lookup: ['competency_templates', 'kompetensi'] }],
     ['DELETE', /^\/api\/competency-templates\/([^/]+)$/, 'competency', (b, q) => q.requesterId ? 'request_change' : 'delete', { lookup: ['competency_templates', 'kompetensi'] }],
     ['PUT', /^\/api\/competency-standard-overrides$/, 'competency', 'update_standard'],
@@ -483,7 +490,7 @@ app.use(async (req, res, next) => {
             if (ruleMethod !== method) continue;
             const match = reqPath.match(pattern);
             if (!match) continue;
-            module = ruleModule;
+            module = typeof ruleModule === 'function' ? ruleModule(body) : ruleModule;
             action = typeof ruleAction === 'function' ? ruleAction(body, req.query || {}) : ruleAction;
             targetId = opts.id ? opts.id(body) : (match[1] ? decodeURIComponent(match[1]) : null);
             if (opts.label) targetLabel = opts.label(body) || null;
@@ -496,6 +503,9 @@ app.use(async (req, res, next) => {
                     beforeRow = rows[0];
                 }
             }
+            // Extra context after the record's name, e.g. which test and the score for a quiz.
+            const suffix = opts.suffix ? opts.suffix(body) : null;
+            if (suffix) targetLabel = targetLabel ? `${targetLabel} · ${suffix}` : suffix;
             break;
         }
     } catch (e) {
