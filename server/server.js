@@ -3793,12 +3793,12 @@ const lmsAnchor = (path, label) => `<a href="${lmsLink(path).replace(/"/g, '&quo
 
 const GENERAL_TICKET_LOG_TEXT_LIMIT = 10000;
 
-// IS5's ticket number from a successful response:
-// { "title": "Berhasil", "message": "Berhasil membuat General Ticket", "data": { "ticketId": "430619" } }
-// A top-level ticketId is accepted too, as an earlier sample of the response had it there.
+// IS5's ticket number from a successful response - the created ticket comes back under `data`:
+// { "title": "Berhasil", "message": "Berhasil membuat General Ticket", "data": { "id": 384309, "subject": ..., ... } }
+// data.ticketId / a top-level ticketId are still accepted, as earlier samples of the response had them.
 const extractGeneralTicketId = (data) => {
     if (!data || typeof data !== 'object') return null;
-    const ticketId = data.data?.ticketId ?? data.ticketId;
+    const ticketId = data.data?.id ?? data.data?.ticketId ?? data.ticketId;
     return ticketId != null && ticketId !== '' && typeof ticketId !== 'object' ? String(ticketId).slice(0, 100) : null;
 };
 
