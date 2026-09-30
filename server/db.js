@@ -682,6 +682,76 @@ export const initDB = async () => {
             console.error("Error creating idp_reviews table:", e);
         }
 
+        // MIGRATION: When a meeting was closed / an external training request was Processed - the
+        // start of the leader's 30-day window to fill in its Post Training Evaluation (see
+        // runPteReminders in server.js). Rows already closed/Processed when the column is first added
+        // have no known date, so they start counting from now (deploy) - this backfill only runs in
+        // the same step that adds the column, never again.
+        try {
+            await connection.query("ALTER TABLE meetings ADD COLUMN closed_at DATETIME NULL");
+            await connection.query("UPDATE meetings SET closed_at = NOW() WHERE is_closed = 1");
+            console.log("Added closed_at column to meetings.");
+        } catch (e) { /* Ignore if exists */ }
+        try {
+            await connection.query("ALTER TABLE external_training_requests ADD COLUMN processed_at DATETIME NULL");
+            await connection.query("UPDATE external_training_requests SET processed_at = NOW() WHERE status = 'Processed'");
+            console.log("Added processed_at column to external_training_requests.");
+        } catch (e) { /* Ignore if exists */ }
+
+        // MIGRATION: Add general_ticket_logs - one row per IS5 general ticket the LMS tried to send
+        // (every flow, see createGeneralTicket in server.js): what was sent, to whom, and what IS5
+        // answered - including failures, so a missing ticket can be traced without server logs.
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS general_ticket_logs (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    kind VARCHAR(50) NOT NULL,
+                    reference VARCHAR(100),
+                    ticket_pic VARCHAR(50),
+                    ticket_id VARCHAR(100),
+                    subject VARCHAR(500),
+                    request_body TEXT,
+                    status ENUM('SUCCESS','FAILED') NOT NULL,
+                    http_status INT,
+                    response_body TEXT,
+                    error_message TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_general_ticket_logs_kind (kind, created_at),
+                    INDEX idx_general_ticket_logs_pic (ticket_pic, created_at)
+                )
+            `);
+            console.log("Verified general_ticket_logs table exists.");
+        } catch (e) {
+            console.error("Error creating general_ticket_logs table:", e);
+        }
+        // MIGRATION: ticket_id - the ticket number IS5 returns, pulled out of response_body (see
+        // extractGeneralTicketId in server.js) so a log row can be matched to its IS5 ticket.
+        try {
+            await connection.query("ALTER TABLE general_ticket_logs ADD COLUMN ticket_id VARCHAR(100) AFTER ticket_pic");
+            await connection.query("ALTER TABLE general_ticket_logs ADD INDEX idx_general_ticket_logs_ticket (ticket_id)");
+            console.log("Added ticket_id column to general_ticket_logs.");
+        } catch (e) { /* Ignore if exists */ }
+
+        // MIGRATION: Add general_ticket_reminders - records every scheduled IS5 general-ticket reminder
+        // (IDP monthly review, competency quarterly assessment) per recipient per period. The unique
+        // key is what keeps restarts and the hourly check from sending the same reminder twice.
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS general_ticket_reminders (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    kind VARCHAR(50) NOT NULL,
+                    recipient_employee_id VARCHAR(50) NOT NULL,
+                    period VARCHAR(20) NOT NULL,
+                    ref_ids TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uniq_reminder (kind, recipient_employee_id, period)
+                )
+            `);
+            console.log("Verified general_ticket_reminders table exists.");
+        } catch (e) {
+            console.error("Error creating general_ticket_reminders table:", e);
+        }
+
         // MIGRATION: Add hr_note to idp_plans — general HR feedback on what's missing/needs adding,
         // independent of the approve/reject decision.
         try {

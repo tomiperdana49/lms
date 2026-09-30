@@ -282,7 +282,9 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                         // The import can never land as Approved regardless of who imports or what the
                         // sheet carries - it lands as Pending (or Draft) with everything else backfilled,
                         // and a real HR approval always has to happen afterward through the app.
-                        body: JSON.stringify({ rows: [parsed] })
+                        // source 'self' (vs the Admin Panel's IDPManager import) is what makes the
+                        // server raise an IS5 ticket for HR about the newly imported plan.
+                        body: JSON.stringify({ rows: [parsed], source: 'self' })
                     });
                     // The server rejects rows it can't match (e.g. a name not in the org chart) per
                     // row, with a 200 - surface that instead of leaving the success message up.

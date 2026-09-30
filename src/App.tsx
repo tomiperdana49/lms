@@ -32,6 +32,18 @@ const SESSION_CHECK_INTERVAL_MS = 15 * 1000;
 const ACTIVITY_WRITE_THROTTLE_MS = 5 * 1000;
 const LOGIN_AT_KEY = 'lms_login_at';
 const LAST_ACTIVITY_KEY = 'lms_last_activity';
+// A link opened while logged out (e.g. from an IS5 general ticket) - login lands there instead of the dashboard.
+const POST_LOGIN_REDIRECT_KEY = 'lms_post_login_redirect';
+
+const takePostLoginRedirect = (): string | null => {
+  try {
+    const target = sessionStorage.getItem(POST_LOGIN_REDIRECT_KEY);
+    sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY);
+    return target;
+  } catch {
+    return null;
+  }
+};
 
 // Mirrors the Page union in types.ts - kept as a runtime list so a URL path (typed by hand, or
 // visited via back/forward) can be validated before being cast to Page.
@@ -98,9 +110,29 @@ function App() {
 
   const [sessionExpiredReason, setSessionExpiredReason] = useState<'idle' | 'absolute' | null>(null);
 
+  // Captured before the query string is stripped below, so a logged-out visitor's link survives login.
+  const [initialUrl] = useState(() => window.location.pathname + window.location.search);
+  useEffect(() => {
+    if (user || initialUrl === '/' || initialUrl.startsWith('/login')) return;
+    try {
+      sessionStorage.setItem(POST_LOGIN_REDIRECT_KEY, initialUrl);
+    } catch {
+      // No sessionStorage (e.g. private mode) - login just lands on the dashboard as before.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Deep links (e.g. from the dashboard's "Perlu Tindakan Anda" widget)
   // can force the External Training tab via ?tab= on load, or via onNavigate('external', tab) later.
   const [deepLinkTab, setDeepLinkTab] = useState<string | null>(() => new URLSearchParams(window.location.search).get('tab'));
+
+  // IS5 general-ticket links point at one record: ?idp=<planId> on /admin/idp, ?request=<id> on
+  // /training/external - read once here, before the query string is stripped.
+  const [deepLinkRecord] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = (key: string) => Number(params.get(key)) || null;
+    return { idpPlanId: id('idp'), externalRequestId: id('request') };
+  });
 
   // Clicking a "New Competency Assessment" notification should open My Competency on the quarter
   // it's about, not whatever quarter is currently selected there - carried as "quarter-year".
@@ -367,6 +399,13 @@ function App() {
             localStorage.setItem(AUTH_TOKEN_KEY, token);
             localStorage.setItem(LOGIN_AT_KEY, String(Date.now()));
             localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+            const redirect = takePostLoginRedirect();
+            if (redirect) {
+              // Reload straight into the linked page so it initializes from that URL like any visit.
+              localStorage.setItem('lms_user', JSON.stringify(loggedInUser));
+              window.location.replace(redirect);
+              return;
+            }
             setUser(loggedInUser);
           }}
           sessionExpiredReason={sessionExpiredReason}
@@ -450,6 +489,7 @@ function App() {
             currentUser={user!}
             isManagementMode={userRole === 'HR' || userRole === 'HR_ADMIN'}
             defaultTab={deepLinkTab === 'team_approvals' ? 'team_approvals' : undefined}
+            focusRequestId={deepLinkRecord.externalRequestId}
           />
         )}
 
@@ -480,6 +520,7 @@ function App() {
               if (view) setAdminView(view);
             }}
             initialView={adminView}
+            focusIdpPlanId={deepLinkRecord.idpPlanId}
           />
         )}
       </DashboardLayout>

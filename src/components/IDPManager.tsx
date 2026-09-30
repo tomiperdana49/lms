@@ -15,6 +15,8 @@ import type { IdpImportGrid, IdpImportRow } from './idpImportParser';
 interface IDPManagerProps {
     userRole: string;
     userName?: string;
+    // Plan to open on load - from an IS5 ticket link (/admin/idp?idp=<id>).
+    focusPlanId?: number | null;
 }
 
 const MANDATORY_TARGET_HOURS = 48;
@@ -58,7 +60,7 @@ const isReviewedThisMonth = (plan: IDPPlan): boolean => {
     return (plan.reviewed_year_months || '').split(',').includes(currentKey);
 };
 
-export default function IDPManager({ userName }: IDPManagerProps) {
+export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
     const { t } = useTranslation('idpPage');
     const [plans, setPlans] = useState<IDPPlan[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -105,6 +107,23 @@ export default function IDPManager({ userName }: IDPManagerProps) {
             }
         } catch (err) { console.error(err); }
     };
+
+    // Opened from an IS5 ticket link: show that plan whatever the filters were, expand it, and
+    // scroll to it - once, as soon as the plan list has loaded.
+    const focusHandledRef = useRef(false);
+    useEffect(() => {
+        if (!focusPlanId || focusHandledRef.current || plans.length === 0) return;
+        focusHandledRef.current = true;
+        const plan = plans.find(p => p.id === focusPlanId);
+        if (!plan) return;
+        setSelectedYear(plan.period_year);
+        setSearchQuery('');
+        setOnlyNotReviewedThisMonth(false);
+        setOnlyPendingHrApproval(false);
+        if (expandedId !== plan.id) toggleExpand(plan.id);
+        setTimeout(() => document.getElementById(`idp-plan-${plan.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [plans, focusPlanId]);
 
     // --- HR edit: lets HR correct/update any employee's IDP narrative fields and action plan directly
     // (e.g. fixing bad import data), reusing the same PUT /api/idp/:id the employee's own edit form uses.
@@ -576,7 +595,7 @@ export default function IDPManager({ userName }: IDPManagerProps) {
                         {t('admin.empty')}
                     </div>
                 ) : filteredPlans.map(plan => (
-                    <div key={plan.id} className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
+                    <div key={plan.id} id={`idp-plan-${plan.id}`} className={`bg-white rounded-3xl border shadow-sm p-6 scroll-mt-6 ${plan.id === focusPlanId ? 'border-indigo-400 ring-2 ring-indigo-200' : 'border-gray-100'}`}>
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <p className="font-bold text-gray-800">{plan.employee_name}</p>

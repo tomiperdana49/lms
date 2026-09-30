@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ExternalTrainingRequest, User } from '../types';
 import { API_BASE_URL } from '../config';
@@ -37,9 +37,11 @@ interface ExternalTrainingProps {
  currentUser: User | null;
  isManagementMode: boolean;
  defaultTab?: TabType;
+ // Team request to scroll to and highlight - from an IS5 ticket link (?tab=team_approvals&request=<id>).
+ focusRequestId?: number | null;
 }
 
-export default function ExternalTraining({ currentUser, isManagementMode, defaultTab }: ExternalTrainingProps) {
+export default function ExternalTraining({ currentUser, isManagementMode, defaultTab, focusRequestId }: ExternalTrainingProps) {
  const { t } = useTranslation('externalTraining');
  const isSupervisor = !!currentUser?.isSupervisor;
  // Interns get no annual learning budget - the personal budget card shows their spend without a cap.
@@ -156,6 +158,14 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  if (res.ok) setTeamRequests(await res.json());
  } catch (err) { console.error(err); }
  };
+
+ // Opened from an IS5 ticket link: scroll to that request once the team list has loaded.
+ const focusHandledRef = useRef(false);
+ useEffect(() => {
+ if (!focusRequestId || focusHandledRef.current || teamRequests.length === 0) return;
+ focusHandledRef.current = true;
+ setTimeout(() => document.getElementById(`etr-request-${focusRequestId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+ }, [teamRequests, focusRequestId]);
 
  const showNotif = (type: 'success'|'error', message: string) => {
  setNotification({ show: true, type, message });
@@ -744,7 +754,7 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  ) : (
  <div className="grid gap-6">
  {teamRequests.map(req => (
- <div key={req.id} className="group bg-white rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-100 hover:border-blue-100 flex flex-col md:flex-row justify-between gap-6 relative overflow-hidden">
+ <div key={req.id} id={`etr-request-${req.id}`} className={`group bg-white rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 border flex flex-col md:flex-row justify-between gap-6 relative overflow-hidden scroll-mt-6 ${req.id === focusRequestId ? 'border-blue-400 ring-2 ring-blue-200' : 'border-slate-100 hover:border-blue-100'}`}>
  {/* Decorative background element */}
  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-blue-50 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
  

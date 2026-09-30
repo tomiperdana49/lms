@@ -95,6 +95,17 @@ initDB().then(async () => {
     } catch (e) {
         console.error('[AUTH] Password migration failed:', e.message);
     }
+
+    // Opt-in, so a dev machine running on a copy of production data never sends real IS5 tickets.
+    if (process.env.IDP_REVIEW_REMINDERS_ENABLED === 'true') {
+        scheduleReminderJob('IDP GT', runIdpReviewReminders);
+    }
+    if (process.env.COMPETENCY_REMINDERS_ENABLED === 'true') {
+        scheduleReminderJob('COMPETENCY GT', runCompetencyAssessmentReminders);
+    }
+    if (process.env.PTE_REMINDERS_ENABLED === 'true') {
+        scheduleReminderJob('PTE GT', runPteReminders);
+    }
 });
 
 // Multer Config
@@ -1748,6 +1759,13 @@ const getMeetingAttendeeEmployeeIds = async (meeting) => {
 // meeting_id it was first created for. Any endpoint that needs "who is this form's audience" must
 // union every meeting that points to the form either way - otherwise a reused template silently
 // drops the attendees of every meeting except the one it was originally built for.
+// Keeps meetings.closed_at in step with is_closed: stamped the first time a session is closed,
+// cleared if it's reopened (so closing it again restarts the leader's 30-day PTE window).
+const syncMeetingClosedAt = (meetingId) => query(
+    'UPDATE meetings SET closed_at = IF(is_closed = 1, COALESCE(closed_at, NOW()), NULL) WHERE id = ?',
+    [meetingId]
+);
+
 const getFormMeetings = async (form) => {
     const meetings = [];
     const seenIds = new Set();
@@ -3737,6 +3755,194 @@ app.delete('/api/users/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- GENERAL TICKETS (IS5) ---
+// Employee IDs that follow every general ticket (HR), from IS5_TICKET_FOLLOW - comma-separated.
+// Unset or empty means the ticket has no followers.
+const getTicketFollowEmployeeIds = () => (process.env.IS5_TICKET_FOLLOW || '')
+    .split(',')
+    .map(id => id.trim())
+    .filter(Boolean);
+
+// Calendar math runs in WIB (UTC+7): these Dates are shifted by 7 hours and read with getUTC*, so
+// "today" and "end of month" match Jakarta regardless of the server's own timezone.
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+const nowInWib = () => new Date(Date.now() + WIB_OFFSET_MS);
+const pad2 = (n) => String(n).padStart(2, '0');
+const formatWibDate = (d) => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+
+// A general ticket is due IS5_TICKET_EXPIRED_DAYS days after it's created (default 3), as
+// "YYYY-MM-DD HH:MM:SS" in WIB.
+const DEFAULT_TICKET_EXPIRED_DAYS = 3;
+const getTicketExpiredDays = () => {
+    const days = Number(process.env.IS5_TICKET_EXPIRED_DAYS);
+    return Number.isFinite(days) && days > 0 ? days : DEFAULT_TICKET_EXPIRED_DAYS;
+};
+const generalTicketDueDate = () => {
+    const due = new Date(nowInWib().getTime() + getTicketExpiredDays() * 24 * 60 * 60 * 1000);
+    return `${formatWibDate(due)} ${pad2(due.getUTCHours())}:${pad2(due.getUTCMinutes())}:${pad2(due.getUTCSeconds())}`;
+};
+
+// Link into the LMS frontend for a ticket's comment, so the recipient lands right on the record.
+// Written as an HTML anchor (opens in a new tab) for IS5's comment view.
+const lmsLink = (path) => `${(process.env.APP_BASE_URL || 'https://lms.nusa.id').replace(/\/+$/, '')}${path}`;
+const lmsAnchor = (path, label) => `<a href="${lmsLink(path).replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+
+const GENERAL_TICKET_LOG_TEXT_LIMIT = 10000;
+
+// IS5's ticket number from a successful response:
+// { "title": "Berhasil", "message": "Berhasil membuat General Ticket", "data": { "ticketId": "430619" } }
+// A top-level ticketId is accepted too, as an earlier sample of the response had it there.
+const extractGeneralTicketId = (data) => {
+    if (!data || typeof data !== 'object') return null;
+    const ticketId = data.data?.ticketId ?? data.ticketId;
+    return ticketId != null && ticketId !== '' && typeof ticketId !== 'object' ? String(ticketId).slice(0, 100) : null;
+};
+
+// Records one send attempt in general_ticket_logs. Never throws - a logging failure must not turn a
+// ticket IS5 accepted into an error, or block the flow that raised it.
+const logGeneralTicket = async ({ kind, reference, ticketPic, ticketId = null, subject, requestBody, status, httpStatus = null, responseBody = null, errorMessage = null }) => {
+    const clip = (v) => v == null ? null : String(v).slice(0, GENERAL_TICKET_LOG_TEXT_LIMIT);
+    try {
+        await query(
+            `INSERT INTO general_ticket_logs (kind, reference, ticket_pic, ticket_id, subject, request_body, status, http_status, response_body, error_message)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [kind, reference ? String(reference).slice(0, 100) : null, ticketPic != null ? String(ticketPic) : null, ticketId,
+             subject ? String(subject).slice(0, 500) : null, clip(JSON.stringify(requestBody)), status, httpStatus,
+             clip(typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody)), clip(errorMessage)]
+        );
+    } catch (err) {
+        console.error('[GENERAL TICKET] Failed to write general_ticket_logs:', err.message);
+    }
+};
+
+// Creates a General Ticket (GT) in IS5. `ticketPic` is the employee the ticket is for; the followers
+// come from IS5_TICKET_FOLLOW. `kind` and `reference` only label the attempt in general_ticket_logs
+// (e.g. 'idp_import' / 'idp:57'). Throws with IS5's response message if the ticket is rejected.
+const createGeneralTicket = async ({ kind = 'manual', reference = null, subject, comment, timeExpired, priorityId = 1, ticketPic }) => {
+    const url = process.env.IS5_GENERAL_TICKET_URL || 'https://legacy.is5.nusa.net.id/api/client/v1/general-tickets/';
+    const apiKey = process.env.IS5_API_KEY;
+    const requestBody = {
+        subject,
+        comment,
+        time_expired: timeExpired,
+        priority_id: priorityId,
+        ticket_pic: String(ticketPic),
+        ticket_follow: getTicketFollowEmployeeIds()
+    };
+    const log = (fields) => logGeneralTicket({ kind, reference, ticketPic, subject, requestBody, ...fields });
+
+    if (!apiKey) {
+        await log({ status: 'FAILED', errorMessage: 'IS5_API_KEY is not configured' });
+        throw new Error('IS5_API_KEY is not configured');
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    let response;
+    let text = null;
+    try {
+        response = await fetch(url, {
+            method: 'POST',
+            headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(requestBody),
+            signal: controller.signal
+        });
+        text = await response.text();
+    } catch (err) {
+        // fetch's own message is just "fetch failed" - the cause says why (ECONNREFUSED, ENOTFOUND, ...).
+        const message = err.name === 'AbortError'
+            ? 'IS5 did not respond within 15 seconds'
+            : `Could not reach IS5: ${err.cause?.code || err.cause?.message || err.message}`;
+        await log({ status: 'FAILED', errorMessage: message });
+        throw new Error(message);
+    } finally {
+        clearTimeout(timeoutId);
+    }
+
+    let data;
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    if (!response.ok) {
+        const message = (data && typeof data === 'object' && (data.message || data.error)) || text || response.statusText;
+        const err = new Error(`IS5 rejected the general ticket (${response.status}): ${message}`);
+        err.status = response.status;
+        err.details = data;
+        await log({ status: 'FAILED', httpStatus: response.status, responseBody: text, errorMessage: err.message });
+        throw err;
+    }
+    const ticketId = extractGeneralTicketId(data);
+    if (!ticketId) console.warn('[GENERAL TICKET] Created, but no ticket id found in the IS5 response - see general_ticket_logs.response_body.');
+    await log({ status: 'SUCCESS', httpStatus: response.status, responseBody: text, ticketId });
+    return data;
+};
+
+// Sends a scheduled reminder ticket at most once per (kind, recipient, period): the row in
+// general_ticket_reminders is claimed first so a concurrent or repeated run skips it, and released
+// again if IS5 rejects the ticket so the next run retries. Returns true only when a ticket was sent.
+const sendReminderTicketOnce = async ({ kind, recipientEmployeeId, period, refIds = [], ticket }) => {
+    const claim = await query(
+        'INSERT IGNORE INTO general_ticket_reminders (kind, recipient_employee_id, period, ref_ids) VALUES (?, ?, ?, ?)',
+        [kind, String(recipientEmployeeId), period, refIds.join(',')]
+    );
+    if (claim.affectedRows === 0) return false;
+    try {
+        await createGeneralTicket({ ...ticket, kind, reference: period, ticketPic: String(recipientEmployeeId) });
+        return true;
+    } catch (err) {
+        await query('DELETE FROM general_ticket_reminders WHERE kind = ? AND recipient_employee_id = ? AND period = ?',
+            [kind, String(recipientEmployeeId), period]);
+        throw err;
+    }
+};
+
+// Runs a reminder job now and then hourly. Only started when its *_ENABLED flag is "true" (see
+// initDB above), so a dev machine on a copy of production data never sends real tickets.
+const REMINDER_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+const scheduleReminderJob = (label, job) => {
+    if (!process.env.IS5_API_KEY) {
+        console.warn(`[${label}] Enabled, but IS5_API_KEY is not set - reminders are disabled.`);
+        return;
+    }
+    console.log(`[${label}] Reminders enabled (checked hourly).`);
+    const run = () => job().catch(err => console.error(`[${label}] Reminder run failed:`, err.message));
+    run();
+    setInterval(run, REMINDER_CHECK_INTERVAL_MS);
+};
+
+const TICKET_DATETIME_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+
+// Body: { subject, comment, time_expired?: "YYYY-MM-DD HH:MM:SS", priority_id?, ticket_pic? }
+// time_expired defaults to IS5_TICKET_EXPIRED_DAYS (3) days from now, ticket_pic to the signed-in user's employee ID;
+// followers always come from IS5_TICKET_FOLLOW.
+app.post('/api/general-tickets', async (req, res) => {
+    try {
+        const { subject, comment, time_expired, priority_id, ticket_pic } = req.body || {};
+        if (!subject || !comment) {
+            return res.status(400).json({ success: false, message: 'subject and comment are required' });
+        }
+        const timeExpired = time_expired || generalTicketDueDate();
+        if (!TICKET_DATETIME_RE.test(String(timeExpired))) {
+            return res.status(400).json({ success: false, message: 'time_expired must be "YYYY-MM-DD HH:MM:SS"' });
+        }
+        const ticketPic = ticket_pic || req.user.employee_id;
+        if (!ticketPic) {
+            return res.status(400).json({ success: false, message: 'ticket_pic is required (your account has no employee ID)' });
+        }
+        const ticket = await createGeneralTicket({
+            kind: 'manual',
+            reference: `user:${req.user.id}`,
+            subject,
+            comment,
+            timeExpired,
+            priorityId: Number(priority_id) || 1,
+            ticketPic
+        });
+        res.json({ success: true, ticket });
+    } catch (err) {
+        console.error('[GENERAL TICKET] Failed to create:', err.message);
+        res.status(err.status ? 502 : 500).json({ success: false, message: err.message, details: err.details });
+    }
+});
+
 const parseFlexibleDate = (timestamp) => {
     if (!timestamp || typeof timestamp !== 'string') return null;
     try {
@@ -4415,6 +4621,7 @@ app.post('/api/meetings', async (req, res) => {
             ]
         );
 
+        await syncMeetingClosedAt(result.insertId);
         const newMeeting = { ...m, id: result.insertId, guests };
 
         if (guests.emails.length > 0) {
@@ -4741,6 +4948,7 @@ app.put('/api/meetings/:id', async (req, res) => {
                 id
             ]
         );
+        await syncMeetingClosedAt(id);
 
         // The linked Post Training Evaluation template only goes live once this session is Paid.
         // Deliberately not gated on "just transitioned to Paid" (wasPaid) - HR can attach or swap
@@ -5052,6 +5260,107 @@ app.get('/api/post-training-evaluations/subordinates', async (req, res) => {
         res.json(items);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// --- POST TRAINING EVALUATION REMINDERS (IS5 general tickets) ---
+// A leader has PTE_FILL_WINDOW_DAYS from when a training closes (meeting closed_at / external request
+// processed_at) to evaluate their attendees; PTE_REMINDER_DAYS_BEFORE_DEADLINE before that runs out,
+// every leader who still has someone unevaluated gets ONE ticket per training naming them. Same
+// forms, attendees and "submitted" rule as GET /api/post-training-evaluations/subordinates.
+const PTE_FILL_WINDOW_DAYS = 30;
+const PTE_REMINDER_DAYS_BEFORE_DEADLINE = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const runPteReminders = async () => {
+    const remindAfterMs = (PTE_FILL_WINDOW_DAYS - PTE_REMINDER_DAYS_BEFORE_DEADLINE) * DAY_MS;
+    const isDueForReminder = (startedAt) => startedAt && Date.now() - new Date(startedAt).getTime() >= remindAfterMs;
+
+    const forms = await query(`
+        SELECT f.*, m.title AS meeting_title, m.date AS meeting_date, m.is_closed AS meeting_is_closed, m.guests_json, m.cost_report_json
+        FROM post_training_evaluation_forms f
+        LEFT JOIN meetings m ON f.meeting_id = m.id
+        WHERE f.status = 'PUBLISHED' AND f.deleted_at IS NULL
+    `);
+
+    // Every training still awaiting evaluations whose reminder point has passed.
+    const trainings = [];
+    for (const form of forms) {
+        const meetings = (await getFormMeetings(form)).filter(m => m.is_closed);
+        const closedAtById = new Map();
+        if (meetings.length > 0) {
+            const rows = await query(`SELECT id, closed_at FROM meetings WHERE id IN (${meetings.map(() => '?').join(',')})`, meetings.map(m => m.id));
+            rows.forEach(r => closedAtById.set(r.id, r.closed_at));
+        }
+        const externalTrainingRequests = (await getFormExternalTrainingRequests(form)).filter(etr => etr.status === 'Processed');
+
+        const responses = await query(
+            'SELECT meeting_id, external_training_request_id, evaluatee_employee_id FROM post_training_evaluation_responses WHERE form_id = ?',
+            [form.id]
+        );
+        const submitted = new Set(responses.map(r => r.meeting_id
+            ? `m${r.meeting_id}-${r.evaluatee_employee_id}`
+            : `e${r.external_training_request_id}-${r.evaluatee_employee_id}`));
+
+        for (const meeting of meetings) {
+            const closedAt = closedAtById.get(meeting.id);
+            if (!isDueForReminder(closedAt)) continue;
+            const pending = (await getMeetingAttendeeEmployeeIds(meeting)).filter(id => !submitted.has(`m${meeting.id}-${id}`));
+            if (pending.length > 0) {
+                trainings.push({ key: `f${form.id}-m${meeting.id}`, title: meeting.title, date: meeting.date, startedAt: closedAt, evaluateeIds: pending });
+            }
+        }
+        for (const etr of externalTrainingRequests) {
+            if (!isDueForReminder(etr.processed_at) || submitted.has(`e${etr.id}-${etr.employee_id}`)) continue;
+            trainings.push({ key: `f${form.id}-e${etr.id}`, title: etr.title, date: etr.end_date, startedAt: etr.processed_at, evaluateeIds: [etr.employee_id] });
+        }
+    }
+    if (trainings.length === 0) return;
+
+    const employees = await querySimAsset(
+        `SELECT id_employee, user_id, full_name, nickname, id_report_to, id_report_to_value, active_status, status_join, deleted_at
+         FROM employees`
+    );
+    const employeeById = new Map(employees.map(e => [String(e.id_employee), e]));
+    const leaders = employees.filter(l => l.id_employee && !l.deleted_at && isActiveNonIntern(l));
+
+    for (const training of trainings) {
+        // Resigned evaluatees drop out, same as filterActiveEmployeeIds on the leader's PTE page.
+        const evaluatees = training.evaluateeIds
+            .map(id => employeeById.get(String(id)))
+            .filter(e => e && e.active_status !== 'Resign');
+
+        const byLeader = new Map();
+        for (const evaluatee of evaluatees) {
+            for (const leader of leaders) {
+                if (leader.id_employee === evaluatee.id_employee || !reportsToLeader(evaluatee, leader)) continue;
+                if (!byLeader.has(leader.id_employee)) byLeader.set(leader.id_employee, { leader, evaluatees: [] });
+                byLeader.get(leader.id_employee).evaluatees.push(evaluatee);
+            }
+        }
+
+        const deadlineLabel = formatIndoDate(new Date(new Date(training.startedAt).getTime() + PTE_FILL_WINDOW_DAYS * DAY_MS));
+        const trainingDateLabel = formatIndoDate(training.date) || '-';
+        for (const [leaderId, { leader, evaluatees: pending }] of byLeader) {
+            const names = pending.map(e => `- ${e.full_name} (${e.id_employee})`);
+            try {
+                const sent = await sendReminderTicketOnce({
+                    kind: 'pte',
+                    recipientEmployeeId: leaderId,
+                    period: training.key,
+                    refIds: pending.map(e => e.id_employee),
+                    ticket: {
+                        subject: `Pengingat Post Training Evaluation: ${training.title}`,
+                        comment: `Halo ${leader.full_name}, Post Training Evaluation untuk training "${training.title}" (${trainingDateLabel}) belum Anda isi untuk anggota tim berikut:\n${names.join('\n')}\n\nBatas pengisian ${deadlineLabel}. Mohon isi di LMS (menu Post Training Evaluation Tim).\n\n${lmsAnchor('/training/pte-team', 'Buka Post Training Evaluation Tim')}`,
+                        timeExpired: generalTicketDueDate(),
+                        priorityId: 1
+                    }
+                });
+                if (sent) console.log(`[PTE GT] Reminder sent to ${leader.full_name} for "${training.title}" (${names.length} employee(s)).`);
+            } catch (err) {
+                console.error(`[PTE GT] Reminder for ${leader.full_name} ("${training.title}") failed:`, err.message);
+            }
+        }
+    }
+};
 
 // Staff self-service: every (form, meeting) pair where the caller was themselves an attendee -
 // mirrors /subordinates above but scoped to one employee_id instead of a leader's whole team, and
@@ -6140,6 +6449,59 @@ app.get('/api/feedback/all', async (req, res) => {
 // --- EXTERNAL TRAINING ENDPOINTS ---
 
 // 1. Employee creates new request
+// Every active leader who sees this employee's requests in their Team Approvals list - the same
+// matching as findSubordinateEmployeeIds (via reportsToLeader), so a comma-separated
+// id_report_to ("A,B") reaches its leaders here too, unlike findReportToEmployee's exact match.
+const findApprovingLeaders = async (employeeId) => {
+    const employees = await querySimAsset(
+        `SELECT id_employee, user_id, full_name, nickname, id_report_to, id_report_to_value, active_status, status_join, deleted_at
+         FROM employees`
+    );
+    const employee = employees.find(e => String(e.id_employee) === String(employeeId));
+    if (!employee) return [];
+    return employees.filter(l =>
+        l.id_employee && l.id_employee !== employee.id_employee && !l.deleted_at && isActiveNonIntern(l) && reportsToLeader(employee, l)
+    );
+};
+
+// An employee submitted an external training request -> a general ticket for each leader who has
+// to approve it, followed by IS5_TICKET_FOLLOW. Skipped when the employee has no leader on the org chart.
+const notifyLeaderExternalTrainingRequest = async ({ requestId, employee_id, employee_name, category, title, start_date, end_date, registration_fee, vendor }) => {
+    const leaders = await findApprovingLeaders(employee_id);
+    if (leaders.length === 0) {
+        console.warn(`[EXTERNAL TRAINING GT] No leader found for ${employee_name} (${employee_id}) - skipping the ticket.`);
+        return;
+    }
+    const formatDate = (v) => v ? String(v).replace('T', ' ') : '-';
+    const fee = Number(registration_fee) || 0;
+    for (const leader of leaders) {
+        try {
+            await createGeneralTicket({
+                kind: 'external_training_request',
+                reference: `external_training_request:${requestId}`,
+                subject: `Pengajuan training eksternal: ${employee_name} - ${title}`,
+                comment: [
+                    `Halo ${leader.full_name}, ${employee_name} (${employee_id}) mengajukan training eksternal yang menunggu persetujuan Anda di LMS.`,
+                    '',
+                    `Judul: ${title}`,
+                    `Kategori: ${category || '-'}`,
+                    `Penyelenggara: ${vendor || '-'}`,
+                    `Tanggal: ${formatDate(start_date)} s/d ${formatDate(end_date)}`,
+                    `Biaya pendaftaran: Rp ${fee.toLocaleString('id-ID')}`,
+                    '',
+                    lmsAnchor(`/training/external?tab=team_approvals&request=${requestId}`, 'Buka Pengajuan')
+                ].join('\n'),
+                timeExpired: generalTicketDueDate(),
+                priorityId: 1,
+                ticketPic: String(leader.id_employee)
+            });
+            console.log(`[EXTERNAL TRAINING GT] Ticket created for leader ${leader.full_name} (${employee_name}: "${title}").`);
+        } catch (err) {
+            console.error(`[EXTERNAL TRAINING GT] Ticket for leader ${leader.full_name} failed:`, err.message);
+        }
+    }
+};
+
 app.post('/api/external-training/request', async (req, res) => {
     try {
         const { employee_id, employee_name, category, title, start_date, end_date, registration_fee, attachment_link, vendor, location, payment_method, cc_employee_ids } = req.body;
@@ -6152,6 +6514,10 @@ app.post('/api/external-training/request', async (req, res) => {
         `, [employee_id, employee_name, category, title, toMysqlDatetime(start_date), toMysqlDatetime(end_date), registration_fee || 0, attachment_link || '', vendor || '', location || '', payment_method || 'Reimbursement', Array.isArray(cc_employee_ids) && cc_employee_ids.length > 0 ? JSON.stringify(cc_employee_ids) : null]);
 
         res.json({ success: true, id: result.insertId });
+
+        // Best-effort, after responding - an IS5 outage must never fail or slow down the request.
+        notifyLeaderExternalTrainingRequest({ requestId: result.insertId, employee_id, employee_name, category, title, start_date, end_date, registration_fee, vendor })
+            .catch(err => console.error('[EXTERNAL TRAINING GT] Failed to notify leader:', err.message));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -6387,7 +6753,8 @@ app.post('/api/external-training/hr-process', async (req, res) => {
         // datetime-local inputs send "YYYY-MM-DDTHH:MM"; MySQL DATETIME literals need a space instead of "T"
         const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
 
-        let sql = `UPDATE external_training_requests SET status = 'Processed', travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, payment_method = ?, hr_name = ?`;
+        // processed_at starts the leader's 30-day Post Training Evaluation window (runPteReminders).
+        let sql = `UPDATE external_training_requests SET status = 'Processed', processed_at = COALESCE(processed_at, NOW()), travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, payment_method = ?, hr_name = ?`;
         let params = [travel_flight_cost || 0, accommodation_cost || 0, miscellaneous_cost || 0, payment_method, hr_name || null];
 
         if (registration_fee !== undefined) {
@@ -6638,6 +7005,11 @@ app.post('/api/idp/bulk-import', async (req, res) => {
     // plan still lands as Pending/Draft, exactly like a sheet with no history at all, so a real HR
     // approval always has to happen through the app afterward rather than being implied by the import.
     const result = { inserted: 0, skipped: 0, duplicates: [], errors: [] };
+    // New plans an employee imported for themselves from the IDP menu (IDPPage.tsx sends
+    // source: 'self') - HR gets a general ticket for each. Imports from the Admin Panel
+    // (IDPManager.tsx) never raise one, even when HR imports their own plan there.
+    const isSelfImport = req.body.source === 'self';
+    const ownImportedPlans = [];
 
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
@@ -6790,13 +7162,103 @@ app.post('/api/idp/bulk-import', async (req, res) => {
             }
 
             result.inserted++;
+            if (isSelfImport && req.user?.employee_id && String(employeeId) === String(req.user.employee_id)) {
+                ownImportedPlans.push({ planId: idpId, employeeId, employeeName, periodYear: row.period_year });
+            }
         } catch (err) {
             result.errors.push({ row: rowLabel, error: err.message });
         }
     }
 
     res.json(result);
+
+    // Best-effort, after responding - an IS5 outage must never fail or slow down the import.
+    for (const plan of ownImportedPlans) {
+        notifyHRImportedIdp(plan).catch(err => console.error('[IDP GT] Failed to notify HR of imported IDP:', err.message));
+    }
 });
+
+// --- IDP GENERAL TICKETS (IS5) ---
+// An employee imported their own IDP -> a general ticket for the HR PIC in IS5_TICKET_PIC_HR.
+const notifyHRImportedIdp = async ({ planId, employeeId, employeeName, periodYear }) => {
+    const hrPic = (process.env.IS5_TICKET_PIC_HR || '').trim();
+    if (!hrPic) {
+        console.warn('[IDP GT] IS5_TICKET_PIC_HR is not set - skipping the HR ticket for an imported IDP.');
+        return;
+    }
+    await createGeneralTicket({
+        kind: 'idp_import',
+        reference: `idp:${planId}`,
+        subject: `IDP baru diimpor: ${employeeName} (${periodYear})`,
+        comment: `${employeeName} (${employeeId}) telah mengimpor Individual Development Plan periode ${periodYear} di LMS. Mohon ditinjau dan disetujui oleh HR.\n\n${lmsAnchor(`/admin/idp?idp=${planId}`, 'Buka IDP')}`,
+        timeExpired: generalTicketDueDate(),
+        priorityId: 1,
+        ticketPic: hrPic
+    });
+    console.log(`[IDP GT] HR ticket created for ${employeeName}'s imported IDP (${periodYear}).`);
+};
+
+// Days before the end of the month when leaders get a ticket for IDPs not yet reviewed that month.
+const IDP_REVIEW_REMINDER_DAYS_BEFORE_MONTH_END = 7;
+
+// Monthly, from H-7 before month end: every leader with an Approved IDP (current year) on their
+// team that has no review logged this month gets ONE general ticket listing those employees.
+// ticket_pic is the leader; followers come from IS5_TICKET_FOLLOW (HR). Safe to run repeatedly -
+// sendReminderTicketOnce allows one ticket per leader per month and retries a failed send next run.
+const runIdpReviewReminders = async () => {
+    const today = nowInWib();
+    const year = today.getUTCFullYear();
+    const month = today.getUTCMonth() + 1;
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    if (today.getUTCDate() < lastDay - IDP_REVIEW_REMINDER_DAYS_BEFORE_MONTH_END) return;
+
+    const periodMonth = `${year}-${pad2(month)}`;
+    const monthStart = `${periodMonth}-01`;
+    const monthEnd = `${periodMonth}-${pad2(lastDay)}`;
+
+    const unreviewed = await query(
+        `SELECT p.id, p.employee_id, p.employee_name
+         FROM idp_plans p
+         WHERE p.status = 'Approved' AND p.period_year = ?
+           AND NOT EXISTS (
+               SELECT 1 FROM idp_reviews r
+               WHERE r.idp_id = p.id AND r.review_date BETWEEN ? AND ?
+           )`,
+        [year, monthStart, monthEnd]
+    );
+    if (unreviewed.length === 0) return;
+
+    const byLeader = new Map();
+    for (const plan of unreviewed) {
+        const leader = await findReportToEmployee(plan.employee_id);
+        if (!leader?.id_employee) continue;
+        const key = String(leader.id_employee);
+        if (!byLeader.has(key)) byLeader.set(key, { leader, plans: [] });
+        byLeader.get(key).plans.push(plan);
+    }
+
+    const monthLabel = `${INDO_MONTHS[month - 1]} ${year}`;
+    for (const [leaderId, { leader, plans }] of byLeader) {
+        const names = plans.map(p => `- ${p.employee_name} (${p.employee_id})`).join('\n');
+        try {
+            const sent = await sendReminderTicketOnce({
+                kind: 'idp_review',
+                recipientEmployeeId: leaderId,
+                period: periodMonth,
+                refIds: plans.map(p => p.id),
+                ticket: {
+                    subject: `Pengingat review IDP ${monthLabel}`,
+                    comment: `Halo ${leader.full_name}, IDP anggota tim berikut belum direview untuk bulan ${monthLabel}:\n${names}\n\nMohon lakukan review 1-on-1 dan catat di LMS sebelum akhir bulan.\n\n${lmsAnchor('/idp', 'Buka IDP Tim')}`,
+                    timeExpired: generalTicketDueDate(),
+                    priorityId: 1
+                }
+            });
+            if (sent) console.log(`[IDP GT] Review reminder sent to ${leader.full_name} for ${plans.length} IDP(s), ${periodMonth}.`);
+        } catch (err) {
+            console.error(`[IDP GT] Review reminder for ${leader.full_name} failed:`, err.message);
+        }
+    }
+};
 
 // 2. Employee's own plans across years.
 app.get('/api/idp/my-plans', async (req, res) => {
@@ -7581,6 +8043,103 @@ app.put('/api/competency-change-requests/:id/reject', async (req, res) => {
 
 // One row per quarter/year the employee has been assessed for - used to notify the employee
 // when their leader submits a new period, since /latest requires already knowing the period.
+// --- COMPETENCY ASSESSMENT REMINDERS (IS5 general tickets) ---
+const COMPETENCY_REMINDER_DAYS_BEFORE_QUARTER_END = 7;
+const COMPETENCY_ALL_POSITIONS = 'Umum';
+const COMPETENCY_ALL_LEADERS = 'Semua Posisi Level Leader';
+
+// Server-side twin of getMatchedCompetencies (src/utils/competency.ts), reduced to "is there at
+// least one competency to assess?" - a leader can't fill in an assessment for someone without any.
+const hasAssessableCompetencies = (jobPosition, isSupervisor, templatePositions) => {
+    const position = jobPosition || '';
+    if (templatePositions.has(COMPETENCY_ALL_POSITIONS)) return true;
+    if (isSupervisor && templatePositions.has(COMPETENCY_ALL_LEADERS)) return true;
+    for (const p of templatePositions) {
+        if (p === COMPETENCY_ALL_POSITIONS || p === COMPETENCY_ALL_LEADERS) continue;
+        if (p === position || (position.startsWith(p) && position[p.length] === ' ')) return true;
+    }
+    return false;
+};
+
+// Mirrors findSubordinateEmployeeIds' SQL on already-loaded employee rows (case-insensitive like
+// MySQL's collation): by id_report_to_value = leader's user_id, id_report_to = full name or nickname,
+// or the leader's full name as any but the last entry of a comma-separated id_report_to.
+const reportsToLeader = (employee, leader) => {
+    const lc = (v) => String(v ?? '').toLowerCase();
+    if (leader.user_id != null && employee.id_report_to_value != null && lc(employee.id_report_to_value) === lc(leader.user_id)) return true;
+    const reportTo = lc(employee.id_report_to);
+    if (!reportTo) return false;
+    const fullName = lc(leader.full_name);
+    if (reportTo === fullName || reportTo === lc(leader.nickname || leader.full_name)) return true;
+    return reportTo.split(',').slice(0, -1).includes(fullName);
+};
+
+const isActiveNonIntern = (e) => e.active_status !== 'Resign' && e.status_join !== 'Internship';
+
+// From H-7 before the current quarter ends: every leader whose team (same members as the
+// "Kompetensi Tim" page - active, non-intern) still has someone with no competency assessment for
+// this quarter gets ONE general ticket naming them. ticket_pic is the leader; followers come from
+// IS5_TICKET_FOLLOW. Safe to run repeatedly - one ticket per leader per quarter.
+const runCompetencyAssessmentReminders = async () => {
+    const today = nowInWib();
+    const year = today.getUTCFullYear();
+    const quarter = Math.floor(today.getUTCMonth() / 3) + 1;
+    const quarterEnd = new Date(Date.UTC(year, quarter * 3, 0));
+    const todayDate = new Date(Date.UTC(year, today.getUTCMonth(), today.getUTCDate()));
+    const daysLeft = Math.round((quarterEnd - todayDate) / (24 * 60 * 60 * 1000));
+    if (daysLeft > COMPETENCY_REMINDER_DAYS_BEFORE_QUARTER_END) return;
+
+    const templatePositions = new Set((await query('SELECT DISTINCT posisi FROM competency_templates')).map(r => r.posisi));
+    if (templatePositions.size === 0) return;
+
+    const assessed = new Set((await query(
+        'SELECT DISTINCT employee_id FROM competency_assessments WHERE quarter = ? AND year = ?',
+        [quarter, year]
+    )).map(r => String(r.employee_id)));
+
+    const employees = await querySimAsset(
+        `SELECT id_employee, user_id, full_name, nickname, job_position, id_report_to, id_report_to_value,
+                active_status, status_join, deleted_at
+         FROM employees`
+    );
+    const reportToSet = new Set(employees.map(e => e.id_report_to).filter(Boolean));
+
+    const period = `${year}-Q${quarter}`;
+    const periodLabel = `Q${quarter} ${year}`;
+    const quarterEndLabel = formatIndoDate(`${formatWibDate(quarterEnd)}T00:00:00`);
+
+    for (const leader of employees) {
+        if (!leader.id_employee || leader.deleted_at || !isActiveNonIntern(leader)) continue;
+        const pending = employees.filter(e =>
+            e.id_employee && e.id_employee !== leader.id_employee && isActiveNonIntern(e) &&
+            reportsToLeader(e, leader) &&
+            !assessed.has(String(e.id_employee)) &&
+            hasAssessableCompetencies(e.job_position, reportToSet.has(e.id_employee) || reportToSet.has(e.full_name), templatePositions)
+        );
+        if (pending.length === 0) continue;
+
+        pending.sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
+        const names = pending.map(e => `- ${e.full_name} (${e.id_employee})`).join('\n');
+        try {
+            const sent = await sendReminderTicketOnce({
+                kind: 'competency_assessment',
+                recipientEmployeeId: leader.id_employee,
+                period,
+                refIds: pending.map(e => e.id_employee),
+                ticket: {
+                    subject: `Pengingat penilaian kompetensi ${periodLabel}`,
+                    comment: `Halo ${leader.full_name}, penilaian kompetensi ${periodLabel} untuk anggota tim berikut belum diisi:\n${names}\n\nMohon isi penilaian di LMS (menu Kompetensi Tim) sebelum kuartal berakhir pada ${quarterEndLabel}.\n\n${lmsAnchor('/competency-team', 'Buka Kompetensi Tim')}`,
+                    timeExpired: generalTicketDueDate(),
+                    priorityId: 1
+                }
+            });
+            if (sent) console.log(`[COMPETENCY GT] Reminder sent to ${leader.full_name} for ${pending.length} employee(s), ${period}.`);
+        } catch (err) {
+            console.error(`[COMPETENCY GT] Reminder for ${leader.full_name} failed:`, err.message);
+        }
+    }
+};
+
 app.get('/api/competency-assessments/periods', async (req, res) => {
     try {
         const { employee_id } = req.query;

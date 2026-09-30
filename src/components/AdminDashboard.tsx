@@ -31,6 +31,8 @@ interface AdminDashboardProps {
     user: User;
     onNavigate: (page: Page, view?: string) => void;
     initialView?: string;
+    // IDP plan to open in the IDP view - from an IS5 ticket link (/admin/idp?idp=<id>).
+    focusIdpPlanId?: number | null;
 }
 
 type AdminView = 'overview' | 'users' | 'logs' | 'training' | 'meetings' | 'courses' | 'reports' | 'calendar' | 'quiz-reports' | 'employee-learning-report' | 'idp' | 'post-training-evaluation' | 'competency-template' | 'competency-approvals' | 'competency-overview' | 'activity-logs';
@@ -66,7 +68,7 @@ const StatCard = ({ label, value, icon: Icon, color, trend }: StatCardProps) => 
     );
 };
 
-const AdminDashboard = ({ user, onNavigate, initialView }: AdminDashboardProps) => {
+const AdminDashboard = ({ user, onNavigate, initialView, focusIdpPlanId }: AdminDashboardProps) => {
     const { t } = useTranslation('adminDashboard');
     const [currentView, setCurrentView] = useState<AdminView>((initialView as AdminView) || 'overview');
 
@@ -159,7 +161,7 @@ const AdminDashboard = ({ user, onNavigate, initialView }: AdminDashboardProps) 
             case 'employee-learning-report':
                 return <EmployeeLearningReport userRole={user.role} />;
             case 'idp':
-                return <IDPManager userRole={user.role} userName={user.name} />;
+                return <IDPManager userRole={user.role} userName={user.name} focusPlanId={focusIdpPlanId} />;
             case 'competency-template':
                 return <CompetencyTemplateManager userRole={user.role} onBack={() => setCurrentView('overview')} />;
             case 'competency-approvals':
