@@ -6793,6 +6793,46 @@ const notifyLeaderExternalTrainingRequest = async ({ requestId, employee_id, emp
     }
 };
 
+// A leader approved an external training request -> a general ticket for the HR PIC in
+// IS5_TICKET_PIC_HR to process it, followed by IS5_TICKET_FOLLOW.
+const notifyHRApprovedExternalTraining = async ({ request, approvedBy, approvalNote, totalCost, budgetNoticeMessage }) => {
+    if (!isGeneralTicketEnabled()) return;
+    const hrPic = (process.env.IS5_TICKET_PIC_HR || '').trim();
+    if (!hrPic) {
+        console.warn('[EXTERNAL TRAINING GT] IS5_TICKET_PIC_HR is not set - skipping the HR ticket for an approved request.');
+        return;
+    }
+    // The row's DATETIMEs come back as Dates read in the server's local time - format them the same way.
+    const formatDate = (v) => {
+        const d = v ? new Date(v) : null;
+        if (!d || isNaN(d.getTime())) return '-';
+        return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    };
+    await createGeneralTicket({
+        kind: 'external_training_approved',
+        reference: `external_training_request:${request.id}`,
+        subject: `Training eksternal disetujui: ${request.employee_name} - ${request.title}`,
+        comment: [
+            `Pengajuan training eksternal ${request.employee_name} (${request.employee_id}) telah disetujui oleh ${approvedBy || '-'} dan menunggu diproses HR di LMS.`,
+            '',
+            `Judul: ${request.title}`,
+            `Kategori: ${request.category || '-'}`,
+            `Penyelenggara: ${request.vendor || '-'}`,
+            `Tanggal: ${formatDate(request.start_date)} s/d ${formatDate(request.end_date)}`,
+            `Total biaya: Rp ${(Number(totalCost) || 0).toLocaleString('id-ID')}`,
+            `Metode pembayaran: ${request.payment_method || '-'}`,
+            `Catatan leader: ${approvalNote || '-'}`,
+            ...(budgetNoticeMessage ? ['', budgetNoticeMessage] : []),
+            '',
+            lmsAnchor('/admin/training', 'Buka Training Eksternal')
+        ].join('\n'),
+        timeExpired: generalTicketDueDate(),
+        priorityId: 1,
+        ticketPic: hrPic
+    });
+    console.log(`[EXTERNAL TRAINING GT] HR ticket created for ${request.employee_name}'s approved request "${request.title}".`);
+};
+
 app.post('/api/external-training/request', async (req, res) => {
     try {
         const { employee_id, employee_name, category, title, start_date, end_date, registration_fee, attachment_link, vendor, location, payment_method, cc_employee_ids } = req.body;
@@ -6986,6 +7026,12 @@ app.post('/api/external-training/approve', async (req, res) => {
         );
 
         res.json({ success: true, exceedsPersonalBudget });
+
+        // Best-effort, after responding - an IS5 outage must never fail or slow down the approval.
+        if (status === 'Approved') {
+            notifyHRApprovedExternalTraining({ request: trainingRequest, approvedBy: approved_by, approvalNote: approval_note.trim(), totalCost: thisRequestCost, budgetNoticeMessage })
+                .catch(err => console.error('[EXTERNAL TRAINING GT] Failed to notify HR:', err.message));
+        }
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
