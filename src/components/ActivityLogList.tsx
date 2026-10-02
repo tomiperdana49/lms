@@ -10,6 +10,9 @@ interface ActivityLog {
     actor_name: string | null;
     actor_email: string | null;
     actor_role: string | null;
+    // The HR account that did this while signed in as the actor (impersonation), if any.
+    impersonator_name: string | null;
+    impersonator_email: string | null;
     module: string;
     action: string;
     target_id: string | null;
@@ -38,7 +41,7 @@ interface ActivityLogListProps {
 }
 
 // Mirrors the module keys assigned by ACTIVITY_RULES in server/server.js.
-const MODULES = ['reading_log', 'online_module', 'internal_training', 'external_training', 'pte', 'idp', 'incentive', 'competency', 'user', 'feedback', 'other'];
+const MODULES = ['reading_log', 'online_module', 'internal_training', 'external_training', 'pte', 'idp', 'incentive', 'competency', 'user', 'feedback', 'auth', 'other'];
 
 const MODULE_COLORS: Record<string, string> = {
     reading_log: 'bg-orange-100 text-orange-700',
@@ -51,6 +54,7 @@ const MODULE_COLORS: Record<string, string> = {
     competency: 'bg-pink-100 text-pink-700',
     user: 'bg-cyan-100 text-cyan-700',
     feedback: 'bg-lime-100 text-lime-700',
+    auth: 'bg-rose-100 text-rose-700',
     other: 'bg-gray-100 text-gray-600',
 };
 
@@ -248,6 +252,11 @@ const ActivityLogList = ({ onBack }: ActivityLogListProps) => {
                                             )}
                                         </div>
                                         <div className="text-xs text-slate-400">{[log.actor_employee_id, log.actor_email].filter(Boolean).join(' · ')}</div>
+                                        {log.impersonator_name && (
+                                            <div className="text-xs font-semibold text-rose-600" title={log.impersonator_email || undefined}>
+                                                {t('impersonatedBy', { name: log.impersonator_name })}
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="px-4 py-3">
                                         <span className={`text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap ${MODULE_COLORS[log.module] || MODULE_COLORS.other}`}>

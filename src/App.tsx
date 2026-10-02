@@ -429,6 +429,22 @@ function App() {
     localStorage.removeItem(LAST_ACTIVITY_KEY);
   };
 
+  // HR signing in as another user, and back. Both swap the session token and reload into the
+  // dashboard, so no page keeps state loaded for the previous account.
+  const switchSession = async (path: string, body: object) => {
+    const res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) throw new Error(data?.message || '');
+    localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+    localStorage.setItem('lms_user', JSON.stringify(data.user));
+    localStorage.removeItem('lms_active_page');
+    window.location.replace('/dashboard');
+  };
+
   // We use the logged-in user's role
   const userRole: Role = user.role;
 
@@ -449,6 +465,8 @@ function App() {
         user={user!}
         onLogout={handleLogout}
         onRoleChange={(role) => setUser({ ...user!, role })}
+        onImpersonate={(userId) => switchSession('/api/auth/impersonate', { userId })}
+        onStopImpersonating={() => switchSession('/api/auth/impersonate/stop', {})}
         adminView={adminView}
         config={config}
       >

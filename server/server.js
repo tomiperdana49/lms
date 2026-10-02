@@ -137,6 +137,8 @@ const query = async (sql, params) => {
 // middleware below rejects any /api request without a valid one, except the routes that must work
 // logged-out. The token only carries the user id - role and profile are re-read from `users` on
 // every request, so a role change or deleted account takes effect immediately.
+// An impersonation token (HR signed in as another user) also carries `imp`, the HR account's id:
+// requests run as `uid`, and `imp` is re-checked to still be HR on every request.
 const AUTH_SECRET = process.env.AUTH_SECRET || (() => {
     console.warn('[AUTH] AUTH_SECRET is not set - using a random per-process secret. Every restart will log all users out.');
     return crypto.randomBytes(32).toString('hex');
@@ -147,16 +149,18 @@ const getSessionEpoch = () => process.env.SESSION_EPOCH || 'v1';
 
 const signAuthPayload = (payload) => crypto.createHmac('sha256', AUTH_SECRET).update(payload).digest('base64url');
 
-const issueAuthToken = (userId) => {
+const issueAuthToken = (userId, impersonatorId = null) => {
     const payload = Buffer.from(JSON.stringify({
         uid: String(userId),
+        ...(impersonatorId ? { imp: String(impersonatorId) } : {}),
         epoch: getSessionEpoch(),
         exp: Date.now() + AUTH_TOKEN_TTL_MS
     })).toString('base64url');
     return `${payload}.${signAuthPayload(payload)}`;
 };
 
-// Returns the token's user id, or null if it is malformed, tampered with, expired, or from an older session epoch.
+// Returns { uid, imp } from the token (imp only on an impersonation token), or null if it is
+// malformed, tampered with, expired, or from an older session epoch.
 const verifyAuthToken = (token) => {
     const [payload, signature] = String(token || '').split('.');
     if (!payload || !signature) return null;
@@ -164,9 +168,9 @@ const verifyAuthToken = (token) => {
     const actual = Buffer.from(signature);
     if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) return null;
     try {
-        const { uid, epoch, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString());
+        const { uid, imp, epoch, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString());
         if (!uid || epoch !== getSessionEpoch() || !(exp > Date.now())) return null;
-        return uid;
+        return { uid, imp: imp || null };
     } catch {
         return null;
     }
@@ -234,12 +238,18 @@ app.use(async (req, res, next) => {
     if (PUBLIC_API_ROUTES.some(([method, pattern]) => (!method || method === req.method) && pattern.test(req.path))) return next();
 
     const header = String(req.headers.authorization || '');
-    const userId = header.startsWith('Bearer ') ? verifyAuthToken(header.slice(7)) : null;
-    if (!userId) return res.status(401).json({ success: false, message: 'Authentication required' });
+    const session = header.startsWith('Bearer ') ? verifyAuthToken(header.slice(7)) : null;
+    if (!session) return res.status(401).json({ success: false, message: 'Authentication required' });
 
     try {
-        const [user] = await query('SELECT id, email, name, role, employee_id FROM users WHERE id = ?', [userId]);
+        const [user] = await query('SELECT id, email, name, role, employee_id FROM users WHERE id = ?', [session.uid]);
         if (!user) return res.status(401).json({ success: false, message: 'Authentication required' });
+        if (session.imp) {
+            // The HR account behind an impersonation session must still exist and still be HR.
+            const [impersonator] = await query('SELECT id, email, name, role, employee_id FROM users WHERE id = ?', [session.imp]);
+            if (!impersonator || !isHRRole(impersonator.role)) return res.status(401).json({ success: false, message: 'Authentication required' });
+            req.impersonator = impersonator;
+        }
         req.user = user;
         next();
     } catch (err) {
@@ -269,6 +279,9 @@ const approvalAction = (status) => {
 };
 
 const ACTIVITY_RULES = [
+    ['POST', /^\/api\/auth\/impersonate$/, 'auth', 'impersonate_start', { lookup: ['users', 'name'], id: (b) => b.userId }],
+    ['POST', /^\/api\/auth\/impersonate\/stop$/, 'auth', 'impersonate_stop'],
+
     ['POST', /^\/api\/logs$/, 'reading_log', 'create', { label: (b) => b.title }],
     ['PATCH', /^\/api\/logs\/([^/]+)\/cancel$/, 'reading_log', 'cancel', { lookup: ['reading_logs', 'title'] }],
     ['DELETE', /^\/api\/logs\/([^/]+)$/, 'reading_log', 'delete', { lookup: ['reading_logs', 'title'] }],
@@ -532,11 +545,14 @@ app.use(async (req, res, next) => {
             email: req.user?.email ?? null,
             role: req.user?.role ?? null,
         };
+        const impersonator = req.impersonator || null;
         const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
         query(
-            `INSERT INTO activity_logs (actor_user_id, actor_employee_id, actor_name, actor_email, actor_role, module, action, target_id, target_label, changes, method, path, status_code, ip_address)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [actor.id, actor.employeeId, actor.name, actor.email, actor.role, module, action,
+            `INSERT INTO activity_logs (actor_user_id, actor_employee_id, actor_name, actor_email, actor_role, impersonator_user_id, impersonator_name, impersonator_email, module, action, target_id, target_label, changes, method, path, status_code, ip_address)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [actor.id, actor.employeeId, actor.name, actor.email, actor.role,
+             impersonator?.id ?? null, impersonator?.name ?? null, impersonator?.email ?? null,
+             module, action,
              targetId != null ? String(targetId).slice(0, 100) : null,
              targetLabel != null ? String(targetLabel).slice(0, 500) : null,
              changes.length ? JSON.stringify(changes) : null,
@@ -2412,14 +2428,14 @@ app.get('/api/activity-logs', async (req, res) => {
         if (endDate) { where.push('created_at <= ?'); params.push(`${endDate} 23:59:59`); }
         if (search) {
             const like = `%${search}%`;
-            where.push('(actor_name LIKE ? OR actor_email LIKE ? OR actor_employee_id LIKE ? OR target_label LIKE ?)');
-            params.push(like, like, like, like);
+            where.push('(actor_name LIKE ? OR actor_email LIKE ? OR actor_employee_id LIKE ? OR impersonator_name LIKE ? OR target_label LIKE ?)');
+            params.push(like, like, like, like, like);
         }
         const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
         const [countRow] = await query(`SELECT COUNT(*) AS total FROM activity_logs ${whereSql}`, params);
         const rows = await query(
-            `SELECT id, actor_user_id, actor_employee_id, actor_name, actor_email, actor_role, module, action,
+            `SELECT id, actor_user_id, actor_employee_id, actor_name, actor_email, actor_role, impersonator_name, impersonator_email, module, action,
                     target_id, target_label, changes, method, path, ip_address, created_at
              FROM activity_logs ${whereSql}
              ORDER BY created_at DESC, id DESC
@@ -2715,52 +2731,105 @@ app.get('/api/auth/session-epoch', (req, res) => {
 });
 
 // --- AUTH SESSION REFRESH ENDPOINT ---
+// Loads a user the way the frontend keeps it (lms_user), re-syncing name/avatar/branch/employee id
+// from SIMASSET on the way. Null if the account no longer exists.
+const loadSessionUser = async (userId) => {
+    const users = await query('SELECT * FROM users WHERE id = ?', [userId]);
+    const user = users[0];
+    if (!user) return null;
+    const { email } = user;
+
+    const employees = await querySimAsset('SELECT * FROM employees WHERE email = ?', [email]);
+    const employeeHelper = employees.length > 0 ? employees[0] : null;
+
+    if (employeeHelper) {
+        const name = employeeHelper.full_name;
+        const avatar = employeeHelper.photo_profile || `https://ui-avatars.com/api/?name=${name}&background=random`;
+        const branch = employeeHelper.organization_name || 'Headquarters';
+        const employeeId = employeeHelper.id_employee;
+
+        await query('UPDATE users SET name = ?, avatar = ?, branch = ?, employee_id = ? WHERE id = ?',
+            [name, avatar, branch, employeeId, user.id]);
+
+        user.name = name;
+        user.avatar = avatar;
+        user.branch = branch;
+        user.employee_id = employeeId;
+    }
+
+    const isSupervisor = await checkIsSupervisor(user);
+
+    return {
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        email: user.email,
+        branch: user.branch,
+        employee_id: user.employee_id,
+        avatar: user.avatar,
+        isSupervisor,
+        isIntern: isInternStatus(employeeHelper?.status_join)
+    };
+};
+
+// The HR account behind an impersonation session, as the frontend shows it ("signed in as ... by ...").
+const toImpersonatorInfo = (impersonator) => impersonator
+    ? { id: impersonator.id, name: impersonator.name, email: impersonator.email }
+    : undefined;
+
 // Re-reads the signed-in user (from the session token, via the auth middleware) on page reload.
 app.post('/api/auth/refresh', async (req, res) => {
     try {
-        const users = await query('SELECT * FROM users WHERE id = ?', [req.user.id]);
-        const user = users[0];
+        const user = await loadSessionUser(req.user.id);
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
-        const { email } = user;
-
-        const employees = await querySimAsset('SELECT * FROM employees WHERE email = ?', [email]);
-        const employeeHelper = employees.length > 0 ? employees[0] : null;
-
-        if (employeeHelper) {
-            const name = employeeHelper.full_name;
-            const avatar = employeeHelper.photo_profile || `https://ui-avatars.com/api/?name=${name}&background=random`;
-            const branch = employeeHelper.organization_name || 'Headquarters';
-            const employeeId = employeeHelper.id_employee;
-
-            await query('UPDATE users SET name = ?, avatar = ?, branch = ?, employee_id = ? WHERE id = ?',
-                [name, avatar, branch, employeeId, user.id]);
-
-            user.name = name;
-            user.avatar = avatar;
-            user.branch = branch;
-            user.employee_id = employeeId;
-        }
-
-        const isSupervisor = await checkIsSupervisor(user);
-
-        res.json({
-            success: true,
-            user: {
-                id: user.id,
-                name: user.name,
-                role: user.role,
-                email: user.email,
-                branch: user.branch,
-                employee_id: user.employee_id,
-                avatar: user.avatar,
-                isSupervisor,
-                isIntern: isInternStatus(employeeHelper?.status_join)
-            }
-        });
+        res.json({ success: true, user: { ...user, impersonator: toImpersonatorInfo(req.impersonator) } });
     } catch (err) {
         console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+// --- IMPERSONATION ---
+// HR signs in as another user to see and use the LMS exactly as they do. The new token runs as
+// that user but remembers the HR account (see issueAuthToken), so every write is logged with both
+// and /stop can hand the HR session back without signing in again.
+app.post('/api/auth/impersonate', async (req, res) => {
+    try {
+        if (req.impersonator) return res.status(400).json({ success: false, message: 'Already signed in as another user - switch back first' });
+        if (!isHRRole(req.user.role)) return res.status(403).json({ success: false, message: 'HR access required' });
+        const targetId = String(req.body?.userId || '');
+        if (!targetId) return res.status(400).json({ success: false, message: 'userId is required' });
+        if (targetId === String(req.user.id)) return res.status(400).json({ success: false, message: 'Cannot impersonate yourself' });
+
+        const user = await loadSessionUser(targetId);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        // Only employee (STAFF) accounts - never another HR account.
+        if (isHRRole(user.role)) return res.status(403).json({ success: false, message: 'Only employee accounts can be signed in as' });
+
+        console.log(`[AUTH] ${req.user.email} started impersonating ${user.email}`);
+        res.json({
+            success: true,
+            token: issueAuthToken(user.id, req.user.id),
+            user: { ...user, impersonator: toImpersonatorInfo(req.user) }
+        });
+    } catch (err) {
+        console.error('[AUTH] Impersonation failed:', err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+app.post('/api/auth/impersonate/stop', async (req, res) => {
+    try {
+        if (!req.impersonator) return res.status(400).json({ success: false, message: 'Not signed in as another user' });
+        const user = await loadSessionUser(req.impersonator.id);
+        if (!user) return res.status(401).json({ success: false, message: 'Authentication required' });
+
+        console.log(`[AUTH] ${req.impersonator.email} stopped impersonating ${req.user.email}`);
+        res.json({ success: true, token: issueAuthToken(user.id), user });
+    } catch (err) {
+        console.error('[AUTH] Stopping impersonation failed:', err);
         res.status(500).json({ error: 'Database error' });
     }
 });

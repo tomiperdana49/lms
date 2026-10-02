@@ -33,7 +33,8 @@
     "competency": "Competency",
     "user": "User Management",
     "feedback": "Feedback",
-    "other": "Other"
+    "other": "Other",
+    "auth": "Account"
   },
   "actions": {
     "create": "Created",
@@ -62,7 +63,9 @@
     "update_standard": "Updated standard",
     "assess": "Assessed",
     "request_change": "Requested change",
-    "submit_feedback": "Submitted feedback"
+    "submit_feedback": "Submitted feedback",
+    "impersonate_start": "Sign in as another user",
+    "impersonate_stop": "Back to own account"
   },
   "unknownUser": "Unknown",
   "empty": "No activity for these filters yet.",
@@ -240,5 +243,6 @@
     "STAFF": "Employee",
     "HR": "HR",
     "HR_ADMIN": "HR Admin"
-  }
+  },
+  "impersonatedBy": "by {{name}}"
 }

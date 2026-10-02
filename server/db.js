@@ -947,6 +947,12 @@ export const initDB = async () => {
             await connection.query("ALTER TABLE activity_logs ADD COLUMN changes MEDIUMTEXT");
             console.log("Added changes column to activity_logs.");
         } catch (e) { /* Ignore if exists */ }
+        // Set when HR performed the action while signed in as another user (Admin Panel > impersonation) -
+        // the actor_* columns hold the impersonated user, these hold the HR account behind it.
+        try {
+            await connection.query("ALTER TABLE activity_logs ADD COLUMN impersonator_user_id VARCHAR(255) NULL, ADD COLUMN impersonator_name VARCHAR(255) NULL, ADD COLUMN impersonator_email VARCHAR(255) NULL");
+            console.log("Added impersonator columns to activity_logs.");
+        } catch (e) { /* Ignore if exists */ }
 
         connection.release();
     } catch (err) {

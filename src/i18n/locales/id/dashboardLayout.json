@@ -20,6 +20,8 @@
     "help": "Bantuan",
     "feedback": "Feedback",
     "signOut": "Keluar",
+    "impersonate": "Masuk sebagai User Lain",
+    "stopImpersonating": "Kembali ke Akun Saya",
     "collapseSidebar": "Sembunyikan menu",
     "expandSidebar": "Tampilkan menu"
   },
@@ -114,5 +116,14 @@
   },
   "footer": "© 2026 PT Media Antar Nusa",
   "userFallback": "Pengguna",
-  "branchFallback": "Nusanet"
+  "branchFallback": "Nusanet",
+  "impersonation": {
+    "title": "Masuk sebagai User Lain",
+    "subtitle": "Lihat dan gunakan LMS persis seperti user yang dipilih. Setiap aksi tercatat atas nama Anda.",
+    "searchPlaceholder": "Cari nama, email, ID karyawan atau cabang...",
+    "noResults": "User tidak ditemukan.",
+    "loadFailed": "Gagal memuat daftar user.",
+    "switchFailed": "Gagal berpindah user.",
+    "banner": "Anda sedang masuk sebagai {{name}} oleh {{impersonator}}. Aksi yang Anda lakukan dijalankan sebagai user ini."
+  }
 }

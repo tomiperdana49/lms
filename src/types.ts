@@ -44,6 +44,8 @@ export interface User {
     isSupervisor?: boolean; // Dynamically computed if they have subordinates
     isIntern?: boolean; // status_join === 'Internship' - interns get no IDP or competency assessment
     organization_name?: string;
+    // Set while an HR account is signed in as this user (/api/auth/impersonate) - the HR account behind it.
+    impersonator?: { id: number | string; name: string; email: string };
 }
 
 export interface TeamMember {

@@ -31,11 +31,14 @@ import {
     ClipboardList,
     Settings,
     BadgeCheck,
-    History
+    History,
+    LogIn,
+    Undo2
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Page, Role, User } from '../types';
 import FeedbackModal from './FeedbackModal';
+import ImpersonateUserModal from './ImpersonateUserModal';
 import LanguageSwitcher from './LanguageSwitcher';
 import { API_BASE_URL } from '../config';
 import {
@@ -55,12 +58,14 @@ interface DashboardLayoutProps {
     userRole: Role;
     user: User;
     onRoleChange: (role: Role) => void; 
+    onImpersonate: (userId: number | string) => Promise<void>;
+    onStopImpersonating: () => Promise<void>;
     onLogout: () => void;
     adminView?: string;
     config?: { moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean; moduleIDP: boolean; moduleLeaderboard?: boolean };
 }
 
-const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onLogout, adminView, config }: DashboardLayoutProps) => {
+const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onImpersonate, onStopImpersonating, onLogout, adminView, config }: DashboardLayoutProps) => {
     const { t, i18n } = useTranslation('dashboardLayout');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(() => {
@@ -128,6 +133,18 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const [notifications, setNotifications] = useState<any[]>([]);
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+    const [isImpersonateOpen, setIsImpersonateOpen] = useState(false);
+    const [isStoppingImpersonation, setIsStoppingImpersonation] = useState(false);
+    const canImpersonate = (userRole === 'HR' || userRole === 'HR_ADMIN') && !user?.impersonator;
+
+    const handleStopImpersonating = async () => {
+        setIsStoppingImpersonation(true);
+        try {
+            await onStopImpersonating();
+        } catch {
+            setIsStoppingImpersonation(false);
+        }
+    };
 
     useEffect(() => {
         const fetchNotifications = async () => {
@@ -1212,7 +1229,33 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                             </button>
 
                             {isProfileMenuOpen && (
-                                <div className="absolute right-0 mt-2 w-56 bg-white/95 backdrop-blur-md border border-slate-100 shadow-2xl rounded-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200 p-2">
+                                <div className="absolute right-0 mt-2 w-60 bg-white/95 backdrop-blur-md border border-slate-100 shadow-2xl rounded-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200 p-2">
+                                    {canImpersonate && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsProfileMenuOpen(false);
+                                                setIsImpersonateOpen(true);
+                                            }}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left"
+                                        >
+                                            <LogIn size={18} />
+                                            <span className="font-medium text-sm">{t('menu.impersonate')}</span>
+                                        </button>
+                                    )}
+                                    {user?.impersonator && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsProfileMenuOpen(false);
+                                                handleStopImpersonating();
+                                            }}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left"
+                                        >
+                                            <Undo2 size={18} />
+                                            <span className="font-medium text-sm">{t('menu.stopImpersonating')}</span>
+                                        </button>
+                                    )}
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -1230,12 +1273,35 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onL
                     </div>
                 </header>
 
+                {user?.impersonator && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-6 lg:px-8 py-2 bg-amber-50 border-b border-amber-200 text-sm text-amber-900">
+                        <span>{t('impersonation.banner', { name: user.name, impersonator: user.impersonator.name })}</span>
+                        <button
+                            type="button"
+                            onClick={handleStopImpersonating}
+                            disabled={isStoppingImpersonation}
+                            className="flex items-center gap-1.5 font-semibold text-amber-800 hover:text-amber-950 disabled:opacity-60"
+                        >
+                            <Undo2 size={14} />
+                            {t('menu.stopImpersonating')}
+                        </button>
+                    </div>
+                )}
+
                 {/* Page Content */}
                 <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
                     {children}
                 </main>
             </div>
             
+            {isImpersonateOpen && (
+                <ImpersonateUserModal
+                    currentUserId={user?.id}
+                    onClose={() => setIsImpersonateOpen(false)}
+                    onSelect={onImpersonate}
+                />
+            )}
+
             {/* Feedback Popup Modal */}
             <FeedbackModal
                 isOpen={isFeedbackOpen}

@@ -20,6 +20,8 @@
     "help": "Help",
     "feedback": "Feedback",
     "signOut": "Sign Out",
+    "impersonate": "Sign in as Another User",
+    "stopImpersonating": "Back to My Account",
     "collapseSidebar": "Hide menu",
     "expandSidebar": "Show menu"
   },
@@ -114,5 +116,14 @@
   },
   "footer": "© 2026 PT Media Antar Nusa",
   "userFallback": "User",
-  "branchFallback": "Nusanet"
+  "branchFallback": "Nusanet",
+  "impersonation": {
+    "title": "Sign in as Another User",
+    "subtitle": "See and use the LMS exactly as the selected user does. Every action is logged under your name.",
+    "searchPlaceholder": "Search name, email, employee ID or branch...",
+    "noResults": "No users found.",
+    "loadFailed": "Failed to load users.",
+    "switchFailed": "Failed to switch user.",
+    "banner": "You are signed in as {{name}} by {{impersonator}}. Actions you take are performed as this user."
+  }
 }

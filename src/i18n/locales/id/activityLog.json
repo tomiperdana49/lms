@@ -33,7 +33,8 @@
     "competency": "Kompetensi",
     "user": "Manajemen Pengguna",
     "feedback": "Feedback",
-    "other": "Lainnya"
+    "other": "Lainnya",
+    "auth": "Akun"
   },
   "actions": {
     "create": "Menambahkan",
@@ -62,7 +63,9 @@
     "update_standard": "Mengubah standar",
     "assess": "Menilai",
     "request_change": "Mengajukan perubahan",
-    "submit_feedback": "Mengisi feedback"
+    "submit_feedback": "Mengisi feedback",
+    "impersonate_start": "Masuk sebagai user lain",
+    "impersonate_stop": "Kembali ke akun sendiri"
   },
   "unknownUser": "Tidak diketahui",
   "empty": "Belum ada aktivitas untuk filter ini.",
@@ -240,5 +243,6 @@
     "STAFF": "Karyawan",
     "HR": "HR",
     "HR_ADMIN": "HR Admin"
-  }
+  },
+  "impersonatedBy": "oleh {{name}}"
 }
