@@ -66,20 +66,19 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
             const loadedEvents: CalendarEvent[] = [];
             const isHR = userRole === 'HR' || userRole === 'HR_ADMIN';
 
-            // 1. Process Meetings (Internal)
+            // 1. Process Meetings (Internal) - every scheduled internal training is shown to everyone,
+            // not just its host and guests, so all employees can see what training is coming up.
             meetings.forEach((m: Meeting) => {
-                if (isHR || m.host === 'HR Team' || m.host === 'Admin' || (userEmail && m.guests?.emails?.includes(userEmail))) {
-                    loadedEvents.push({
-                        id: m.id,
-                        title: m.title,
-                        type: 'INTERNAL',
-                        date: new Date(m.date),
-                        time: m.time,
-                        description: m.description,
-                        location: m.location,
-                        link: m.meetLink
-                    });
-                }
+                loadedEvents.push({
+                    id: m.id,
+                    title: m.title,
+                    type: 'INTERNAL',
+                    date: new Date(m.date),
+                    time: m.time,
+                    description: m.description,
+                    location: m.location,
+                    link: m.meetLink
+                });
             });
 
             // 2. Process External Training
