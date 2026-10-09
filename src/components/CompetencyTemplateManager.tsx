@@ -112,7 +112,7 @@ const CompetencyTemplateManager = ({ userRole, onBack }: CompetencyTemplateManag
                 });
                 if (res.ok) {
                     const created = await res.json();
-                    setTemplates([created, ...templates]);
+                    setTemplates([...templates, created]);
                     setIsFormOpen(false);
                     setFormData(emptyFormData);
                     setNotification({ show: true, type: 'success', message: t('notifications.createSuccess') });

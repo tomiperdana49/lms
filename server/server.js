@@ -8227,7 +8227,7 @@ const mapCompetencyTemplate = (row) => ({
 
 app.get('/api/competency-templates', async (req, res) => {
     try {
-        const rows = await query('SELECT * FROM competency_templates ORDER BY id DESC');
+        const rows = await query('SELECT * FROM competency_templates ORDER BY id ASC');
         res.json(rows.map(mapCompetencyTemplate));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
