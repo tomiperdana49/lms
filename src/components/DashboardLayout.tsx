@@ -756,7 +756,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onI
         { icon: Library, label: t('menu.readingLog'), id: 'reading-log' },
         { icon: BookOpen, label: t('menu.onlineModules'), id: 'courses' },
         { icon: Calendar, label: t('menu.calendar'), id: 'calendar' },
-        { icon: TrendingUp, label: t('menu.learningReport'), id: 'learning-report' },
+        // "Learning Report" is hidden for now - Employee Learning Report below covers the same data.
+        // The page itself is still routed in App.tsx, so restoring this line brings it back.
         { icon: UsersRound, label: t('menu.employeeLearningReport'), id: 'employee-learning-report' },
         ...(config?.moduleLeaderboard ? [{ icon: Trophy, label: t('menu.leaderboard'), id: 'leaderboard' }] : []),
         // Interns get no IDP - same "no participation at all" rule enforced server-side too
