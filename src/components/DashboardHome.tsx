@@ -91,7 +91,8 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
                         id: p.id,
                         title: p.employee_name,
                         subtitle: t('pendingActions.idpItem', { year: p.period_year }),
-                        date: p.created_by_date,
+                        // created_by_date is empty on some imported plans - fall back to when the row was made
+                        date: p.created_by_date || p.created_at,
                         target: { page: 'admin-dashboard', view: 'idp' }
                     }));
                     const competencyItems: PendingActionItem[] = (Array.isArray(competencyData) ? competencyData : []).map((r: any) => ({
