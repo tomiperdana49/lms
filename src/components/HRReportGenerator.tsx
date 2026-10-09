@@ -113,6 +113,10 @@ const HRReportGenerator = () => {
         return ids.some(id => employees.find(e => e.id_employee === id)?.branch_name === selectedBranch);
     };
 
+    // An external training counts toward the month it finished in (end_date), not when its row was
+    // last touched - updated_at moves on any edit or bulk update and piles everything into one month.
+    const externalTrainingReportDate = (r: any) => r.end_date || r.start_date || r.created_at;
+
     const isInPeriod = (dateStr: string, range: { start: Date, end: Date }) => {
         const d = new Date(dateStr);
         return d >= range.start && d <= range.end;
@@ -156,7 +160,7 @@ const HRReportGenerator = () => {
         
         externalRequests.filter(r => r.status === 'Processed').forEach(r => {
             if (!matchesBranch(r.employee_id)) return;
-            const dateToCheck = r.updated_at || r.created_at || r.start_date;
+            const dateToCheck = externalTrainingReportDate(r);
             if (isInPeriod(dateToCheck, range)) {
                 externalTraining += safeNum(r.registration_fee) + safeNum(r.travel_flight_cost) + safeNum(r.accommodation_cost) + safeNum(r.miscellaneous_cost);
             }
@@ -258,7 +262,7 @@ const HRReportGenerator = () => {
 
         externalRequests.filter(r => r.status === 'Processed').forEach(r => {
             if (!matchesBranch(r.employee_id)) return;
-            const dateToCheck = r.updated_at || r.created_at || r.start_date;
+            const dateToCheck = externalTrainingReportDate(r);
             if (isInPeriod(dateToCheck, range)) {
                 const details = [t('transactions.registrationDetail', { amount: formatCurrency(safeNum(r.registration_fee)) })];
                 if (safeNum(r.travel_flight_cost)) details.push(t('transactions.travelDetail', { amount: formatCurrency(safeNum(r.travel_flight_cost)) }));
