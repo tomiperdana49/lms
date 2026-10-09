@@ -3941,6 +3941,27 @@ app.get('/api/employees/positions', async (req, res) => {
     }
 });
 
+// Positions held by active employees, grouped by organization_name ({ [organization]: position[] }).
+// Competency templates only carry a position, so this lets the Competency Dictionary filter by
+// organization. A position can sit in several organizations (e.g. Account Manager across sales teams).
+app.get('/api/employees/organization-positions', async (req, res) => {
+    try {
+        const rows = await querySimAsset(`
+            SELECT DISTINCT organization_name, job_position FROM employees
+            WHERE deleted_at IS NULL
+              AND organization_name IS NOT NULL AND organization_name <> ''
+              AND job_position IS NOT NULL AND job_position <> ''
+            ORDER BY organization_name ASC, job_position ASC
+        `);
+        const grouped = {};
+        for (const r of rows) (grouped[r.organization_name] ||= []).push(r.job_position);
+        res.json(grouped);
+    } catch (err) {
+        console.error("[API] Error in /api/employees/organization-positions:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Every active employee company-wide, with isSupervisor - unlike /api/team-members (which is
 // scoped to one leader's subordinates), this powers HR's company-wide Competency Overview.
 // Must stay registered before /api/employees/:employeeId below, or Express would match

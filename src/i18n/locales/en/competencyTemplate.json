@@ -15,7 +15,10 @@
     "searchPosition": "Search position...",
     "noPositionMatch": "No matching position",
     "searchType": "Search competency type...",
-    "noTypeMatch": "No matching competency type"
+    "noTypeMatch": "No matching competency type",
+    "allOrganizations": "All Organizations",
+    "searchOrganization": "Search organization...",
+    "noOrganizationMatch": "No matching organization"
   },
   "table": {
     "competencyType": "Competency Type",

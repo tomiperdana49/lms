@@ -30,6 +30,7 @@ const CompetencyTemplateManager = ({ userRole, onBack }: CompetencyTemplateManag
     const { t } = useTranslation('competencyTemplate');
     const [templates, setTemplates] = useState<CompetencyTemplate[]>([]);
     const [positions, setPositions] = useState<string[]>([]);
+    const [organizationPositions, setOrganizationPositions] = useState<Record<string, string[]>>({});
     const [isPositionDropdownOpen, setIsPositionDropdownOpen] = useState(false);
     const [hasEditedPosition, setHasEditedPosition] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -38,6 +39,7 @@ const CompetencyTemplateManager = ({ userRole, onBack }: CompetencyTemplateManag
     const [formData, setFormData] = useState(emptyFormData);
     const [filterType, setFilterType] = useState('');
     const [filterPosition, setFilterPosition] = useState('');
+    const [filterOrganization, setFilterOrganization] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [viewingTemplate, setViewingTemplate] = useState<CompetencyTemplate | null>(null);
     const itemsPerPage = 10;
@@ -56,9 +58,10 @@ const CompetencyTemplateManager = ({ userRole, onBack }: CompetencyTemplateManag
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [templatesRes, positionsRes] = await Promise.all([
+                const [templatesRes, positionsRes, orgPositionsRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/api/competency-templates`),
-                    fetch(`${API_BASE_URL}/api/employees/positions`)
+                    fetch(`${API_BASE_URL}/api/employees/positions`),
+                    fetch(`${API_BASE_URL}/api/employees/organization-positions`)
                 ]);
                 if (templatesRes.ok) {
                     const data = await templatesRes.json();
@@ -67,6 +70,10 @@ const CompetencyTemplateManager = ({ userRole, onBack }: CompetencyTemplateManag
                 if (positionsRes.ok) {
                     const data = await positionsRes.json();
                     if (Array.isArray(data)) setPositions(data);
+                }
+                if (orgPositionsRes.ok) {
+                    const data = await orgPositionsRes.json();
+                    if (data && typeof data === 'object' && !Array.isArray(data)) setOrganizationPositions(data);
                 }
             } catch (err) {
                 console.error(err);
@@ -124,9 +131,19 @@ const CompetencyTemplateManager = ({ userRole, onBack }: CompetencyTemplateManag
         : positionOptions;
 
     const filterTypeOptions = Array.from(new Set(templates.map(item => item.competencyType).filter(Boolean))).sort();
-    const filterPositionOptions = Array.from(new Set(templates.map(item => item.position).filter(Boolean))).sort();
+    const templatePositions = new Set(templates.map(item => item.position).filter(Boolean));
+    // Templates have no organization of their own: an organization matches the positions its
+    // active employees hold. Only list organizations that cover at least one template.
+    const filterOrganizationOptions = Object.keys(organizationPositions)
+        .filter(org => organizationPositions[org].some(pos => templatePositions.has(pos)))
+        .sort();
+    const organizationPositionSet = filterOrganization ? new Set(organizationPositions[filterOrganization] || []) : null;
+    const filterPositionOptions = Array.from(templatePositions)
+        .filter(pos => !organizationPositionSet || organizationPositionSet.has(pos))
+        .sort();
     const visibleTemplates = templates.filter(item =>
         (!filterType || item.competencyType === filterType) &&
+        (!organizationPositionSet || organizationPositionSet.has(item.position)) &&
         (!filterPosition || item.position === filterPosition)
     );
     const totalPages = Math.max(1, Math.ceil(visibleTemplates.length / itemsPerPage));
@@ -170,7 +187,7 @@ const CompetencyTemplateManager = ({ userRole, onBack }: CompetencyTemplateManag
 
     if (isLoading) return <div className="p-8 text-center">{t('loading')}</div>;
 
-    // Exports what's currently shown (honours the type/position filters), using the table's own
+    // Exports what's currently shown (honours the type/organization/position filters), using the table's own
     // column headers so the file reads the same as the screen.
     const exportExcel = () => {
         const rows = visibleTemplates.map(item => ({
@@ -186,7 +203,7 @@ const CompetencyTemplateManager = ({ userRole, onBack }: CompetencyTemplateManag
         ws['!cols'] = [{ wch: 14 }, { wch: 28 }, { wch: 32 }, { wch: 60 }, { wch: 60 }, { wch: 40 }, { wch: 8 }];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, t('export.sheetName'));
-        const filterLabel = [filterType, filterPosition].filter(Boolean).join('_').replace(/[\\/:*?"<>|\s]+/g, '_');
+        const filterLabel = [filterType, filterOrganization, filterPosition].filter(Boolean).join('_').replace(/[\\/:*?"<>|\s]+/g, '_');
         XLSX.writeFile(wb, `Kamus_Kompetensi${filterLabel ? `_${filterLabel}` : ''}.xlsx`);
     };
 
@@ -242,6 +259,20 @@ const CompetencyTemplateManager = ({ userRole, onBack }: CompetencyTemplateManag
                     className="sm:w-64"
                 />
                 <SearchableSelect
+                    value={filterOrganization}
+                    onChange={value => {
+                        setFilterOrganization(value);
+                        // Drop a position the new organization doesn't hold, so the table isn't silently empty.
+                        if (value && filterPosition && !(organizationPositions[value] || []).includes(filterPosition)) setFilterPosition('');
+                        setCurrentPage(1);
+                    }}
+                    options={filterOrganizationOptions}
+                    allLabel={t('filters.allOrganizations')}
+                    searchPlaceholder={t('filters.searchOrganization')}
+                    noResultsLabel={t('filters.noOrganizationMatch')}
+                    className="sm:w-72"
+                />
+                <SearchableSelect
                     value={filterPosition}
                     onChange={value => { setFilterPosition(value); setCurrentPage(1); }}
                     options={filterPositionOptions}
@@ -250,9 +281,9 @@ const CompetencyTemplateManager = ({ userRole, onBack }: CompetencyTemplateManag
                     noResultsLabel={t('filters.noPositionMatch')}
                     className="sm:w-72"
                 />
-                {(filterType || filterPosition) && (
+                {(filterType || filterOrganization || filterPosition) && (
                     <button
-                        onClick={() => { setFilterType(''); setFilterPosition(''); setCurrentPage(1); }}
+                        onClick={() => { setFilterType(''); setFilterOrganization(''); setFilterPosition(''); setCurrentPage(1); }}
                         className="text-sm text-slate-500 hover:text-indigo-600 font-medium px-2"
                     >
                         {t('filters.reset')}

@@ -15,7 +15,10 @@
     "searchPosition": "Cari posisi...",
     "noPositionMatch": "Posisi tidak ditemukan",
     "searchType": "Cari jenis kompetensi...",
-    "noTypeMatch": "Jenis kompetensi tidak ditemukan"
+    "noTypeMatch": "Jenis kompetensi tidak ditemukan",
+    "allOrganizations": "Semua Organisasi",
+    "searchOrganization": "Cari organisasi...",
+    "noOrganizationMatch": "Organisasi tidak ditemukan"
   },
   "table": {
     "competencyType": "Jenis Kompetensi",
