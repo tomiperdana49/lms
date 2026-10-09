@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BookOpen, Users, Calendar as CalendarIcon, Video, GraduationCap, Star, Briefcase, Award, X, Clock, Wallet, AlertCircle, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { Page, Role } from '../types';
+import type { Page, Role, Meeting } from '../types';
 import { API_BASE_URL } from '../config';
 import { ANNUAL_LEARNING_BUDGET } from './LearningReport';
 
@@ -110,6 +110,22 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
         }
     }, [userRole, isSupervisor, userEmployeeId, t]);
 
+    // "Training Mendatang": the next few scheduled internal training sessions, shown to everyone.
+    const [upcomingTrainings, setUpcomingTrainings] = useState<Meeting[]>([]);
+    useEffect(() => {
+        fetch(`${API_BASE_URL}/api/meetings`)
+            .then(res => res.json())
+            .then(data => {
+                const startOfToday = new Date();
+                startOfToday.setHours(0, 0, 0, 0);
+                const upcoming = (Array.isArray(data) ? data : [])
+                    .filter((m: Meeting) => new Date(m.date) >= startOfToday)
+                    .sort((a: Meeting, b: Meeting) => new Date(a.date).getTime() - new Date(b.date).getTime() || (a.time || '').localeCompare(b.time || ''));
+                setUpcomingTrainings(upcoming.slice(0, 4));
+            })
+            .catch(err => console.error('Error fetching upcoming training:', err));
+    }, []);
+
     const handlePendingActionClick = (item: PendingActionItem) => {
         setIsPendingActionsModalOpen(false);
         onNavigate?.(item.target.page, item.target.view);
@@ -142,7 +158,7 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
         {
             title: t('menu.readingLogTitle'),
             subtitle: t('menu.readingLogSubtitle'),
-            icon: <BookOpen size={24} />,
+            icon: <BookOpen size={20} />,
             page: 'reading-log' as Page,
             color: 'text-orange-600',
             bg: 'bg-orange-50'
@@ -150,7 +166,7 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
         {
             title: t('menu.onlineCoursesTitle'),
             subtitle: t('menu.onlineCoursesSubtitle'),
-            icon: <Video size={24} />,
+            icon: <Video size={20} />,
             page: 'courses' as Page,
             color: 'text-blue-600',
             bg: 'bg-blue-50'
@@ -158,7 +174,7 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
         ...(config?.moduleInternal ? [{
             title: t('menu.internalTrainingTitle'),
             subtitle: t('menu.internalTrainingSubtitle'),
-            icon: <Users size={24} />,
+            icon: <Users size={20} />,
             page: 'internal' as Page,
             color: 'text-purple-600',
             bg: 'bg-purple-50'
@@ -166,7 +182,7 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
         ...(config?.moduleExternal ? [{
             title: t('menu.externalTrainingTitle'),
             subtitle: t('menu.externalTrainingSubtitle'),
-            icon: <Briefcase size={24} />,
+            icon: <Briefcase size={20} />,
             page: 'external' as Page,
             color: 'text-teal-600',
             bg: 'bg-teal-50'
@@ -174,7 +190,7 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
         ...(config?.moduleIncentive ? [{
             title: t('menu.incentivesTitle'),
             subtitle: t('menu.incentivesSubtitle'),
-            icon: <Award size={24} />,
+            icon: <Award size={20} />,
             page: 'incentives' as Page,
             color: 'text-amber-500',
             bg: 'bg-amber-50'
@@ -182,11 +198,10 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
         {
             title: t('menu.calendarTitle'),
             subtitle: t('menu.calendarSubtitle'),
-            icon: <CalendarIcon size={24} />,
+            icon: <CalendarIcon size={20} />,
             page: 'calendar' as Page,
             color: 'text-red-500',
-            bg: 'bg-red-50',
-            fullWidth: true
+            bg: 'bg-red-50'
         }
     ];
 
@@ -202,59 +217,63 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
         return t('goodNight');
     };
 
+    const showPendingActions = isSupervisor || userRole === 'HR' || userRole === 'HR_ADMIN';
+    const currentYear = new Date().getFullYear();
+
     return (
-        <div className="max-w-[1600px] mx-auto pt-4 md:pt-6 px-4 md:px-6 min-h-screen lg:h-[calc(100vh-100px)] flex flex-col gap-6">
+        <div className="max-w-[1600px] mx-auto pt-2 md:pt-4 md:px-4 flex flex-col gap-5 sm:gap-6">
             {/* Header / Hero Section */}
-            <div className="bg-gradient-to-br from-blue-700 via-indigo-700 to-purple-800 rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden shrink-0 group">
-                <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12">
-                    <GraduationCap size={200} />
+            <div className="bg-gradient-to-br from-blue-700 via-indigo-700 to-purple-800 rounded-3xl p-5 sm:p-6 text-white shadow-xl relative overflow-hidden shrink-0 group">
+                <div className="absolute -top-6 right-0 p-8 opacity-10 rotate-12 hidden sm:block">
+                    <GraduationCap size={150} />
                 </div>
                 <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
                 <div className="absolute -left-10 -bottom-10 w-60 h-60 bg-blue-400/10 rounded-full blur-3xl"></div>
 
-                <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                    <div className="space-y-1">
-                        <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10 mb-2">
+                <div className="relative z-10 flex flex-col lg:flex-row justify-between lg:items-center gap-5">
+                    <div className="space-y-1 min-w-0">
+                        <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10 mb-1">
                             <Star size={12} className="text-yellow-400 fill-yellow-400" /> {t('dashboardOverview')}
                         </div>
-                        <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
+                        <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
                             {getGreeting()}, <span className="text-blue-200">{userName || t('defaultUser')}</span>!
                         </h1>
-                        <p className="text-blue-100/80 font-medium max-w-md text-sm sm:text-base">
+                        <p className="text-blue-100/80 font-medium max-w-md text-sm">
                             {t('heroSubtitle')}
                         </p>
                     </div>
 
-                    {/* Quick Stats Bar */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full md:w-auto md:mr-12 lg:mr-24 md:min-w-[320px]">
+                    {/* Quick Stats - both cards share one layout: label row on top, figure at the bottom */}
+                    <div className="grid grid-cols-2 gap-3 w-full lg:w-[460px] shrink-0">
                         <button
                             type="button"
                             onClick={() => setDetailModal('hours')}
-                            className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all text-left cursor-pointer flex flex-col"
+                            className="bg-white/10 backdrop-blur-md rounded-2xl p-3 sm:p-4 border border-white/10 hover:bg-white/15 transition-all text-left cursor-pointer flex flex-col gap-3"
                         >
-                            <div className="flex items-start gap-3 mb-3">
-                                <div className="p-2 bg-blue-500 rounded-lg shadow-lg shadow-blue-500/20 shrink-0">
-                                    <Clock size={18} />
+                            <div className="flex items-center gap-2">
+                                <div className="p-1.5 sm:p-2 bg-blue-500 rounded-lg shadow-lg shadow-blue-500/20 shrink-0">
+                                    <Clock size={16} />
                                 </div>
-                                <span className="text-[11px] font-bold text-blue-100 uppercase tracking-wide leading-tight min-w-0 break-words">{t('learningHours')}</span>
+                                <span className="text-[10px] sm:text-[11px] font-bold text-blue-100 uppercase tracking-wide leading-tight min-w-0">{t('learningHours')}</span>
                             </div>
-                            <div className="flex-1 flex items-center justify-center">
-                                <div className="flex flex-col items-center text-center">
-                                    <span className="text-xl sm:text-2xl font-black tracking-tighter">{learningStats.totalJam}</span>
-                                    <span className="text-sm font-bold opacity-60">{t('hours')}</span>
+                            <div className="mt-auto space-y-1.5">
+                                <div className="flex items-baseline gap-1 flex-wrap">
+                                    <span className="text-lg sm:text-xl font-black tracking-tighter">{learningStats.totalJam}</span>
+                                    <span className="text-[11px] font-bold text-blue-100/60">{t('hours')}</span>
                                 </div>
+                                <p className="text-[10px] font-bold text-blue-100/70">{t('thisYear', { year: currentYear })}</p>
                             </div>
                         </button>
                         <button
                             type="button"
                             onClick={() => setDetailModal('cost')}
-                            className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:bg-white/15 transition-all text-left cursor-pointer flex flex-col"
+                            className="bg-white/10 backdrop-blur-md rounded-2xl p-3 sm:p-4 border border-white/10 hover:bg-white/15 transition-all text-left cursor-pointer flex flex-col gap-3"
                         >
-                            <div className="flex items-start gap-3 mb-3">
-                                <div className="p-2 bg-emerald-500 rounded-lg shadow-lg shadow-emerald-500/20 shrink-0">
-                                    <Wallet size={18} />
+                            <div className="flex items-center gap-2">
+                                <div className="p-1.5 sm:p-2 bg-emerald-500 rounded-lg shadow-lg shadow-emerald-500/20 shrink-0">
+                                    <Wallet size={16} />
                                 </div>
-                                <span className="text-[11px] font-bold text-blue-100 uppercase tracking-wide leading-tight min-w-0 break-words">{t('learningCost')}</span>
+                                <span className="text-[10px] sm:text-[11px] font-bold text-blue-100 uppercase tracking-wide leading-tight min-w-0">{t('learningCost')}</span>
                             </div>
                             <div className="mt-auto space-y-1.5">
                                 <div className="flex items-baseline gap-1 flex-wrap" title={`Rp ${learningStats.totalBiaya.toLocaleString('id-ID')}`}>
@@ -277,7 +296,7 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
                                                 style={{ width: `${Math.min((learningStats.totalBiaya / ANNUAL_LEARNING_BUDGET) * 100, 100)}%` }}
                                             />
                                         </div>
-                                        <p className={`text-[10px] font-bold whitespace-nowrap ${remainingBudget > 0 ? 'text-blue-100/70' : 'text-rose-300'}`}>
+                                        <p className={`text-[10px] font-bold ${remainingBudget > 0 ? 'text-blue-100/70' : 'text-rose-300'}`}>
                                             {remainingBudget > 0
                                                 ? `${t('remainingBudget')}: Rp ${remainingBudget.toLocaleString('id-ID')}`
                                                 : t('budgetExceeded')}
@@ -309,97 +328,128 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
                 />
             )}
 
-            {/* Perlu Tindakan Anda - only shown to roles that actually approve something */}
-            {(isSupervisor || userRole === 'HR' || userRole === 'HR_ADMIN') && (
-                <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 sm:p-6 shrink-0">
-                    <div className="flex items-center justify-between gap-3 mb-4">
-                        <div className="flex items-center gap-2.5">
-                            <div className={`p-2 rounded-xl ${pendingActions.length > 0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                                <AlertCircle size={18} />
+            {/* Pending actions and upcoming training side by side on wide screens, stacked on phones */}
+            <div className={`grid grid-cols-1 ${showPendingActions ? 'lg:grid-cols-2' : ''} gap-5 sm:gap-6`}>
+                {/* Perlu Tindakan Anda - only shown to roles that actually approve something */}
+                {showPendingActions && (
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-5 flex flex-col">
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className={`p-2 rounded-xl shrink-0 ${pendingActions.length > 0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                    <AlertCircle size={18} />
+                                </div>
+                                <h2 className="font-black text-slate-800 text-base sm:text-lg truncate">{t('pendingActions.title')}</h2>
+                                {pendingActions.length > 0 && (
+                                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold shrink-0">{pendingActions.length}</span>
+                                )}
                             </div>
-                            <h2 className="font-black text-slate-800 text-lg">{t('pendingActions.title')}</h2>
                             {pendingActions.length > 0 && (
-                                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">{pendingActions.length}</span>
+                                <button onClick={() => setIsPendingActionsModalOpen(true)} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 shrink-0">
+                                    {t('pendingActions.viewAll')} <ChevronRight size={14} />
+                                </button>
                             )}
                         </div>
-                        {pendingActions.length > 0 && (
-                            <button onClick={() => setIsPendingActionsModalOpen(true)} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 shrink-0">
-                                {t('pendingActions.viewAll')} <ChevronRight size={14} />
-                            </button>
+
+                        {pendingActions.length === 0 ? (
+                            <p className="text-sm text-slate-400">{t('pendingActions.empty')}</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {pendingActions.slice(0, 3).map(item => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => handlePendingActionClick(item)}
+                                        className="w-full flex items-center gap-3 p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors text-left group"
+                                    >
+                                        <div className="min-w-0 flex-1">
+                                            <p className="font-bold text-slate-700 text-sm truncate">{item.title}</p>
+                                            <p className="text-xs text-slate-400 truncate">
+                                                {item.subtitle} · {new Date(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                                            </p>
+                                        </div>
+                                        <span className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-colors">
+                                            {t('pendingActions.review')} <ChevronRight size={12} />
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
                         )}
                     </div>
+                )}
 
-                    {pendingActions.length === 0 ? (
-                        <p className="text-sm text-slate-400">{t('pendingActions.empty')}</p>
+                {/* Training Mendatang - the next scheduled internal sessions, open to everyone */}
+                <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-5 flex flex-col">
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 shrink-0">
+                                <CalendarIcon size={18} />
+                            </div>
+                            <h2 className="font-black text-slate-800 text-base sm:text-lg truncate">{t('upcomingTraining.title')}</h2>
+                        </div>
+                        <button onClick={() => onNavigate?.('calendar')} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 shrink-0">
+                            {t('upcomingTraining.viewCalendar')} <ChevronRight size={14} />
+                        </button>
+                    </div>
+
+                    {upcomingTrainings.length === 0 ? (
+                        <p className="text-sm text-slate-400">{t('upcomingTraining.empty')}</p>
                     ) : (
-                        <div className="space-y-2">
-                            {pendingActions.slice(0, 2).map(item => (
-                                <button
-                                    key={item.id}
-                                    onClick={() => handlePendingActionClick(item)}
-                                    className="w-full flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors text-left"
-                                >
-                                    <div className="min-w-0">
-                                        <p className="font-bold text-slate-700 text-sm truncate">{item.title}</p>
-                                        <p className="text-xs text-slate-400 truncate">{item.subtitle}</p>
-                                    </div>
-                                    <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap shrink-0">
-                                        {new Date(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
-                                    </span>
-                                </button>
-                            ))}
+                        <div className={`grid grid-cols-1 ${showPendingActions ? '' : 'md:grid-cols-2'} gap-2`}>
+                            {upcomingTrainings.map(m => {
+                                const d = new Date(m.date);
+                                const isToday = d.toDateString() === new Date().toDateString();
+                                return (
+                                    <button
+                                        key={m.id}
+                                        onClick={() => onNavigate?.('calendar')}
+                                        className="w-full flex items-center gap-3 p-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                                    >
+                                        <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 ${isToday ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-700'}`}>
+                                            <span className="text-base font-black leading-none">{d.getDate()}</span>
+                                            <span className={`text-[9px] font-bold uppercase mt-0.5 ${isToday ? 'text-indigo-100' : 'text-slate-400'}`}>
+                                                {d.toLocaleDateString('id-ID', { month: 'short' })}
+                                            </span>
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="font-bold text-slate-700 text-sm truncate">{m.title}</p>
+                                            <p className="text-xs text-slate-400 truncate flex items-center gap-1">
+                                                {isToday && <span className="text-indigo-600 font-bold">{t('upcomingTraining.today')} ·</span>}
+                                                <Clock size={11} className="shrink-0" /> {m.time}{m.type ? ` · ${m.type}` : ''}
+                                            </p>
+                                        </div>
+                                    </button>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
-            )}
+            </div>
 
-            {/* Main Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 lg:overflow-hidden min-h-0">
-
-                {/* --- Features Menu --- */}
-                <div className="lg:col-span-12 h-full overflow-y-auto custom-scrollbar px-1">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        {menuItems.map((item, index) => (
-                            <div
-                                key={index}
-                                onClick={() => onNavigate && onNavigate(item.page)}
-                                className={`
-                                    ${item.fullWidth ? 'md:col-span-2' : ''}
-                                    bg-white p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgb(0,0,0,0.08)] transition-all duration-500 cursor-pointer border border-slate-100/50 group
-                                    flex flex-col items-center text-center justify-center gap-5 py-12
-                                    relative overflow-hidden active:scale-[0.98]
-                                `}
-                            >
-                                {/* Decorative Gradient Blobs */}
-                                <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full opacity-0 group-hover:opacity-10 transition-opacity duration-700 blur-2xl ${item.bg}`}></div>
-                                
-                                <div className={`absolute top-4 right-4 p-3 opacity-5 group-hover:opacity-10 group-hover:scale-150 transition-all duration-1000 rotate-12`}>
-                                    <div className={`${item.color} scale-[3]`}>{item.icon}</div>
-                                </div>
-
-                                <div className={`relative p-6 rounded-3xl ${item.bg} ${item.color} group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-sm ring-8 ring-slate-50/50`}>
-                                    {item.icon}
-                                </div>
-                                <div className="relative z-10 space-y-1">
-                                    <h3 className="text-2xl font-black text-slate-800 tracking-tight">{item.title}</h3>
-                                    <p className="text-sm text-slate-400 font-bold uppercase tracking-wider opacity-60">{item.subtitle}</p>
-                                </div>
-
-                                {/* Hover Button / Indicator */}
-                                <div className="mt-2 w-10 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                    <div className={`h-full w-0 group-hover:w-full transition-all duration-500 rounded-full ${item.bg.replace('bg-', 'bg-').replace('-50', '-500')}`}></div>
-                                </div>
+            {/* Quick access tiles - small so the whole dashboard fits on one screen */}
+            <div>
+                <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">{t('quickAccess')}</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+                    {menuItems.map((item, index) => (
+                        <button
+                            key={index}
+                            onClick={() => onNavigate && onNavigate(item.page)}
+                            className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col items-start gap-3 text-left hover:shadow-md hover:-translate-y-0.5 transition-all active:scale-[0.98] group"
+                        >
+                            <div className={`p-2.5 rounded-xl ${item.bg} ${item.color} group-hover:scale-110 transition-transform`}>
+                                {item.icon}
                             </div>
-                        ))}
-                    </div>
-
-                    <div className="mt-12 mb-8 flex items-center justify-center gap-4 text-slate-300">
-                        <div className="h-px w-12 bg-slate-100"></div>
-                        <div className="text-[10px] font-black uppercase tracking-widest">{t('footer')}</div>
-                        <div className="h-px w-12 bg-slate-100"></div>
-                    </div>
+                            <div className="min-w-0 w-full">
+                                <h3 className="text-sm font-black text-slate-800 leading-tight truncate">{item.title}</h3>
+                                <p className="text-xs text-slate-400 font-medium truncate mt-0.5">{item.subtitle}</p>
+                            </div>
+                        </button>
+                    ))}
                 </div>
+            </div>
 
+            <div className="mt-2 mb-6 flex items-center justify-center gap-4 text-slate-300">
+                <div className="h-px w-12 bg-slate-100"></div>
+                <div className="text-[10px] font-black uppercase tracking-widest">{t('footer')}</div>
+                <div className="h-px w-12 bg-slate-100"></div>
             </div>
         </div>
     );

@@ -37,7 +37,8 @@
     "empty": "Tidak ada yang perlu ditindaklanjuti saat ini.",
     "viewAll": "Lihat semua",
     "idpItem": "IDP Tahun {{year}}",
-    "competencyItem": "Perubahan kompetensi - {{position}}"
+    "competencyItem": "Perubahan kompetensi - {{position}}",
+    "review": "Tinjau"
   },
   "menu": {
     "readingLogTitle": "Log Bacaan",
@@ -54,5 +55,13 @@
     "calendarSubtitle": "Jadwal belajar"
   },
   "footer": "© 2026 PT Media Antar Nusa",
-  "noBudget": "Tidak ada budget belajar untuk internship"
+  "noBudget": "Tidak ada budget belajar untuk internship",
+  "thisYear": "Tahun {{year}}",
+  "quickAccess": "Akses Cepat",
+  "upcomingTraining": {
+    "title": "Training Mendatang",
+    "viewCalendar": "Lihat kalender",
+    "empty": "Belum ada training internal yang terjadwal.",
+    "today": "Hari ini"
+  }
 }

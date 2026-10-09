@@ -37,7 +37,8 @@
     "empty": "Nothing needs your attention right now.",
     "viewAll": "View all",
     "idpItem": "IDP for {{year}}",
-    "competencyItem": "Competency change - {{position}}"
+    "competencyItem": "Competency change - {{position}}",
+    "review": "Review"
   },
   "menu": {
     "readingLogTitle": "Reading Log",
@@ -54,5 +55,13 @@
     "calendarSubtitle": "Learning schedule"
   },
   "footer": "© 2026 PT Media Antar Nusa",
-  "noBudget": "No learning budget for interns"
+  "noBudget": "No learning budget for interns",
+  "thisYear": "Year {{year}}",
+  "quickAccess": "Quick Access",
+  "upcomingTraining": {
+    "title": "Upcoming Training",
+    "viewCalendar": "View calendar",
+    "empty": "No internal training scheduled yet.",
+    "today": "Today"
+  }
 }
