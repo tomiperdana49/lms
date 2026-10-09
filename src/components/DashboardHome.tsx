@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { BookOpen, Users, Calendar as CalendarIcon, Video, GraduationCap, Star, Briefcase, Award, X, Clock, Wallet, AlertCircle, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Page, Role } from '../types';
-import LMSCalendar from './LMSCalendar';
 import { API_BASE_URL } from '../config';
 import { ANNUAL_LEARNING_BUDGET } from './LearningReport';
 
@@ -353,16 +352,11 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
                 </div>
             )}
 
-            {/* 3-Column Layout */}
+            {/* Main Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 lg:overflow-hidden min-h-0">
 
-                {/* --- Left Column: Compact Calendar (3 cols) --- */}
-                <div className="hidden lg:block lg:col-span-3 h-full overflow-hidden bg-white rounded-3xl border border-slate-100 shadow-sm">
-                    <LMSCalendar compact={true} userEmail={userEmail} userRole={userRole} />
-                </div>
-
-                {/* --- Center Column: Features Menu (9 cols) --- */}
-                <div className="lg:col-span-9 h-full overflow-y-auto custom-scrollbar px-1">
+                {/* --- Features Menu --- */}
+                <div className="lg:col-span-12 h-full overflow-y-auto custom-scrollbar px-1">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {menuItems.map((item, index) => (
                             <div
@@ -396,11 +390,6 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
                                 </div>
                             </div>
                         ))}
-                    </div>
-
-                    {/* Mobile Footer */}
-                    <div className="lg:hidden mt-8 space-y-6">
-                        <LMSCalendar userEmail={userEmail} />
                     </div>
 
                     <div className="mt-12 mb-8 flex items-center justify-center gap-4 text-slate-300">
