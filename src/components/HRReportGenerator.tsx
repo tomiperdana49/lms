@@ -113,9 +113,9 @@ const HRReportGenerator = () => {
         return ids.some(id => employees.find(e => e.id_employee === id)?.branch_name === selectedBranch);
     };
 
-    // An external training counts toward the month it finished in (end_date), not when its row was
+    // An external training counts toward the month it started in (start_date), not when its row was
     // last touched - updated_at moves on any edit or bulk update and piles everything into one month.
-    const externalTrainingReportDate = (r: any) => r.end_date || r.start_date || r.created_at;
+    const externalTrainingReportDate = (r: any) => r.start_date || r.end_date || r.created_at;
 
     const isInPeriod = (dateStr: string, range: { start: Date, end: Date }) => {
         const d = new Date(dateStr);
