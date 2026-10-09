@@ -50,8 +50,8 @@ const getStatusColor = (status: string) => {
 // down to the 3 canonical keys so filtering and display both work regardless of which path created the row.
 const normalizeCategory = (raw: string | null | undefined): 'Sertifikat' | 'Training' | 'Modul' => {
     const v = (raw || '').trim().toLowerCase();
-    if (v === 'sertifikat' || v.includes('with certification') || v.includes('dengan sertifikasi')) return 'Sertifikat';
-    if (v === 'modul' || v.includes('modul') || v.includes('module') || v.includes('self-paced') || v.includes('mandiri')) return 'Modul';
+    if (v === 'sertifikat' || v.includes('with certification') || v.includes('competency certification') || v.includes('dengan sertifikasi')) return 'Sertifikat';
+    if (v === 'modul' || v.includes('modul') || v.includes('module') || v.includes('self-paced') || v.includes('mandiri') || v.includes('e-learning')) return 'Modul';
     return 'Training';
 };
 

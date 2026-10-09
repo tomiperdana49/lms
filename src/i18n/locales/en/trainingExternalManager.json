@@ -1,8 +1,8 @@
 {
   "categoryLabels": {
-    "Sertifikat": "Training with Certification",
-    "Training": "Training without Certification",
-    "Modul": "Video Module – Self-Paced Learning"
+    "Sertifikat": "Training with Competency Certification",
+    "Training": "Training with Certificate of Participation",
+    "Modul": "E-Learning / Self-Paced Learning"
   },
   "statusBadge": {
     "approved": "Approved",

@@ -1,8 +1,8 @@
 {
   "categoryLabels": {
-    "Sertifikat": "Pelatihan dengan Sertifikasi",
-    "Training": "Pelatihan tanpa Sertifikasi",
-    "Modul": "Video Modul – Pembelajaran Mandiri"
+    "Sertifikat": "Pelatihan dengan Sertifikasi Kompetensi",
+    "Training": "Pelatihan dengan Sertifikat Kepesertaan",
+    "Modul": "E-Learning / Pembelajaran Mandiri"
   },
   "statusBadge": {
     "approved": "Disetujui",
