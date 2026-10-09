@@ -28,7 +28,7 @@ export interface ReadingLogEntry {
     claimedAt?: string;
 }
 
-export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'external-approval' | 'pte-team' | 'pte-mine' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives' | 'learning-report' | 'help' | 'idp' | 'competency-team' | 'competency-mine' | 'leaderboard';
+export type Page = 'dashboard' | 'reading-log' | 'courses' | 'internal' | 'external' | 'external-approval' | 'pte-team' | 'pte-mine' | 'calendar' | 'users' | 'admin-logs' | 'admin-dashboard' | 'incentives' | 'learning-report' | 'employee-learning-report' | 'help' | 'idp' | 'competency-team' | 'competency-mine' | 'leaderboard';
 export type Role = 'STAFF' | 'HR' | 'HR_ADMIN';
 export type AdminView = 'users' | 'logs' | 'approval' | 'meetings' | 'courses' | 'assets' | 'employees';
 

@@ -742,7 +742,6 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onI
         { icon: Library, label: t('admin.readingLog'), id: 'admin-dashboard', view: 'logs' },
         { icon: Award, label: t('admin.quizReport'), id: 'admin-dashboard', view: 'quiz-reports' },
         { icon: TrendingUp, label: t('admin.hrReport'), id: 'admin-dashboard', view: 'reports' },
-        { icon: UsersRound, label: t('admin.employeeLearningReport'), id: 'admin-dashboard', view: 'employee-learning-report' },
         ...(config?.moduleIDP ? [{ icon: Target, label: t('admin.idp'), id: 'admin-dashboard', view: 'idp' }] : []),
         { header: t('admin.settingsHeader') },
         { icon: Settings, label: t('admin.competencyTemplate'), id: 'admin-dashboard', view: 'competency-template' },
@@ -758,6 +757,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onI
         { icon: BookOpen, label: t('menu.onlineModules'), id: 'courses' },
         { icon: Calendar, label: t('menu.calendar'), id: 'calendar' },
         { icon: TrendingUp, label: t('menu.learningReport'), id: 'learning-report' },
+        { icon: UsersRound, label: t('menu.employeeLearningReport'), id: 'employee-learning-report' },
         ...(config?.moduleLeaderboard ? [{ icon: Trophy, label: t('menu.leaderboard'), id: 'leaderboard' }] : []),
         // Interns get no IDP - same "no participation at all" rule enforced server-side too
         // (POST /api/idp rejects their employee_id outright).

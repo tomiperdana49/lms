@@ -13,6 +13,7 @@ import UserManagement from './components/UserManagement';
 import AdminDashboard from './components/AdminDashboard';
 import IncentiveManager from './components/IncentiveManager';
 import LearningReport from './components/LearningReport';
+import EmployeeLearningReport from './components/EmployeeLearningReport';
 import LeaderboardPage from './components/LeaderboardPage';
 import VerifyCertificate from './components/VerifyCertificate';
 import HelpPage from './components/HelpPage';
@@ -48,7 +49,7 @@ const takePostLoginRedirect = (): string | null => {
 
 // Mirrors the Page union in types.ts - kept as a runtime list so a URL path (typed by hand, or
 // visited via back/forward) can be validated before being cast to Page.
-const VALID_PAGES: Page[] = ['dashboard', 'reading-log', 'courses', 'internal', 'external', 'external-approval', 'pte-team', 'pte-mine', 'calendar', 'users', 'admin-logs', 'admin-dashboard', 'incentives', 'learning-report', 'help', 'idp', 'competency-team', 'competency-mine', 'leaderboard'];
+const VALID_PAGES: Page[] = ['dashboard', 'reading-log', 'courses', 'internal', 'external', 'external-approval', 'pte-team', 'pte-mine', 'calendar', 'users', 'admin-logs', 'admin-dashboard', 'incentives', 'learning-report', 'employee-learning-report', 'help', 'idp', 'competency-team', 'competency-mine', 'leaderboard'];
 const isValidPage = (value: string): value is Page => (VALID_PAGES as string[]).includes(value);
 
 // These five live under the sidebar's "Training" group, so their URL nests the same way
@@ -527,6 +528,8 @@ function App() {
             isIntern={user?.isIntern}
           />
         )}
+
+        {activePage === 'employee-learning-report' && <EmployeeLearningReport userRole={user?.role} />}
         {/* User Management Route - Only for HR */}
         {activePage === 'users' && <UserManagement userRole={userRole} onBack={() => setActivePage('dashboard')} />}
 
