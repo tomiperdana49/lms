@@ -395,7 +395,7 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
                                 return (
                                     <button
                                         key={m.id}
-                                        onClick={() => onNavigate?.('calendar')}
+                                        onClick={() => onNavigate?.('calendar', `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)}
                                         className="w-full flex items-center gap-3 p-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors text-left"
                                     >
                                         <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 ${isToday ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-700'}`}>

@@ -42,13 +42,20 @@ interface LMSCalendarProps {
     userRole?: Role;
     // Enables the "Request to Join" button on internal trainings the employee isn't part of yet.
     userEmployeeId?: string;
+    // "YYYY-MM-DD" - open on this day (month shown and day selected) instead of today.
+    initialDate?: string | null;
 }
 
-const LMSCalendar = ({ compact = false, userEmail, userRole, userEmployeeId }: LMSCalendarProps) => {
+const parseLocalDate = (value?: string | null) => {
+    const match = value?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : null;
+};
+
+const LMSCalendar = ({ compact = false, userEmail, userRole, userEmployeeId, initialDate }: LMSCalendarProps) => {
     const { t } = useTranslation('lmsCalendar');
     // --- State ---
-    const [currentDate, setCurrentDate] = useState(new Date());
-    const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+    const [currentDate, setCurrentDate] = useState(() => parseLocalDate(initialDate) || new Date());
+    const [selectedDate, setSelectedDate] = useState<Date>(() => parseLocalDate(initialDate) || new Date());
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [joinRequests, setJoinRequests] = useState<Record<number, JoinRequest>>({});
     const [joiningId, setJoiningId] = useState<number | null>(null);

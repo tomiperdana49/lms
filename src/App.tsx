@@ -140,6 +140,10 @@ function App() {
   // it's about, not whatever quarter is currently selected there - carried as "quarter-year".
   const [competencyDeepLinkPeriod, setCompetencyDeepLinkPeriod] = useState<string | null>(null);
 
+  // Clicking a training in the dashboard's Upcoming Training list opens the Calendar on that
+  // training's day ("YYYY-MM-DD") instead of today.
+  const [calendarDeepLinkDate, setCalendarDeepLinkDate] = useState<string | null>(null);
+
   const [activePage, setActivePage] = useState<Page>(() => {
     // A path like /dashboard, /training/internal or /admin/calendar (typed directly, bookmarked,
     // or restored via refresh) wins over the legacy ?page= deep link and the last page remembered
@@ -456,6 +460,7 @@ function App() {
         activePage={activePage}
         onNavigate={(page, view) => {
           setActivePage(page);
+          setCalendarDeepLinkDate(null);
           if (view) {
             setAdminView(view);
             if (page === 'external') setDeepLinkTab(view);
@@ -475,6 +480,10 @@ function App() {
           <DashboardHome
             onNavigate={(page, view) => {
               setActivePage(page);
+              if (page === 'calendar') {
+                setCalendarDeepLinkDate(view || null);
+                return;
+              }
               if (view) {
                 setAdminView(view);
                 if (page === 'external') setDeepLinkTab(view);
@@ -515,7 +524,7 @@ function App() {
           />
         )}
 
-        {activePage === 'calendar' && <LMSCalendar userEmail={user?.email} userEmployeeId={user?.employee_id} />}
+        {activePage === 'calendar' && <LMSCalendar key={calendarDeepLinkDate || 'today'} userEmail={user?.email} userEmployeeId={user?.employee_id} initialDate={calendarDeepLinkDate} />}
 
         {activePage === 'leaderboard' && config.moduleLeaderboard && <LeaderboardPage currentUser={user} />}
 
