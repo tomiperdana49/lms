@@ -766,6 +766,13 @@ export const initDB = async () => {
             console.log("Added hr_note_by column to idp_plans.");
         } catch (e) { /* Ignore if exists */ }
 
+        // MIGRATION: Add imported_by / imported_at — who created the plan through the Excel bulk import
+        // (POST /api/idp/bulk-import), shown on the IDP card. NULL for plans created in the app.
+        try {
+            await connection.query("ALTER TABLE idp_plans ADD COLUMN imported_by VARCHAR(255) NULL, ADD COLUMN imported_at DATETIME NULL");
+            console.log("Added imported_by/imported_at columns to idp_plans.");
+        } catch (e) { /* Ignore if exists */ }
+
         // MIGRATION: Add the supervisor's final approval columns to idp_plans — the closing step of
         // the IDP cycle, done by the direct supervisor after HR's initial approval and the year's
         // monthly reviews. Separate from approved_by/approved_date, which record HR's approval.
@@ -953,6 +960,26 @@ export const initDB = async () => {
             await connection.query("ALTER TABLE activity_logs ADD COLUMN impersonator_user_id VARCHAR(255) NULL, ADD COLUMN impersonator_name VARCHAR(255) NULL, ADD COLUMN impersonator_email VARCHAR(255) NULL");
             console.log("Added impersonator columns to activity_logs.");
         } catch (e) { /* Ignore if exists */ }
+
+        // Backfill idp_plans.imported_by for plans imported before that column existed: each import
+        // request is logged right after its plans are inserted, so the first IDP import log within a
+        // few seconds after a plan's created_at is the request that created it.
+        try {
+            const [backfill] = await connection.query(`
+                UPDATE idp_plans p
+                JOIN activity_logs l ON l.id = (
+                    SELECT l2.id FROM activity_logs l2
+                    WHERE l2.module = 'idp' AND l2.action = 'import'
+                      AND l2.created_at BETWEEN p.created_at AND p.created_at + INTERVAL 30 SECOND
+                    ORDER BY l2.created_at LIMIT 1
+                )
+                -- updated_at = updated_at keeps ON UPDATE CURRENT_TIMESTAMP from stamping the backfill as an edit.
+                SET p.imported_by = COALESCE(l.impersonator_name, l.actor_name), p.imported_at = p.created_at,
+                    p.updated_at = p.updated_at
+                WHERE p.imported_by IS NULL
+            `);
+            if (backfill.affectedRows) console.log(`Backfilled imported_by on ${backfill.affectedRows} idp_plans.`);
+        } catch (e) { console.error("Failed to backfill idp_plans.imported_by:", e.message); }
 
         connection.release();
     } catch (err) {

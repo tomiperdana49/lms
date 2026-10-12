@@ -7437,6 +7437,9 @@ app.post('/api/idp/bulk-import', async (req, res) => {
     // (IDPManager.tsx) never raise one, even when HR imports their own plan there.
     const isSelfImport = req.body.source === 'self';
     const ownImportedPlans = [];
+    // Recorded on each newly inserted plan and shown on the IDP card. While HR is impersonating,
+    // the HR account behind the session is the one who actually did the import.
+    const importedBy = req.impersonator?.name || req.user?.name || null;
 
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
@@ -7552,13 +7555,13 @@ app.post('/api/idp/bulk-import', async (req, res) => {
                 INSERT INTO idp_plans
                 (employee_id, employee_name, job_position, department, supervisor_name, period_year,
                  join_date_label, achievements, career_goal, existing_skills, development_area, status,
-                 created_by_date, approved_date, hr_note, hr_note_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 created_by_date, approved_date, hr_note, hr_note_by, imported_by, imported_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             `, [
                 employeeId, employeeName, jobPosition, department, supervisorName,
                 row.period_year, joinDateLabel, row.achievements || '', row.career_goal || '',
                 row.existing_skills || '', row.development_area || '', status,
-                row.created_by_date || null, approvedDateToStore, row.hr_note || null, hrNoteBy
+                row.created_by_date || null, approvedDateToStore, row.hr_note || null, hrNoteBy, importedBy
             ]);
             const idpId = planResult.insertId;
 

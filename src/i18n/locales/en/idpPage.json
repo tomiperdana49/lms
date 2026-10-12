@@ -57,6 +57,7 @@
   "team": {
     "empty": "No IDPs from your team yet.",
     "idLabel": "ID: {{id}}",
+    "importedBy": "Imported by {{name}} on {{date}}",
     "searchPlaceholder": "Search employee name or ID...",
     "approve": "Approve",
     "reject": "Reject",

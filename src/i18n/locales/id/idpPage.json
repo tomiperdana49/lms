@@ -57,6 +57,7 @@
   "team": {
     "empty": "Belum ada IDP dari anggota tim kamu.",
     "idLabel": "ID: {{id}}",
+    "importedBy": "Diimport oleh {{name}} pada {{date}}",
     "searchPlaceholder": "Cari nama atau ID karyawan...",
     "approve": "Setujui",
     "reject": "Tolak",

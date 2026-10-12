@@ -600,6 +600,11 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
                             <div>
                                 <p className="font-bold text-gray-800">{plan.employee_name}</p>
                                 <p className="text-xs text-gray-400">{t('team.idLabel', { id: plan.employee_id })} &middot; {plan.department || '-'} &middot; {t('form.period')} {plan.period_year} &middot; {t('form.supervisor')}: {plan.supervisor_name || '-'}</p>
+                                {plan.imported_by && (
+                                    <p className="text-xs text-gray-400 mt-0.5">
+                                        {t('team.importedBy', { name: plan.imported_by, date: plan.imported_at ? new Date(plan.imported_at).toLocaleDateString('en-GB') : '-' })}
+                                    </p>
+                                )}
                             </div>
                             <div className="flex items-center gap-3">
                                 {statusBadge(plan.status)}

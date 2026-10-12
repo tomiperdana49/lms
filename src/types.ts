@@ -407,6 +407,9 @@ export interface IDPPlan {
     rejection_reason?: string;
     hr_note?: string;
     hr_note_by?: string;
+    // Set only on plans created through the Excel bulk import - who imported it, and when.
+    imported_by?: string | null;
+    imported_at?: string | null;
     // Present only on the HR list endpoint (GET /api/idp/all) — comma-separated "YYYY-MM" values for
     // every calendar month that has at least one supervisor review logged against this plan.
     reviewed_year_months?: string;
