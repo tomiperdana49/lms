@@ -221,7 +221,7 @@ const AdminDashboard = ({ user, onNavigate, initialView, focusIdpPlanId }: Admin
                                         <button
                                             onClick={() => setCurrentView('meetings')}
                                             className="w-full text-left p-3 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors font-medium flex justify-between items-center group">
-                                            {t('quickActions.scheduleMeeting')}
+                                            {t('quickActions.scheduleTraining')}
                                             <ChevronRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                                         </button>
                                         <button
