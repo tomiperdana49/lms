@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Clock, MapPin, User, Users, Video, CalendarDays } from 'lucide-react';
+import { Clock, MapPin, Users, Video, CalendarDays } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 interface PublicTraining {
@@ -10,7 +10,10 @@ interface PublicTraining {
     type: string | null;
     location: string | null;
     host: string | null;
+    hostPhotoUrl: string | null;
     participantCount: number;
+    // The first few participants (short name + photo); participantCount is the full number.
+    participants: { name: string; photoUrl: string | null }[];
 }
 
 const REFRESH_MS = 5 * 60 * 1000;
@@ -34,6 +37,47 @@ const parseTimeRange = (time: string | null) => {
 };
 
 const isSameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+
+// A person's round photo (participant or trainer); falls back to their initial if it can't load.
+const ParticipantAvatar = ({ name, photoUrl, className = '' }: { name: string; photoUrl: string | null; className?: string }) => {
+    const [failed, setFailed] = useState(false);
+    const ring = `w-9 h-9 lg:w-10 lg:h-10 rounded-full ring-2 ring-indigo-950 shrink-0 ${className}`;
+    return photoUrl && !failed ? (
+        <img src={photoUrl} alt={name} title={name} onError={() => setFailed(true)} className={`${ring} object-cover bg-slate-600`} />
+    ) : (
+        <div title={name} className={`${ring} bg-indigo-400 text-white flex items-center justify-center text-sm font-black`}>
+            {name.charAt(0).toUpperCase()}
+        </div>
+    );
+};
+
+// Who's joining: a row of stacked photos, with their short names (and how many more) on the line
+// below - side by side, three-column cards leave the names too narrow a strip and they wrap word by word.
+const ParticipantPreview = ({ training }: { training: PublicTraining }) => {
+    const shown = training.participants || [];
+    const more = training.participantCount - shown.length;
+    if (training.participantCount === 0) return null;
+    if (shown.length === 0) {
+        return <span className="flex items-center gap-2"><Users size={18} className="shrink-0 text-indigo-300" />{training.participantCount} peserta</span>;
+    }
+    return (
+        <div className="flex flex-col gap-1.5 pt-1">
+            <p className="text-[11px] lg:text-xs font-black uppercase tracking-wider text-indigo-300">Peserta ({training.participantCount})</p>
+            <div className="flex -space-x-2.5">
+                {shown.map((p, i) => <ParticipantAvatar key={i} name={p.name} photoUrl={p.photoUrl} />)}
+                {more > 0 && (
+                    <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-full ring-2 ring-indigo-950 bg-white/20 text-white flex items-center justify-center text-xs lg:text-sm font-black shrink-0">
+                        +{more}
+                    </div>
+                )}
+            </div>
+            <p className="text-sm lg:text-base text-indigo-100 leading-snug">
+                {shown.map(p => p.name).join(', ')}
+                {more > 0 && <span className="text-indigo-300"> & {more} lainnya</span>}
+            </p>
+        </div>
+    );
+};
 
 // Public, no-login board for office TVs (/upcoming-training): the next scheduled internal
 // trainings, refreshed every few minutes, with today's sessions - and any running right now -
@@ -193,8 +237,16 @@ const UpcomingTrainingBoard = () => {
                                                     <span className="break-words min-w-0">{tr.location || 'Online'}</span>
                                                 </span>
                                             )}
-                                            {tr.host && <span className="flex items-start gap-2 min-w-0"><User size={18} className="shrink-0 mt-0.5 text-indigo-300" /><span className="break-words min-w-0">{tr.host}</span></span>}
-                                            {tr.participantCount > 0 && <span className="flex items-center gap-2"><Users size={18} className="shrink-0 text-indigo-300" />{tr.participantCount} peserta</span>}
+                                            {tr.host && (
+                                                <div className="flex items-center gap-3 pt-1 min-w-0">
+                                                    <ParticipantAvatar name={tr.host} photoUrl={tr.hostPhotoUrl} />
+                                                    <div className="min-w-0">
+                                                        <p className="text-[11px] lg:text-xs font-black uppercase tracking-wider text-indigo-300">Trainer</p>
+                                                        <p className="font-semibold text-white break-words leading-snug">{tr.host}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <ParticipantPreview training={tr} />
                                         </div>
                                     </div>
                                 </div>

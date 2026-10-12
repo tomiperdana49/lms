@@ -5035,20 +5035,52 @@ app.get('/api/meetings/deleted', async (req, res) => {
 });
 
 // Public, no login: the next scheduled internal trainings for the /upcoming-training TV board.
-// Only what's fine to show on a screen anyone can see - no meeting links, agenda or participant
-// names/emails, just how many are invited.
+// Only what's fine to show on a screen anyone can see - no meeting links or agenda; the host's
+// name and photo; and for participants just the count plus the first few people's short name and
+// photo (no emails or full participant list).
 const PUBLIC_UPCOMING_TRAINING_LIMIT = 12;
+const PUBLIC_UPCOMING_TRAINING_PARTICIPANT_PREVIEW = 5;
+
+// Nickname from the org chart, else the first word of the full name - skipping a lone initial
+// like "M" or "M." so "M Rozi Fikri" shows as "Rozi".
+const shortEmployeeName = (employee) => {
+    if (employee.nickname && employee.nickname.trim()) return employee.nickname.trim();
+    const words = String(employee.full_name || '').trim().split(/\s+/);
+    return words.find(w => w.replace(/\./g, '').length > 1) || words[0] || '';
+};
+
 app.get('/api/public/upcoming-training', async (req, res) => {
     try {
         const rows = await query(
-            `SELECT id, title, DATE_FORMAT(date, '%Y-%m-%d') AS date, time, type, location, host, guests_json
+            `SELECT id, title, DATE_FORMAT(date, '%Y-%m-%d') AS date, time, type, location, host, employee_id AS host_employee_id, guests_json
              FROM meetings
              WHERE deleted_at IS NULL AND date >= CURDATE()
              ORDER BY date ASC, time ASC
              LIMIT ?`,
             [PUBLIC_UPCOMING_TRAINING_LIMIT]
         );
-        res.json(rows.map(({ guests_json, ...m }) => ({ ...m, participantCount: parseGuests(guests_json).employee_ids.length })));
+        const guestsById = new Map(rows.map(m => [m.id, parseGuests(m.guests_json).employee_ids.map(String)]));
+        const previewIds = [...new Set([
+            ...[...guestsById.values()].flatMap(ids => ids.slice(0, PUBLIC_UPCOMING_TRAINING_PARTICIPANT_PREVIEW)),
+            ...rows.map(m => m.host_employee_id).filter(Boolean).map(String)
+        ])];
+        const employees = previewIds.length
+            ? await querySimAsset(`SELECT id_employee, full_name, nickname, photo_profile FROM employees WHERE id_employee IN (${previewIds.map(() => '?').join(',')})`, previewIds)
+            : [];
+        const employeeById = new Map(employees.map(e => [String(e.id_employee), e]));
+
+        res.json(rows.map(({ guests_json, host_employee_id, ...m }) => {
+            const ids = guestsById.get(m.id);
+            return {
+                ...m,
+                hostPhotoUrl: employeeById.get(String(host_employee_id))?.photo_profile || null,
+                participantCount: ids.length,
+                participants: ids.slice(0, PUBLIC_UPCOMING_TRAINING_PARTICIPANT_PREVIEW)
+                    .map(id => employeeById.get(id))
+                    .filter(Boolean)
+                    .map(e => ({ name: shortEmployeeName(e), photoUrl: e.photo_profile || null }))
+            };
+        }));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
