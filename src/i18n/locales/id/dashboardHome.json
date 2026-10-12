@@ -27,15 +27,6 @@
     "grandTotal": "Total Keseluruhan",
     "close": "Tutup"
   },
-  "pendingActions": {
-    "title": "Perlu Tindakan Anda",
-    "empty": "Tidak ada yang perlu ditindaklanjuti saat ini.",
-    "viewAll": "Lihat semua",
-    "idpItem": "IDP Tahun {{year}}",
-    "competencyItem": "Perubahan kompetensi - {{position}}",
-    "joinRequestItem": "Minta ikut training - {{title}}",
-    "review": "Tinjau"
-  },
   "menu": {
     "readingLogTitle": "Log Bacaan",
     "readingLogSubtitle": "Log bacaan buku",
@@ -59,5 +50,23 @@
     "viewCalendar": "Lihat kalender",
     "empty": "Belum ada training internal yang terjadwal.",
     "today": "Hari ini"
+  },
+  "topLearners": {
+    "title": "Top Learners {{year}}",
+    "tabs": {
+      "reading": "Reading Log",
+      "internal": "Internal",
+      "external": "Eksternal"
+    },
+    "unit": {
+      "reading_one": "buku",
+      "reading_other": "buku",
+      "internal_one": "training",
+      "internal_other": "training",
+      "external_one": "training",
+      "external_other": "training"
+    },
+    "you": "Kamu",
+    "empty": "Belum ada yang masuk daftar tahun ini - jadilah yang pertama!"
   }
 }

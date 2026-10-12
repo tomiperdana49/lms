@@ -2715,6 +2715,84 @@ app.get('/api/leaderboard', async (req, res) => {
     }
 });
 
+// --- DASHBOARD TOP LEARNERS ---
+// The dashboard's "Top Learners" card, shown to every employee to motivate them: the active,
+// non-intern employees with the most books finished, closed internal trainings attended, and
+// Processed external trainings this year - a plain count per category, independent of the
+// Leaderboard module. Unlike the Leaderboard, every finished book counts, not just HR-Approved
+// ones: most finished books are never claimed for an incentive and stay "Read" (hr_approval_status
+// 'Draft'), and only HR-Rejected or Cancelled logs are left out.
+// Many employees tie on a count (dozens finish 5 books), so a tie goes to whoever reached that
+// count first - the date of their latest counted activity - rather than to alphabetical order.
+const TOP_LEARNERS_LIMIT = 5;
+const TOP_LEARNERS_CACHE_MS = 10 * 60 * 1000;
+const topLearnersCache = new Map();
+
+const computeTopLearners = async (year) => {
+    const employees = (await querySimAsset(
+        'SELECT id_employee, full_name, organization_name, photo_profile, active_status, status_join, deleted_at FROM employees'
+    )).filter(e => e.id_employee && !e.deleted_at && isActiveNonIntern(e));
+    const employeeById = new Map(employees.map(e => [String(e.id_employee), e]));
+
+    // counts: Map of employeeId -> { count, reachedAt }.
+    const rank = (counts) => {
+        const time = (v) => v ? new Date(v).getTime() : Infinity;
+        const rows = [...counts.entries()]
+            .filter(([id, c]) => c.count > 0 && employeeById.has(id))
+            .map(([id, c]) => {
+                const e = employeeById.get(id);
+                return { employeeId: id, name: e.full_name, department: e.organization_name || null, photoUrl: e.photo_profile || null, count: c.count, reachedAt: c.reachedAt };
+            })
+            .sort((a, b) => b.count - a.count || time(a.reachedAt) - time(b.reachedAt) || a.name.localeCompare(b.name));
+        rows.forEach((row, i) => { row.rank = i + 1; });
+        return rows.slice(0, TOP_LEARNERS_LIMIT).map(({ reachedAt, ...row }) => row);
+    };
+    const tally = (map, id, date) => {
+        const entry = map.get(id) || { count: 0, reachedAt: null };
+        entry.count++;
+        if (date && (!entry.reachedAt || new Date(date) > new Date(entry.reachedAt))) entry.reachedAt = date;
+        map.set(id, entry);
+    };
+
+    const reading = new Map();
+    for (const r of await query(
+        `SELECT employee_id, finish_date AS done_date FROM reading_logs
+         WHERE status = 'Finished' AND finish_date IS NOT NULL AND YEAR(finish_date) = ? AND employee_id IS NOT NULL
+           AND COALESCE(hr_approval_status, '') NOT IN ('Rejected', 'Cancelled')`, [year]
+    )) tally(reading, String(r.employee_id), r.done_date);
+
+    const internal = new Map();
+    for (const meeting of await query(
+        `SELECT id, date, employee_id, guests_json, cost_report_json FROM meetings
+         WHERE is_closed = 1 AND deleted_at IS NULL AND YEAR(date) = ?`, [year]
+    )) {
+        for (const id of new Set((await getMeetingAttendeeEmployeeIds(meeting)).map(String))) tally(internal, id, meeting.date);
+    }
+
+    const external = new Map();
+    for (const r of await query(
+        `SELECT employee_id, COALESCE(end_date, start_date) AS done_date FROM external_training_requests
+         WHERE status = 'Processed' AND deleted_at IS NULL AND YEAR(COALESCE(end_date, start_date)) = ? AND employee_id IS NOT NULL`, [year]
+    )) tally(external, String(r.employee_id), r.done_date);
+
+    return { year, reading: rank(reading), internal: rank(internal), external: rank(external) };
+};
+
+app.get('/api/dashboard/top-learners', async (req, res) => {
+    try {
+        const year = nowInWib().getUTCFullYear();
+        const cached = topLearnersCache.get(year);
+        if (cached && cached.expiresAt > Date.now()) return res.json(await cached.promise);
+        const promise = computeTopLearners(year);
+        topLearnersCache.set(year, { promise, expiresAt: Date.now() + TOP_LEARNERS_CACHE_MS });
+        promise.catch(() => topLearnersCache.delete(year));
+        res.json(await promise);
+    } catch (err) {
+        console.error('[TOP LEARNERS] Failed to compute:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- APP CONFIG ENDPOINT ---
 app.get('/api/config', (req, res) => {
     res.json({

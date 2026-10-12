@@ -489,8 +489,6 @@ function App() {
                 if (page === 'external') setDeepLinkTab(view);
               }
             }}
-            userRole={userRole}
-            isSupervisor={user?.isSupervisor}
             userEmail={user?.email}
             userName={user?.name}
             userEmployeeId={user?.employee_id}

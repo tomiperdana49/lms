@@ -27,15 +27,6 @@
     "grandTotal": "Grand Total",
     "close": "Close"
   },
-  "pendingActions": {
-    "title": "Needs Your Action",
-    "empty": "Nothing needs your attention right now.",
-    "viewAll": "View all",
-    "idpItem": "IDP for {{year}}",
-    "competencyItem": "Competency change - {{position}}",
-    "joinRequestItem": "Join request - {{title}}",
-    "review": "Review"
-  },
   "menu": {
     "readingLogTitle": "Reading Log",
     "readingLogSubtitle": "Book reading logs",
@@ -59,5 +50,23 @@
     "viewCalendar": "View calendar",
     "empty": "No internal training scheduled yet.",
     "today": "Today"
+  },
+  "topLearners": {
+    "title": "Top Learners {{year}}",
+    "tabs": {
+      "reading": "Reading Log",
+      "internal": "Internal",
+      "external": "External"
+    },
+    "unit": {
+      "reading_one": "book",
+      "reading_other": "books",
+      "internal_one": "training",
+      "internal_other": "trainings",
+      "external_one": "training",
+      "external_other": "trainings"
+    },
+    "you": "You",
+    "empty": "No one is on the list yet this year - be the first!"
   }
 }
