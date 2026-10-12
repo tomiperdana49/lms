@@ -280,28 +280,16 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
                                     <span className="text-lg sm:text-xl font-black tracking-tighter text-emerald-300 whitespace-nowrap">
                                         Rp {learningStats.totalBiaya.toLocaleString('id-ID')}
                                     </span>
-                                    {!isIntern && (
-                                        <span className="text-[11px] font-bold text-blue-100/60 whitespace-nowrap">
-                                            / Rp {ANNUAL_LEARNING_BUDGET.toLocaleString('id-ID')}
-                                        </span>
-                                    )}
                                 </div>
                                 {isIntern ? (
                                     <p className="text-[10px] font-bold text-blue-100/70">{t('noBudget')}</p>
                                 ) : (
-                                    <>
-                                        <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                            <div
-                                                className={`h-full rounded-full ${remainingBudget > 0 ? 'bg-emerald-400' : 'bg-rose-400'}`}
-                                                style={{ width: `${Math.min((learningStats.totalBiaya / ANNUAL_LEARNING_BUDGET) * 100, 100)}%` }}
-                                            />
-                                        </div>
-                                        <p className={`text-[10px] font-bold ${remainingBudget > 0 ? 'text-blue-100/70' : 'text-rose-300'}`}>
-                                            {remainingBudget > 0
-                                                ? `${t('remainingBudget')}: Rp ${remainingBudget.toLocaleString('id-ID')}`
-                                                : t('budgetExceeded')}
-                                        </p>
-                                    </>
+                                    <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                        <div
+                                            className={`h-full rounded-full ${remainingBudget > 0 ? 'bg-emerald-400' : 'bg-rose-400'}`}
+                                            style={{ width: `${Math.min((learningStats.totalBiaya / ANNUAL_LEARNING_BUDGET) * 100, 100)}%` }}
+                                        />
+                                    </div>
                                 )}
                             </div>
                         </button>
@@ -315,7 +303,6 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
                     stats={learningStats}
                     onClose={() => setDetailModal(null)}
                     t={t}
-                    hasBudget={!isIntern}
                 />
             )}
 
@@ -511,11 +498,9 @@ interface LearningStatsDetailModalProps {
     stats: LearningStats;
     onClose: () => void;
     t: (key: string) => string;
-    // False for interns - hides the annual budget footer, since they don't have one.
-    hasBudget: boolean;
 }
 
-const LearningStatsDetailModal = ({ mode, stats, onClose, t, hasBudget }: LearningStatsDetailModalProps) => {
+const LearningStatsDetailModal = ({ mode, stats, onClose, t }: LearningStatsDetailModalProps) => {
     const isHours = mode === 'hours';
 
     const formatDate = (dateStr: string) => {
@@ -605,29 +590,6 @@ const LearningStatsDetailModal = ({ mode, stats, onClose, t, hasBudget }: Learni
                         </div>
                     ))}
                 </div>
-
-                {!isHours && hasBudget && (
-                    <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 space-y-2 shrink-0">
-                        <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-                            <span>{t('detailModal.annualBudget')}</span>
-                            <span>Rp {ANNUAL_LEARNING_BUDGET.toLocaleString('id-ID')}</span>
-                        </div>
-                        <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                            <div
-                                className={`h-full rounded-full ${grandTotal <= ANNUAL_LEARNING_BUDGET ? 'bg-emerald-500' : 'bg-rose-500'}`}
-                                style={{ width: `${Math.min((grandTotal / ANNUAL_LEARNING_BUDGET) * 100, 100)}%` }}
-                            />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className={`text-xs font-bold ${grandTotal <= ANNUAL_LEARNING_BUDGET ? 'text-slate-500' : 'text-rose-600'}`}>
-                                {grandTotal <= ANNUAL_LEARNING_BUDGET ? t('detailModal.remainingBudget') : t('detailModal.budgetExceeded')}
-                            </span>
-                            <span className={`text-sm font-black ${grandTotal <= ANNUAL_LEARNING_BUDGET ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                Rp {Math.abs(ANNUAL_LEARNING_BUDGET - grandTotal).toLocaleString('id-ID')}
-                            </span>
-                        </div>
-                    </div>
-                )}
 
                 <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl shrink-0">
                     <span className="text-sm font-black text-slate-700 uppercase tracking-wide">{t('detailModal.grandTotal')}</span>
