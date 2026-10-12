@@ -221,14 +221,16 @@ const migrateLocalPasswords = async () => {
 };
 
 // Reachable without a session: sign-in itself, what the login page needs before sign-in, public
-// certificate verification (the /verify/:serial page), and the external API, which has its own
-// OAuth client-credentials check (authenticateExternalApi).
+// certificate verification (the /verify/:serial page), the upcoming-training board shown on office
+// TVs (the /upcoming-training page), and the external API, which has its own OAuth
+// client-credentials check (authenticateExternalApi).
 const PUBLIC_API_ROUTES = [
     ['POST', /^\/api\/login$/],
     ['POST', /^\/api\/auth\/google$/],
     ['GET', /^\/api\/config$/],
     ['GET', /^\/api\/auth\/session-epoch$/],
     ['GET', /^\/api\/(internal|online)-certificates\/verify\/[^/]+$/],
+    ['GET', /^\/api\/public\/upcoming-training$/],
     ['POST', /^\/api\/oauth\/token$/],
     [null, /^\/api\/external\//],
 ];
@@ -5029,6 +5031,24 @@ app.get('/api/meetings/deleted', async (req, res) => {
     try {
         const meetings = await query('SELECT id, title, date, host, employee_id, deleted_at FROM meetings WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC');
         res.json(meetings);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Public, no login: the next scheduled internal trainings for the /upcoming-training TV board.
+// Only what's fine to show on a screen anyone can see - no meeting links, agenda or participant
+// names/emails, just how many are invited.
+const PUBLIC_UPCOMING_TRAINING_LIMIT = 12;
+app.get('/api/public/upcoming-training', async (req, res) => {
+    try {
+        const rows = await query(
+            `SELECT id, title, DATE_FORMAT(date, '%Y-%m-%d') AS date, time, type, location, host, guests_json
+             FROM meetings
+             WHERE deleted_at IS NULL AND date >= CURDATE()
+             ORDER BY date ASC, time ASC
+             LIMIT ?`,
+            [PUBLIC_UPCOMING_TRAINING_LIMIT]
+        );
+        res.json(rows.map(({ guests_json, ...m }) => ({ ...m, participantCount: parseGuests(guests_json).employee_ids.length })));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

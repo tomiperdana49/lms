@@ -16,6 +16,7 @@ import LearningReport from './components/LearningReport';
 import EmployeeLearningReport from './components/EmployeeLearningReport';
 import LeaderboardPage from './components/LeaderboardPage';
 import VerifyCertificate from './components/VerifyCertificate';
+import UpcomingTrainingBoard from './components/UpcomingTrainingBoard';
 import HelpPage from './components/HelpPage';
 import IDPPage from './components/IDPPage';
 import CompetencyTeamPage from './components/CompetencyTeamPage';
@@ -101,6 +102,10 @@ function App() {
   if (window.location.pathname.startsWith('/verify/')) {
     const serial = window.location.pathname.split('/verify/')[1] || '';
     return <VerifyCertificate serial={decodeURIComponent(serial)} />;
+  }
+  // Public upcoming-training board for office TVs - also no login.
+  if (window.location.pathname.replace(/\/+$/, '') === '/upcoming-training') {
+    return <UpcomingTrainingBoard />;
   }
 
   const [user, setUser] = useState<User | null>(() => {
