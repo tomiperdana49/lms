@@ -33,6 +33,7 @@
     "viewAll": "Lihat semua",
     "idpItem": "IDP Tahun {{year}}",
     "competencyItem": "Perubahan kompetensi - {{position}}",
+    "joinRequestItem": "Minta ikut training - {{title}}",
     "review": "Tinjau"
   },
   "menu": {

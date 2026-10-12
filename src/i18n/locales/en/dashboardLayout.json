@@ -113,7 +113,14 @@
     },
     "competencyAssessmentSubmittedTitle": "New Competency Assessment",
     "competencyAssessmentSubmittedMessage": "{{name}} has submitted your competency assessment for Q{{quarter}} {{year}}.",
-    "ccBudgetNoticeTitle": "External Training Over Budget"
+    "ccBudgetNoticeTitle": "External Training Over Budget",
+    "joinRequestNewTitle": "New Training Join Request",
+    "joinRequestNewMessage": "{{name}} asked to join \"{{title}}\".",
+    "joinRequestApprovedTitle": "Join Request Approved",
+    "joinRequestApprovedMessage": "HR approved your request - you're now a participant of \"{{title}}\".",
+    "joinRequestRejectedTitle": "Join Request Rejected",
+    "joinRequestRejectedMessage": "HR rejected your request to join \"{{title}}\".",
+    "joinRequestRejectedWithReason": "HR rejected your request to join \"{{title}}\": {{reason}}"
   },
   "footer": "© 2026 PT Media Antar Nusa",
   "userFallback": "User",

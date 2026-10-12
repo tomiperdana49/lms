@@ -64,6 +64,7 @@
     "assess": "Assessed",
     "request_change": "Requested change",
     "submit_feedback": "Submitted feedback",
+    "request_join": "Requested to join",
     "impersonate_start": "Sign in as another user",
     "impersonate_stop": "Back to own account"
   },

@@ -26,6 +26,7 @@ import CompetencyTemplateManager from './CompetencyTemplateManager';
 import CompetencyApprovalManager from './CompetencyApprovalManager';
 import CompetencyOverviewPage from './CompetencyOverviewPage';
 import ActivityLogList from './ActivityLogList';
+import MeetingJoinRequests from './MeetingJoinRequests';
 
 interface AdminDashboardProps {
     user: User;
@@ -71,6 +72,7 @@ const StatCard = ({ label, value, icon: Icon, color, trend }: StatCardProps) => 
 const AdminDashboard = ({ user, onNavigate, initialView, focusIdpPlanId }: AdminDashboardProps) => {
     const { t } = useTranslation('adminDashboard');
     const [currentView, setCurrentView] = useState<AdminView>((initialView as AdminView) || 'overview');
+    const [meetingsReloadKey, setMeetingsReloadKey] = useState(0);
 
     // Sinkronkan view jika prop berubah dari sidebar utama
     useEffect(() => {
@@ -152,7 +154,14 @@ const AdminDashboard = ({ user, onNavigate, initialView, focusIdpPlanId }: Admin
             case 'logs': return <AdminReadingLog user={user} onBack={() => setCurrentView('overview')} />;
             case 'training': return <TrainingExternalManager userRole={user.role} userName={user.name} />;
             case 'post-training-evaluation': return <PostTrainingEvaluationManager userName={user.name} />;
-            case 'meetings': return <TrainingInternalList userRole={user.role} user={user} isManagementMode={true} />;
+            case 'meetings':
+                return (
+                    <>
+                        <MeetingJoinRequests onApproved={() => setMeetingsReloadKey(k => k + 1)} />
+                        {/* Remounted after an approval so the list reloads with the new participant. */}
+                        <TrainingInternalList key={meetingsReloadKey} userRole={user.role} user={user} isManagementMode={true} />
+                    </>
+                );
             case 'courses': return <OnlineModulesManager />;
             case 'quiz-reports':
                 return <QuizReportList onBack={() => setCurrentView('overview')} />;

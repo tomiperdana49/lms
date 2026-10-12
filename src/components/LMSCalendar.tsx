@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MoreHorizontal, MapPin, Video, Plus, X, ArrowUpRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MoreHorizontal, MapPin, Video, Plus, X, ArrowUpRight, UserPlus, CheckCircle2, Hourglass } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { Role, Meeting, Incentive, TrainingRequest } from '../types';
@@ -24,20 +24,35 @@ interface CalendarEvent {
     description: string;
     location?: string;
     link?: string;
+    // INTERNAL only - whether the signed-in employee can ask to join this training.
+    isParticipant?: boolean;
+    isOpenForJoin?: boolean;
+}
+
+interface JoinRequest {
+    id: number;
+    meeting_id: number;
+    status: 'Pending' | 'Approved' | 'Rejected';
+    rejection_reason?: string | null;
 }
 
 interface LMSCalendarProps {
     compact?: boolean;
     userEmail?: string;
     userRole?: Role;
+    // Enables the "Request to Join" button on internal trainings the employee isn't part of yet.
+    userEmployeeId?: string;
 }
 
-const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps) => {
+const LMSCalendar = ({ compact = false, userEmail, userRole, userEmployeeId }: LMSCalendarProps) => {
     const { t } = useTranslation('lmsCalendar');
     // --- State ---
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
     const [events, setEvents] = useState<CalendarEvent[]>([]);
+    const [joinRequests, setJoinRequests] = useState<Record<number, JoinRequest>>({});
+    const [joiningId, setJoiningId] = useState<number | null>(null);
+    const [joinError, setJoinError] = useState<{ id: number; message: string } | null>(null);
 
     // Quick Schedule Modal State
     const [isScheduleOpen, setIsScheduleOpen] = useState(false);
@@ -65,19 +80,28 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
 
             const loadedEvents: CalendarEvent[] = [];
             const isHR = userRole === 'HR' || userRole === 'HR_ADMIN';
+            const startOfToday = new Date();
+            startOfToday.setHours(0, 0, 0, 0);
 
             // 1. Process Meetings (Internal) - every scheduled internal training is shown to everyone,
             // not just its host and guests, so all employees can see what training is coming up.
             meetings.forEach((m: Meeting) => {
+                const date = new Date(m.date);
+                const isParticipant = !!userEmployeeId && (
+                    String(m.employee_id || '') === String(userEmployeeId) ||
+                    (m.guests?.employee_ids || []).some(id => String(id) === String(userEmployeeId))
+                );
                 loadedEvents.push({
                     id: m.id,
                     title: m.title,
                     type: 'INTERNAL',
-                    date: new Date(m.date),
+                    date,
                     time: m.time,
                     description: m.description,
                     location: m.location,
-                    link: m.meetLink
+                    link: m.meetLink,
+                    isParticipant,
+                    isOpenForJoin: !m.is_closed && date >= startOfToday
                 });
             });
 
@@ -128,11 +152,83 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
         } catch (err) {
             console.error("Calendar fetch error", err);
         }
-    }, [userRole, userEmail]);
+    }, [userRole, userEmail, userEmployeeId]);
+
+    const fetchJoinRequests = useCallback(async () => {
+        if (!userEmployeeId) return;
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/meeting-join-requests/mine`);
+            const rows: JoinRequest[] = await res.json();
+            setJoinRequests(Object.fromEntries((Array.isArray(rows) ? rows : []).map(r => [r.meeting_id, r])));
+        } catch (err) {
+            console.error('Join requests fetch error', err);
+        }
+    }, [userEmployeeId]);
 
     useEffect(() => {
         fetchEvents();
     }, [fetchEvents]);
+
+    useEffect(() => {
+        fetchJoinRequests();
+    }, [fetchJoinRequests]);
+
+    const handleRequestJoin = async (meetingId: number) => {
+        setJoiningId(meetingId);
+        setJoinError(null);
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/meetings/${meetingId}/join-requests`, { method: 'POST' });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setJoinError({ id: meetingId, message: data.error || t('join.failed') });
+            }
+            await Promise.all([fetchJoinRequests(), fetchEvents()]);
+        } catch (err) {
+            console.error('Join request failed', err);
+            setJoinError({ id: meetingId, message: t('join.failed') });
+        } finally {
+            setJoiningId(null);
+        }
+    };
+
+    // Join state for an internal training card: already in, waiting on HR, or a button to ask.
+    const renderJoinSection = (ev: CalendarEvent) => {
+        if (ev.type !== 'INTERNAL' || !userEmployeeId) return null;
+        if (ev.isParticipant) {
+            return (
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-2 rounded-xl mb-3">
+                    <CheckCircle2 size={14} /> {t('join.participant')}
+                </div>
+            );
+        }
+        const request = joinRequests[ev.id];
+        if (request?.status === 'Pending') {
+            return (
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-100 px-3 py-2 rounded-xl mb-3">
+                    <Hourglass size={14} /> {t('join.pending')}
+                </div>
+            );
+        }
+        if (!ev.isOpenForJoin) return null;
+        return (
+            <div className="mb-3 space-y-2">
+                {request?.status === 'Rejected' && (
+                    <p className="text-xs font-semibold text-rose-600">
+                        {request.rejection_reason ? t('join.rejectedWithReason', { reason: request.rejection_reason }) : t('join.rejected')}
+                    </p>
+                )}
+                <button
+                    type="button"
+                    onClick={() => handleRequestJoin(ev.id)}
+                    disabled={joiningId === ev.id}
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all"
+                >
+                    <UserPlus size={16} /> {joiningId === ev.id ? t('join.sending') : request?.status === 'Rejected' ? t('join.requestAgain') : t('join.request')}
+                </button>
+                {joinError?.id === ev.id && <p className="text-xs font-semibold text-rose-600">{joinError.message}</p>}
+            </div>
+        );
+    };
 
     // --- Schedule Handler ---
     const handleQuickSchedule = async () => {
@@ -452,6 +548,8 @@ const LMSCalendar = ({ compact = false, userEmail, userRole }: LMSCalendarProps)
                                         <div className="text-slate-600 text-sm whitespace-pre-wrap leading-relaxed mb-5">
                                             {renderTextWithLinks(ev.description)}
                                         </div>
+
+                                        {renderJoinSection(ev)}
 
                                         {ev.link && (
                                             <a 

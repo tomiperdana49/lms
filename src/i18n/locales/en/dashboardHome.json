@@ -33,6 +33,7 @@
     "viewAll": "View all",
     "idpItem": "IDP for {{year}}",
     "competencyItem": "Competency change - {{position}}",
+    "joinRequestItem": "Join request - {{title}}",
     "review": "Review"
   },
   "menu": {

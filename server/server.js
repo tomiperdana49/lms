@@ -308,6 +308,8 @@ const ACTIVITY_RULES = [
 
     ['POST', /^\/api\/meetings$/, 'internal_training', 'create', { label: (b) => b.title }],
     ['POST', /^\/api\/meetings\/bulk$/, 'internal_training', 'import'],
+    ['POST', /^\/api\/meetings\/([^/]+)\/join-requests$/, 'internal_training', 'request_join', { lookup: ['meetings', 'title'] }],
+    ['POST', /^\/api\/meeting-join-requests\/([^/]+)\/decision$/, 'internal_training', (b) => b.action === 'approve' ? 'approve' : b.action === 'reject' ? 'reject' : 'update', { lookup: ['meeting_join_requests', 'employee_name'] }],
     ['PUT', /^\/api\/meetings\/([^/]+)$/, 'internal_training', 'update', { lookup: ['meetings', 'title'] }],
     ['DELETE', /^\/api\/meetings\/([^/]+)$/, 'internal_training', 'delete', { lookup: ['meetings', 'title'] }],
     ['POST', /^\/api\/internal-certificates\/issue$/, 'internal_training', 'issue_certificate', { lookup: ['meetings', 'title'], id: (b) => b.meetingId }],
@@ -4950,6 +4952,140 @@ app.get('/api/meetings/deleted', async (req, res) => {
         const meetings = await query('SELECT id, title, date, host, employee_id, deleted_at FROM meetings WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC');
         res.json(meetings);
     } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- INTERNAL TRAINING JOIN REQUESTS ---
+// An employee asks to join a scheduled training from the Calendar; HR approves or rejects it.
+// Approving adds them to the meeting's guests_json, exactly as if HR had invited them.
+
+const parseGuests = (raw) => {
+    let guests = null;
+    try { guests = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null; } catch (e) { /* ignore */ }
+    guests = guests && typeof guests === 'object' ? guests : { status: 'Awaiting', count: 0, emails: [] };
+    if (!Array.isArray(guests.emails)) guests.emails = [];
+    if (!Array.isArray(guests.employee_ids)) guests.employee_ids = [];
+    return guests;
+};
+
+const isMeetingParticipant = (meeting, employeeId) => {
+    if (!employeeId) return false;
+    if (meeting.employee_id && String(meeting.employee_id) === String(employeeId)) return true;
+    return parseGuests(meeting.guests_json).employee_ids.some(id => String(id) === String(employeeId));
+};
+
+// The signed-in employee's own requests, so the Calendar can show Pending/Rejected per training.
+app.get('/api/meeting-join-requests/mine', async (req, res) => {
+    try {
+        if (!req.user?.employee_id) return res.json([]);
+        const rows = await query(
+            `SELECT r.id, r.meeting_id, r.status, r.rejection_reason, r.created_at, r.decided_at, m.title AS meeting_title
+             FROM meeting_join_requests r
+             JOIN meetings m ON m.id = r.meeting_id AND m.deleted_at IS NULL
+             WHERE r.employee_id = ?`,
+            [req.user.employee_id]
+        );
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// HR: requests to review (Pending by default), with the training they're for.
+app.get('/api/meeting-join-requests', async (req, res) => {
+    try {
+        if (!isHRRole(req.user?.role)) return res.status(403).json({ success: false, message: 'HR access required' });
+        const status = req.query.status || 'Pending';
+        const rows = await query(
+            `SELECT r.*, m.title AS meeting_title, m.date AS meeting_date, m.time AS meeting_time
+             FROM meeting_join_requests r
+             JOIN meetings m ON m.id = r.meeting_id AND m.deleted_at IS NULL
+             WHERE r.status = ?
+             ORDER BY r.created_at ASC`,
+            [status]
+        );
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/meetings/:id/join-requests', async (req, res) => {
+    try {
+        const employeeId = req.user?.employee_id;
+        if (!employeeId) return res.status(400).json({ error: 'Your account is not linked to an employee ID.' });
+
+        const [meeting] = await query(
+            'SELECT id, title, date, employee_id, guests_json, is_closed, (date >= CURDATE()) AS is_upcoming FROM meetings WHERE id = ? AND deleted_at IS NULL',
+            [req.params.id]
+        );
+        if (!meeting) return res.status(404).json({ error: 'Training not found.' });
+        if (meeting.is_closed || !meeting.is_upcoming) return res.status(400).json({ error: 'This training is no longer open for joining.' });
+        if (isMeetingParticipant(meeting, employeeId)) return res.status(409).json({ error: 'You are already a participant of this training.' });
+
+        const [existing] = await query('SELECT id, status FROM meeting_join_requests WHERE meeting_id = ? AND employee_id = ?', [meeting.id, employeeId]);
+        if (existing && existing.status !== 'Rejected') {
+            return res.status(409).json({ error: existing.status === 'Pending' ? 'Your request is already waiting for HR approval.' : 'Your request was already approved.' });
+        }
+        if (existing) {
+            // Asking again after a rejection re-opens the same request for HR.
+            await query(
+                `UPDATE meeting_join_requests SET status = 'Pending', rejection_reason = NULL, decided_by = NULL, decided_at = NULL,
+                 employee_name = ?, employee_email = ?, created_at = NOW() WHERE id = ?`,
+                [req.user.name || null, req.user.email || null, existing.id]
+            );
+        } else {
+            await query(
+                'INSERT INTO meeting_join_requests (meeting_id, employee_id, employee_name, employee_email) VALUES (?, ?, ?, ?)',
+                [meeting.id, employeeId, req.user.name || null, req.user.email || null]
+            );
+        }
+        res.json({ success: true, status: 'Pending' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// HR approves or rejects. Approving adds the employee to the meeting's participants inside a
+// transaction with the meeting row locked, so two approvals at once can't overwrite each other.
+app.post('/api/meeting-join-requests/:id/decision', async (req, res) => {
+    if (!isHRRole(req.user?.role)) return res.status(403).json({ success: false, message: 'HR access required' });
+    const { action, reason } = req.body;
+    if (action !== 'approve' && action !== 'reject') return res.status(400).json({ error: 'action must be approve or reject' });
+    const decidedBy = req.impersonator?.name || req.user?.name || null;
+
+    const connection = await pool.getConnection();
+    let invite = null;
+    try {
+        await connection.beginTransaction();
+        const [[request]] = await connection.query('SELECT * FROM meeting_join_requests WHERE id = ? FOR UPDATE', [req.params.id]);
+        if (!request) { await connection.rollback(); return res.status(404).json({ error: 'Request not found.' }); }
+        if (request.status !== 'Pending') { await connection.rollback(); return res.status(409).json({ error: `This request was already ${request.status.toLowerCase()}.` }); }
+
+        if (action === 'reject') {
+            await connection.query(
+                "UPDATE meeting_join_requests SET status = 'Rejected', rejection_reason = ?, decided_by = ?, decided_at = NOW() WHERE id = ?",
+                [reason || null, decidedBy, request.id]
+            );
+        } else {
+            const [[meeting]] = await connection.query('SELECT * FROM meetings WHERE id = ? AND deleted_at IS NULL FOR UPDATE', [request.meeting_id]);
+            if (!meeting) { await connection.rollback(); return res.status(404).json({ error: 'Training not found.' }); }
+            const guests = parseGuests(meeting.guests_json);
+            if (!guests.employee_ids.some(id => String(id) === String(request.employee_id))) guests.employee_ids.push(request.employee_id);
+            const email = request.employee_email ? String(request.employee_email).toLowerCase() : null;
+            if (email && !guests.emails.some(e => String(e).toLowerCase() === email)) guests.emails.push(request.employee_email);
+            guests.count = guests.employee_ids.length;
+            await connection.query('UPDATE meetings SET guests_json = ? WHERE id = ?', [JSON.stringify(guests), meeting.id]);
+            await connection.query(
+                "UPDATE meeting_join_requests SET status = 'Approved', rejection_reason = NULL, decided_by = ?, decided_at = NOW() WHERE id = ?",
+                [decidedBy, request.id]
+            );
+            if (request.employee_email) invite = { meeting: { ...meeting, description: meeting.agenda }, email: request.employee_email };
+        }
+        await connection.commit();
+        res.json({ success: true });
+    } catch (err) {
+        await connection.rollback().catch(() => { });
+        res.status(500).json({ error: err.message });
+    } finally {
+        connection.release();
+    }
+
+    // Same invitation email HR's own invite sends; best-effort, after responding.
+    if (invite) sendMeetingInvite(invite.meeting, [invite.email]).catch(e => console.error('[JOIN REQUEST] Invite email failed:', e.message));
 });
 
 app.post('/api/meetings', async (req, res) => {

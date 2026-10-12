@@ -961,6 +961,31 @@ export const initDB = async () => {
             console.log("Added impersonator columns to activity_logs.");
         } catch (e) { /* Ignore if exists */ }
 
+        // An employee asking to join a scheduled internal training from the Calendar. HR approves or
+        // rejects it; approving adds the employee to the meeting's guests_json (its participant list).
+        // One row per (meeting, employee) - a rejected request is re-opened in place if they ask again.
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS meeting_join_requests (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    meeting_id INT NOT NULL,
+                    employee_id VARCHAR(50) NOT NULL,
+                    employee_name VARCHAR(255),
+                    employee_email VARCHAR(255),
+                    status VARCHAR(20) NOT NULL DEFAULT 'Pending',
+                    rejection_reason TEXT,
+                    decided_by VARCHAR(255),
+                    decided_at DATETIME,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_meeting_employee (meeting_id, employee_id),
+                    INDEX idx_meeting_join_requests_status (status),
+                    FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
+                )
+            `);
+            console.log("Verified meeting_join_requests table exists.");
+        } catch (e) { console.error("Failed to create meeting_join_requests:", e.message); }
+
         // Backfill idp_plans.imported_by for plans imported before that column existed: each import
         // request is logged right after its plans are inserted, so the first IDP import log within a
         // few seconds after a plan's created_at is the request that created it.

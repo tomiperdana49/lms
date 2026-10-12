@@ -38,5 +38,15 @@
     "statusLabel": "Status: {{status}}",
     "incentiveEndTitle": "Incentive End: {{courseName}} - {{employeeName}}",
     "incentivePeriodEnds": "Incentive period ends."
+  },
+  "join": {
+    "request": "Request to Join",
+    "requestAgain": "Request Again",
+    "sending": "Sending...",
+    "pending": "Request sent - waiting for HR approval",
+    "participant": "You're a participant of this training",
+    "rejected": "Your previous request was rejected by HR.",
+    "rejectedWithReason": "Your previous request was rejected by HR: {{reason}}",
+    "failed": "Failed to send the request. Please try again."
   }
 }

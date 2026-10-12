@@ -83,9 +83,10 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
         } else if (userRole === 'HR' || userRole === 'HR_ADMIN') {
             Promise.all([
                 fetch(`${API_BASE_URL}/api/idp/all`).then(res => res.json()),
-                fetch(`${API_BASE_URL}/api/competency-change-requests?status=PENDING`).then(res => res.json())
+                fetch(`${API_BASE_URL}/api/competency-change-requests?status=PENDING`).then(res => res.json()),
+                fetch(`${API_BASE_URL}/api/meeting-join-requests?status=Pending`).then(res => res.json())
             ])
-                .then(([idpData, competencyData]) => {
+                .then(([idpData, competencyData, joinRequestData]) => {
                     const pendingIdp = (Array.isArray(idpData) ? idpData : []).filter((p: any) => p.status === 'Pending');
                     const idpItems: PendingActionItem[] = pendingIdp.map((p: any) => ({
                         id: p.id,
@@ -102,7 +103,14 @@ const DashboardHome = ({ onNavigate, userRole, isSupervisor, userEmail, userName
                         date: r.createdAt,
                         target: { page: 'admin-dashboard', view: 'competency-approvals' }
                     }));
-                    setPendingActions([...idpItems, ...competencyItems]);
+                    const joinRequestItems: PendingActionItem[] = (Array.isArray(joinRequestData) ? joinRequestData : []).map((r: any) => ({
+                        id: 200000 + r.id,
+                        title: r.employee_name || r.employee_id,
+                        subtitle: t('pendingActions.joinRequestItem', { title: r.meeting_title }),
+                        date: r.created_at,
+                        target: { page: 'admin-dashboard', view: 'meetings' }
+                    }));
+                    setPendingActions([...idpItems, ...competencyItems, ...joinRequestItems]);
                 })
                 .catch(err => console.error('Error fetching pending actions:', err));
         } else {

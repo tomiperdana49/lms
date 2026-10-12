@@ -113,7 +113,14 @@
     },
     "competencyAssessmentSubmittedTitle": "Penilaian Kompetensi Baru",
     "competencyAssessmentSubmittedMessage": "{{name}} telah mengisi penilaian kompetensi Anda untuk Q{{quarter}} {{year}}.",
-    "ccBudgetNoticeTitle": "Training Eksternal Melebihi Budget"
+    "ccBudgetNoticeTitle": "Training Eksternal Melebihi Budget",
+    "joinRequestNewTitle": "Permintaan Ikut Training Baru",
+    "joinRequestNewMessage": "{{name}} minta ikut training \"{{title}}\".",
+    "joinRequestApprovedTitle": "Permintaan Ikut Training Disetujui",
+    "joinRequestApprovedMessage": "HR menyetujui permintaan Anda - Anda sekarang peserta \"{{title}}\".",
+    "joinRequestRejectedTitle": "Permintaan Ikut Training Ditolak",
+    "joinRequestRejectedMessage": "HR menolak permintaan Anda untuk ikut \"{{title}}\".",
+    "joinRequestRejectedWithReason": "HR menolak permintaan Anda untuk ikut \"{{title}}\": {{reason}}"
   },
   "footer": "© 2026 PT Media Antar Nusa",
   "userFallback": "Pengguna",

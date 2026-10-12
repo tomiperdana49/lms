@@ -515,7 +515,7 @@ function App() {
           />
         )}
 
-        {activePage === 'calendar' && <LMSCalendar userEmail={user?.email} />}
+        {activePage === 'calendar' && <LMSCalendar userEmail={user?.email} userEmployeeId={user?.employee_id} />}
 
         {activePage === 'leaderboard' && config.moduleLeaderboard && <LeaderboardPage currentUser={user} />}
 

@@ -37,5 +37,15 @@
     "statusLabel": "Status: {{status}}",
     "incentiveEndTitle": "Insentif Berakhir: {{courseName}} - {{employeeName}}",
     "incentivePeriodEnds": "Periode insentif berakhir."
+  },
+  "join": {
+    "request": "Minta Ikut Training",
+    "requestAgain": "Minta Lagi",
+    "sending": "Mengirim...",
+    "pending": "Permintaan terkirim - menunggu persetujuan HR",
+    "participant": "Kamu peserta training ini",
+    "rejected": "Permintaan sebelumnya ditolak oleh HR.",
+    "rejectedWithReason": "Permintaan sebelumnya ditolak oleh HR: {{reason}}",
+    "failed": "Gagal mengirim permintaan. Silakan coba lagi."
   }
 }

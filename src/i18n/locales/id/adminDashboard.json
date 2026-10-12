@@ -23,5 +23,15 @@
   },
   "calendar": {
     "title": "Kalender Pelatihan"
+  },
+  "joinRequests": {
+    "title": "Permintaan Ikut Training Internal",
+    "requestedAt": "Diajukan {{date}}",
+    "approve": "Setujui",
+    "reject": "Tolak",
+    "confirmReject": "Konfirmasi Tolak",
+    "cancel": "Batal",
+    "reasonPlaceholder": "Alasan (opsional)",
+    "failed": "Gagal memproses permintaan. Silakan coba lagi."
   }
 }

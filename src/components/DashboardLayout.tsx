@@ -201,6 +201,13 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onI
                 const ccBudgetNotices = await fetch(`${API_BASE_URL}/api/external-training/cc-budget-notices?employee_id=${user.employee_id || ''}`)
                     .then(r => r.ok ? r.json() : [])
                     .catch(() => []);
+                // Internal training join requests - also fetched outside the guard above, for the same reason.
+                const [pendingJoinRequests, myJoinRequests] = await Promise.all([
+                    isHrViewer
+                        ? fetch(`${API_BASE_URL}/api/meeting-join-requests?status=Pending`).then(r => r.ok ? r.json() : []).catch(() => [])
+                        : Promise.resolve([]),
+                    fetch(`${API_BASE_URL}/api/meeting-join-requests/mine`).then(r => r.ok ? r.json() : []).catch(() => [])
+                ]);
 
                 // Get already read notification IDs from LocalStorage
                 let readIds: number[] = [];
@@ -654,11 +661,54 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onI
                     };
                 });
 
+                // 17. Internal Training: notify every HR user when an employee asks to join a training
+                // from the Calendar.
+                const joinRequestHrNotifs = (Array.isArray(pendingJoinRequests) ? pendingJoinRequests : []).map((r: any) => {
+                    const notifId = 2400000 + r.id;
+                    const notifDate = new Date(r.created_at || Date.now());
+                    return {
+                        id: notifId,
+                        title: t('notifications.joinRequestNewTitle'),
+                        message: t('notifications.joinRequestNewMessage', { name: r.employee_name || r.employee_id, title: r.meeting_title }),
+                        time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                        sortTime: notifDate.getTime(),
+                        type: 'INFO',
+                        isRead: readIds.includes(notifId),
+                        page: 'admin-dashboard',
+                        view: 'meetings'
+                    };
+                });
+
+                // 18. Internal Training: notify the EMPLOYEE when HR approves or rejects their join request.
+                const joinRequestStatusNotifs = (Array.isArray(myJoinRequests) ? myJoinRequests : [])
+                    .filter((r: any) => r.status === 'Approved' || r.status === 'Rejected')
+                    .map((r: any) => {
+                        // Each decision gets its own id, so asking again after a rejection and then
+                        // being approved shows up as a new notification.
+                        const notifId = 2500000 + r.id * 10 + (r.status === 'Approved' ? 1 : 2);
+                        const notifDate = new Date(r.decided_at || Date.now());
+                        const approved = r.status === 'Approved';
+                        return {
+                            id: notifId,
+                            title: approved ? t('notifications.joinRequestApprovedTitle') : t('notifications.joinRequestRejectedTitle'),
+                            message: approved
+                                ? t('notifications.joinRequestApprovedMessage', { title: r.meeting_title })
+                                : r.rejection_reason
+                                    ? t('notifications.joinRequestRejectedWithReason', { title: r.meeting_title, reason: r.rejection_reason })
+                                    : t('notifications.joinRequestRejectedMessage', { title: r.meeting_title }),
+                            time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+                            sortTime: notifDate.getTime(),
+                            type: approved ? 'SUCCESS' : 'WARNING',
+                            isRead: readIds.includes(notifId),
+                            page: approved ? 'internal' : 'calendar'
+                        };
+                    });
+
                 // Combine and sort by actual notification date (sortTime), newest first - the
                 // synthetic `id` above is only for per-category read/unread tracking and is not
                 // comparable across categories (each has its own numeric offset), so it must not
                 // be used for ordering.
-                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpStatusNotifs, ...idpNoteNotifs, ...idpSubmittedNotifs, ...idpReviewNotifs, ...pteLeaderNotifs, ...pteMineNotifs, ...incentiveNotifs, ...competencySubmittedNotifs, ...competencyStatusNotifs, ...myCompetencyAssessmentNotifs, ...ccBudgetNotifs].sort((a, b) => b.sortTime - a.sortTime);
+                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpStatusNotifs, ...idpNoteNotifs, ...idpSubmittedNotifs, ...idpReviewNotifs, ...pteLeaderNotifs, ...pteMineNotifs, ...incentiveNotifs, ...competencySubmittedNotifs, ...competencyStatusNotifs, ...myCompetencyAssessmentNotifs, ...ccBudgetNotifs, ...joinRequestHrNotifs, ...joinRequestStatusNotifs].sort((a, b) => b.sortTime - a.sortTime);
                 setNotifications(all);
             } catch (error) {
                 console.error("Failed to fetch header notifications", error);

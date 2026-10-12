@@ -23,5 +23,15 @@
   },
   "calendar": {
     "title": "Training Calendar"
+  },
+  "joinRequests": {
+    "title": "Join Requests - Internal Training",
+    "requestedAt": "Requested on {{date}}",
+    "approve": "Approve",
+    "reject": "Reject",
+    "confirmReject": "Confirm Reject",
+    "cancel": "Cancel",
+    "reasonPlaceholder": "Reason (optional)",
+    "failed": "Failed to process the request. Please try again."
   }
 }
