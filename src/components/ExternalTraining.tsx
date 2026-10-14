@@ -23,7 +23,6 @@ import {
  ClipboardCheck
 } from 'lucide-react';
 import PopupNotification from './PopupNotification';
-import { ANNUAL_LEARNING_BUDGET } from './LearningReport';
 
 interface CcOption {
     employeeId: string;
@@ -44,8 +43,6 @@ interface ExternalTrainingProps {
 export default function ExternalTraining({ currentUser, isManagementMode, defaultTab, focusRequestId }: ExternalTrainingProps) {
  const { t } = useTranslation('externalTraining');
  const isSupervisor = !!currentUser?.isSupervisor;
- // Interns get no annual learning budget - the personal budget card shows their spend without a cap.
- const isIntern = !!currentUser?.isIntern;
  const [activeTab, setActiveTab] = useState<TabType>(defaultTab || 'my_requests');
 
  useEffect(() => {
@@ -104,10 +101,6 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
     const [ccSearch, setCcSearch] = useState('');
     const [ccDropdownOpen, setCcDropdownOpen] = useState(false);
 
-    // Personal learning budget so far this year - same figure/cap shown on the Dashboard
-    // (ANNUAL_LEARNING_BUDGET), surfaced here too since it's exactly what a new request eats into.
-    const [personalLearningCost, setPersonalLearningCost] = useState(0);
-
  // Form States for Request
  const [category, setCategory] = useState('Training');
  const [title, setTitle] = useState('');
@@ -133,17 +126,6 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  .then((data: CcOption[]) => setCcOptions(Array.isArray(data) ? data : []))
  .catch(err => console.error('Error fetching CC options:', err));
  }, []);
-
- // Personal learning cost for the current calendar year - same query shape (Jan 1-Dec 31,
- // this year) as the Dashboard's own "Learning Cost" widget, so the two numbers always agree.
- useEffect(() => {
- if (!currentUser?.employee_id) return;
- const currentYear = new Date().getFullYear();
- fetch(`${API_BASE_URL}/api/learning-stats?employee_id=${currentUser.employee_id}&startDate=${currentYear}-01-01&endDate=${currentYear}-12-31`)
- .then(res => res.json())
- .then(data => { if (!data.error) setPersonalLearningCost(data.totalBiaya || 0); })
- .catch(err => console.error('Error fetching personal learning cost:', err));
- }, [currentUser?.employee_id]);
 
  const fetchMyRequests = async () => {
  try {
@@ -494,37 +476,6 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  {/* My Requests Tab */}
  {activeTab === 'my_requests' && (
  <div className="space-y-6">
- {/* Personal Learning Budget - same figure/cap as the Dashboard's own widget, shown
- here since a new request is exactly what eats into it. */}
- <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
- <div className="flex items-center gap-2 text-gray-500 mb-2">
- <Wallet className="w-4 h-4" />
- <span className="text-xs font-bold uppercase tracking-wide">{t('budget.title')}</span>
- </div>
- <div className="flex items-baseline gap-2 flex-wrap">
- <span className={`text-2xl font-black ${!isIntern && personalLearningCost > ANNUAL_LEARNING_BUDGET ? 'text-rose-600' : 'text-gray-800'}`}>
- {formatRp(personalLearningCost)}
- </span>
- {!isIntern && <span className="text-sm font-semibold text-gray-400">/ {formatRp(ANNUAL_LEARNING_BUDGET)}</span>}
- </div>
- {isIntern ? (
- <p className="text-xs font-semibold mt-2 text-gray-500">{t('budget.none')}</p>
- ) : (
- <>
- <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mt-2">
- <div
- className={`h-full rounded-full ${personalLearningCost <= ANNUAL_LEARNING_BUDGET ? 'bg-emerald-500' : 'bg-rose-500'}`}
- style={{ width: `${Math.min((personalLearningCost / ANNUAL_LEARNING_BUDGET) * 100, 100)}%` }}
- />
- </div>
- <p className={`text-xs font-semibold mt-2 ${personalLearningCost <= ANNUAL_LEARNING_BUDGET ? 'text-gray-500' : 'text-rose-600'}`}>
- {personalLearningCost <= ANNUAL_LEARNING_BUDGET
- ? t('budget.remaining', { amount: formatRp(ANNUAL_LEARNING_BUDGET - personalLearningCost) })
- : t('budget.exceeded', { amount: formatRp(personalLearningCost - ANNUAL_LEARNING_BUDGET) })}
- </p>
- </>
- )}
- </div>
  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
  <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
  <h2 className="text-lg font-semibold text-gray-800 mb-4">{t('form.newRequest')}</h2>

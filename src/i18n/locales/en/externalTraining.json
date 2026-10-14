@@ -50,12 +50,6 @@
     "Rejected": "Rejected",
     "Processed": "Processed"
   },
-  "budget": {
-    "title": "Your Personal Learning Budget",
-    "remaining": "Remaining: {{amount}}",
-    "exceeded": "Over budget by {{amount}}",
-    "none": "Interns have no learning budget."
-  },
   "empty": {
     "noRequests": "No external training requests yet.",
     "allCaughtUpTitle": "All Caught Up!",
