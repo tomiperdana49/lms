@@ -24,12 +24,27 @@ interface EmployeeOption {
     photo_profile?: string;
     active_status?: string | null;
     status_join?: string | null;
+    join_date?: string | null;
+    resign_date?: string | null;
 }
 
 type EmployeeStatusFilter = '' | 'active' | 'resign' | 'internship';
 
 // Same buckets as the learning budget: resign wins over internship, and anyone who is neither is active.
 const employeeStatus = (emp: EmployeeOption): Exclude<EmployeeStatusFilter, ''> => learningBudgetExclusion(emp) ?? 'active';
+
+// Whether the employee worked at any point in the period: joined by its end and not resigned before
+// its start. SimAsset stores both dates as YYYY-MM-DD text; a missing date doesn't exclude anyone.
+const employedDuring = (emp: EmployeeOption, startDate: string, endDate: string) => {
+    const joined = emp.join_date?.slice(0, 10);
+    const resigned = emp.resign_date?.slice(0, 10);
+    return (!joined || !endDate || joined <= endDate) && (!resigned || !startDate || resigned >= startDate);
+};
+
+const matchesRosterFilter = (emp: EmployeeOption, orgs: string[], branch: string, status: EmployeeStatusFilter) =>
+    (orgs.length === 0 || (!!emp.organization_name && orgs.includes(emp.organization_name)))
+    && (!branch || emp.branch_name === branch)
+    && (!status || employeeStatus(emp) === status);
 
 const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
     const canSyncNusawork = userRole === 'HR' || userRole === 'HR_ADMIN';
@@ -51,11 +66,13 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
     const selectedBranchRef = useRef(selectedBranch);
     useEffect(() => { selectedBranchRef.current = selectedBranch; }, [selectedBranch]);
     const [selectedStatus, setSelectedStatus] = useState<EmployeeStatusFilter>('');
+    const selectedStatusRef = useRef(selectedStatus);
+    useEffect(() => { selectedStatusRef.current = selectedStatus; }, [selectedStatus]);
     const [selectedEmployees, setSelectedEmployees] = useState<EmployeeOption[]>([]);
-    // Once employees load, default the report to everyone (All Organizations + All Branches) instead
-    // of an empty "select employees" state. Only fires once - after that, an explicit "Clear all" is
-    // respected instead of being immediately overridden back to everyone.
-    const [hasAutoSelectedAll, setHasAutoSelectedAll] = useState(false);
+    // The report starts on everyone employed in the period (All Organizations + All Branches) instead
+    // of an empty "select employees" state, and keeps following the period until the roster is
+    // edited by hand - after that, an explicit "Clear all" or hand-picked list is respected.
+    const rosterIsEveryoneRef = useRef(true);
     const [stats, setStats] = useState<LearningStats>(EMPTY_STATS);
     const [perEmployeeStats, setPerEmployeeStats] = useState<TeamMemberSummary[]>([]);
     const [expandedEmployeeIds, setExpandedEmployeeIds] = useState<Set<string>>(new Set());
@@ -89,12 +106,33 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
             .finally(() => setEmployeesLoading(false));
     }, []);
 
+    // Only employees who worked during the period can be picked - someone who resigned before it
+    // started, or joined after it ended, has nothing to report there.
+    const periodEmployees = useMemo(
+        () => employees.filter(emp => employedDuring(emp, startDate, endDate)),
+        [employees, startDate, endDate]
+    );
+
+    // Re-fits the roster whenever the period (or the employee list) changes: a filtered roster is
+    // re-run against the new period, the default everyone-roster follows it, and a hand-picked one
+    // just drops whoever didn't work in the period.
     useEffect(() => {
-        if (!hasAutoSelectedAll && !employeesLoading && employees.length > 0) {
-            setSelectedEmployees(employees);
-            setHasAutoSelectedAll(true);
+        if (employeesLoading) return;
+        const orgs = selectedOrgsRef.current;
+        const branch = selectedBranchRef.current;
+        const status = selectedStatusRef.current;
+        if (orgs.length > 0 || branch || status) {
+            setSelectedEmployees(periodEmployees.filter(emp => matchesRosterFilter(emp, orgs, branch, status)));
+        } else if (rosterIsEveryoneRef.current) {
+            setSelectedEmployees(periodEmployees);
+        } else {
+            const inPeriod = new Set(periodEmployees.map(emp => emp.id_employee));
+            setSelectedEmployees(prev => {
+                const next = prev.filter(emp => inPeriod.has(emp.id_employee));
+                return next.length === prev.length ? prev : next;
+            });
         }
-    }, [hasAutoSelectedAll, employeesLoading, employees]);
+    }, [employeesLoading, periodEmployees]);
 
     useEffect(() => {
         if (selectedEmployees.length === 0) {
@@ -171,16 +209,13 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
 
     const filteredEmployees = useMemo(() => {
         const q = search.trim().toLowerCase();
-        const sorted = [...employees].sort((a, b) => a.full_name.localeCompare(b.full_name));
+        const sorted = [...periodEmployees].sort((a, b) => a.full_name.localeCompare(b.full_name));
         return sorted.filter(emp => {
             if (selectedIds.has(emp.id_employee)) return false;
-            const matchesOrg = selectedOrgs.length === 0 || (!!emp.organization_name && selectedOrgs.includes(emp.organization_name));
-            const matchesBranch = !selectedBranch || emp.branch_name === selectedBranch;
-            const matchesStatus = !selectedStatus || employeeStatus(emp) === selectedStatus;
             const matchesSearch = !q || emp.full_name?.toLowerCase().includes(q) || emp.email?.toLowerCase().includes(q);
-            return matchesOrg && matchesBranch && matchesStatus && matchesSearch;
+            return matchesRosterFilter(emp, selectedOrgs, selectedBranch, selectedStatus) && matchesSearch;
         });
-    }, [employees, search, selectedOrgs, selectedBranch, selectedStatus, selectedIds]);
+    }, [periodEmployees, search, selectedOrgs, selectedBranch, selectedStatus, selectedIds]);
 
     const sections = useMemo(() => buildSections(stats, t), [stats, t]);
     const includeEmployeeColumn = selectedEmployees.length > 1;
@@ -194,11 +229,13 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
     );
 
     const handleAddEmployee = (emp: EmployeeOption) => {
+        rosterIsEveryoneRef.current = false;
         setSelectedEmployees(prev => [...prev, emp]);
         setSearch('');
     };
 
     const handleRemoveEmployee = (id: string) => {
+        rosterIsEveryoneRef.current = false;
         setSelectedEmployees(prev => prev.filter(emp => emp.id_employee !== id));
     };
 
@@ -208,11 +245,8 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
     // doesn't wipe out employees the user added by hand.
     const applyRosterFilter = (orgs: string[], branch: string, status: EmployeeStatusFilter = selectedStatus) => {
         if (orgs.length === 0 && !branch && !status) return;
-        setSelectedEmployees(employees.filter(emp =>
-            (orgs.length === 0 || (!!emp.organization_name && orgs.includes(emp.organization_name)))
-            && (!branch || emp.branch_name === branch)
-            && (!status || employeeStatus(emp) === status)
-        ));
+        rosterIsEveryoneRef.current = false;
+        setSelectedEmployees(periodEmployees.filter(emp => matchesRosterFilter(emp, orgs, branch, status)));
     };
 
     const handleStatusSelect = (status: EmployeeStatusFilter) => {
@@ -311,6 +345,7 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
                     {selectedEmployees.length > 0 && (
                         <button
                             onClick={() => {
+                                rosterIsEveryoneRef.current = false;
                                 setSelectedEmployees([]);
                                 setSelectedOrgs([]);
                                 setSelectedBranch('');
