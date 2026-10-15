@@ -33,7 +33,8 @@ import {
     BadgeCheck,
     History,
     LogIn,
-    Undo2
+    Undo2,
+    ListTodo
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Page, Role, User } from '../types';
@@ -50,6 +51,8 @@ import {
     type AudienceKey,
     type GuideContent
 } from './HelpPage';
+
+const FEEDBACK_LIST_URL = 'https://docs.google.com/spreadsheets/d/1pLEXuuaowpjJkxykjaZFjZ-HVkwKoW2MGnCLiz9UCFI/edit?gid=0#gid=0';
 
 interface DashboardLayoutProps {
     children: ReactNode;
@@ -1240,6 +1243,16 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onI
                                 </div>
                             )}
                         </div>
+
+                        <a
+                            href={FEEDBACK_LIST_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={t('menu.feedbackList')}
+                            className="text-slate-500 hover:text-slate-700 transition-colors p-2 hover:bg-gray-100 rounded-full cursor-pointer flex items-center justify-center focus:outline-none"
+                        >
+                            <ListTodo size={20} />
+                        </a>
 
                         <button
                             type="button"
