@@ -2587,6 +2587,10 @@ const computeLeaderboard = async (year) => {
         }
     };
 
+    // A month or quarter still in progress isn't due yet (its review is due by the period's end), so
+    // it counts only once done - early work earns credit, pending work isn't held against anyone.
+    const inProgressTask = (employeeId, key, isDone) => { if (isDone) task(employeeId, key, true); };
+
     // IDP - each month of each Approved plan, from approval to now, is one monthly review to log.
     const reviewedMonths = new Set((await query(`SELECT idp_id, DATE_FORMAT(review_date, '%Y-%m') AS ym FROM idp_reviews`)).map(r => `${r.idp_id}|${r.ym}`));
     for (const plan of await query(
@@ -2594,7 +2598,10 @@ const computeLeaderboard = async (year) => {
          WHERE status = 'Approved' AND period_year = ?`, [year]
     )) {
         const firstMonth = plan.start && yearOf(plan.start) === year ? new Date(plan.start).getMonth() + 1 : 1;
-        for (let m = firstMonth; m <= lastMonth; m++) task(plan.employee_id, 'idp', reviewedMonths.has(`${plan.id}|${year}-${pad2(m)}`));
+        for (let m = firstMonth; m <= lastMonth; m++) {
+            const record = isCurrentYear && m === lastMonth ? inProgressTask : task;
+            record(plan.employee_id, 'idp', reviewedMonths.has(`${plan.id}|${year}-${pad2(m)}`));
+        }
     }
 
     // Competency - each team member, in each quarter the company has run assessments for so far.
@@ -2603,7 +2610,8 @@ const computeLeaderboard = async (year) => {
     )).map(r => `${r.employee_id}|${r.quarter}`));
     const activeQuarters = [...new Set([...assessedPairs].map(k => Number(k.split('|')[1])))];
     for (const members of teams.values()) for (const m of members) for (const qtr of activeQuarters) {
-        task(m, 'competency', assessedPairs.has(`${m}|${qtr}`));
+        const record = isCurrentYear && qtr === lastQuarter ? inProgressTask : task;
+        record(m, 'competency', assessedPairs.has(`${m}|${qtr}`));
     }
 
     // Post Training Evaluation - the same (form, training, attendee) items the leader's PTE page lists.
