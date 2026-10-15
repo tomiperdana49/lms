@@ -5074,6 +5074,9 @@ app.get('/api/public/upcoming-training', async (req, res) => {
             : [];
         const employeeById = new Map(employees.map(e => [String(e.id_employee), e]));
 
+        // The board's clock runs off the server's time, not the TV's (which may drift or sit in
+        // another timezone). A header keeps the body a plain array for TV tabs on an older build.
+        res.set({ 'X-Server-Time': String(Date.now()), 'Access-Control-Expose-Headers': 'X-Server-Time' });
         res.json(rows.map(({ guests_json, host_employee_id, ...m }) => {
             const ids = guestsById.get(m.id);
             return {

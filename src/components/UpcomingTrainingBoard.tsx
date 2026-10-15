@@ -36,7 +36,14 @@ const parseTimeRange = (time: string | null) => {
     return { start: matches[0] ?? null, end: matches[1] ?? null };
 };
 
-const isSameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+// The board keeps WIB time whatever the TV's own timezone is set to.
+const WIB_TIME_ZONE = 'Asia/Jakarta';
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+const wibDateKey = (ms: number) => new Date(ms + WIB_OFFSET_MS).toISOString().slice(0, 10);
+const wibMinutes = (ms: number) => {
+    const wib = new Date(ms + WIB_OFFSET_MS);
+    return wib.getUTCHours() * 60 + wib.getUTCMinutes();
+};
 
 // A person's round photo (participant or trainer); falls back to their initial if it can't load.
 const ParticipantAvatar = ({ name, photoUrl, className = '' }: { name: string; photoUrl: string | null; className?: string }) => {
@@ -85,21 +92,32 @@ const ParticipantPreview = ({ training }: { training: PublicTraining }) => {
 const UpcomingTrainingBoard = () => {
     const [trainings, setTrainings] = useState<PublicTraining[] | null>(null);
     const [failed, setFailed] = useState(false);
-    const [now, setNow] = useState(new Date());
+    // The clock follows the server's time: each load re-measures how far the TV's clock is off,
+    // and the clock ticks on from there between loads.
+    const clockOffsetRef = useRef(0);
+    const [now, setNow] = useState(() => Date.now());
     const scrollRef = useRef<HTMLElement>(null);
 
     useEffect(() => {
         document.title = 'Upcoming Training - LMS Nusa';
         const load = () => {
             fetch(`${API_BASE_URL}/api/public/upcoming-training`)
-                .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
+                .then(res => {
+                    if (!res.ok) return Promise.reject(new Error(`HTTP ${res.status}`));
+                    const serverTime = Number(res.headers.get('X-Server-Time'));
+                    if (serverTime > 0) {
+                        clockOffsetRef.current = serverTime - Date.now();
+                        setNow(serverTime);
+                    }
+                    return res.json();
+                })
                 .then((data: PublicTraining[]) => { setTrainings(data); setFailed(false); })
                 // Keep showing the last good list if a refresh fails (e.g. the network blips).
                 .catch(err => { console.error('Failed to load upcoming training:', err); setFailed(true); });
         };
         load();
         const refresh = setInterval(load, REFRESH_MS);
-        const clock = setInterval(() => setNow(new Date()), 30 * 1000);
+        const clock = setInterval(() => setNow(Date.now() + clockOffsetRef.current), 30 * 1000);
         const reload = setTimeout(() => window.location.reload(), FULL_RELOAD_MS);
         return () => { clearInterval(refresh); clearInterval(clock); clearTimeout(reload); };
     }, []);
@@ -152,11 +170,11 @@ const UpcomingTrainingBoard = () => {
         };
     }, []);
 
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const nowMinutes = wibMinutes(now);
+    const todayKey = wibDateKey(now);
     // Drop today's sessions that have already ended, so the board only shows what's still ahead.
     const visible = (trainings || []).filter(tr => {
-        const date = parseLocalDate(tr.date);
-        if (!isSameDay(date, now)) return true;
+        if (tr.date !== todayKey) return true;
         const { end } = parseTimeRange(tr.time);
         return end === null || end > nowMinutes;
     });
@@ -173,10 +191,10 @@ const UpcomingTrainingBoard = () => {
                 </div>
                 <div className="text-right shrink-0">
                     <p className="text-3xl sm:text-5xl lg:text-6xl font-black tabular-nums leading-none">
-                        {now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(now).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: WIB_TIME_ZONE })}
                     </p>
                     <p className="text-xs sm:text-base font-semibold text-indigo-200 mt-1">
-                        {now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                        {new Date(now).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: WIB_TIME_ZONE })}
                     </p>
                 </div>
             </header>
@@ -197,7 +215,7 @@ const UpcomingTrainingBoard = () => {
                             // The first card is the nearest training still ahead - it glows and
                             // blinks to catch the eye of whoever walks past the TV.
                             const isNearest = index === 0;
-                            const isToday = isSameDay(date, now);
+                            const isToday = tr.date === todayKey;
                             const { start, end } = parseTimeRange(tr.time);
                             const isLive = isToday && start !== null && start <= nowMinutes && (end === null || nowMinutes < end);
                             const isOnline = (tr.type || '').toLowerCase() === 'online';
