@@ -2497,10 +2497,13 @@ const computeLeaderboard = async (year) => {
     const points = new Map(employees.map(e => [String(e.id_employee), Object.fromEntries(LEADERBOARD_BASE_KEYS.map(k => [k, 0]))]));
     const add = (employeeId, key, value) => { const p = points.get(String(employeeId)); if (p) p[key] += value; };
 
-    // Reading logs - only HR-Approved ones count; Rejected/Cancelled/Pending/Draft earn nothing.
+    // Reading logs - every finished book counts, like the dashboard's Top Learners. Only HR-Rejected
+    // or Cancelled logs are left out: HR approves at most 5 books a year for the incentive, so most
+    // finished books stay "Read" (hr_approval_status 'Draft') and counting Approved alone capped this.
     for (const r of await query(
         `SELECT employee_id, category FROM reading_logs
-         WHERE hr_approval_status = 'Approved' AND YEAR(COALESCE(finish_date, date)) = ?`, [year]
+         WHERE status = 'Finished' AND finish_date IS NOT NULL AND YEAR(finish_date) = ?
+           AND COALESCE(hr_approval_status, '') NOT IN ('Rejected', 'Cancelled')`, [year]
     )) add(r.employee_id, 'reading', readingLogPoints(r.category));
 
     // Online modules - a course counts once every module is completed: average best post-test / 10.

@@ -55,7 +55,7 @@
   "howTitle": "How it's scored",
   "how": {
     "intro": "Points come from this year's activity and have no cap: the more you do, the more you earn. The ranking follows total points, and the label (Excellent/Good/Fair) follows where your rank falls: top 10%, 25% and 50%.",
-    "reading": "Reading Log: per book Approved by HR. Non-fiction 10, business comics 5, fiction/magazines 3. Rejected books don't count.",
+    "reading": "Reading Log: per finished book (Approved or not yet claimed for the incentive). Non-fiction 10, business comics 5, fiction/magazines 3. Books rejected by HR or cancelled don't count.",
     "module": "Online Module: per course with every module completed, points = post-test score ÷ 10 (8 without a post-test).",
     "internal": "Internal Training: per closed session you attended. Points = post-test score ÷ 10; without your own post-test, the session average, or 8 if the session has no post-test.",
     "host": "Training Host: per session you host, points = the attendees' average post-test ÷ 10 (8 without a post-test).",

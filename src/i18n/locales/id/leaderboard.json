@@ -55,7 +55,7 @@
   "howTitle": "Cara penilaian",
   "how": {
     "intro": "Poin dihitung dari aktivitas tahun berjalan dan tidak ada batasnya: semakin banyak aktivitas, semakin banyak poin. Peringkat diurutkan dari total poin, dan label (Excellent/Good/Fair) mengikuti posisi peringkat: 10%, 25%, dan 50% teratas.",
-    "reading": "Reading Log: per buku yang Approved oleh HR. Non-fiksi 10, komik bisnis 5, fiksi/majalah 3. Buku yang ditolak tidak dihitung.",
+    "reading": "Reading Log: per buku yang sudah selesai dibaca (Approved maupun belum diklaim insentif). Non-fiksi 10, komik bisnis 5, fiksi/majalah 3. Buku yang ditolak HR atau dibatalkan tidak dihitung.",
     "module": "Online Module: per course yang semua modulnya selesai, poin = nilai post-test ÷ 10 (8 bila tanpa post-test).",
     "internal": "Training Internal: per training yang sudah closed dan Anda hadir. Poin = nilai post-test ÷ 10; tanpa post-test memakai rata-rata peserta, atau 8 bila training tidak punya post-test.",
     "host": "Host Training: per training yang Anda bawakan, poin = rata-rata nilai post-test peserta ÷ 10 (8 bila tanpa post-test).",
