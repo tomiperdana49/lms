@@ -10,7 +10,6 @@ const COMPONENT_ORDER: ComponentKey[] = ['reading', 'module', 'internal', 'host'
 
 interface ComponentScore {
     points: number;
-    max: number;
     done?: number;
     due?: number;
 }
@@ -46,10 +45,12 @@ interface LeaderboardData {
     teams: TeamRow[];
 }
 
-const categoryOf = (score: number): { key: 'excellent' | 'good' | 'fair' | 'low'; className: string } => {
-    if (score >= 90) return { key: 'excellent', className: 'bg-emerald-50 text-emerald-700' };
-    if (score >= 75) return { key: 'good', className: 'bg-blue-50 text-blue-700' };
-    if (score >= 60) return { key: 'fair', className: 'bg-amber-50 text-amber-700' };
+// Points are uncapped, so the category comes from where the rank falls: top 10%, top 25%, top half.
+const categoryOf = (rank: number, total: number): { key: 'excellent' | 'good' | 'fair' | 'low'; className: string } => {
+    const share = rank / Math.max(1, total);
+    if (share <= 0.1) return { key: 'excellent', className: 'bg-emerald-50 text-emerald-700' };
+    if (share <= 0.25) return { key: 'good', className: 'bg-blue-50 text-blue-700' };
+    if (share <= 0.5) return { key: 'fair', className: 'bg-amber-50 text-amber-700' };
     return { key: 'low', className: 'bg-slate-100 text-slate-500' };
 };
 
@@ -60,32 +61,35 @@ const RankBadge = ({ rank }: { rank: number }) => {
     return <span className="text-sm font-bold text-slate-400">{rank}</span>;
 };
 
-const ScoreBar = ({ score }: { score: number }) => (
+// The bar is scaled to the top score on the board, since points have no fixed maximum.
+const ScoreBar = ({ score, topScore }: { score: number; topScore: number }) => (
     <div className="flex items-center gap-3 min-w-[140px]">
         <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.max(0, Math.min(100, score))}%` }} />
+            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${topScore > 0 ? Math.max(0, Math.min(100, (score / topScore) * 100)) : 0}%` }} />
         </div>
-        <span className="w-10 text-right text-sm font-black text-slate-800 tabular-nums">{score}</span>
+        <span className="w-12 text-right text-sm font-black text-slate-800 tabular-nums">{score}</span>
     </div>
 );
 
 const ComponentBreakdown = ({ components }: { components: Partial<Record<ComponentKey, ComponentScore>> }) => {
     const { t } = useTranslation('leaderboard');
+    // Each bar shows the component's share of the person's points - not a cap, since there is none.
+    const totalPoints = Math.max(1, Object.values(components).reduce((sum, c) => sum + Math.abs(c?.points ?? 0), 0));
     return (
         <div className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
             {COMPONENT_ORDER.filter(k => components[k]).map(k => {
                 const c = components[k]!;
-                const pct = Math.max(0, Math.min(100, (c.points / c.max) * 100));
+                const pct = Math.min(100, (Math.abs(c.points) / totalPoints) * 100);
                 return (
                     <div key={k}>
                         <div className="flex items-center justify-between text-xs mb-1">
                             <span className="font-semibold text-slate-600">{t(`components.${k}`)}</span>
                             <span className={`font-bold tabular-nums ${c.points < 0 ? 'text-rose-600' : 'text-slate-700'}`}>
-                                {c.points} / {c.max}
+                                {c.points}
                             </span>
                         </div>
                         <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${c.points < 0 ? 'bg-rose-400' : 'bg-emerald-500'}`} style={{ width: `${c.points < 0 ? 100 : pct}%` }} />
+                            <div className={`h-full rounded-full ${c.points < 0 ? 'bg-rose-400' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
                         </div>
                         {c.due !== undefined && (
                             <p className="text-[11px] text-slate-400 mt-0.5">{t('dutyProgress', { done: c.done, due: c.due })}</p>
@@ -135,6 +139,9 @@ export default function LeaderboardPage({ currentUser }: { currentUser: User }) 
     const viewerId = data?.viewerEmployeeId || currentUser.employee_id || null;
     const me = data?.individuals.find(r => r.employeeId === viewerId) || null;
     const myTeams = data?.teams.filter(team => viewerId && team.memberIds.includes(viewerId)) || [];
+    const topIndividualScore = data?.individuals[0]?.score ?? 0;
+    const topTeamScore = data?.teams[0]?.score ?? 0;
+    const myCategory = me && data ? categoryOf(me.rank, data.individuals.length) : null;
 
     const query = search.trim().toLowerCase();
     const individuals = (data?.individuals || []).filter(r => !query ||
@@ -192,11 +199,13 @@ export default function LeaderboardPage({ currentUser }: { currentUser: User }) 
                                 <div className="lg:w-56 shrink-0">
                                     <div className="flex items-end gap-2">
                                         <span className="text-5xl font-black text-slate-800 tabular-nums">{me.score}</span>
-                                        <span className="text-slate-400 font-bold mb-1.5">/ 100</span>
+                                        <span className="text-slate-400 font-bold mb-1.5">{t('myScore.pointsUnit')}</span>
                                     </div>
-                                    <span className={`inline-block mt-2 px-2.5 py-1 rounded-full text-xs font-bold ${categoryOf(me.score).className}`}>
-                                        {t(`category.${categoryOf(me.score).key}`)}
-                                    </span>
+                                    {myCategory && (
+                                        <span className={`inline-block mt-2 px-2.5 py-1 rounded-full text-xs font-bold ${myCategory.className}`}>
+                                            {t(`category.${myCategory.key}`)}
+                                        </span>
+                                    )}
                                     <p className="text-sm font-semibold text-slate-600 mt-3">{t('myScore.rankOf', { rank: me.rank, total: data.individuals.length })}</p>
                                     {myTeams.map(team => (
                                         <p key={team.leaderId} className="text-xs text-slate-500 mt-1">
@@ -282,7 +291,7 @@ export default function LeaderboardPage({ currentUser }: { currentUser: User }) 
                                                         </p>
                                                         <p className="text-xs text-slate-400 truncate">{[row.jobPosition, row.department].filter(Boolean).join(' · ')}</p>
                                                     </div>
-                                                    <ScoreBar score={row.score} />
+                                                    <ScoreBar score={row.score} topScore={topIndividualScore} />
                                                     {canExpand && (
                                                         <button
                                                             onClick={() => setExpandedId(isExpanded ? null : row.employeeId)}
@@ -322,7 +331,7 @@ export default function LeaderboardPage({ currentUser }: { currentUser: User }) 
                                                     {[team.department, t('membersCount', { count: team.size })].filter(Boolean).join(' · ')}
                                                 </p>
                                             </div>
-                                            <ScoreBar score={team.score} />
+                                            <ScoreBar score={team.score} topScore={topTeamScore} />
                                         </li>
                                     );
                                 })}

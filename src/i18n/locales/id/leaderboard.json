@@ -17,7 +17,8 @@
     "rankOf": "Peringkat #{{rank}} dari {{total}}",
     "notRanked": "Akun Anda belum terhubung ke data karyawan aktif, jadi belum masuk peringkat.",
     "myTeam": "Tim {{name}}: #{{rank}} · skor {{score}}",
-    "breakdown": "Rincian poin"
+    "breakdown": "Rincian poin",
+    "pointsUnit": "poin"
   },
   "columns": {
     "rank": "#",
@@ -53,13 +54,13 @@
   "hideDetail": "Sembunyikan rincian",
   "howTitle": "Cara penilaian",
   "how": {
-    "intro": "Skor 1–100 dihitung dari aktivitas tahun berjalan. Setiap komponen punya target: poin dihitung penuh sampai target, lalu setengahnya sampai batas maksimum. Skor = total poin ÷ poin maksimum yang bisa Anda raih × 100.",
-    "reading": "Reading Log (maks 50): buku Approved oleh HR. Non-fiksi 10, komik bisnis 5, fiksi/majalah 3. Buku yang ditolak tidak dihitung.",
-    "module": "Online Module (target 30, maks 40): course yang semua modulnya selesai, poin = nilai post-test ÷ 10 (8 bila tanpa post-test).",
-    "internal": "Training Internal (target 60, maks 90): training yang sudah closed dan Anda hadir. Poin = nilai post-test ÷ 10; tanpa post-test memakai rata-rata peserta, atau 8 bila training tidak punya post-test.",
-    "host": "Host Training (target 40, maks 50): sebagai host, poin = rata-rata nilai post-test peserta ÷ 10 (8 bila tanpa post-test).",
-    "external": "Training Eksternal (target 20, maks 30): 10 poin per training yang sudah diproses (dibayar) HR.",
-    "leader": "Khusus leader: Review IDP tim (maks 30, bisa minus bila review tidak diisi), Penilaian Kompetensi tim (maks 15), dan Post Training Evaluation tim (maks 15), dihitung dari persentase tugas yang diselesaikan. Tugas yang belum ada di periode ini tidak mengurangi skor.",
-    "team": "Skor tim = rata-rata skor leader dan bawahan langsungnya."
+    "intro": "Poin dihitung dari aktivitas tahun berjalan dan tidak ada batasnya: semakin banyak aktivitas, semakin banyak poin. Peringkat diurutkan dari total poin, dan label (Excellent/Good/Fair) mengikuti posisi peringkat: 10%, 25%, dan 50% teratas.",
+    "reading": "Reading Log: per buku yang Approved oleh HR. Non-fiksi 10, komik bisnis 5, fiksi/majalah 3. Buku yang ditolak tidak dihitung.",
+    "module": "Online Module: per course yang semua modulnya selesai, poin = nilai post-test ÷ 10 (8 bila tanpa post-test).",
+    "internal": "Training Internal: per training yang sudah closed dan Anda hadir. Poin = nilai post-test ÷ 10; tanpa post-test memakai rata-rata peserta, atau 8 bila training tidak punya post-test.",
+    "host": "Host Training: per training yang Anda bawakan, poin = rata-rata nilai post-test peserta ÷ 10 (8 bila tanpa post-test).",
+    "external": "Training Eksternal: 10 poin per training yang sudah diproses (dibayar) HR.",
+    "leader": "Khusus leader, per tugas tim: Review IDP bulanan ±1, Penilaian Kompetensi per anggota per kuartal ±2, dan Post Training Evaluation per peserta ±1 — poin bertambah bila dikerjakan dan berkurang bila terlewat. Bulan/kuartal yang masih berjalan baru dihitung setelah dikerjakan.",
+    "team": "Skor tim = rata-rata poin leader dan bawahan langsungnya, sehingga tim besar tidak otomatis unggul."
   }
 }

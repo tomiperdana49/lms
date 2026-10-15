@@ -2458,16 +2458,13 @@ app.get('/api/activity-logs', async (req, res) => {
     }
 });
 
-// --- LEADERBOARD (points 1-100 per employee and per team) ---
-// Every active, non-intern employee earns capped points per component for the year; leaders also
-// earn points for their leader duties, measured as the share of those tasks they completed. The
-// score is total / the maximum they could have earned, scaled to 1-100. A team is a leader plus
-// their direct reports, scored as the average of its members.
-// Caps sit around the 90th percentile of 2026 activity, so the most active still stand apart; leader
-// duties keep roughly a fifth of a leader's maximum.
-const LEADERBOARD_CAPS = { reading: 50, module: 40, internal: 90, host: 50, external: 30, idp: 30, competency: 15, pte: 15 };
-// Base components earn full points up to their target, then half points from there up to the cap.
-const LEADERBOARD_TARGETS = { reading: 50, module: 30, internal: 60, host: 40, external: 20 };
+// --- LEADERBOARD (uncapped points per employee and per team) ---
+// Every active, non-intern employee earns points for each learning activity in the year, with no
+// cap - more activity, more points. Leaders also gain points for each leader duty done and lose the
+// same for each one missed. The score is the plain total. A team is a leader plus their direct
+// reports, scored as the average of its members so team size doesn't decide the ranking.
+// Points per leader duty, earned when done and lost when missed - sized against a training (~8-10).
+const LEADERBOARD_DUTY_POINTS = { idp: 1, competency: 2, pte: 1 };
 const LEADERBOARD_BASE_KEYS = ['reading', 'module', 'internal', 'host', 'external'];
 const LEADERBOARD_DUTY_KEYS = ['idp', 'competency', 'pte'];
 // Points for a completed module or attended training that has no post-test to score it by.
@@ -2497,7 +2494,7 @@ const computeLeaderboard = async (year) => {
                 active_status, status_join, deleted_at
          FROM employees`
     )).filter(e => e.id_employee && !e.deleted_at && isActiveNonIntern(e));
-    const points = new Map(employees.map(e => [String(e.id_employee), Object.fromEntries(Object.keys(LEADERBOARD_CAPS).map(k => [k, 0]))]));
+    const points = new Map(employees.map(e => [String(e.id_employee), Object.fromEntries(LEADERBOARD_BASE_KEYS.map(k => [k, 0]))]));
     const add = (employeeId, key, value) => { const p = points.get(String(employeeId)); if (p) p[key] += value; };
 
     // Reading logs - only HR-Approved ones count; Rejected/Cancelled/Pending/Draft earn nothing.
@@ -2576,8 +2573,7 @@ const computeLeaderboard = async (year) => {
         leadersOf.get(m).push(leaderId);
     }
 
-    // Leader duties as { due, done } - scored by the share completed; a duty with nothing due is
-    // left out of that leader's maximum instead of counting against them.
+    // Leader duties as { due, done } - each done task earns its points, each missed one costs them.
     const duty = new Map([...teams.keys()].map(l => [l, Object.fromEntries(LEADERBOARD_DUTY_KEYS.map(k => [k, { due: 0, done: 0 }]))]));
     const task = (employeeId, key, isDone) => {
         for (const l of leadersOf.get(String(employeeId)) || []) {
@@ -2645,23 +2641,16 @@ const computeLeaderboard = async (year) => {
         const isLeader = teams.has(id);
         const components = {};
         let total = 0;
-        let max = 0;
         for (const k of LEADERBOARD_BASE_KEYS) {
-            const target = LEADERBOARD_TARGETS[k];
-            const value = Math.min(raw[k], target) + Math.min(Math.max(raw[k] - target, 0) / 2, LEADERBOARD_CAPS[k] - target);
-            components[k] = { points: round1(value), max: LEADERBOARD_CAPS[k] };
-            total += value;
-            max += LEADERBOARD_CAPS[k];
+            components[k] = { points: round1(raw[k]) };
+            total += raw[k];
         }
         for (const k of LEADERBOARD_DUTY_KEYS) {
             const d = isLeader ? duty.get(id)[k] : null;
             if (!d || d.due === 0) continue;
-            const share = d.done / d.due;
-            // IDP reviews swing both ways: all months reviewed +30, half 0, none -30.
-            const value = k === 'idp' ? (2 * share - 1) * LEADERBOARD_CAPS.idp : share * LEADERBOARD_CAPS[k];
-            components[k] = { points: round1(value), max: LEADERBOARD_CAPS[k], done: d.done, due: d.due };
+            const value = (d.done - (d.due - d.done)) * LEADERBOARD_DUTY_POINTS[k];
+            components[k] = { points: round1(value), done: d.done, due: d.due };
             total += value;
-            max += LEADERBOARD_CAPS[k];
         }
         return {
             employeeId: id,
@@ -2670,7 +2659,7 @@ const computeLeaderboard = async (year) => {
             department: e.organization_name || null,
             isLeader,
             teamLeaderIds: leadersOf.get(id) || [],
-            score: Math.max(1, Math.min(100, Math.round(total / max * 100))),
+            score: round1(total),
             components
         };
     }).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
