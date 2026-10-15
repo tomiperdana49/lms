@@ -53,13 +53,13 @@
   "hideDetail": "Hide breakdown",
   "howTitle": "How it's scored",
   "how": {
-    "intro": "The 1–100 score comes from this year's activity. Each component is capped, and score = total points ÷ the maximum you could earn × 100.",
-    "reading": "Reading Log (max 30): books Approved by HR. Non-fiction 10, business comics 5, fiction/magazines 3. Rejected books don't count.",
-    "module": "Online Module (max 5): completed modules, points = post-test score ÷ 10 (8 without a post-test).",
-    "internal": "Internal Training (max 20): closed sessions you attended. Points = post-test score ÷ 10; without your own post-test, the session average, or 8 if the session has no post-test.",
-    "host": "Training Host (max 10): as host, points = the attendees' average post-test ÷ 10 (8 without a post-test).",
-    "external": "External Training (max 15): 10 points per training Processed (paid) by HR.",
-    "leader": "Leaders only: team IDP reviews (max 10, can go negative when reviews are missed), team competency assessments (max 5) and team Post Training Evaluations (max 5), scored by the share of tasks completed. Duties with nothing due in the period don't lower the score.",
+    "intro": "The 1–100 score comes from this year's activity. Each component has a target: points count in full up to the target, then at half rate up to the cap. Score = total points ÷ the maximum you could earn × 100.",
+    "reading": "Reading Log (max 50): books Approved by HR. Non-fiction 10, business comics 5, fiction/magazines 3. Rejected books don't count.",
+    "module": "Online Module (target 30, max 40): courses with every module completed, points = post-test score ÷ 10 (8 without a post-test).",
+    "internal": "Internal Training (target 60, max 90): closed sessions you attended. Points = post-test score ÷ 10; without your own post-test, the session average, or 8 if the session has no post-test.",
+    "host": "Training Host (target 40, max 50): as host, points = the attendees' average post-test ÷ 10 (8 without a post-test).",
+    "external": "External Training (target 20, max 30): 10 points per training Processed (paid) by HR.",
+    "leader": "Leaders only: team IDP reviews (max 30, can go negative when reviews are missed), team competency assessments (max 15) and team Post Training Evaluations (max 15), scored by the share of tasks completed. Duties with nothing due in the period don't lower the score.",
     "team": "Team score = the average score of the leader and their direct reports."
   }
 }

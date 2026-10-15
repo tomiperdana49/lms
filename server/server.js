@@ -2463,7 +2463,11 @@ app.get('/api/activity-logs', async (req, res) => {
 // earn points for their leader duties, measured as the share of those tasks they completed. The
 // score is total / the maximum they could have earned, scaled to 1-100. A team is a leader plus
 // their direct reports, scored as the average of its members.
-const LEADERBOARD_CAPS = { reading: 30, module: 5, internal: 20, host: 10, external: 15, idp: 10, competency: 5, pte: 5 };
+// Caps sit around the 90th percentile of 2026 activity, so the most active still stand apart; leader
+// duties keep roughly a fifth of a leader's maximum.
+const LEADERBOARD_CAPS = { reading: 50, module: 40, internal: 90, host: 50, external: 30, idp: 30, competency: 15, pte: 15 };
+// Base components earn full points up to their target, then half points from there up to the cap.
+const LEADERBOARD_TARGETS = { reading: 50, module: 30, internal: 60, host: 40, external: 20 };
 const LEADERBOARD_BASE_KEYS = ['reading', 'module', 'internal', 'host', 'external'];
 const LEADERBOARD_DUTY_KEYS = ['idp', 'competency', 'pte'];
 // Points for a completed module or attended training that has no post-test to score it by.
@@ -2635,7 +2639,8 @@ const computeLeaderboard = async (year) => {
         let total = 0;
         let max = 0;
         for (const k of LEADERBOARD_BASE_KEYS) {
-            const value = Math.min(raw[k], LEADERBOARD_CAPS[k]);
+            const target = LEADERBOARD_TARGETS[k];
+            const value = Math.min(raw[k], target) + Math.min(Math.max(raw[k] - target, 0) / 2, LEADERBOARD_CAPS[k] - target);
             components[k] = { points: round1(value), max: LEADERBOARD_CAPS[k] };
             total += value;
             max += LEADERBOARD_CAPS[k];
@@ -2644,7 +2649,7 @@ const computeLeaderboard = async (year) => {
             const d = isLeader ? duty.get(id)[k] : null;
             if (!d || d.due === 0) continue;
             const share = d.done / d.due;
-            // IDP reviews swing both ways: all months reviewed +10, half 0, none -10.
+            // IDP reviews swing both ways: all months reviewed +30, half 0, none -30.
             const value = k === 'idp' ? (2 * share - 1) * LEADERBOARD_CAPS.idp : share * LEADERBOARD_CAPS[k];
             components[k] = { points: round1(value), max: LEADERBOARD_CAPS[k], done: d.done, due: d.due };
             total += value;
