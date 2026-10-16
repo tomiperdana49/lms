@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { Search, Download, Loader2, CalendarRange, UsersRound, Building2, MapPin, Check, X, ChevronDown, Trophy, Crown, User, UserCheck } from 'lucide-react';
+import { Search, Download, Loader2, CalendarRange, UsersRound, Building2, MapPin, Check, X, ChevronDown, Trophy, Crown, User, UserCheck, UserCog } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import {
@@ -18,6 +18,11 @@ import { learningBudgetExclusion } from '../utils/learningBudget';
 interface EmployeeOption {
     id_employee: string;
     full_name: string;
+    nickname?: string | null;
+    user_id?: string | null;
+    // SimAsset's report-to link: id_report_to_value is the leader's user_id, id_report_to their name.
+    id_report_to?: string | null;
+    id_report_to_value?: string | null;
     email?: string;
     organization_name?: string;
     branch_name?: string;
@@ -41,10 +46,20 @@ const employedDuring = (emp: EmployeeOption, startDate: string, endDate: string)
     return (!joined || !endDate || joined <= endDate) && (!resigned || !startDate || resigned >= startDate);
 };
 
-const matchesRosterFilter = (emp: EmployeeOption, orgs: string[], branch: string, status: EmployeeStatusFilter) =>
+// Direct reports only. Same matching as the backend's findReportToEmployee: the user_id link first,
+// falling back to the leader's name for records where the link wasn't populated. The top of the org
+// chart reports to themself in SimAsset - that isn't a direct report.
+const reportsTo = (emp: EmployeeOption, leader: EmployeeOption) => {
+    if (emp.id_employee === leader.id_employee) return false;
+    if (emp.id_report_to_value) return !!leader.user_id && String(emp.id_report_to_value) === String(leader.user_id);
+    return !!emp.id_report_to && (emp.id_report_to === leader.full_name || emp.id_report_to === leader.nickname);
+};
+
+const matchesRosterFilter = (emp: EmployeeOption, orgs: string[], branch: string, status: EmployeeStatusFilter, leader: EmployeeOption | null) =>
     (orgs.length === 0 || (!!emp.organization_name && orgs.includes(emp.organization_name)))
     && (!branch || emp.branch_name === branch)
-    && (!status || employeeStatus(emp) === status);
+    && (!status || employeeStatus(emp) === status)
+    && (!leader || reportsTo(emp, leader));
 
 const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
     const canSyncNusawork = userRole === 'HR' || userRole === 'HR_ADMIN';
@@ -68,6 +83,11 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
     const [selectedStatus, setSelectedStatus] = useState<EmployeeStatusFilter>('');
     const selectedStatusRef = useRef(selectedStatus);
     useEffect(() => { selectedStatusRef.current = selectedStatus; }, [selectedStatus]);
+    const [selectedLeader, setSelectedLeader] = useState<EmployeeOption | null>(null);
+    const [leaderQuery, setLeaderQuery] = useState('');
+    const [leaderDropdownOpen, setLeaderDropdownOpen] = useState(false);
+    const selectedLeaderRef = useRef(selectedLeader);
+    useEffect(() => { selectedLeaderRef.current = selectedLeader; }, [selectedLeader]);
     const [selectedEmployees, setSelectedEmployees] = useState<EmployeeOption[]>([]);
     // The report starts on everyone employed in the period (All Organizations + All Branches) instead
     // of an empty "select employees" state, and keeps following the period until the roster is
@@ -121,8 +141,9 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
         const orgs = selectedOrgsRef.current;
         const branch = selectedBranchRef.current;
         const status = selectedStatusRef.current;
-        if (orgs.length > 0 || branch || status) {
-            setSelectedEmployees(periodEmployees.filter(emp => matchesRosterFilter(emp, orgs, branch, status)));
+        const leader = selectedLeaderRef.current;
+        if (orgs.length > 0 || branch || status || leader) {
+            setSelectedEmployees(periodEmployees.filter(emp => matchesRosterFilter(emp, orgs, branch, status, leader)));
         } else if (rosterIsEveryoneRef.current) {
             setSelectedEmployees(periodEmployees);
         } else {
@@ -207,15 +228,34 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
         return branches.filter(branch => branch.toLowerCase().includes(q));
     }, [branches, branchQuery]);
 
+    // Everyone at least one employee reports to, with how many direct reports they have.
+    const leaders = useMemo(() => {
+        const counts = new Map<string, number>();
+        employees.forEach(emp => {
+            const leader = employees.find(candidate => reportsTo(emp, candidate));
+            if (leader) counts.set(leader.id_employee, (counts.get(leader.id_employee) ?? 0) + 1);
+        });
+        return employees
+            .filter(emp => counts.has(emp.id_employee))
+            .map(emp => ({ leader: emp, reportCount: counts.get(emp.id_employee)! }))
+            .sort((a, b) => a.leader.full_name.localeCompare(b.leader.full_name));
+    }, [employees]);
+
+    const filteredLeaders = useMemo(() => {
+        const q = leaderQuery.trim().toLowerCase();
+        if (!q) return leaders;
+        return leaders.filter(({ leader }) => leader.full_name.toLowerCase().includes(q) || leader.email?.toLowerCase().includes(q));
+    }, [leaders, leaderQuery]);
+
     const filteredEmployees = useMemo(() => {
         const q = search.trim().toLowerCase();
         const sorted = [...periodEmployees].sort((a, b) => a.full_name.localeCompare(b.full_name));
         return sorted.filter(emp => {
             if (selectedIds.has(emp.id_employee)) return false;
             const matchesSearch = !q || emp.full_name?.toLowerCase().includes(q) || emp.email?.toLowerCase().includes(q);
-            return matchesRosterFilter(emp, selectedOrgs, selectedBranch, selectedStatus) && matchesSearch;
+            return matchesRosterFilter(emp, selectedOrgs, selectedBranch, selectedStatus, selectedLeader) && matchesSearch;
         });
-    }, [periodEmployees, search, selectedOrgs, selectedBranch, selectedStatus, selectedIds]);
+    }, [periodEmployees, search, selectedOrgs, selectedBranch, selectedStatus, selectedLeader, selectedIds]);
 
     const sections = useMemo(() => buildSections(stats, t), [stats, t]);
     const includeEmployeeColumn = selectedEmployees.length > 1;
@@ -239,14 +279,19 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
         setSelectedEmployees(prev => prev.filter(emp => emp.id_employee !== id));
     };
 
-    // Recomputes the employee roster from whichever of org/branch/status is currently active, so the
-    // filters combine (AND) instead of one silently overriding another's selection. Organization
+    // Recomputes the employee roster from whichever of org/branch/status/leader is currently active, so
+    // the filters combine (AND) instead of one silently overriding another's selection. Organization
     // itself is OR'd across every picked org. Bails out when all are cleared so clearing filters
     // doesn't wipe out employees the user added by hand.
-    const applyRosterFilter = (orgs: string[], branch: string, status: EmployeeStatusFilter = selectedStatus) => {
-        if (orgs.length === 0 && !branch && !status) return;
+    const applyRosterFilter = (
+        orgs: string[],
+        branch: string,
+        status: EmployeeStatusFilter = selectedStatus,
+        leader: EmployeeOption | null = selectedLeaderRef.current
+    ) => {
+        if (orgs.length === 0 && !branch && !status && !leader) return;
         rosterIsEveryoneRef.current = false;
-        setSelectedEmployees(periodEmployees.filter(emp => matchesRosterFilter(emp, orgs, branch, status)));
+        setSelectedEmployees(periodEmployees.filter(emp => matchesRosterFilter(emp, orgs, branch, status, leader)));
     };
 
     const handleStatusSelect = (status: EmployeeStatusFilter) => {
@@ -273,6 +318,13 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
         setBranchQuery(branch);
         setBranchDropdownOpen(false);
         applyRosterFilter(selectedOrgsRef.current, branch);
+    };
+
+    const handleLeaderSelect = (leader: EmployeeOption | null) => {
+        setSelectedLeader(leader);
+        setLeaderQuery(leader?.full_name ?? '');
+        setLeaderDropdownOpen(false);
+        applyRosterFilter(selectedOrgsRef.current, selectedBranchRef.current, selectedStatusRef.current, leader);
     };
 
     const handleExport = () => {
@@ -351,6 +403,8 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
                                 setSelectedBranch('');
                                 setBranchQuery('');
                                 setSelectedStatus('');
+                                setSelectedLeader(null);
+                                setLeaderQuery('');
                             }}
                             className="text-xs font-bold text-slate-400 hover:text-red-600 px-2 py-1"
                         >
@@ -390,7 +444,7 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
                             placeholder={t('employee.searchPlaceholder')}
                             className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        {employeeDropdownOpen && !employeesLoading && (search.trim() || selectedOrgs.length > 0 || selectedBranch || selectedStatus) && (
+                        {employeeDropdownOpen && !employeesLoading && (search.trim() || selectedOrgs.length > 0 || selectedBranch || selectedStatus || selectedLeader) && (
                             <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-slate-100 rounded-lg shadow-lg divide-y divide-slate-50">
                                 {filteredEmployees.length === 0 ? (
                                     <p className="text-sm text-slate-400 italic px-4 py-3">{t('employee.notFound')}</p>
@@ -492,6 +546,46 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
                                     >
                                         {branch}
                                         {selectedBranch === branch && <Check size={14} className="text-blue-600" />}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <div className="relative sm:w-64">
+                        <UserCog className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                        <input
+                            type="text"
+                            value={leaderQuery}
+                            onFocus={() => setLeaderDropdownOpen(true)}
+                            onBlur={() => setTimeout(() => { setLeaderDropdownOpen(false); setLeaderQuery(selectedLeaderRef.current?.full_name ?? ''); }, 150)}
+                            onChange={e => { setLeaderQuery(e.target.value); setLeaderDropdownOpen(true); }}
+                            placeholder={t('employee.allLeaders')}
+                            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        {leaderDropdownOpen && (
+                            <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-slate-100 rounded-lg shadow-lg divide-y divide-slate-50">
+                                <button
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => handleLeaderSelect(null)}
+                                    className="w-full flex items-center justify-between text-left px-4 py-2 hover:bg-slate-50 transition-colors text-sm font-semibold text-slate-700"
+                                >
+                                    {t('employee.allLeaders')}
+                                    {!selectedLeader && <Check size={14} className="text-blue-600" />}
+                                </button>
+                                {filteredLeaders.length === 0 ? (
+                                    <p className="text-sm text-slate-400 italic px-4 py-3">{t('employee.notFound')}</p>
+                                ) : filteredLeaders.map(({ leader, reportCount }) => (
+                                    <button
+                                        key={leader.id_employee}
+                                        onMouseDown={e => e.preventDefault()}
+                                        onClick={() => handleLeaderSelect(leader)}
+                                        className="w-full flex items-center justify-between gap-2 text-left px-4 py-2 hover:bg-slate-50 transition-colors text-sm text-slate-700"
+                                    >
+                                        <span className="min-w-0">
+                                            <span className="block truncate">{leader.full_name}</span>
+                                            <span className="block text-[11px] text-slate-400">{t('employee.directReports', { count: reportCount })}</span>
+                                        </span>
+                                        {selectedLeader?.id_employee === leader.id_employee && <Check size={14} className="text-blue-600 shrink-0" />}
                                     </button>
                                 ))}
                             </div>

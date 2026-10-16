@@ -75,6 +75,9 @@
     "allOrganizations": "All Organizations",
     "organizationsSelected": "{{count}} Organizations selected",
     "allBranches": "All Branches",
+    "allLeaders": "All Leaders",
+    "directReports_one": "{{count}} direct report",
+    "directReports_other": "{{count}} direct reports",
     "clearAll": "Clear all",
     "status": {
       "all": "All Statuses",

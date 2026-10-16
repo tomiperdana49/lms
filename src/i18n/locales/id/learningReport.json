@@ -75,6 +75,8 @@
     "allOrganizations": "Semua Organisasi",
     "organizationsSelected": "{{count}} Organisasi dipilih",
     "allBranches": "Semua Cabang",
+    "allLeaders": "Semua Atasan",
+    "directReports_other": "{{count}} bawahan langsung",
     "clearAll": "Hapus semua",
     "status": {
       "all": "Semua Status",
