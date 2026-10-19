@@ -60,7 +60,9 @@ const LoginPage = ({ onLogin, sessionExpired, onSessionExpiredShown }: LoginPage
                 setNotification({
                     show: true,
                     type: 'error',
-                    message: t('loginFailed', { message: data.message, status: response.status })
+                    message: data.code === 'DB_UNAVAILABLE'
+                        ? t('databaseUnavailable')
+                        : t('loginFailed', { message: data.message || data.error, status: response.status })
                 });
                 setIsLoading(false);
             }
@@ -93,7 +95,7 @@ const LoginPage = ({ onLogin, sessionExpired, onSessionExpiredShown }: LoginPage
                 // Google login success - go straight to dashboard
                 onLogin(data.user, data.token);
             } else {
-                setNotification({ show: true, type: 'error', message: data.message || t('googleLoginFailed') });
+                setNotification({ show: true, type: 'error', message: data.code === 'DB_UNAVAILABLE' ? t('databaseUnavailable') : (data.message || t('googleLoginFailed')) });
                 setIsLoading(false);
             }
         } catch (err) {

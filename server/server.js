@@ -131,6 +131,24 @@ const query = async (sql, params) => {
     return results;
 };
 
+// mysql2 error codes meaning the database itself is unreachable (down, wrong host/credentials,
+// connection dropped or refused) rather than a bad query.
+const DB_UNAVAILABLE_CODES = new Set([
+    'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EHOSTUNREACH', 'ENETUNREACH', 'ECONNRESET', 'EAI_AGAIN',
+    'PROTOCOL_CONNECTION_LOST', 'PROTOCOL_SEQUENCE_TIMEOUT', 'ER_ACCESS_DENIED_ERROR', 'ER_BAD_DB_ERROR', 'ER_CON_COUNT_ERROR'
+]);
+const isDbUnavailableError = (err) => !!err && (DB_UNAVAILABLE_CODES.has(err.code) || (err.fatal === true && !!err.code));
+
+// Login's 500 response: a database outage gets its own code so the login page can say so.
+const sendLoginError = (res, err, fallbackMessage) => {
+    if (isDbUnavailableError(err)) {
+        console.error(`[LOGIN] Database unavailable (${err.code}):`, err.message);
+        return res.status(503).json({ success: false, code: 'DB_UNAVAILABLE', message: 'Cannot connect to the database. Please try again later or contact the administrator.' });
+    }
+    console.error(err);
+    return res.status(500).json({ success: false, error: fallbackMessage, message: fallbackMessage });
+};
+
 // --- AUTHENTICATION ---
 // Login issues a signed session token (HMAC-SHA256 over a small JSON payload), which the frontend
 // sends as "Authorization: Bearer <token>" on every API call (see src/utils/actorFetch.ts). The
@@ -2296,12 +2314,11 @@ app.post('/api/login', async (req, res) => {
                 return res.status(401).json({ success: false, message: authData.message || 'Invalid credentials' });
             }
         } catch (authErr) {
-            console.error(`[NUSANET AUTH] Error:`, authErr);
-            return res.status(500).json({ error: 'Authentication service error' });
+            if (!isDbUnavailableError(authErr)) console.error(`[NUSANET AUTH] Error:`, authErr);
+            return sendLoginError(res, authErr, 'Authentication service error');
         }
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Database error' });
+        sendLoginError(res, err, 'Database error');
     }
 });
 
@@ -2411,8 +2428,7 @@ app.post('/api/auth/google', async (req, res) => {
             }
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Database error' });
+        sendLoginError(res, err, 'Database error');
     }
 });
 

@@ -10,6 +10,7 @@
   "signingIn": "Sedang masuk...",
   "orContinueWith": "Atau lanjutkan dengan",
   "loginFailed": "Login Gagal: {{message}} (Status: {{status}})",
+  "databaseUnavailable": "Tidak dapat terhubung ke database. Silakan coba lagi beberapa saat lagi atau hubungi administrator.",
   "connectionError": "Kesalahan Koneksi: {{message}}",
   "googleLoginFailed": "Login Google Gagal",
   "googleLoginError": "Kesalahan Login Google",

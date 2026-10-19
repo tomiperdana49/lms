@@ -10,6 +10,7 @@
   "signingIn": "Signing in...",
   "orContinueWith": "Or continue with",
   "loginFailed": "Login Failed: {{message}} (Status: {{status}})",
+  "databaseUnavailable": "Cannot connect to the database. Please try again in a few minutes or contact the administrator.",
   "connectionError": "Connection Error: {{message}}",
   "googleLoginFailed": "Google Login Failed",
   "googleLoginError": "Google Login Error",
