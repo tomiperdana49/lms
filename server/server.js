@@ -96,6 +96,15 @@ initDB().then(async () => {
         console.error('[AUTH] Password migration failed:', e.message);
     }
 
+    // Opt-in, and before the reminder jobs below so their first run already sees new hires.
+    if (process.env.NUSAWORK_NEW_EMPLOYEE_SYNC_ENABLED === 'true') {
+        const runSync = () => runNusaworkNewEmployeeSync()
+            .catch(err => console.error('[NUSAWORK NEW EMPLOYEE SYNC] Run failed:', err.message));
+        console.log('[NUSAWORK NEW EMPLOYEE SYNC] Enabled (every 6 hours).');
+        await runSync();
+        setInterval(runSync, NUSAWORK_NEW_EMPLOYEE_SYNC_INTERVAL_MS);
+    }
+
     // Opt-in, so a dev machine running on a copy of production data never sends real IS5 tickets.
     if (process.env.IDP_REVIEW_REMINDERS_ENABLED === 'true') {
         scheduleReminderJob('IDP GT', runIdpReviewReminders);
@@ -105,6 +114,9 @@ initDB().then(async () => {
     }
     if (process.env.PTE_REMINDERS_ENABLED === 'true') {
         scheduleReminderJob('PTE GT', runPteReminders);
+    }
+    if (process.env.IDP_NEW_EMPLOYEE_REMINDERS_ENABLED === 'true') {
+        scheduleReminderJob('IDP NEW EMPLOYEE GT', runNewEmployeeIdpReminders);
     }
 });
 
@@ -3048,6 +3060,44 @@ app.get('/api/feedback/history', async (req, res) => {
 });
 
 
+// Every employee in Nusawork with one of the given active_status values, from the employee filter
+// API in a single page. Throws if Nusawork answers with an error.
+const fetchNusaworkEmployeeList = async (token, activeStatuses) => {
+    const baseUrl = process.env.NUSANET_BASE_URL || 'https://nusanet.app.nusawork.com';
+    const filterUrl = `${baseUrl}/emp/api/v4.2/client/employee/filter?page=1`;
+
+    const response = await fetch(filterUrl, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+            fields: {
+                active_status: activeStatuses
+            },
+            page_count: 999999,
+            paginate: true,
+            periods: getNusaworkFilterPeriods()
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error(`Nusawork API returned status ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    if (result && result.data) {
+        if (Array.isArray(result.data.list)) return result.data.list;
+        if (Array.isArray(result.data)) return result.data;
+        if (result.data.data && Array.isArray(result.data.data)) return result.data.data;
+    } else if (Array.isArray(result)) {
+        return result;
+    }
+    return [];
+};
+
 app.post('/api/admin/sync-all-nusawork', async (req, res) => {
     console.log('[API] POST /api/admin/sync-all-nusawork - Request to bulk sync all users');
     try {
@@ -3071,43 +3121,7 @@ app.post('/api/admin/sync-all-nusawork', async (req, res) => {
             let failCount = 0;
 
             console.log(`[API SYNC] Fetching all active employees from Nusawork...`);
-            const baseUrl = process.env.NUSANET_BASE_URL || 'https://nusanet.app.nusawork.com';
-            const filterUrl = `${baseUrl}/emp/api/v4.2/client/employee/filter?page=1`;
-
-            const response = await fetch(filterUrl, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({
-                    fields: {
-                        active_status: ["active", "Resign"]
-                    },
-                    page_count: 999999,
-                    paginate: true,
-                    periods: getNusaworkFilterPeriods()
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`Nusawork API returned status ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            const extractEmpList = (resObj) => {
-                if (resObj && resObj.data) {
-                    if (Array.isArray(resObj.data.list)) return resObj.data.list;
-                    if (Array.isArray(resObj.data)) return resObj.data;
-                    if (resObj.data.data && Array.isArray(resObj.data.data)) return resObj.data.data;
-                } else if (Array.isArray(resObj)) {
-                    return resObj;
-                }
-                return [];
-            };
-
-            const empList = extractEmpList(result);
+            const empList = await fetchNusaworkEmployeeList(token, ["active", "Resign"]);
             console.log(`[API SYNC] Retrieved ${empList.length} employees from Nusawork.`);
 
             if (empList.length === 0) {
@@ -3260,6 +3274,63 @@ app.post('/api/admin/sync-all-nusawork', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// Nusawork is the source of truth for employees, but the local employees table only picks up a new
+// hire when HR runs Sync All or the person signs in. This job adds every active Nusawork employee
+// that is missing locally, so jobs reading the table (e.g. the new-employee IDP ticket) see new hires
+// without waiting for HR. Existing records are left to login / Sync All.
+// syncEmployeeFromNusawork also matches local rows by email and by username across the company
+// domains, so a new hire whose email collides with an existing employee or account (e.g. a former
+// employee with the same username) would overwrite that record - those are skipped and logged for
+// HR instead. Only a brand-new person (or a user account already linked to this exact employee) is synced.
+const NUSAWORK_NEW_EMPLOYEE_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+const runNusaworkNewEmployeeSync = async () => {
+    const token = await getNusanetToken();
+    if (!token) {
+        console.warn('[NUSAWORK NEW EMPLOYEE SYNC] No Nusawork token available - skipped.');
+        return;
+    }
+    const empList = await fetchNusaworkEmployeeList(token, ['active']);
+    if (empList.length === 0) {
+        console.warn('[NUSAWORK NEW EMPLOYEE SYNC] Empty employee list returned from Nusawork - skipped.');
+        return;
+    }
+    const localIds = new Set((await querySimAsset('SELECT id_employee FROM employees WHERE id_employee IS NOT NULL'))
+        .map(r => String(r.id_employee)));
+    const missing = new Map();
+    for (const emp of empList) {
+        const id = emp.id_employee || emp.employee_id;
+        if (id && !localIds.has(String(id))) missing.set(String(id), emp);
+    }
+    if (missing.size === 0) return;
+
+    let added = 0;
+    let skipped = 0;
+    for (const [id, emp] of missing) {
+        try {
+            const email = (emp.email || '').trim();
+            const clashingEmployee = email ? await findLocalEmployeeByEmailOrId(email, null) : null;
+            const linkedUser = email ? await findLocalUserByEmailOrId(email, null) : null;
+            const clashingUser = linkedUser && !(
+                String(linkedUser.employee_id || '') === id ||
+                (!linkedUser.employee_id && linkedUser.email.toLowerCase() === email.toLowerCase())
+            );
+            if (clashingEmployee || clashingUser) {
+                const other = clashingEmployee
+                    ? `employee ${clashingEmployee.id_employee} (${clashingEmployee.email})`
+                    : `user ${linkedUser.email} (employee ${linkedUser.employee_id || '-'})`;
+                console.warn(`[NUSAWORK NEW EMPLOYEE SYNC] Skipped ${id} (${email}): email matches existing ${other} - check manually.`);
+                skipped++;
+                continue;
+            }
+            if (await syncEmployeeFromNusawork(id, token)) added++;
+        } catch (err) {
+            console.error(`[NUSAWORK NEW EMPLOYEE SYNC] Failed to sync ${id}:`, err.message);
+        }
+    }
+    console.log(`[NUSAWORK NEW EMPLOYEE SYNC] Added ${added} of ${missing.size} employee(s) missing locally; ${skipped} skipped (email clash).`);
+};
 
 // --- USER ROUTES ---
 // Aggregates learning hours/cost across internal training, external training, online modules, and the
@@ -7922,6 +7993,66 @@ const notifyHRImportedIdp = async ({ planId, employeeId, employeeName, periodYea
         ticketPic: hrPic
     });
     console.log(`[IDP GT] HR ticket created for ${employeeName}'s imported IDP (${periodYear}).`);
+};
+
+// A new employee gets ONE general ticket asking them to write this year's IDP within their first
+// month: active, non-intern employees who joined in the last IDP_NEW_EMPLOYEE_WINDOW_DAYS days, have
+// no IDP for this year yet, and write their own IDP (same rule as the IDP page - staff-level, or no
+// reports). The ticket is due a month after the join date. ticket_pic is the new employee;
+// followers come from IS5_TICKET_FOLLOW / IS5_TICKET_FOLLOW_GROUP. Safe to run repeatedly - one
+// ticket per employee per join date.
+const IDP_NEW_EMPLOYEE_WINDOW_DAYS = 30;
+const IDP_STAFF_JOB_LEVELS = new Set(['Staff', 'Senior Staff']);
+
+const runNewEmployeeIdpReminders = async () => {
+    const today = nowInWib();
+    const todayStr = formatWibDate(today);
+    const windowStart = formatWibDate(new Date(today.getTime() - IDP_NEW_EMPLOYEE_WINDOW_DAYS * DAY_MS));
+    const year = today.getUTCFullYear();
+
+    const newEmployees = await querySimAsset(
+        `SELECT id_employee, full_name, job_level, status_join, active_status, join_date, deleted_at
+         FROM employees WHERE join_date BETWEEN ? AND ?`,
+        [windowStart, todayStr]
+    );
+    if (newEmployees.length === 0) return;
+
+    const withIdp = new Set((await query('SELECT employee_id FROM idp_plans WHERE period_year = ?', [year]))
+        .map(r => String(r.employee_id)));
+    const reportToSet = new Set((await querySimAsset(
+        `SELECT DISTINCT id_report_to FROM employees
+         WHERE id_report_to IS NOT NULL AND (active_status IS NULL OR active_status != 'Resign')`
+    )).map(r => r.id_report_to));
+
+    for (const e of newEmployees) {
+        if (!e.id_employee || e.deleted_at || !isActiveNonIntern(e) || withIdp.has(String(e.id_employee))) continue;
+        const hasReports = reportToSet.has(e.id_employee) || reportToSet.has(e.full_name);
+        if (hasReports && !IDP_STAFF_JOB_LEVELS.has(e.job_level)) continue;
+
+        const joinDate = String(e.join_date).slice(0, 10);
+        const [y, m, d] = joinDate.split('-').map(Number);
+        const oneMonthLater = `${formatWibDate(new Date(Date.UTC(y, m, d)))} 23:59:59`;
+        const defaultDue = generalTicketDueDate();
+        const timeExpired = oneMonthLater > defaultDue ? oneMonthLater : defaultDue;
+        const dueLabel = formatIndoDate(`${timeExpired.slice(0, 10)}T00:00:00`);
+
+        try {
+            const sent = await sendReminderTicketOnce({
+                kind: 'idp_new_employee',
+                recipientEmployeeId: e.id_employee,
+                period: `join:${joinDate}`,
+                ticket: {
+                    subject: `Wajib membuat IDP ${year} - karyawan baru`,
+                    comment: `Halo ${e.full_name}, selamat bergabung! Sebagai karyawan baru (bergabung ${formatIndoDate(`${joinDate}T00:00:00`)}), kamu wajib menyusun Individual Development Plan (IDP) ${year} di LMS dalam bulan pertama, paling lambat ${dueLabel}.\n\nIDP berisi pencapaian, tujuan karier, dan rencana aksi pengembangan diri (minimal 4 baris, termasuk item wajib jam learning 48 jam/tahun). Setelah diisi, ajukan ke atasan langsung untuk disetujui.\n\n${lmsAnchor('/idp', 'Buka IDP')}`,
+                    timeExpired,
+                    priorityId: 1
+                }
+            });
+            if (sent) console.log(`[IDP NEW EMPLOYEE GT] Ticket sent to ${e.full_name} (joined ${joinDate}).`);
+        } catch (err) {
+            console.error(`[IDP NEW EMPLOYEE GT] Ticket for ${e.full_name} failed:`, err.message);
+        }
+    }
 };
 
 // Days before the end of the month when leaders get a ticket for IDPs not yet reviewed that month.
