@@ -110,7 +110,13 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  const [endDate, setEndDate] = useState('');
  const [regFee, setRegFee] = useState('');
  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+ // E-Learning (Modul) requests can attach a link (e.g. the course page) instead of uploading a file.
+ const [attachmentMode, setAttachmentMode] = useState<'file' | 'link'>('file');
+ const [attachmentUrl, setAttachmentUrl] = useState('');
+ const useAttachmentLink = category === 'Modul' && attachmentMode === 'link';
  const [paymentMethod, setPaymentMethod] = useState<'Reimbursement' | 'Direct Payment'>('Direct Payment');
+ // Fee and payment method only apply when the request costs something.
+ const [hasFee, setHasFee] = useState(false);
 
 
  useEffect(() => {
@@ -159,8 +165,8 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  if (!currentUser) return;
  setIsLoading(true);
  try {
- let attachmentLink = '';
- if (attachmentFile) {
+ let attachmentLink = useAttachmentLink ? attachmentUrl.trim() : '';
+ if (!useAttachmentLink && attachmentFile) {
  const formData = new FormData();
  formData.append('file', attachmentFile);
  const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
@@ -182,17 +188,17 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  title,
  start_date: startDate,
  end_date: endDate,
- registration_fee: Number(regFee.replace(/\./g, '')) || 0,
+ registration_fee: hasFee ? Number(regFee.replace(/\./g, '')) || 0 : 0,
  attachment_link: attachmentLink,
  vendor,
  location,
- payment_method: paymentMethod,
+ payment_method: hasFee ? paymentMethod : null,
  cc_employee_ids: selectedCcIds
  })
  });
  if (res.ok) {
  showNotif('success', t('notifications.submitSuccess'));
- setTitle(''); setVendor(''); setLocation(''); setRegFee(''); setAttachmentFile(null); setStartDate(''); setEndDate(''); setPaymentMethod('Direct Payment'); setSelectedCcIds([]);
+ setTitle(''); setVendor(''); setLocation(''); setRegFee(''); setAttachmentFile(null); setAttachmentUrl(''); setAttachmentMode('file'); setStartDate(''); setEndDate(''); setPaymentMethod('Direct Payment'); setHasFee(false); setSelectedCcIds([]);
  fetchMyRequests();
  } else {
  throw new Error(t('notifications.submitFailed'));
@@ -510,9 +516,16 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.endDate')} <span className="text-red-500">*</span></label>
  <input required type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg" />
  </div>
+ <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+ <input type="checkbox" checked={hasFee} onChange={e => setHasFee(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+ {t('form.hasFee')}
+ </label>
+ {hasFee && (
+ <>
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.registrationFee')}</label>
+ <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.registrationFee')} <span className="text-red-500">*</span></label>
  <input
+ required
  type="text"
  value={regFee}
  onChange={e => {
@@ -543,14 +556,44 @@ export default function ExternalTraining({ currentUser, isManagementMode, defaul
  ))}
  </div>
  </div>
+ </>
+ )}
  <div>
  <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.attachmentLink')}</label>
+ {category === 'Modul' && (
+ <div className="grid grid-cols-2 gap-3 mb-2">
+ {(['file', 'link'] as const).map(mode => (
+ <button
+ key={mode}
+ type="button"
+ onClick={() => { setAttachmentMode(mode); setAttachmentFile(null); }}
+ className={`py-2 rounded-lg text-sm font-medium border transition-colors ${
+ attachmentMode === mode
+ ? 'bg-blue-600 text-white border-blue-600'
+ : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-300'
+ }`}
+ >
+ {mode === 'file' ? t('form.attachmentModeFile') : t('form.attachmentModeLink')}
+ </button>
+ ))}
+ </div>
+ )}
+ {useAttachmentLink ? (
+ <input
+ type="url"
+ value={attachmentUrl}
+ onChange={e => setAttachmentUrl(e.target.value)}
+ className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+ placeholder={t('form.attachmentPlaceholder')}
+ />
+ ) : (
  <input
  type="file"
  accept="image/*,.pdf"
  onChange={e => setAttachmentFile(e.target.files ? e.target.files[0] : null)}
  className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
  />
+ )}
  </div>
  <div>
  <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.ccLabel')}</label>

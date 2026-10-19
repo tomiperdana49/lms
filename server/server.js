@@ -7204,7 +7204,7 @@ app.post('/api/external-training/request', async (req, res) => {
             INSERT INTO external_training_requests
             (employee_id, employee_name, category, title, start_date, end_date, registration_fee, attachment_link, vendor, location, payment_method, cc_employee_ids)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [employee_id, employee_name, category, title, toMysqlDatetime(start_date), toMysqlDatetime(end_date), registration_fee || 0, attachment_link || '', vendor || '', location || '', payment_method || 'Reimbursement', Array.isArray(cc_employee_ids) && cc_employee_ids.length > 0 ? JSON.stringify(cc_employee_ids) : null]);
+        `, [employee_id, employee_name, category, title, toMysqlDatetime(start_date), toMysqlDatetime(end_date), registration_fee || 0, attachment_link || '', vendor || '', location || '', payment_method || null, Array.isArray(cc_employee_ids) && cc_employee_ids.length > 0 ? JSON.stringify(cc_employee_ids) : null]);
 
         res.json({ success: true, id: result.insertId });
 
