@@ -3276,14 +3276,17 @@ app.post('/api/admin/sync-all-nusawork', async (req, res) => {
 });
 
 // Nusawork is the source of truth for employees, but the local employees table only picks up a new
-// hire when HR runs Sync All or the person signs in. This job adds every active Nusawork employee
-// that is missing locally, so jobs reading the table (e.g. the new-employee IDP ticket) see new hires
-// without waiting for HR. Existing records are left to login / Sync All.
+// hire when HR runs Sync All or the person signs in. This job adds active Nusawork employees that
+// are missing locally AND are new hires (joined in the last NUSAWORK_NEW_EMPLOYEE_SYNC_WINDOW_DAYS days,
+// or joining later), so jobs reading the table (e.g. the new-employee IDP ticket) see them without
+// waiting for HR. Long-standing employees missing locally and existing records are left to login /
+// Sync All, so the job never changes what existing lists and reports show.
 // syncEmployeeFromNusawork also matches local rows by email and by username across the company
 // domains, so a new hire whose email collides with an existing employee or account (e.g. a former
 // employee with the same username) would overwrite that record - those are skipped and logged for
 // HR instead. Only a brand-new person (or a user account already linked to this exact employee) is synced.
 const NUSAWORK_NEW_EMPLOYEE_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const NUSAWORK_NEW_EMPLOYEE_SYNC_WINDOW_DAYS = 30;
 
 const runNusaworkNewEmployeeSync = async () => {
     const token = await getNusanetToken();
@@ -3298,10 +3301,14 @@ const runNusaworkNewEmployeeSync = async () => {
     }
     const localIds = new Set((await querySimAsset('SELECT id_employee FROM employees WHERE id_employee IS NOT NULL'))
         .map(r => String(r.id_employee)));
+    const joinedSince = formatWibDate(new Date(nowInWib().getTime() - NUSAWORK_NEW_EMPLOYEE_SYNC_WINDOW_DAYS * DAY_MS));
     const missing = new Map();
     for (const emp of empList) {
         const id = emp.id_employee || emp.employee_id;
-        if (id && !localIds.has(String(id))) missing.set(String(id), emp);
+        const joinDate = typeof emp.join_date === 'string' ? emp.join_date.slice(0, 10) : '';
+        if (id && !localIds.has(String(id)) && /^\d{4}-\d{2}-\d{2}$/.test(joinDate) && joinDate >= joinedSince) {
+            missing.set(String(id), emp);
+        }
     }
     if (missing.size === 0) return;
 
@@ -3329,7 +3336,7 @@ const runNusaworkNewEmployeeSync = async () => {
             console.error(`[NUSAWORK NEW EMPLOYEE SYNC] Failed to sync ${id}:`, err.message);
         }
     }
-    console.log(`[NUSAWORK NEW EMPLOYEE SYNC] Added ${added} of ${missing.size} employee(s) missing locally; ${skipped} skipped (email clash).`);
+    console.log(`[NUSAWORK NEW EMPLOYEE SYNC] Added ${added} of ${missing.size} new hire(s) missing locally; ${skipped} skipped (email clash).`);
 };
 
 // --- USER ROUTES ---
