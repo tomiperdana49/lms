@@ -4209,12 +4209,14 @@ app.delete('/api/users/:id', async (req, res) => {
 });
 
 // --- GENERAL TICKETS (IS5) ---
-// Employee IDs that follow every general ticket (HR), from IS5_TICKET_FOLLOW - comma-separated.
-// Unset or empty means the ticket has no followers.
-const getTicketFollowEmployeeIds = () => (process.env.IS5_TICKET_FOLLOW || '')
+// Followers of every general ticket, each a comma-separated env var - unset or empty means none:
+// employee IDs (HR) from IS5_TICKET_FOLLOW, IS5 follow-group IDs from IS5_TICKET_FOLLOW_GROUP.
+const parseIdList = (value) => (value || '')
     .split(',')
     .map(id => id.trim())
     .filter(Boolean);
+const getTicketFollowEmployeeIds = () => parseIdList(process.env.IS5_TICKET_FOLLOW);
+const getTicketFollowGroupIds = () => parseIdList(process.env.IS5_TICKET_FOLLOW_GROUP);
 
 // Calendar math runs in WIB (UTC+7): these Dates are shifted by 7 hours and read with getUTC*, so
 // "today" and "end of month" match Jakarta regardless of the server's own timezone.
@@ -4273,7 +4275,7 @@ const logGeneralTicket = async ({ kind, reference, ticketPic, ticketId = null, s
 const isGeneralTicketEnabled = () => process.env.FITUR_GENERAL_TICKET === 'true';
 
 // Creates a General Ticket (GT) in IS5. `ticketPic` is the employee the ticket is for; the followers
-// come from IS5_TICKET_FOLLOW. `kind` and `reference` only label the attempt in general_ticket_logs
+// come from IS5_TICKET_FOLLOW and IS5_TICKET_FOLLOW_GROUP. `kind` and `reference` only label the attempt in general_ticket_logs
 // (e.g. 'idp_import' / 'idp:57'). Throws with IS5's response message if the ticket is rejected.
 const createGeneralTicket = async ({ kind = 'manual', reference = null, subject, comment, timeExpired, priorityId = 1, ticketPic }) => {
     const url = process.env.IS5_GENERAL_TICKET_URL || 'https://legacy.is5.nusa.net.id/api/client/v1/general-tickets/';
@@ -4284,7 +4286,8 @@ const createGeneralTicket = async ({ kind = 'manual', reference = null, subject,
         time_expired: timeExpired,
         priority_id: priorityId,
         ticket_pic: String(ticketPic),
-        ticket_follow: getTicketFollowEmployeeIds()
+        ticket_follow: getTicketFollowEmployeeIds(),
+        ticket_follow_group: getTicketFollowGroupIds()
     };
     const log = (fields) => logGeneralTicket({ kind, reference, ticketPic, subject, requestBody, ...fields });
 
@@ -4378,7 +4381,7 @@ const TICKET_DATETIME_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
 // Body: { subject, comment, time_expired?: "YYYY-MM-DD HH:MM:SS", priority_id?, ticket_pic? }
 // time_expired defaults to IS5_TICKET_EXPIRED_DAYS (3) days from now, ticket_pic to the signed-in user's employee ID;
-// followers always come from IS5_TICKET_FOLLOW.
+// followers always come from IS5_TICKET_FOLLOW and IS5_TICKET_FOLLOW_GROUP.
 app.post('/api/general-tickets', async (req, res) => {
     try {
         if (!isGeneralTicketEnabled()) {
