@@ -56,7 +56,7 @@
     "autoTracked": "Otomatis",
     "mandatoryProgressValue": "{{total}} / {{target}} jam ({{pct}}%)",
     "mandatoryProgressAuto": "Dihitung otomatis dari aktivitas belajar di LMS (Log Bacaan, Modul Online, Training).",
-    "mandatoryManualNotes": "Catatan sebelumnya",
+    "mandatoryManualNotes": "Catatan",
     "mandatoryProgress": "Jam Learning (Wajib)"
   },
   "team": {

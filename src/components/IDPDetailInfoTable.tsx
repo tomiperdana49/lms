@@ -88,7 +88,23 @@ export default function IDPDetailInfoTable({ plan, editableProgress, onToggleCom
                                 <td colSpan={2} className={hintCell}>{t('form.notesHint')}</td>
                             </tr>
                             {plan.action_items.map(item => {
+                                // The mandatory row's checkbox is system-tracked; only its notes are editable.
                                 const canEditItem = editableProgress && !item.is_mandatory;
+                                const notesEditor = editableProgress ? (
+                                    <label className="block">
+                                        <span className="flex items-center gap-1.5 mb-1.5 text-xs font-semibold text-indigo-700">
+                                            <Pencil className="w-3.5 h-3.5" />
+                                            {t('form.notesEditLabel')}
+                                        </span>
+                                        <textarea
+                                            value={item.notes || ''}
+                                            onChange={e => onNotesChange?.(item, e.target.value)}
+                                            placeholder={t('form.notesPlaceholder')}
+                                            rows={3}
+                                            className="w-full px-3 py-2 text-sm text-slate-800 bg-indigo-50 border-2 border-indigo-300 rounded-lg shadow-sm placeholder:text-indigo-400 hover:border-indigo-400 focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 outline-none resize-y transition-colors"
+                                        />
+                                    </label>
+                                ) : undefined;
                                 return (
                                     <tr key={item.id}>
                                         <td colSpan={2} className={contentCell}>{item.action_description}</td>
@@ -107,22 +123,8 @@ export default function IDPDetailInfoTable({ plan, editableProgress, onToggleCom
                                         </td>
                                         <td colSpan={2} className={valueCell}>
                                             {item.is_mandatory ? (
-                                                <MandatoryProgressNote progress={plan.learningProgress} notes={item.notes} />
-                                            ) : canEditItem ? (
-                                                <label className="block">
-                                                    <span className="flex items-center gap-1.5 mb-1.5 text-xs font-semibold text-indigo-700">
-                                                        <Pencil className="w-3.5 h-3.5" />
-                                                        {t('form.notesEditLabel')}
-                                                    </span>
-                                                    <textarea
-                                                        value={item.notes || ''}
-                                                        onChange={e => onNotesChange?.(item, e.target.value)}
-                                                        placeholder={t('form.notesPlaceholder')}
-                                                        rows={3}
-                                                        className="w-full px-3 py-2 text-sm text-slate-800 bg-indigo-50 border-2 border-indigo-300 rounded-lg shadow-sm placeholder:text-indigo-400 hover:border-indigo-400 focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 outline-none resize-y transition-colors"
-                                                    />
-                                                </label>
-                                            ) : (item.notes || '')}
+                                                <MandatoryProgressNote progress={plan.learningProgress} notes={item.notes} notesEditor={notesEditor} />
+                                            ) : notesEditor ?? (item.notes || '')}
                                         </td>
                                     </tr>
                                 );
