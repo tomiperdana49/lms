@@ -2198,7 +2198,8 @@ app.post('/api/login', async (req, res) => {
                     employee_id: finalUser.employee_id,
                     avatar: finalUser.avatar,
                     isSupervisor,
-                    isIntern: isInternStatus(finalEmployee?.status_join)
+                    isIntern: isInternStatus(finalEmployee?.status_join),
+                    jobLevel: finalEmployee?.job_level || null
                 }
             });
         }
@@ -2286,7 +2287,8 @@ app.post('/api/login', async (req, res) => {
                         employee_id: user.employee_id,
                         avatar: user.avatar,
                         isSupervisor,
-                        isIntern: isInternStatus(employeeHelper?.status_join)
+                        isIntern: isInternStatus(employeeHelper?.status_join),
+                        jobLevel: employeeHelper?.job_level || null
                     }
                 });
             } else {
@@ -2404,7 +2406,8 @@ app.post('/api/auth/google', async (req, res) => {
                 employee_id: user.employee_id,
                 avatar: user.avatar,
                 isSupervisor,
-                isIntern: isInternStatus(employeeHelper?.status_join)
+                isIntern: isInternStatus(employeeHelper?.status_join),
+                jobLevel: employeeHelper?.job_level || null
             }
         });
     } catch (err) {
@@ -2853,7 +2856,8 @@ const loadSessionUser = async (userId) => {
         employee_id: user.employee_id,
         avatar: user.avatar,
         isSupervisor,
-        isIntern: isInternStatus(employeeHelper?.status_join)
+        isIntern: isInternStatus(employeeHelper?.status_join),
+        jobLevel: employeeHelper?.job_level || null
     };
 };
 

@@ -42,6 +42,8 @@ const CURRENT_YEAR = new Date().getFullYear();
 const MANDATORY_TARGET_HOURS = 48;
 // Mandatory learning-hours row counts as 1 of the 4, so employees must add at least 3 more.
 const MIN_ACTION_PLAN_ITEMS = 4;
+// Staff-level employees write their own IDP even when someone reports to them (e.g. an intern).
+const STAFF_JOB_LEVELS = new Set(['Staff', 'Senior Staff']);
 
 const INDO_MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const formatIndoDate = (dateVal?: string) => {
@@ -62,7 +64,10 @@ const emptyDraft = () => ({
 export default function IDPPage({ currentUser }: IDPPageProps) {
     const { t } = useTranslation('idpPage');
     // A supervisor's own development is out of scope here — they only review their team's IDPs.
-    const isSupervisor = !!currentUser?.isSupervisor;
+    // Staff-level employees with reports are not supervisors here: they write their own IDP and
+    // review their team's below it.
+    const hasReports = !!currentUser?.isSupervisor;
+    const isSupervisor = hasReports && !STAFF_JOB_LEVELS.has(currentUser?.jobLevel || '');
 
     const [myPlans, setMyPlans] = useState<IDPPlan[]>([]);
     const [teamPlans, setTeamPlans] = useState<IDPPlan[]>([]);
@@ -100,8 +105,9 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
 
     useEffect(() => {
         if (!currentUser) return;
-        if (isSupervisor) fetchTeamPlans(); else fetchMyPlans();
-    }, [isSupervisor, currentUser]);
+        if (hasReports) fetchTeamPlans();
+        if (!isSupervisor) fetchMyPlans();
+    }, [hasReports, isSupervisor, currentUser]);
 
     useEffect(() => {
         fetch(`${API_BASE_URL}/api/employees`).then(r => r.json()).then(setEmployees).catch(() => {});
@@ -510,7 +516,7 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                 </div>
             </div>
 
-            {/* ===== MY IDP (staff without direct reports) ===== */}
+            {/* ===== MY IDP (everyone except supervisors) ===== */}
             {!isSupervisor && (
                 <div className="space-y-6">
                     <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-6">
@@ -754,9 +760,10 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                 </div>
             )}
 
-            {/* ===== TEAM IDP (supervisors only — reviewing is their role here, not their own IDP) ===== */}
-            {isSupervisor && (
+            {/* ===== TEAM IDP (supervisors; staff-level leads only once a report has an IDP) ===== */}
+            {(isSupervisor || (hasReports && teamPlans.length > 0)) && (
                 <div className="space-y-4">
+                    {!isSupervisor && <h2 className="text-lg font-bold text-gray-800">{t('header.titleTeam')}</h2>}
                     {teamPlans.length > 0 && (
                         <div className="flex flex-wrap gap-3">
                             <div className="flex-1 min-w-[240px] relative">
