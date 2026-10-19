@@ -9,11 +9,11 @@ import LanguageSwitcher from './LanguageSwitcher';
 
 interface LoginPageProps {
     onLogin: (user: User, token: string) => void;
-    sessionExpiredReason?: 'idle' | 'absolute' | null;
-    onSessionExpiredReasonShown?: () => void;
+    sessionExpired?: boolean;
+    onSessionExpiredShown?: () => void;
 }
 
-const LoginPage = ({ onLogin, sessionExpiredReason, onSessionExpiredReasonShown }: LoginPageProps) => {
+const LoginPage = ({ onLogin, sessionExpired, onSessionExpiredShown }: LoginPageProps) => {
     const { t } = useTranslation('loginPage');
     const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
@@ -27,15 +27,15 @@ const LoginPage = ({ onLogin, sessionExpiredReason, onSessionExpiredReasonShown 
         message: string;
     }>({ show: false, type: 'success', message: '' });
 
-    // Show a notice if we were redirected here by an idle/absolute session timeout.
+    // Show a notice if we were redirected here because the server rejected the session.
     useEffect(() => {
-        if (sessionExpiredReason) {
+        if (sessionExpired) {
             setNotification({
                 show: true,
                 type: 'info',
-                message: sessionExpiredReason === 'idle' ? t('sessionExpiredIdle') : t('sessionExpiredAbsolute')
+                message: t('sessionExpired')
             });
-            onSessionExpiredReasonShown?.();
+            onSessionExpiredShown?.();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);

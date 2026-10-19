@@ -143,8 +143,7 @@ const AUTH_SECRET = process.env.AUTH_SECRET || (() => {
     console.warn('[AUTH] AUTH_SECRET is not set - using a random per-process secret. Every restart will log all users out.');
     return crypto.randomBytes(32).toString('hex');
 })();
-// Matches the frontend's absolute session timeout (src/App.tsx), which also enforces the 30-minute idle timeout.
-const AUTH_TOKEN_TTL_MS = 8 * 60 * 60 * 1000;
+// Tokens don't expire - a session lasts until logout. Bump SESSION_EPOCH to log everyone out.
 const getSessionEpoch = () => process.env.SESSION_EPOCH || 'v1';
 
 const signAuthPayload = (payload) => crypto.createHmac('sha256', AUTH_SECRET).update(payload).digest('base64url');
@@ -153,14 +152,13 @@ const issueAuthToken = (userId, impersonatorId = null) => {
     const payload = Buffer.from(JSON.stringify({
         uid: String(userId),
         ...(impersonatorId ? { imp: String(impersonatorId) } : {}),
-        epoch: getSessionEpoch(),
-        exp: Date.now() + AUTH_TOKEN_TTL_MS
+        epoch: getSessionEpoch()
     })).toString('base64url');
     return `${payload}.${signAuthPayload(payload)}`;
 };
 
 // Returns { uid, imp } from the token (imp only on an impersonation token), or null if it is
-// malformed, tampered with, expired, or from an older session epoch.
+// malformed, tampered with, or from an older session epoch. Any `exp` in older tokens is ignored.
 const verifyAuthToken = (token) => {
     const [payload, signature] = String(token || '').split('.');
     if (!payload || !signature) return null;
@@ -168,8 +166,8 @@ const verifyAuthToken = (token) => {
     const actual = Buffer.from(signature);
     if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) return null;
     try {
-        const { uid, imp, epoch, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString());
-        if (!uid || epoch !== getSessionEpoch() || !(exp > Date.now())) return null;
+        const { uid, imp, epoch } = JSON.parse(Buffer.from(payload, 'base64url').toString());
+        if (!uid || epoch !== getSessionEpoch()) return null;
         return { uid, imp: imp || null };
     } catch {
         return null;
