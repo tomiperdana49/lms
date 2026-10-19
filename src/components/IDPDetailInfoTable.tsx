@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { IDPPlan, IDPActionItem } from '../types';
 import { Pencil } from 'lucide-react';
+import { MandatoryProgressCheck, MandatoryProgressNote } from './IDPMandatoryProgress';
 import { idpLabelCell as labelCell, idpValueCell as valueCell, idpSectionHeaderCell as sectionHeaderCell, idpHintCell as hintCell, idpContentCell as contentCell } from './idpTableStyles';
 
 interface Props {
@@ -93,19 +94,21 @@ export default function IDPDetailInfoTable({ plan, editableProgress, onToggleCom
                                         <td colSpan={2} className={contentCell}>{item.action_description}</td>
                                         <td className={valueCell}>{item.target_time || '-'}</td>
                                         <td className={`${valueCell} text-center`}>
+                                            {item.is_mandatory ? <MandatoryProgressCheck progress={plan.learningProgress} /> : (
                                             <input
                                                 type="checkbox"
-                                                checked={item.is_mandatory
-                                                    ? !!plan.learningProgress && plan.learningProgress.totalJam >= plan.learningProgress.target
-                                                    : !!item.is_completed}
+                                                checked={!!item.is_completed}
                                                 disabled={!canEditItem}
                                                 readOnly={!canEditItem}
                                                 onChange={canEditItem ? () => onToggleCompleted?.(item) : undefined}
                                                 className="w-4 h-4 accent-indigo-600"
                                             />
+                                            )}
                                         </td>
                                         <td colSpan={2} className={valueCell}>
-                                            {canEditItem ? (
+                                            {item.is_mandatory ? (
+                                                <MandatoryProgressNote progress={plan.learningProgress} notes={item.notes} />
+                                            ) : canEditItem ? (
                                                 <label className="block">
                                                     <span className="flex items-center gap-1.5 mb-1.5 text-xs font-semibold text-indigo-700">
                                                         <Pencil className="w-3.5 h-3.5" />

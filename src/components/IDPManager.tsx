@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx-js-style';
 import { API_BASE_URL } from '../config';
 import type { IDPPlan, IDPActionItem } from '../types';
 import IDPDetailInfoTable from './IDPDetailInfoTable';
+import { MandatoryProgressCheck, MandatoryProgressNote } from './IDPMandatoryProgress';
 import { idpLabelCell, idpValueCell, idpSectionHeaderCell, idpContentCell } from './idpTableStyles';
 import { parseIdpSheet } from './idpImportParser';
 import type { IdpImportGrid, IdpImportRow } from './idpImportParser';
@@ -731,9 +732,13 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
                                                             </td>
                                                             <td className={idpValueCell}>{item.target_time}</td>
                                                             <td className={`${idpValueCell} text-center`}>
-                                                                <input type="checkbox" disabled readOnly checked={!!detail.learningProgress && detail.learningProgress.totalJam >= detail.learningProgress.target} className="w-4 h-4 accent-indigo-600" />
+                                                                <MandatoryProgressCheck progress={detail.learningProgress} />
                                                             </td>
-                                                            <td colSpan={2} className={idpValueCell}>{t('form.mandatoryRowNote', { hours: MANDATORY_TARGET_HOURS })}</td>
+                                                            <td colSpan={2} className={idpValueCell}>
+                                                                {detail.learningProgress
+                                                                    ? <MandatoryProgressNote progress={detail.learningProgress} notes={item.notes} />
+                                                                    : t('form.mandatoryRowNote', { hours: MANDATORY_TARGET_HOURS })}
+                                                            </td>
                                                         </tr>
                                                     ))}
 

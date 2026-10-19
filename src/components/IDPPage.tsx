@@ -23,6 +23,7 @@ import { API_BASE_URL } from '../config';
 import type { User, IDPPlan, Employee, IDPActionItem } from '../types';
 import PopupNotification from './PopupNotification';
 import IDPDetailInfoTable from './IDPDetailInfoTable';
+import { MandatoryProgressCheck, MandatoryProgressNote } from './IDPMandatoryProgress';
 import { idpLabelCell, idpValueCell, idpSectionHeaderCell, idpHintCell, idpContentCell } from './idpTableStyles';
 
 interface IDPPageProps {
@@ -630,9 +631,13 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                                                     </td>
                                                     <td className={idpValueCell}>{mandatoryItem.target_time}</td>
                                                     <td className={`${idpValueCell} text-center`}>
-                                                        <input type="checkbox" disabled readOnly checked={!!detail?.learningProgress && detail.learningProgress.totalJam >= detail.learningProgress.target} className="w-4 h-4 accent-indigo-600" />
+                                                        <MandatoryProgressCheck progress={detail?.learningProgress} />
                                                     </td>
-                                                    <td colSpan={2} className={idpValueCell}>{t('form.mandatoryRowNote', { hours: MANDATORY_TARGET_HOURS })}</td>
+                                                    <td colSpan={2} className={idpValueCell}>
+                                                        {detail?.learningProgress
+                                                            ? <MandatoryProgressNote progress={detail.learningProgress} notes={mandatoryItem.notes} />
+                                                            : t('form.mandatoryRowNote', { hours: MANDATORY_TARGET_HOURS })}
+                                                    </td>
                                                 </tr>
                                             ) : (
                                                 <tr>

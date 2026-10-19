@@ -53,6 +53,10 @@
     "pastPlans": "Previous Years' IDPs",
     "download": "Download PDF",
     "downloading": "Downloading...",
+    "autoTracked": "Auto",
+    "mandatoryProgressValue": "{{total}} / {{target}} hours ({{pct}}%)",
+    "mandatoryProgressAuto": "Calculated automatically from LMS learning activity (Reading Log, Online Modules, Training).",
+    "mandatoryManualNotes": "Previous notes",
     "mandatoryProgress": "Learning Hours (Mandatory)"
   },
   "team": {
