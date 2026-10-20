@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LMS Nusa API Docs</title>
+<style>
+  :root {
+    --bg: #f7f8fa; --surface: #ffffff; --text: #1f2937; --muted: #6b7280; --border: #e5e7eb;
+    --accent: #4f46e5; --code-bg: #0f172a; --code-text: #e2e8f0; --inline-bg: #eef2ff; --inline-text: #3730a3;
+    --get: #059669; --post: #4f46e5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1020; --surface: #121a2e; --text: #e5e7eb; --muted: #9ca3af; --border: #24304a;
+      --accent: #818cf8; --code-bg: #060a16; --code-text: #e2e8f0; --inline-bg: #1e2547; --inline-text: #c7d2fe;
+      --get: #34d399; --post: #a5b4fc;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 40px 16px 80px; }
+  header h1 { margin: 0 0 4px; font-size: 28px; }
+  header p { margin: 0; color: var(--muted); }
+  nav { margin: 24px 0 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+  nav a { font-size: 13px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--text); text-decoration: none; background: var(--surface); }
+  nav a:hover { border-color: var(--accent); color: var(--accent); }
+  section { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px; margin-top: 20px; }
+  h2 { margin: 0 0 12px; font-size: 20px; }
+  h3 { margin: 20px 0 8px; font-size: 15px; }
+  .endpoint { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; margin-bottom: 12px; }
+  .method { font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 6px; border: 1px solid currentColor; }
+  .method.post { color: var(--post); } .method.get { color: var(--get); }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; background: var(--inline-bg); color: var(--inline-text); padding: 1px 6px; border-radius: 5px; }
+  pre { background: var(--code-bg); color: var(--code-text); padding: 14px 16px; border-radius: 10px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 8px 0 0; }
+  pre code { background: none; color: inherit; padding: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .req { color: #dc2626; font-size: 12px; font-weight: 600; }
+  .muted { color: var(--muted); }
+  ul.cats { columns: 2; padding-left: 18px; margin: 8px 0 0; }
+  @media (max-width: 560px) { ul.cats { columns: 1; } section { padding: 18px; } }
+  .table-scroll { overflow-x: auto; }
+  .group-title { margin: 44px 0 0; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  .group-title + p { margin: 4px 0 0; color: var(--muted); }
+  nav .nav-label { font-size: 12px; color: var(--muted); align-self: center; margin-left: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>LMS Nusa API</h1>
+    <p>API for client systems: Reading Log and External Training.</p>
+  </header>
+
+  <nav>
+    <a href="#overview">Overview</a>
+    <a href="#auth">Authentication</a>
+    <span class="nav-label">Reading Log:</span>
+    <a href="#categories">Categories</a>
+    <a href="#report">Report reading</a>
+    <span class="nav-label">External Training:</span>
+    <a href="#training-request">New request</a>
+    <a href="#errors">Errors</a>
+  </nav>
+
+  <section id="overview">
+    <h2>Overview</h2>
+    <p>Base URL: <code class="base-url">https://lms.example.com</code></p>
+    <p>Responses are JSON. Every call except the token request needs the header <code>Authorization: Bearer &lt;access_token&gt;</code>. Employees are identified by their LMS <strong>email</strong>.</p>
+    <div class="table-scroll"><table>
+      <tr><th>API</th><th>Endpoint</th><th>Use it to</th></tr>
+      <tr><td>Authentication</td><td><code>POST /api/oauth/token</code></td><td>Get an access token</td></tr>
+      <tr><td>Reading Log</td><td><code>GET /api/external/v1/reading-logs/categories</code></td><td>List the valid book categories</td></tr>
+      <tr><td>Reading Log</td><td><code>POST /api/external/v1/reading-logs</code></td><td>Report a finished personal book</td></tr>
+      <tr><td>External Training</td><td><code>POST /api/external/v1/external-trainings</code></td><td>File a new external training request, already approved by the employee's leader</td></tr>
+    </table></div>
+  </section>
+
+  <section id="auth">
+    <h2>Authentication</h2>
+    <div class="endpoint"><span class="method post">POST</span><span>/api/oauth/token</span></div>
+    <p>Exchanges your client credentials for an access token (OAuth2 <code>client_credentials</code>). The token is valid for <code>expires_in</code> seconds (1 hour by default); request a new one when it expires.</p>
+    <div class="table-scroll"><table>
+      <tr><th>Field</th><th>Description</th></tr>
+      <tr><td><code>grant_type</code> <span class="req">required</span></td><td>Always <code>client_credentials</code></td></tr>
+      <tr><td><code>client_id</code> <span class="req">required</span></td><td>Provided by the LMS team</td></tr>
+      <tr><td><code>client_secret</code> <span class="req">required</span></td><td>Provided by the LMS team. Keep it secret.</td></tr>
+    </table></div>
+    <h3>Example</h3>
+<pre><code>curl -X POST <span class="base-url">https://lms.example.com</span>/api/oauth/token \
+  -H "Content-Type: application/json" \
+  -d '{ "grant_type": "client_credentials", "client_id": "CLIENT_ID", "client_secret": "CLIENT_SECRET" }'</code></pre>
+    <h3>Response <span class="muted">200</span></h3>
+<pre><code>{ "access_token": "eyJjaWQiOi...abc", "token_type": "Bearer", "expires_in": 3600 }</code></pre>
+  </section>
+
+  <h2 class="group-title" id="reading-log">Reading Log</h2>
+  <p>Report books employees have finished reading, the same as <strong>Report Private Reading</strong> in the LMS.</p>
+
+  <section id="categories">
+    <h2>Categories</h2>
+    <div class="endpoint"><span class="method get">GET</span><span>/api/external/v1/reading-logs/categories</span></div>
+    <p>Returns the valid values for the <code>category</code> field of Report reading. Use it to fill a picker instead of hardcoding or typing categories; the list can change over time.</p>
+    <h3>Example</h3>
+<pre><code>curl <span class="base-url">https://lms.example.com</span>/api/external/v1/reading-logs/categories \
+  -H "Authorization: Bearer &lt;access_token&gt;"</code></pre>
+    <h3>Response <span class="muted">200</span></h3>
+<pre><code>{ "categories": [{{CATEGORIES_JSON}}] }</code></pre>
+    <p>Current categories:</p>
+    <ul class="cats">{{CATEGORIES}}</ul>
+  </section>
+
+  <section id="report">
+    <h2>Report reading</h2>
+    <div class="endpoint"><span class="method post">POST</span><span>/api/external/v1/reading-logs</span></div>
+    <p>Reports a finished personal book, the same as the <strong>Report Private Reading</strong> form in the LMS. The log is saved as <code>Finished</code> with <code>hr_approval_status: "Draft"</code> and appears to HR as a <strong>personal</strong> book. The employee then claims the incentive in the LMS.</p>
+    <p>Send it as <code>multipart/form-data</code> (not JSON), because it includes the evidence photo.</p>
+    <div class="table-scroll"><table>
+      <tr><th>Field</th><th>Description</th></tr>
+      <tr><td><code>email</code> <span class="req">required</span></td><td>Employee's LMS email (case-insensitive)</td></tr>
+      <tr><td><code>title</code> <span class="req">required</span></td><td>Book title</td></tr>
+      <tr><td><code>category</code> <span class="req">required</span></td><td>One of the values from <a href="#categories">Categories</a> (case-insensitive)</td></tr>
+      <tr><td><code>start_date</code> <span class="req">required</span></td><td>When reading started. ISO 8601, e.g. <code>2026-10-01</code> or <code>2026-10-01T09:00:00+07:00</code></td></tr>
+      <tr><td><code>finish_date</code> <span class="req">required</span></td><td>When reading finished. ISO 8601. Must be <strong>more than 1 day</strong> after <code>start_date</code></td></tr>
+      <tr><td><code>review_link</code> <span class="req">required</span></td><td>Link to the employee's book review</td></tr>
+      <tr><td><code>evidence</code> <span class="req">required</span></td><td>Evidence photo file (image, max 10 MB)</td></tr>
+      <tr><td><code>author</code></td><td>Book author</td></tr>
+    </table></div>
+    <h3>Example</h3>
+<pre><code>curl -X POST <span class="base-url">https://lms.example.com</span>/api/external/v1/reading-logs \
+  -H "Authorization: Bearer &lt;access_token&gt;" \
+  -F "email=employee@nusa.id" \
+  -F "title=Atomic Habits" \
+  -F "category=Buku Pengembangan Diri" \
+  -F "author=James Clear" \
+  -F "start_date=2026-10-01" \
+  -F "finish_date=2026-10-15" \
+  -F "review_link=https://docs.google.com/document/d/xxxx" \
+  -F "evidence=@/path/to/photo.jpg"</code></pre>
+    <h3>Response <span class="muted">201</span></h3>
+<pre><code>{
+  "id": 906,
+  "email": "employee@nusa.id",
+  "employee_id": "0200000",
+  "name": "Budi Santoso",
+  "title": "Atomic Habits",
+  "author": "James Clear",
+  "category": "Buku Pengembangan Diri",
+  "source": "Personal Book",
+  "status": "Finished",
+  "hr_approval_status": "Draft",
+  "start_date": "2026-10-01T00:00:00.000Z",
+  "finish_date": "2026-10-15T00:00:00.000Z",
+  "review_link": "https://docs.google.com/document/d/xxxx",
+  "evidence_url": "/api/uploads/1792480926348-885832929.jpg"
+}</code></pre>
+    <p class="muted"><code>evidence_url</code> is relative to the LMS address.</p>
+  </section>
+
+  <h2 class="group-title" id="external-training">External Training</h2>
+  <p>File external training requests, the same as <strong>New Request</strong> on the External Training page in the LMS.</p>
+
+  <section id="training-request">
+    <h2>New request</h2>
+    <div class="endpoint"><span class="method post">POST</span><span>/api/external/v1/external-trainings</span></div>
+    <p>Creates an external training request that is <strong>already approved by the employee's leader</strong> (the same leader who would approve it in the LMS; taken from the org chart), so it skips the leader's approval step and goes straight to HR to process. The status is <code>Approved</code>.</p>
+    <p>Send it as <code>multipart/form-data</code>, because it can include an attachment file.</p>
+    <h3 id="training-categories">Training categories</h3>
+    <p>Only these 3 values are accepted. Send the <strong>value</strong>; it is what's saved in the database. The LMS shows it with the label on the right.</p>
+    <div class="table-scroll"><table>
+      <tr><th>Value to send</th><th>Shown in the LMS as (EN)</th><th>Shown in the LMS as (ID)</th></tr>
+      <tr><td><code>Sertifikat</code></td><td>Training with Competency Certification</td><td>Pelatihan dengan Sertifikasi Kompetensi</td></tr>
+      <tr><td><code>Training</code></td><td>Training with Certificate of Participation</td><td>Pelatihan dengan Sertifikat Kepesertaan</td></tr>
+      <tr><td><code>Modul</code></td><td>E-Learning / Self-Paced Learning</td><td>E-Learning / Pembelajaran Mandiri</td></tr>
+    </table></div>
+    <h3>Fields</h3>
+    <div class="table-scroll"><table>
+      <tr><th>Field</th><th>Description</th></tr>
+      <tr><td><code>email</code> <span class="req">required</span></td><td>Employee's LMS email (case-insensitive)</td></tr>
+      <tr><td><code>category</code> <span class="req">required</span></td><td>One of the 3 values in <a href="#training-categories">Training categories</a> below (case-insensitive)</td></tr>
+      <tr><td><code>title</code> <span class="req">required</span></td><td>Training name</td></tr>
+      <tr><td><code>vendor</code> <span class="req">required</span></td><td>Training provider</td></tr>
+      <tr><td><code>location</code> <span class="req">required</span></td><td>Where it takes place, e.g. <code>Online</code> or a city</td></tr>
+      <tr><td><code>start_date</code> <span class="req">required</span></td><td>ISO 8601, e.g. <code>2026-11-03</code>. A date without a time is read as WIB (UTC+7)</td></tr>
+      <tr><td><code>end_date</code> <span class="req">required</span></td><td>ISO 8601. Cannot be before <code>start_date</code></td></tr>
+      <tr><td><code>registration_fee</code></td><td>Fee in Rupiah, number only (e.g. <code>2500000</code>). Default: <code>0</code> (free)</td></tr>
+      <tr><td><code>payment_method</code></td><td><code>Reimbursement</code> or <code>Direct Payment</code>. <strong>Required when <code>registration_fee</code> is more than 0</strong></td></tr>
+      <tr><td><code>attachment</code></td><td>Attachment file (image or PDF, max 10 MB), e.g. a brochure or invoice</td></tr>
+      <tr><td><code>attachment_link</code></td><td>Link instead of a file (e.g. the course page). <strong>Only for category <code>Modul</code></strong>, same as the LMS form. Send either <code>attachment</code> or <code>attachment_link</code>, not both</td></tr>
+      <tr><td><code>cc_emails</code></td><td>Emails of employees to CC, comma-separated. They're notified if this request goes over the employee's personal learning budget</td></tr>
+      <tr><td><code>approval_note</code></td><td>The leader's approval note. Default: <code>Approved via external API</code></td></tr>
+    </table></div>
+    <h3>Example</h3>
+<pre><code>curl -X POST <span class="base-url">https://lms.example.com</span>/api/external/v1/external-trainings \
+  -H "Authorization: Bearer &lt;access_token&gt;" \
+  -F "email=employee@nusa.id" \
+  -F "category=Training" \
+  -F "title=AWS Solutions Architect Associate" \
+  -F "vendor=Training Provider" \
+  -F "location=Jakarta" \
+  -F "start_date=2026-11-03" \
+  -F "end_date=2026-11-04" \
+  -F "registration_fee=2500000" \
+  -F "payment_method=Direct Payment" \
+  -F "cc_emails=manager@nusa.id" \
+  -F "approval_note=Approved in the client system" \
+  -F "attachment=@/path/to/brochure.pdf"</code></pre>
+    <h3>Response <span class="muted">201</span></h3>
+<pre><code>{
+  "id": 161,
+  "email": "employee@nusa.id",
+  "employee_id": "0200000",
+  "name": "Budi Santoso",
+  "category": "Training",
+  "title": "AWS Solutions Architect Associate",
+  "vendor": "Training Provider",
+  "location": "Jakarta",
+  "start_date": "2026-11-03T00:00:00.000Z",
+  "end_date": "2026-11-04T00:00:00.000Z",
+  "registration_fee": 2500000,
+  "payment_method": "Direct Payment",
+  "attachment_url": "/api/uploads/1792481522024-141284271.pdf",
+  "cc_employee_ids": ["0200001"],
+  "status": "Approved",
+  "approved_by": "Siti Rahma",
+  "approval_note": "Approved in the client system",
+  "exceeds_personal_budget": true
+}</code></pre>
+    <p class="muted"><code>approved_by</code> is the employee's direct leader. <code>exceeds_personal_budget</code> is <code>true</code> when this request takes the employee over their annual personal learning budget; the CC list is then notified. <code>attachment_url</code> is relative to the LMS address when a file was uploaded.</p>
+  </section>
+
+  <section id="errors">
+    <h2>Errors</h2>
+    <p>Errors return <code>{ "error": "...", "error_description": "..." }</code>.</p>
+    <div class="table-scroll"><table>
+      <tr><th>Status</th><th>Meaning</th></tr>
+      <tr><td><code>401</code></td><td>Missing, invalid, or expired access token. Request a new token.</td></tr>
+      <tr><td><code>400</code></td><td>Missing required field, file of the wrong type or over 10 MB, unknown <code>category</code>, invalid date, or a field breaking a rule above (e.g. reading period of 1 day or less, fee without <code>payment_method</code>, unknown <code>cc_emails</code>).</td></tr>
+      <tr><td><code>404</code></td><td>Email not registered in the LMS.</td></tr>
+      <tr><td><code>409</code></td><td>Already submitted, e.g. a retried request. Reading Log: same email, title, start and finish date; the response includes the existing <code>reading_log</code>. External Training: same email, title and start date; the response includes the existing <code>external_training</code>.</td></tr>
+      <tr><td><code>422</code></td><td>External Training: the employee has no active leader set in the LMS, so the request can't be filed as leader-approved. Ask the LMS team to fix the employee's leader.</td></tr>
+      <tr><td><code>500</code></td><td>Server error. Retry later or contact the LMS team.</td></tr>
+    </table></div>
+  </section>
+</div>
+<script>
+  document.querySelectorAll('.base-url').forEach(el => { el.textContent = location.origin; });
+</script>
+</body>
+</html>

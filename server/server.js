@@ -3944,6 +3944,287 @@ app.get('/api/external/v1/employees/:employeeId/learning-hours', authenticateExt
     }
 });
 
+// Reading log reporting for external clients. Mirrors the in-app "Report Private Reading" form
+// (ReadingLogPage.tsx): one call records a finished personal book as 'Finished' / 'Draft' with
+// source 'Personal Book', and the employee then claims the incentive themselves in the LMS, so the
+// 5-per-year claim limit is enforced there, not here.
+// A bare date ("2026-11-03") is read as local (WIB) midnight, the same as the web forms' date inputs -
+// new Date() would read it as UTC midnight and store 07:00. Date-times without an offset are local too.
+const parseExternalApiDate = (value) => {
+    if (value === undefined || value === null || value === '') return null;
+    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value).trim());
+    const d = dateOnly ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])) : new Date(value);
+    return isNaN(d.getTime()) ? undefined : d;
+};
+
+// Clients identify the employee by email only. Returns the users row, or an error response body.
+const resolveExternalApiEmployee = async (email) => {
+    if (!email || typeof email !== 'string') {
+        return { status: 400, body: { error: 'invalid_request', error_description: 'email is required' } };
+    }
+    const users = await query('SELECT employee_id, name, email FROM users WHERE LOWER(email) = LOWER(?)', [email.trim()]);
+    if (users.length === 0 || !users[0].employee_id) {
+        return { status: 404, body: { error: 'not_found', error_description: `No employee found with email ${email}` } };
+    }
+    return { user: users[0] };
+};
+
+const mapExternalReadingLog = (log, email) => ({
+    id: log.id,
+    email,
+    employee_id: log.employee_id,
+    name: log.user_name,
+    title: log.title,
+    author: log.author || null,
+    category: log.category,
+    source: log.source || null,
+    status: log.status,
+    hr_approval_status: log.hr_approval_status || null,
+    start_date: log.start_date,
+    finish_date: log.finish_date,
+    review_link: log.link || null,
+    evidence_url: log.evidence_url || null
+});
+
+// Single-file multipart upload for external API endpoints, stored in uploads/ like any other upload.
+// Runs after authenticateExternalApi so an unauthenticated request never writes a file, and turns
+// multer errors into the API's JSON error shape. Handlers delete the file themselves on rejection.
+const EXTERNAL_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+const receiveExternalUpload = (field, isAllowedType, typeError) => {
+    const upload = multer({
+        storage,
+        limits: { fileSize: EXTERNAL_UPLOAD_MAX_BYTES, files: 1 },
+        fileFilter: (req, file, cb) => isAllowedType(file.mimetype) ? cb(null, true) : cb(new Error(typeError))
+    }).single(field);
+    return (req, res, next) => upload(req, res, (err) => {
+        if (!err) return next();
+        const description = err.code === 'LIMIT_FILE_SIZE' ? `${field} must be 10 MB or smaller` : err.message;
+        res.status(400).json({ error: 'invalid_request', error_description: description });
+    });
+};
+
+// The reading evidence photo, the same as the in-app form's required photo.
+const receiveExternalEvidence = receiveExternalUpload('evidence', type => type.startsWith('image/'), 'evidence must be an image file');
+
+// Public documentation page for external API clients. Outside /api/, so the session check doesn't
+// apply. The category list is filled in from READING_LOG_CATEGORIES so it never drifts from the
+// validation in the report endpoint.
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+app.get('/api-docs', (req, res) => {
+    const html = fs.readFileSync(path.join(__dirname, 'api-docs.html'), 'utf8')
+        .replace('{{CATEGORIES}}', READING_LOG_CATEGORIES.map(c => `<li><code>${escapeHtml(c)}</code></li>`).join(''))
+        .replace('{{CATEGORIES_JSON}}', READING_LOG_CATEGORIES.map(c => escapeHtml(JSON.stringify(c))).join(', '));
+    res.type('html').send(html);
+});
+
+// Valid reading log categories, so clients can offer a picker instead of typing them. Same list the
+// report endpoint validates against.
+app.get('/api/external/v1/reading-logs/categories', authenticateExternalApi, (req, res) => {
+    res.json({ categories: READING_LOG_CATEGORIES });
+});
+
+// Report a finished personal book ("Report Private Reading").
+app.post('/api/external/v1/reading-logs', authenticateExternalApi, receiveExternalEvidence, async (req, res) => {
+    // The uploaded photo is only kept once the log is saved; every rejection below removes it.
+    let keepEvidence = false;
+    const reject = (status, body) => res.status(status).json(body);
+    try {
+        const { email, title, category, author, review_link } = req.body || {};
+        if (!email || !title || !category || !req.body.start_date || !req.body.finish_date || !review_link) {
+            return reject(400, { error: 'invalid_request', error_description: 'email, title, category, start_date, finish_date and review_link are required' });
+        }
+        if (!req.file) {
+            return reject(400, { error: 'invalid_request', error_description: 'evidence photo is required (multipart/form-data field "evidence")' });
+        }
+
+        const trimmedCategory = String(category).trim();
+        const resolvedCategory = READING_LOG_CATEGORIES.find(c => c.toLowerCase() === trimmedCategory.toLowerCase())
+            || READING_LOG_CATEGORY_ALIASES[trimmedCategory.toLowerCase()];
+        if (!resolvedCategory) {
+            return reject(400, { error: 'invalid_request', error_description: `Unknown category "${category}". Valid categories: ${READING_LOG_CATEGORIES.join(', ')}` });
+        }
+
+        const startDate = parseExternalApiDate(req.body.start_date);
+        const finishDate = parseExternalApiDate(req.body.finish_date);
+        if (!startDate || !finishDate) {
+            return reject(400, { error: 'invalid_request', error_description: 'start_date and finish_date must be valid ISO 8601 dates' });
+        }
+        // Same rule as the in-app form: a book read in a day or less isn't accepted.
+        if ((finishDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) <= 1) {
+            return reject(400, { error: 'invalid_request', error_description: 'finish_date must be more than 1 day after start_date' });
+        }
+
+        const employee = await resolveExternalApiEmployee(email);
+        if (!employee.user) return reject(employee.status, employee.body);
+        const { employee_id, name } = employee.user;
+
+        // Guards against a client retrying the same request and reporting the book twice.
+        const existing = await query(
+            "SELECT * FROM reading_logs WHERE employee_id = ? AND LOWER(title) = LOWER(?) AND DATE(start_date) = DATE(?) AND DATE(finish_date) = DATE(?) AND status != 'Cancelled' LIMIT 1",
+            [employee_id, String(title).trim(), startDate, finishDate]
+        );
+        if (existing.length > 0) {
+            return reject(409, { error: 'conflict', error_description: 'This reading has already been reported', reading_log: mapExternalReadingLog(existing[0], employee.user.email) });
+        }
+
+        const result = await query(
+            'INSERT INTO reading_logs (title, author, category, date, duration, review, status, user_name, employee_id, evidence_url, start_date, finish_date, reading_duration, hr_approval_status, link, planned_finish_date, location, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [String(title).trim(), author || '', resolvedCategory, new Date(), 0, '-', 'Finished', name, employee_id, `/api/uploads/${req.file.filename}`, startDate, finishDate, 0, 'Draft', review_link, finishDate, 'Personal', 'Personal Book']
+        );
+        keepEvidence = true;
+        reconcileReadingLogNusawork(result.insertId);
+
+        const created = await query('SELECT * FROM reading_logs WHERE id = ?', [result.insertId]);
+        res.status(201).json(mapExternalReadingLog(created[0], employee.user.email));
+    } catch (err) {
+        console.error('[API] Error in POST /api/external/v1/reading-logs:', err);
+        res.status(500).json({ error: 'server_error', error_description: err.message });
+    } finally {
+        if (req.file && !keepEvidence) fs.unlink(req.file.path, () => {});
+    }
+});
+
+
+// External training "Permintaan Baru" for external clients, filed as already approved by the
+// employee's leader - the same leaders who see it under Team Approvals in the web (findApprovingLeaders),
+// recorded under their LMS name as the Approve button does. It skips
+// the leader notification and goes straight to HR, through the same approval step as that button
+// (approveExternalTrainingRequest), so budget notices and the HR ticket behave identically.
+const EXTERNAL_TRAINING_CATEGORIES = ['Training', 'Sertifikat', 'Modul'];
+const EXTERNAL_TRAINING_PAYMENT_METHODS = ['Reimbursement', 'Direct Payment'];
+
+// Same file types the in-app request form accepts for its attachment.
+const receiveExternalTrainingAttachment = receiveExternalUpload('attachment', type => type.startsWith('image/') || type === 'application/pdf', 'attachment must be an image or PDF file');
+
+const mapExternalTrainingRequest = (row, email) => ({
+    id: row.id,
+    email,
+    employee_id: row.employee_id,
+    name: row.employee_name,
+    category: row.category,
+    title: row.title,
+    vendor: row.vendor || null,
+    location: row.location || null,
+    start_date: row.start_date,
+    end_date: row.end_date,
+    registration_fee: Number(row.registration_fee || 0),
+    payment_method: row.payment_method || null,
+    attachment_url: row.attachment_link || null,
+    cc_employee_ids: row.cc_employee_ids || [],
+    status: row.status,
+    approved_by: row.approved_by || null,
+    approval_note: row.approval_note || null,
+    exceeds_personal_budget: !!row.budget_notice_message
+});
+
+app.post('/api/external/v1/external-trainings', authenticateExternalApi, receiveExternalTrainingAttachment, async (req, res) => {
+    // The uploaded attachment is only kept once the request is saved; every rejection removes it.
+    let keepAttachment = false;
+    const reject = (status, body) => res.status(status).json(body);
+    try {
+        const { email, title, vendor, location, attachment_link } = req.body || {};
+        if (!email || !req.body.category || !title || !vendor || !location || !req.body.start_date || !req.body.end_date) {
+            return reject(400, { error: 'invalid_request', error_description: 'email, category, title, vendor, location, start_date and end_date are required' });
+        }
+
+        const category = EXTERNAL_TRAINING_CATEGORIES.find(c => c.toLowerCase() === String(req.body.category).trim().toLowerCase());
+        if (!category) {
+            return reject(400, { error: 'invalid_request', error_description: `Unknown category "${req.body.category}". Valid categories: ${EXTERNAL_TRAINING_CATEGORIES.join(', ')}` });
+        }
+
+        const startDate = parseExternalApiDate(req.body.start_date);
+        const endDate = parseExternalApiDate(req.body.end_date);
+        if (!startDate || !endDate) {
+            return reject(400, { error: 'invalid_request', error_description: 'start_date and end_date must be valid ISO 8601 dates' });
+        }
+        if (endDate < startDate) {
+            return reject(400, { error: 'invalid_request', error_description: 'end_date cannot be before start_date' });
+        }
+
+        // Fee and payment method only apply when the training costs something, as in the in-app form.
+        const fee = req.body.registration_fee === undefined || req.body.registration_fee === '' ? 0 : Number(req.body.registration_fee);
+        if (!Number.isFinite(fee) || fee < 0) {
+            return reject(400, { error: 'invalid_request', error_description: 'registration_fee must be a number of 0 or more' });
+        }
+        let paymentMethod = null;
+        if (fee > 0) {
+            paymentMethod = EXTERNAL_TRAINING_PAYMENT_METHODS.find(m => m.toLowerCase() === String(req.body.payment_method || '').trim().toLowerCase());
+            if (!paymentMethod) {
+                return reject(400, { error: 'invalid_request', error_description: `payment_method is required when registration_fee is more than 0. Valid values: ${EXTERNAL_TRAINING_PAYMENT_METHODS.join(', ')}` });
+            }
+        }
+
+        if (req.file && attachment_link) {
+            return reject(400, { error: 'invalid_request', error_description: 'Send either an attachment file or attachment_link, not both' });
+        }
+        // The web form only offers a link (instead of a file) for e-learning modules.
+        if (attachment_link && category !== 'Modul') {
+            return reject(400, { error: 'invalid_request', error_description: 'attachment_link is only allowed for category Modul; send an attachment file instead' });
+        }
+
+        const employee = await resolveExternalApiEmployee(email);
+        if (!employee.user) return reject(employee.status, employee.body);
+        const { employee_id, name } = employee.user;
+
+        // CC accepts a comma-separated list or a repeated field; each email must be a registered employee.
+        const ccEmails = [].concat(req.body.cc_emails || [])
+            .flatMap(v => String(v).split(','))
+            .map(v => v.trim())
+            .filter(Boolean);
+        const ccEmployeeIds = [];
+        for (const ccEmail of ccEmails) {
+            const cc = await resolveExternalApiEmployee(ccEmail);
+            if (!cc.user) return reject(400, { error: 'invalid_request', error_description: `cc_emails: no employee found with email ${ccEmail}` });
+            if (!ccEmployeeIds.includes(cc.user.employee_id)) ccEmployeeIds.push(cc.user.employee_id);
+        }
+
+        // An employee can report to more than one leader; any of them can approve in the web, so the
+        // first is recorded as the approver.
+        const [leader] = await findApprovingLeaders(employee_id);
+        if (!leader) {
+            return reject(422, { error: 'no_leader', error_description: `No active leader is set for ${email} in SimAsset, so the request can't be filed as leader-approved` });
+        }
+        const [leaderUser] = await query('SELECT name FROM users WHERE employee_id = ? LIMIT 1', [leader.id_employee]);
+        const approvedBy = leaderUser?.name || leader.full_name;
+
+        // Guards against a client retrying the same request and filing it twice.
+        const existing = await query(
+            'SELECT * FROM external_training_requests WHERE employee_id = ? AND LOWER(title) = LOWER(?) AND DATE(start_date) = DATE(?) AND deleted_at IS NULL LIMIT 1',
+            [employee_id, String(title).trim(), startDate]
+        );
+        if (existing.length > 0) {
+            return reject(409, { error: 'conflict', error_description: 'This training request has already been filed', external_training: mapExternalTrainingRequest(parseExternalTrainingRow(existing[0]), employee.user.email) });
+        }
+
+        const result = await query(`
+            INSERT INTO external_training_requests
+            (employee_id, employee_name, category, title, start_date, end_date, registration_fee, attachment_link, vendor, location, payment_method, cc_employee_ids)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+            employee_id, name, category, String(title).trim(), startDate, endDate, fee,
+            req.file ? `/api/uploads/${req.file.filename}` : (attachment_link || ''),
+            String(vendor).trim(), String(location).trim(), paymentMethod,
+            ccEmployeeIds.length > 0 ? JSON.stringify(ccEmployeeIds) : null
+        ]);
+        keepAttachment = true;
+
+        const approvalNote = String(req.body.approval_note || '').trim() || 'Approved via external API';
+        const approval = await approveExternalTrainingRequest({ id: result.insertId, approvedBy, approvalNote });
+
+        const saved = await query('SELECT * FROM external_training_requests WHERE id = ?', [result.insertId]);
+        res.status(201).json(mapExternalTrainingRequest(parseExternalTrainingRow(saved[0]), employee.user.email));
+
+        // Best-effort, after responding - an IS5 outage must never fail or slow down the request.
+        notifyHRApprovedExternalTraining({ request: approval.trainingRequest, approvedBy, approvalNote, totalCost: approval.thisRequestCost, budgetNoticeMessage: approval.budgetNoticeMessage })
+            .catch(err => console.error('[EXTERNAL TRAINING GT] Failed to notify HR:', err.message));
+    } catch (err) {
+        console.error('[API] Error in POST /api/external/v1/external-trainings:', err);
+        if (!res.headersSent) res.status(500).json({ error: 'server_error', error_description: err.message });
+    } finally {
+        if (req.file && !keepAttachment) fs.unlink(req.file.path, () => {});
+    }
+});
+
 // Issue (or fetch existing) internal training certificate for an attendee.
 // Server-side validates the meeting is paid and the employee actually attended,
 // so this cannot be used to mint certificates for arbitrary meetings/employees.
@@ -7476,6 +7757,49 @@ app.get('/api/external-training/subordinates', async (req, res) => {
 // per-person cap is already defined and shown to users (Dashboard, Employee Learning Report).
 const ANNUAL_LEARNING_BUDGET = 2000000;
 
+// Leader approval of a pending request: records the approval and, when this request pushes the
+// requester over their personal budget, the notice their CC list sees. Shared by the leader's
+// Approve button (POST /api/external-training/approve) and the external API, which files a request
+// already approved by the employee's leader. Returns null when the request doesn't exist; the caller
+// sends the HR notification (notifyHRApprovedExternalTraining) after responding.
+const approveExternalTrainingRequest = async ({ id, approvedBy, approvalNote }) => {
+    const requestRows = await query('SELECT * FROM external_training_requests WHERE id = ?', [id]);
+    if (requestRows.length === 0) return null;
+    const trainingRequest = parseExternalTrainingRow(requestRows[0]);
+
+    // Whether approving THIS request pushes the requester over their own annual learning budget -
+    // if so, the excess is effectively coming out of the team's pool, so their CC list gets a
+    // heads-up. Uses the same per-employee cost total already shown everywhere else in the app
+    // (computeLearningStats, for the calendar year this training starts in) plus this request's
+    // own cost, which isn't counted yet since it isn't Approved/Processed until this call.
+    const thisRequestCost = Number(trainingRequest.registration_fee || 0) + Number(trainingRequest.travel_flight_cost || 0)
+        + Number(trainingRequest.accommodation_cost || 0) + Number(trainingRequest.miscellaneous_cost || 0)
+        + Number(trainingRequest.additional_cost || 0);
+    const periodYear = trainingRequest.start_date ? new Date(trainingRequest.start_date).getFullYear() : new Date().getFullYear();
+    const existingStats = await computeLearningStats({
+        employee_id: trainingRequest.employee_id,
+        startDate: `${periodYear}-01-01`,
+        endDate: `${periodYear}-12-31`
+    }).catch(() => null);
+    const existingCost = existingStats ? (existingStats.biayaTraining + existingStats.biayaTrainingExternal + existingStats.biayaBuku) : 0;
+    // Interns get no personal learning budget, so any cost of theirs comes from the team's pool.
+    const personalBudget = await isInternEmployeeId(trainingRequest.employee_id) ? 0 : ANNUAL_LEARNING_BUDGET;
+    const exceedsPersonalBudget = (existingCost + thisRequestCost) > personalBudget;
+
+    let budgetNoticeMessage = null;
+    if (exceedsPersonalBudget) {
+        const [employeeRow] = await querySimAsset('SELECT organization_name FROM employees WHERE id_employee = ?', [trainingRequest.employee_id]);
+        const organizationName = employeeRow?.organization_name || '-';
+        budgetNoticeMessage = `Pengajuan training eksternal "${trainingRequest.title}" (${trainingRequest.employee_name}) melebihi budget per-orang dan saat ini menggunakan budget tim "${organizationName}".`;
+    }
+
+    await query(
+        'UPDATE external_training_requests SET status = ?, approved_by = ?, approval_note = ?, budget_notice_message = ? WHERE id = ?',
+        ['Approved', approvedBy, approvalNote, budgetNoticeMessage, id]
+    );
+    return { trainingRequest, thisRequestCost, budgetNoticeMessage, exceedsPersonalBudget };
+};
+
 // 4. Leader approves/rejects
 app.post('/api/external-training/approve', async (req, res) => {
     try {
@@ -7488,40 +7812,9 @@ app.post('/api/external-training/approve', async (req, res) => {
             return res.status(400).json({ error: 'A note explaining the approval is required.' });
         }
 
-        const requestRows = await query('SELECT * FROM external_training_requests WHERE id = ?', [id]);
-        if (requestRows.length === 0) return res.status(404).json({ error: 'Request not found' });
-        const trainingRequest = parseExternalTrainingRow(requestRows[0]);
-
-        // Whether approving THIS request pushes the requester over their own annual learning budget -
-        // if so, the excess is effectively coming out of the team's pool, so their CC list gets a
-        // heads-up. Uses the same per-employee cost total already shown everywhere else in the app
-        // (computeLearningStats, for the calendar year this training starts in) plus this request's
-        // own cost, which isn't counted yet since it isn't Approved/Processed until this call.
-        const thisRequestCost = Number(trainingRequest.registration_fee || 0) + Number(trainingRequest.travel_flight_cost || 0)
-            + Number(trainingRequest.accommodation_cost || 0) + Number(trainingRequest.miscellaneous_cost || 0)
-            + Number(trainingRequest.additional_cost || 0);
-        const periodYear = trainingRequest.start_date ? new Date(trainingRequest.start_date).getFullYear() : new Date().getFullYear();
-        const existingStats = await computeLearningStats({
-            employee_id: trainingRequest.employee_id,
-            startDate: `${periodYear}-01-01`,
-            endDate: `${periodYear}-12-31`
-        }).catch(() => null);
-        const existingCost = existingStats ? (existingStats.biayaTraining + existingStats.biayaTrainingExternal + existingStats.biayaBuku) : 0;
-        // Interns get no personal learning budget, so any cost of theirs comes from the team's pool.
-        const personalBudget = await isInternEmployeeId(trainingRequest.employee_id) ? 0 : ANNUAL_LEARNING_BUDGET;
-        const exceedsPersonalBudget = (existingCost + thisRequestCost) > personalBudget;
-
-        let budgetNoticeMessage = null;
-        if (exceedsPersonalBudget) {
-            const [employeeRow] = await querySimAsset('SELECT organization_name FROM employees WHERE id_employee = ?', [trainingRequest.employee_id]);
-            const organizationName = employeeRow?.organization_name || '-';
-            budgetNoticeMessage = `Pengajuan training eksternal "${trainingRequest.title}" (${trainingRequest.employee_name}) melebihi budget per-orang dan saat ini menggunakan budget tim "${organizationName}".`;
-        }
-
-        await query(
-            'UPDATE external_training_requests SET status = ?, approved_by = ?, approval_note = ?, budget_notice_message = ? WHERE id = ?',
-            [status, approved_by, approval_note.trim(), budgetNoticeMessage, id]
-        );
+        const approval = await approveExternalTrainingRequest({ id, approvedBy: approved_by, approvalNote: approval_note.trim() });
+        if (!approval) return res.status(404).json({ error: 'Request not found' });
+        const { trainingRequest, thisRequestCost, budgetNoticeMessage, exceedsPersonalBudget } = approval;
 
         res.json({ success: true, exceedsPersonalBudget });
 
