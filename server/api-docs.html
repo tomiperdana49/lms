@@ -3,132 +3,276 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
 <title>LMS Nusa API Docs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f7f8fa; --surface: #ffffff; --text: #1f2937; --muted: #6b7280; --border: #e5e7eb;
-    --accent: #4f46e5; --code-bg: #0f172a; --code-text: #e2e8f0; --inline-bg: #eef2ff; --inline-text: #3730a3;
-    --get: #059669; --post: #4f46e5;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0b1020; --surface: #121a2e; --text: #e5e7eb; --muted: #9ca3af; --border: #24304a;
-      --accent: #818cf8; --code-bg: #060a16; --code-text: #e2e8f0; --inline-bg: #1e2547; --inline-text: #c7d2fe;
-      --get: #34d399; --post: #a5b4fc;
-    }
+    --bg: #f6f7fb;
+    --surface: #ffffff;
+    --text: #1e293b;
+    --text-soft: #475569;
+    --muted: #94a3b8;
+    --border: #e2e8f0;
+    --border-soft: #eef2f7;
+    --brand: #4f46e5;
+    --brand-dark: #3730a3;
+    --brand-soft: #eef2ff;
+    --brand-ink: #312e81;
+    --code-bg: #f8fafc;
+    --code-text: #0f172a;
+    --get: #059669; --get-soft: #ecfdf5;
+    --post: #4f46e5; --post-soft: #eef2ff;
+    --req: #e11d48; --req-soft: #fff1f2;
+    --ok: #059669; --warn: #d97706; --err: #e11d48;
+    --sidebar-w: 248px;
+    --radius: 16px;
+    --shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 4px 16px rgba(15, 23, 42, .05);
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  .wrap { max-width: 860px; margin: 0 auto; padding: 40px 16px 80px; }
-  header h1 { margin: 0 0 4px; font-size: 28px; }
-  header p { margin: 0; color: var(--muted); }
-  nav { margin: 24px 0 8px; display: flex; flex-wrap: wrap; gap: 8px; }
-  nav a { font-size: 13px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--text); text-decoration: none; background: var(--surface); }
-  nav a:hover { border-color: var(--accent); color: var(--accent); }
-  section { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px; margin-top: 20px; }
-  h2 { margin: 0 0 12px; font-size: 20px; }
-  h3 { margin: 20px 0 8px; font-size: 15px; }
-  .endpoint { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; margin-bottom: 12px; }
-  .method { font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 6px; border: 1px solid currentColor; }
-  .method.post { color: var(--post); } .method.get { color: var(--get); }
-  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; background: var(--inline-bg); color: var(--inline-text); padding: 1px 6px; border-radius: 5px; }
-  pre { background: var(--code-bg); color: var(--code-text); padding: 14px 16px; border-radius: 10px; overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 8px 0 0; }
-  pre code { background: none; color: inherit; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.65 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--brand); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Hero */
+  .hero {
+    background: linear-gradient(135deg, #312e81 0%, #4f46e5 55%, #6366f1 100%);
+    color: #fff; padding: 44px 16px 92px; position: relative; overflow: hidden;
+  }
+  .hero::after {
+    content: ""; position: absolute; right: -120px; top: -120px; width: 420px; height: 420px;
+    border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.16), rgba(255,255,255,0) 70%);
+  }
+  .hero-inner { max-width: 1180px; margin: 0 auto; position: relative; z-index: 1; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: .06em; font-size: 13px; text-transform: uppercase; opacity: .92; }
+  .brand-mark { width: 30px; height: 30px; border-radius: 9px; background: rgba(255,255,255,.18); display: grid; place-items: center; }
+  .hero h1 { margin: 18px 0 8px; font-size: 38px; line-height: 1.15; font-weight: 800; letter-spacing: -.02em; }
+  .hero p { margin: 0; max-width: 640px; font-size: 16px; color: rgba(255,255,255,.85); }
+  .hero-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 999px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.22); font-size: 13px; }
+  .chip code { background: transparent; color: #fff; padding: 0; font-size: 13px; }
+
+  /* Layout */
+  .layout { max-width: 1180px; margin: -60px auto 0; padding: 0 16px 80px; display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); gap: 28px; position: relative; z-index: 2; }
+  .sidebar { position: sticky; top: 20px; align-self: start; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 12px; }
+  .side-group { margin-bottom: 14px; }
+  .side-group:last-child { margin-bottom: 0; }
+  .side-title { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 0 10px; margin-bottom: 4px; }
+  .sidebar a { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 9px; color: var(--text-soft); font-size: 14px; font-weight: 500; }
+  .sidebar a:hover { background: var(--brand-soft); color: var(--brand-dark); text-decoration: none; }
+  .sidebar a.active { background: var(--brand-soft); color: var(--brand-dark); font-weight: 600; }
+  .sidebar .m { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 5px; }
+  .m.get { color: var(--get); background: var(--get-soft); }
+  .m.post { color: var(--post); background: var(--post-soft); }
+  main { min-width: 0; }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px; margin-bottom: 22px; scroll-margin-top: 20px; }
+  .card > h2 { margin: 0 0 6px; font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+  .card > .lead { margin: 0 0 18px; color: var(--text-soft); }
+  .card p { margin: 0 0 12px; }
+  h3 { margin: 26px 0 10px; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-soft); }
+  .group-head { display: flex; align-items: center; gap: 12px; margin: 40px 0 16px; scroll-margin-top: 20px; }
+  .group-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; flex-shrink: 0; }
+  .group-head h2 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
+  .group-head p { margin: 2px 0 0; color: var(--text-soft); font-size: 14px; }
+
+  /* Endpoint line */
+  .endpoint { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 16px; }
+  .endpoint .path { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 14px; color: var(--code-text); word-break: break-all; }
+  .method { font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 8px; letter-spacing: .03em; }
+  .method.get { color: #fff; background: var(--get); }
+  .method.post { color: #fff; background: var(--post); }
+
+  code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; background: var(--brand-soft); color: var(--brand-ink); padding: 2px 6px; border-radius: 6px; }
+
+  /* Callouts */
+  .note { display: flex; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--brand-soft); color: var(--brand-ink); font-size: 14px; margin: 14px 0; }
+  .note.warn { background: #fffbeb; color: #92400e; }
+  .note svg { flex-shrink: 0; margin-top: 2px; }
+
+  /* Code blocks */
+  .code { position: relative; margin: 8px 0 0; }
+  .code-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px 8px 14px; background: #f1f5f9; border: 1px solid var(--border); border-bottom: none; border-radius: 12px 12px 0 0; font-size: 12px; color: var(--text-soft); font-weight: 600; }
+  .copy { font: inherit; font-size: 12px; font-weight: 600; color: var(--text-soft); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+  .copy:hover { color: var(--brand); border-color: #c7d2fe; }
+  .copy.done { color: var(--ok); border-color: #a7f3d0; }
+  pre { margin: 0; background: var(--code-bg); color: var(--code-text); padding: 16px 18px; border: 1px solid var(--border); border-radius: 0 0 12px 12px; overflow-x: auto; font-size: 13px; line-height: 1.6; }
+  pre code { background: none; color: inherit; padding: 0; font-size: 13px; }
+
+  /* Tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-  .req { color: #dc2626; font-size: 12px; font-weight: 600; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  th { background: #f8fafc; color: var(--text-soft); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); }
+  td:first-child { white-space: nowrap; }
+  .req { display: inline-block; margin-left: 6px; color: var(--req); background: var(--req-soft); font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; vertical-align: 1px; }
+  .opt { display: inline-block; margin-left: 6px; color: var(--muted); background: #f1f5f9; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; vertical-align: 1px; }
+  .status { display: inline-block; font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 7px; }
+  .s2 { color: var(--ok); background: #ecfdf5; } .s4 { color: var(--warn); background: #fffbeb; } .s5 { color: var(--err); background: #fff1f2; }
+
+  /* Flow steps */
+  .steps { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 10px; }
+  .steps li { display: flex; gap: 12px; align-items: flex-start; }
+  .steps .n { width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+
+  ul.cats { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  ul.cats code { display: inline-block; font-size: 12.5px; padding: 5px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); color: var(--text); }
   .muted { color: var(--muted); }
-  ul.cats { columns: 2; padding-left: 18px; margin: 8px 0 0; }
-  @media (max-width: 560px) { ul.cats { columns: 1; } section { padding: 18px; } }
-  .table-scroll { overflow-x: auto; }
-  .group-title { margin: 44px 0 0; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
-  .group-title + p { margin: 4px 0 0; color: var(--muted); }
-  nav .nav-label { font-size: 12px; color: var(--muted); align-self: center; margin-left: 6px; }
+  .small { font-size: 13.5px; color: var(--text-soft); }
+
+  footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 36px; }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; margin-top: -60px; }
+    .sidebar { position: static; display: flex; gap: 6px; overflow-x: auto; padding: 10px; }
+    .side-group { display: contents; }
+    .side-title { display: none; }
+    .sidebar a { white-space: nowrap; flex-shrink: 0; }
+  }
+  @media (max-width: 560px) {
+    .hero { padding: 32px 16px 84px; }
+    .hero h1 { font-size: 30px; }
+    .card { padding: 20px 16px; }
+    td:first-child { white-space: normal; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>LMS Nusa API</h1>
-    <p>API for client systems: Reading Log and External Training.</p>
-  </header>
 
-  <nav>
-    <a href="#overview">Overview</a>
-    <a href="#auth">Authentication</a>
-    <span class="nav-label">Reading Log:</span>
-    <a href="#categories">Categories</a>
-    <a href="#report">Report reading</a>
-    <span class="nav-label">External Training:</span>
-    <a href="#training-request">New request</a>
-    <a href="#errors">Errors</a>
-  </nav>
+<header class="hero">
+  <div class="hero-inner">
+    <div class="brand">
+      <span class="brand-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14.5"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20"/><path d="M9 7h6"/></svg>
+      </span>
+      LMS Nusa
+    </div>
+    <h1>API Documentation</h1>
+    <p>Connect your system to the LMS: report employees' reading and file external training requests.</p>
+    <div class="hero-meta">
+      <span class="chip">Base URL <code class="base-url">https://lms.example.com</code></span>
+      <span class="chip">Auth: OAuth2 client credentials</span>
+      <span class="chip">Version v1</span>
+    </div>
+  </div>
+</header>
 
-  <section id="overview">
-    <h2>Overview</h2>
-    <p>Base URL: <code class="base-url">https://lms.example.com</code></p>
-    <p>Responses are JSON. Every call except the token request needs the header <code>Authorization: Bearer &lt;access_token&gt;</code>. Employees are identified by their LMS <strong>email</strong>.</p>
-    <div class="table-scroll"><table>
-      <tr><th>API</th><th>Endpoint</th><th>Use it to</th></tr>
-      <tr><td>Authentication</td><td><code>POST /api/oauth/token</code></td><td>Get an access token</td></tr>
-      <tr><td>Reading Log</td><td><code>GET /api/external/v1/reading-logs/categories</code></td><td>List the valid book categories</td></tr>
-      <tr><td>Reading Log</td><td><code>POST /api/external/v1/reading-logs</code></td><td>Report a finished personal book</td></tr>
-      <tr><td>External Training</td><td><code>POST /api/external/v1/external-trainings</code></td><td>File a new external training request, already approved by the employee's leader</td></tr>
-    </table></div>
-  </section>
+<div class="layout">
+  <aside class="sidebar" aria-label="Contents">
+    <div class="side-group">
+      <div class="side-title">Getting started</div>
+      <a href="#overview">Overview</a>
+      <a href="#auth"><span class="m post">POST</span> Authentication</a>
+    </div>
+    <div class="side-group">
+      <div class="side-title">Reading Log</div>
+      <a href="#categories"><span class="m get">GET</span> Categories</a>
+      <a href="#report"><span class="m post">POST</span> Report reading</a>
+    </div>
+    <div class="side-group">
+      <div class="side-title">External Training</div>
+      <a href="#training-request"><span class="m post">POST</span> New request</a>
+    </div>
+    <div class="side-group">
+      <div class="side-title">Reference</div>
+      <a href="#errors">Errors</a>
+    </div>
+  </aside>
 
-  <section id="auth">
-    <h2>Authentication</h2>
-    <div class="endpoint"><span class="method post">POST</span><span>/api/oauth/token</span></div>
-    <p>Exchanges your client credentials for an access token (OAuth2 <code>client_credentials</code>). The token is valid for <code>expires_in</code> seconds (1 hour by default); request a new one when it expires.</p>
-    <div class="table-scroll"><table>
-      <tr><th>Field</th><th>Description</th></tr>
-      <tr><td><code>grant_type</code> <span class="req">required</span></td><td>Always <code>client_credentials</code></td></tr>
-      <tr><td><code>client_id</code> <span class="req">required</span></td><td>Provided by the LMS team</td></tr>
-      <tr><td><code>client_secret</code> <span class="req">required</span></td><td>Provided by the LMS team. Keep it secret.</td></tr>
-    </table></div>
-    <h3>Example</h3>
+  <main>
+    <section class="card" id="overview">
+      <h2>Overview</h2>
+      <p class="lead">Responses are JSON. Every call except the token request needs the header <code>Authorization: Bearer &lt;access_token&gt;</code>. Employees are identified by their LMS <strong>email</strong>.</p>
+
+      <div class="table-scroll"><table>
+        <tr><th>API</th><th>Endpoint</th><th>Use it to</th></tr>
+        <tr><td>Authentication</td><td><span class="m post">POST</span> <code>/api/oauth/token</code></td><td>Get an access token</td></tr>
+        <tr><td>Reading Log</td><td><span class="m get">GET</span> <code>/api/external/v1/reading-logs/categories</code></td><td>List the valid book categories</td></tr>
+        <tr><td>Reading Log</td><td><span class="m post">POST</span> <code>/api/external/v1/reading-logs</code></td><td>Report a finished personal book</td></tr>
+        <tr><td>External Training</td><td><span class="m post">POST</span> <code>/api/external/v1/external-trainings</code></td><td>File a new external training request, already approved by the employee's leader</td></tr>
+      </table></div>
+
+      <h3>How it works</h3>
+      <ol class="steps">
+        <li><span class="n">1</span><span>Get an access token with the <code>client_id</code> and <code>client_secret</code> from the LMS team.</span></li>
+        <li><span class="n">2</span><span><strong>Reading Log:</strong> load the categories for your picker, then report a book once the employee has finished it. The employee claims the incentive in the LMS.</span></li>
+        <li><span class="n">3</span><span><strong>External Training:</strong> file the request. It is recorded as approved by the employee's leader and goes straight to HR.</span></li>
+      </ol>
+    </section>
+
+    <section class="card" id="auth">
+      <h2>Authentication</h2>
+      <p class="lead">Exchange your client credentials for an access token (OAuth2 <code>client_credentials</code>). The token is valid for <code>expires_in</code> seconds (1 hour by default); request a new one when it expires.</p>
+      <div class="endpoint"><span class="method post">POST</span><span class="path">/api/oauth/token</span></div>
+
+      <h3>Body (JSON)</h3>
+      <div class="table-scroll"><table>
+        <tr><th>Field</th><th>Description</th></tr>
+        <tr><td><code>grant_type</code><span class="req">required</span></td><td>Always <code>client_credentials</code></td></tr>
+        <tr><td><code>client_id</code><span class="req">required</span></td><td>Provided by the LMS team</td></tr>
+        <tr><td><code>client_secret</code><span class="req">required</span></td><td>Provided by the LMS team. Keep it secret: never put it in a browser or mobile app.</td></tr>
+      </table></div>
+
+      <h3>Example</h3>
+      <div class="code"><div class="code-head">Request<button class="copy" type="button">Copy</button></div>
 <pre><code>curl -X POST <span class="base-url">https://lms.example.com</span>/api/oauth/token \
   -H "Content-Type: application/json" \
-  -d '{ "grant_type": "client_credentials", "client_id": "CLIENT_ID", "client_secret": "CLIENT_SECRET" }'</code></pre>
-    <h3>Response <span class="muted">200</span></h3>
-<pre><code>{ "access_token": "eyJjaWQiOi...abc", "token_type": "Bearer", "expires_in": 3600 }</code></pre>
-  </section>
+  -d '{ "grant_type": "client_credentials", "client_id": "CLIENT_ID", "client_secret": "CLIENT_SECRET" }'</code></pre></div>
+      <div class="code" style="margin-top:12px"><div class="code-head">Response <span class="status s2">200</span><button class="copy" type="button">Copy</button></div>
+<pre><code>{ "access_token": "eyJjaWQiOi...abc", "token_type": "Bearer", "expires_in": 3600 }</code></pre></div>
+    </section>
 
-  <h2 class="group-title" id="reading-log">Reading Log</h2>
-  <p>Report books employees have finished reading, the same as <strong>Report Private Reading</strong> in the LMS.</p>
+    <div class="group-head" id="reading-log">
+      <span class="group-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></svg></span>
+      <div><h2>Reading Log</h2><p>Report books employees have finished reading, the same as <strong>Report Private Reading</strong> in the LMS.</p></div>
+    </div>
 
-  <section id="categories">
-    <h2>Categories</h2>
-    <div class="endpoint"><span class="method get">GET</span><span>/api/external/v1/reading-logs/categories</span></div>
-    <p>Returns the valid values for the <code>category</code> field of Report reading. Use it to fill a picker instead of hardcoding or typing categories; the list can change over time.</p>
-    <h3>Example</h3>
+    <section class="card" id="categories">
+      <h2>Categories</h2>
+      <p class="lead">Returns the valid values for the <code>category</code> field of Report reading. Use it to fill a picker instead of hardcoding or typing categories; the list can change over time.</p>
+      <div class="endpoint"><span class="method get">GET</span><span class="path">/api/external/v1/reading-logs/categories</span></div>
+
+      <h3>Example</h3>
+      <div class="code"><div class="code-head">Request<button class="copy" type="button">Copy</button></div>
 <pre><code>curl <span class="base-url">https://lms.example.com</span>/api/external/v1/reading-logs/categories \
-  -H "Authorization: Bearer &lt;access_token&gt;"</code></pre>
-    <h3>Response <span class="muted">200</span></h3>
-<pre><code>{ "categories": [{{CATEGORIES_JSON}}] }</code></pre>
-    <p>Current categories:</p>
-    <ul class="cats">{{CATEGORIES}}</ul>
-  </section>
+  -H "Authorization: Bearer &lt;access_token&gt;"</code></pre></div>
+      <div class="code" style="margin-top:12px"><div class="code-head">Response <span class="status s2">200</span><button class="copy" type="button">Copy</button></div>
+<pre><code>{ "categories": [{{CATEGORIES_JSON}}] }</code></pre></div>
 
-  <section id="report">
-    <h2>Report reading</h2>
-    <div class="endpoint"><span class="method post">POST</span><span>/api/external/v1/reading-logs</span></div>
-    <p>Reports a finished personal book, the same as the <strong>Report Private Reading</strong> form in the LMS. The log is saved as <code>Finished</code> with <code>hr_approval_status: "Draft"</code> and appears to HR as a <strong>personal</strong> book. The employee then claims the incentive in the LMS.</p>
-    <p>Send it as <code>multipart/form-data</code> (not JSON), because it includes the evidence photo.</p>
-    <div class="table-scroll"><table>
-      <tr><th>Field</th><th>Description</th></tr>
-      <tr><td><code>email</code> <span class="req">required</span></td><td>Employee's LMS email (case-insensitive)</td></tr>
-      <tr><td><code>title</code> <span class="req">required</span></td><td>Book title</td></tr>
-      <tr><td><code>category</code> <span class="req">required</span></td><td>One of the values from <a href="#categories">Categories</a> (case-insensitive)</td></tr>
-      <tr><td><code>start_date</code> <span class="req">required</span></td><td>When reading started. ISO 8601, e.g. <code>2026-10-01</code> or <code>2026-10-01T09:00:00+07:00</code></td></tr>
-      <tr><td><code>finish_date</code> <span class="req">required</span></td><td>When reading finished. ISO 8601. Must be <strong>more than 1 day</strong> after <code>start_date</code></td></tr>
-      <tr><td><code>review_link</code> <span class="req">required</span></td><td>Link to the employee's book review</td></tr>
-      <tr><td><code>evidence</code> <span class="req">required</span></td><td>Evidence photo file (image, max 10 MB)</td></tr>
-      <tr><td><code>author</code></td><td>Book author</td></tr>
-    </table></div>
-    <h3>Example</h3>
+      <h3>Current categories</h3>
+      <ul class="cats">{{CATEGORIES}}</ul>
+    </section>
+
+    <section class="card" id="report">
+      <h2>Report reading</h2>
+      <p class="lead">Reports a finished personal book, the same as the <strong>Report Private Reading</strong> form in the LMS. The log is saved as <code>Finished</code> with <code>hr_approval_status: "Draft"</code> and appears to HR as a <strong>personal</strong> book. The employee then claims the incentive in the LMS.</p>
+      <div class="endpoint"><span class="method post">POST</span><span class="path">/api/external/v1/reading-logs</span></div>
+      <div class="note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span>Send it as <code>multipart/form-data</code> (not JSON), because it includes the evidence photo.</span></div>
+
+      <h3>Fields</h3>
+      <div class="table-scroll"><table>
+        <tr><th>Field</th><th>Description</th></tr>
+        <tr><td><code>email</code><span class="req">required</span></td><td>Employee's LMS email (case-insensitive)</td></tr>
+        <tr><td><code>title</code><span class="req">required</span></td><td>Book title</td></tr>
+        <tr><td><code>category</code><span class="req">required</span></td><td>One of the values from <a href="#categories">Categories</a> (case-insensitive)</td></tr>
+        <tr><td><code>start_date</code><span class="req">required</span></td><td>When reading started. ISO 8601, e.g. <code>2026-10-01</code> or <code>2026-10-01T09:00:00+07:00</code>. A date without a time is read as WIB (UTC+7)</td></tr>
+        <tr><td><code>finish_date</code><span class="req">required</span></td><td>When reading finished. ISO 8601. Must be <strong>more than 1 day</strong> after <code>start_date</code></td></tr>
+        <tr><td><code>review_link</code><span class="req">required</span></td><td>Link to the employee's book review</td></tr>
+        <tr><td><code>evidence</code><span class="req">required</span></td><td>Evidence photo file (image, max 10 MB)</td></tr>
+        <tr><td><code>author</code><span class="opt">optional</span></td><td>Book author</td></tr>
+      </table></div>
+
+      <h3>Example</h3>
+      <div class="code"><div class="code-head">Request<button class="copy" type="button">Copy</button></div>
 <pre><code>curl -X POST <span class="base-url">https://lms.example.com</span>/api/external/v1/reading-logs \
   -H "Authorization: Bearer &lt;access_token&gt;" \
   -F "email=employee@nusa.id" \
@@ -138,8 +282,8 @@
   -F "start_date=2026-10-01" \
   -F "finish_date=2026-10-15" \
   -F "review_link=https://docs.google.com/document/d/xxxx" \
-  -F "evidence=@/path/to/photo.jpg"</code></pre>
-    <h3>Response <span class="muted">201</span></h3>
+  -F "evidence=@/path/to/photo.jpg"</code></pre></div>
+      <div class="code" style="margin-top:12px"><div class="code-head">Response <span class="status s2">201</span><button class="copy" type="button">Copy</button></div>
 <pre><code>{
   "id": 906,
   "email": "employee@nusa.id",
@@ -151,48 +295,54 @@
   "source": "Personal Book",
   "status": "Finished",
   "hr_approval_status": "Draft",
-  "start_date": "2026-10-01T00:00:00.000Z",
-  "finish_date": "2026-10-15T00:00:00.000Z",
+  "start_date": "2026-09-30T17:00:00.000Z",
+  "finish_date": "2026-10-14T17:00:00.000Z",
   "review_link": "https://docs.google.com/document/d/xxxx",
   "evidence_url": "/api/uploads/1792480926348-885832929.jpg"
-}</code></pre>
-    <p class="muted"><code>evidence_url</code> is relative to the LMS address.</p>
-  </section>
+}</code></pre></div>
+      <p class="small" style="margin-top:12px">Dates in responses are UTC (<code>2026-09-30T17:00:00.000Z</code> is 1 Oct 2026 00:00 WIB). <code>evidence_url</code> is relative to the LMS address.</p>
+    </section>
 
-  <h2 class="group-title" id="external-training">External Training</h2>
-  <p>File external training requests, the same as <strong>New Request</strong> on the External Training page in the LMS.</p>
+    <div class="group-head" id="external-training">
+      <span class="group-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></span>
+      <div><h2>External Training</h2><p>File external training requests, the same as <strong>New Request</strong> on the External Training page in the LMS.</p></div>
+    </div>
 
-  <section id="training-request">
-    <h2>New request</h2>
-    <div class="endpoint"><span class="method post">POST</span><span>/api/external/v1/external-trainings</span></div>
-    <p>Creates an external training request that is <strong>already approved by the employee's leader</strong> (the same leader who would approve it in the LMS; taken from the org chart), so it skips the leader's approval step and goes straight to HR to process. The status is <code>Approved</code>.</p>
-    <p>Send it as <code>multipart/form-data</code>, because it can include an attachment file.</p>
-    <h3 id="training-categories">Training categories</h3>
-    <p>Only these 3 values are accepted. Send the <strong>value</strong>; it is what's saved in the database. The LMS shows it with the label on the right.</p>
-    <div class="table-scroll"><table>
-      <tr><th>Value to send</th><th>Shown in the LMS as (EN)</th><th>Shown in the LMS as (ID)</th></tr>
-      <tr><td><code>Sertifikat</code></td><td>Training with Competency Certification</td><td>Pelatihan dengan Sertifikasi Kompetensi</td></tr>
-      <tr><td><code>Training</code></td><td>Training with Certificate of Participation</td><td>Pelatihan dengan Sertifikat Kepesertaan</td></tr>
-      <tr><td><code>Modul</code></td><td>E-Learning / Self-Paced Learning</td><td>E-Learning / Pembelajaran Mandiri</td></tr>
-    </table></div>
-    <h3>Fields</h3>
-    <div class="table-scroll"><table>
-      <tr><th>Field</th><th>Description</th></tr>
-      <tr><td><code>email</code> <span class="req">required</span></td><td>Employee's LMS email (case-insensitive)</td></tr>
-      <tr><td><code>category</code> <span class="req">required</span></td><td>One of the 3 values in <a href="#training-categories">Training categories</a> below (case-insensitive)</td></tr>
-      <tr><td><code>title</code> <span class="req">required</span></td><td>Training name</td></tr>
-      <tr><td><code>vendor</code> <span class="req">required</span></td><td>Training provider</td></tr>
-      <tr><td><code>location</code> <span class="req">required</span></td><td>Where it takes place, e.g. <code>Online</code> or a city</td></tr>
-      <tr><td><code>start_date</code> <span class="req">required</span></td><td>ISO 8601, e.g. <code>2026-11-03</code>. A date without a time is read as WIB (UTC+7)</td></tr>
-      <tr><td><code>end_date</code> <span class="req">required</span></td><td>ISO 8601. Cannot be before <code>start_date</code></td></tr>
-      <tr><td><code>registration_fee</code></td><td>Fee in Rupiah, number only (e.g. <code>2500000</code>). Default: <code>0</code> (free)</td></tr>
-      <tr><td><code>payment_method</code></td><td><code>Reimbursement</code> or <code>Direct Payment</code>. <strong>Required when <code>registration_fee</code> is more than 0</strong></td></tr>
-      <tr><td><code>attachment</code></td><td>Attachment file (image or PDF, max 10 MB), e.g. a brochure or invoice</td></tr>
-      <tr><td><code>attachment_link</code></td><td>Link instead of a file (e.g. the course page). <strong>Only for category <code>Modul</code></strong>, same as the LMS form. Send either <code>attachment</code> or <code>attachment_link</code>, not both</td></tr>
-      <tr><td><code>cc_emails</code></td><td>Emails of employees to CC, comma-separated. They're notified if this request goes over the employee's personal learning budget</td></tr>
-      <tr><td><code>approval_note</code></td><td>The leader's approval note. Default: <code>Approved via external API</code></td></tr>
-    </table></div>
-    <h3>Example</h3>
+    <section class="card" id="training-request">
+      <h2>New request</h2>
+      <p class="lead">Creates an external training request that is <strong>already approved by the employee's leader</strong> (the same leader who would approve it in the LMS, taken from the org chart). It skips the leader's approval step and goes straight to HR to process, with status <code>Approved</code>.</p>
+      <div class="endpoint"><span class="method post">POST</span><span class="path">/api/external/v1/external-trainings</span></div>
+      <div class="note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span>Send it as <code>multipart/form-data</code>, because it can include an attachment file.</span></div>
+
+      <h3 id="training-categories">Training categories</h3>
+      <p class="small">Only these 3 values are accepted. Send the <strong>value</strong>; it is what's saved in the database. The LMS shows it with the label on the right.</p>
+      <div class="table-scroll"><table>
+        <tr><th>Value to send</th><th>Shown in the LMS as (EN)</th><th>Shown in the LMS as (ID)</th></tr>
+        <tr><td><code>Sertifikat</code></td><td>Training with Competency Certification</td><td>Pelatihan dengan Sertifikasi Kompetensi</td></tr>
+        <tr><td><code>Training</code></td><td>Training with Certificate of Participation</td><td>Pelatihan dengan Sertifikat Kepesertaan</td></tr>
+        <tr><td><code>Modul</code></td><td>E-Learning / Self-Paced Learning</td><td>E-Learning / Pembelajaran Mandiri</td></tr>
+      </table></div>
+
+      <h3>Fields</h3>
+      <div class="table-scroll"><table>
+        <tr><th>Field</th><th>Description</th></tr>
+        <tr><td><code>email</code><span class="req">required</span></td><td>Employee's LMS email (case-insensitive)</td></tr>
+        <tr><td><code>category</code><span class="req">required</span></td><td>One of the 3 values in <a href="#training-categories">Training categories</a> (case-insensitive)</td></tr>
+        <tr><td><code>title</code><span class="req">required</span></td><td>Training name</td></tr>
+        <tr><td><code>vendor</code><span class="req">required</span></td><td>Training provider</td></tr>
+        <tr><td><code>location</code><span class="req">required</span></td><td>Where it takes place, e.g. <code>Online</code> or a city</td></tr>
+        <tr><td><code>start_date</code><span class="req">required</span></td><td>ISO 8601, e.g. <code>2026-11-03</code>. A date without a time is read as WIB (UTC+7)</td></tr>
+        <tr><td><code>end_date</code><span class="req">required</span></td><td>ISO 8601. Cannot be before <code>start_date</code></td></tr>
+        <tr><td><code>registration_fee</code><span class="opt">optional</span></td><td>Fee in Rupiah, number only (e.g. <code>2500000</code>). Default: <code>0</code> (free)</td></tr>
+        <tr><td><code>payment_method</code><span class="opt">optional</span></td><td><code>Reimbursement</code> or <code>Direct Payment</code>. <strong>Required when <code>registration_fee</code> is more than 0</strong></td></tr>
+        <tr><td><code>attachment</code><span class="opt">optional</span></td><td>Attachment file (image or PDF, max 10 MB), e.g. a brochure or invoice</td></tr>
+        <tr><td><code>attachment_link</code><span class="opt">optional</span></td><td>Link instead of a file (e.g. the course page). <strong>Only for category <code>Modul</code></strong>, same as the LMS form. Send either <code>attachment</code> or <code>attachment_link</code>, not both</td></tr>
+        <tr><td><code>cc_emails</code><span class="opt">optional</span></td><td>Emails of employees to CC, comma-separated. They're notified if this request goes over the employee's personal learning budget</td></tr>
+        <tr><td><code>approval_note</code><span class="opt">optional</span></td><td>The leader's approval note. Default: <code>Approved via external API</code></td></tr>
+      </table></div>
+
+      <h3>Example</h3>
+      <div class="code"><div class="code-head">Request<button class="copy" type="button">Copy</button></div>
 <pre><code>curl -X POST <span class="base-url">https://lms.example.com</span>/api/external/v1/external-trainings \
   -H "Authorization: Bearer &lt;access_token&gt;" \
   -F "email=employee@nusa.id" \
@@ -206,8 +356,8 @@
   -F "payment_method=Direct Payment" \
   -F "cc_emails=manager@nusa.id" \
   -F "approval_note=Approved in the client system" \
-  -F "attachment=@/path/to/brochure.pdf"</code></pre>
-    <h3>Response <span class="muted">201</span></h3>
+  -F "attachment=@/path/to/brochure.pdf"</code></pre></div>
+      <div class="code" style="margin-top:12px"><div class="code-head">Response <span class="status s2">201</span><button class="copy" type="button">Copy</button></div>
 <pre><code>{
   "id": 161,
   "email": "employee@nusa.id",
@@ -217,8 +367,8 @@
   "title": "AWS Solutions Architect Associate",
   "vendor": "Training Provider",
   "location": "Jakarta",
-  "start_date": "2026-11-03T00:00:00.000Z",
-  "end_date": "2026-11-04T00:00:00.000Z",
+  "start_date": "2026-11-02T17:00:00.000Z",
+  "end_date": "2026-11-03T17:00:00.000Z",
   "registration_fee": 2500000,
   "payment_method": "Direct Payment",
   "attachment_url": "/api/uploads/1792481522024-141284271.pdf",
@@ -227,26 +377,57 @@
   "approved_by": "Siti Rahma",
   "approval_note": "Approved in the client system",
   "exceeds_personal_budget": true
-}</code></pre>
-    <p class="muted"><code>approved_by</code> is the employee's direct leader. <code>exceeds_personal_budget</code> is <code>true</code> when this request takes the employee over their annual personal learning budget; the CC list is then notified. <code>attachment_url</code> is relative to the LMS address when a file was uploaded.</p>
-  </section>
+}</code></pre></div>
+      <p class="small" style="margin-top:12px"><code>approved_by</code> is the employee's leader. <code>exceeds_personal_budget</code> is <code>true</code> when this request takes the employee over their annual personal learning budget; the CC list is then notified. Dates are UTC (<code>2026-11-02T17:00:00.000Z</code> is 3 Nov 2026 00:00 WIB). <code>attachment_url</code> is relative to the LMS address when a file was uploaded.</p>
+    </section>
 
-  <section id="errors">
-    <h2>Errors</h2>
-    <p>Errors return <code>{ "error": "...", "error_description": "..." }</code>.</p>
-    <div class="table-scroll"><table>
-      <tr><th>Status</th><th>Meaning</th></tr>
-      <tr><td><code>401</code></td><td>Missing, invalid, or expired access token. Request a new token.</td></tr>
-      <tr><td><code>400</code></td><td>Missing required field, file of the wrong type or over 10 MB, unknown <code>category</code>, invalid date, or a field breaking a rule above (e.g. reading period of 1 day or less, fee without <code>payment_method</code>, unknown <code>cc_emails</code>).</td></tr>
-      <tr><td><code>404</code></td><td>Email not registered in the LMS.</td></tr>
-      <tr><td><code>409</code></td><td>Already submitted, e.g. a retried request. Reading Log: same email, title, start and finish date; the response includes the existing <code>reading_log</code>. External Training: same email, title and start date; the response includes the existing <code>external_training</code>.</td></tr>
-      <tr><td><code>422</code></td><td>External Training: the employee has no active leader set in the LMS, so the request can't be filed as leader-approved. Ask the LMS team to fix the employee's leader.</td></tr>
-      <tr><td><code>500</code></td><td>Server error. Retry later or contact the LMS team.</td></tr>
-    </table></div>
-  </section>
+    <section class="card" id="errors">
+      <h2>Errors</h2>
+      <p class="lead">Errors return <code>{ "error": "...", "error_description": "..." }</code>. The <code>error_description</code> explains what to fix.</p>
+      <div class="table-scroll"><table>
+        <tr><th>Status</th><th>Meaning</th></tr>
+        <tr><td><span class="status s4">400</span></td><td>Missing required field, file of the wrong type or over 10 MB, unknown <code>category</code>, invalid date, or a field breaking a rule above (e.g. reading period of 1 day or less, fee without <code>payment_method</code>, unknown <code>cc_emails</code>).</td></tr>
+        <tr><td><span class="status s4">401</span></td><td>Missing, invalid, or expired access token. Request a new token.</td></tr>
+        <tr><td><span class="status s4">404</span></td><td>Email not registered in the LMS.</td></tr>
+        <tr><td><span class="status s4">409</span></td><td>Already submitted, e.g. a retried request. <strong>Reading Log:</strong> same email, title, start and finish date; the response includes the existing <code>reading_log</code>. <strong>External Training:</strong> same email, title and start date; the response includes the existing <code>external_training</code>.</td></tr>
+        <tr><td><span class="status s4">422</span></td><td><strong>External Training:</strong> the employee has no active leader set in the LMS, so the request can't be filed as leader-approved. Ask the LMS team to fix the employee's leader.</td></tr>
+        <tr><td><span class="status s5">500</span></td><td>Server error. Retry later or contact the LMS team.</td></tr>
+      </table></div>
+    </section>
+
+    <footer>LMS Nusa &middot; External API v1</footer>
+  </main>
 </div>
+
 <script>
+  // Examples use the address this page is served from, so they can be copied as-is.
   document.querySelectorAll('.base-url').forEach(el => { el.textContent = location.origin; });
+
+  document.querySelectorAll('.copy').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const text = btn.closest('.code').querySelector('pre').innerText;
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = 'Copied'; btn.classList.add('done');
+      } catch (e) {
+        btn.textContent = 'Press Ctrl+C';
+      }
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 1600);
+    });
+  });
+
+  // Highlight the sidebar link of the section currently in view.
+  const links = [...document.querySelectorAll('.sidebar a')];
+  const targets = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + entry.target.id));
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    targets.forEach(t => observer.observe(t));
+  }
 </script>
 </body>
 </html>
