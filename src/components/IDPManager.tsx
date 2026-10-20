@@ -667,12 +667,7 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
                                                         <td colSpan={2} className={idpSectionHeaderCell}>{t('form.actionPlan')}</td>
                                                         <td className={`${idpSectionHeaderCell} cursor-help`} title={t('form.targetTimeTooltip')}>{t('form.targetTime')}</td>
                                                         <td className={idpSectionHeaderCell}>{t('form.checklistProgress')}</td>
-                                                        <td colSpan={2} className={idpSectionHeaderCell}>
-                                                            <div className="flex items-center justify-between">
-                                                                <span>{t('form.notes')}</span>
-                                                                <button type="button" onClick={addEditActionRow} className="flex items-center gap-1 text-xs font-bold text-white hover:text-indigo-100"><Plus size={14} /> {t('form.addRow')}</button>
-                                                            </div>
-                                                        </td>
+                                                        <td colSpan={2} className={idpSectionHeaderCell}>{t('form.notes')}</td>
                                                     </tr>
 
                                                     {(detail.action_items || []).filter(i => i.is_mandatory).map((item: IDPActionItem) => (
@@ -717,6 +712,7 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
                                                 </tbody>
                                             </table>
                                         </div>
+                                        <button type="button" onClick={addEditActionRow} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border-2 border-dashed border-indigo-200 text-indigo-600 text-sm font-bold hover:border-indigo-400 hover:bg-indigo-50 transition-colors"><Plus size={16} /> {t('form.addRow')}</button>
                                         <div className="flex gap-3">
                                             <button onClick={cancelEdit} disabled={isSavingEdit} className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 disabled:opacity-50 transition-colors">{t('form.cancel')}</button>
                                             <button onClick={() => saveEdit(plan.id)} disabled={isSavingEdit} className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors">

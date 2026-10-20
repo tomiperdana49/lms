@@ -609,12 +609,7 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                                                 <td colSpan={2} className={idpSectionHeaderCell}>{t('form.actionPlan')}</td>
                                                 <td className={`${idpSectionHeaderCell} cursor-help`} title={t('form.targetTimeTooltip')}>{t('form.targetTime')}</td>
                                                 <td className={idpSectionHeaderCell}>{t('form.checklistProgress')}</td>
-                                                <td colSpan={2} className={idpSectionHeaderCell}>
-                                                    <div className="flex items-center justify-between">
-                                                        <span>{t('form.notes')}</span>
-                                                        <button type="button" onClick={addActionRow} className="flex items-center gap-1 text-xs font-bold text-white hover:text-indigo-100"><Plus size={14} /> {t('form.addRow')}</button>
-                                                    </div>
-                                                </td>
+                                                <td colSpan={2} className={idpSectionHeaderCell}>{t('form.notes')}</td>
                                             </tr>
                                             <tr>
                                                 <td colSpan={2} className={idpHintCell}>{t('form.actionPlanHint')}</td>
@@ -674,6 +669,8 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                                         </tbody>
                                     </table>
                                 </div>
+
+                                <button type="button" onClick={addActionRow} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border-2 border-dashed border-indigo-200 text-indigo-600 text-sm font-bold hover:border-indigo-400 hover:bg-indigo-50 transition-colors"><Plus size={16} /> {t('form.addRow')}</button>
 
                                 <div className="flex gap-3 pt-2">
                                     {manualEditMode ? (
