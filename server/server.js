@@ -3014,6 +3014,41 @@ app.post('/api/feedback', async (req, res) => {
             }
         }
 
+        // Optional Google Chat notification so new feedback doesn't have to be checked manually in the sheet
+        const chatWebhookUrl = process.env.FEEDBACK_GOOGLE_CHAT_WEBHOOK_URL;
+
+        if (chatWebhookUrl) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 6000);
+                const hostUrl = process.env.VITE_API_BASE_URL || `http://localhost:${process.env.PORT || 8036}`;
+                const images = (imageUrls || []).map(u => u.startsWith('http') ? u : `${hostUrl}${u}`);
+                const sheetUrl = process.env.FEEDBACK_SHEET_URL;
+
+                const lines = [
+                    `*Feedback LMS baru: ${category || 'Issue'}*`,
+                    `Dari: ${userName || 'Anonymous'} (${userEmail || '-'})`,
+                    url ? `Halaman: ${url}` : null,
+                    '',
+                    description || '-',
+                    images.length ? `\nLampiran:\n${images.join('\n')}` : null,
+                    sheetUrl ? `\n<${sheetUrl}|Buka daftar feedback>` : null
+                ].filter(line => line !== null);
+
+                const chatRes = await fetch(chatWebhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                    body: JSON.stringify({ text: lines.join('\n') }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                if (!chatRes.ok) throw new Error(`HTTP ${chatRes.status}`);
+                console.log("Sent feedback notification to Google Chat");
+            } catch (chatErr) {
+                console.error("Google Chat feedback notification failed:", chatErr.message);
+            }
+        }
+
         res.json({ success: true, feedbackId: result.insertId });
     } catch (err) {
         console.error(err);
