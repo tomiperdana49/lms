@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx-js-style';
 import { API_BASE_URL } from '../config';
 import type { IDPPlan, IDPActionItem } from '../types';
 import IDPDetailInfoTable from './IDPDetailInfoTable';
+import IDPReviewMonthStrip from './IDPReviewMonthStrip';
 import { MandatoryProgressCheck, MandatoryProgressNote } from './IDPMandatoryProgress';
 import { idpLabelCell, idpValueCell, idpSectionHeaderCell, idpContentCell } from './idpTableStyles';
 import { parseIdpSheet } from './idpImportParser';
@@ -21,38 +22,6 @@ interface IDPManagerProps {
 }
 
 const MANDATORY_TARGET_HOURS = 48;
-
-// Builds the monthly review strip: one entry per calendar month of the plan's period year, from
-// January - or from the employee's join month when they joined during that year - through the
-// current month (or through December once the period year has fully elapsed), marking whether a
-// supervisor review landed in that month. Each entry is labelled with its calendar month number.
-// Starts from the join date rather than the IDP's created_by_date: reviews can predate that date
-// (e.g. a plan filled in on paper first), and a later created_by_date would hide them.
-const reviewMonthStrip = (plan: IDPPlan): { key: string; month: number; reviewed: boolean }[] => {
-    const reviewedSet = new Set((plan.reviewed_year_months || '').split(',').filter(Boolean));
-
-    let startY = plan.period_year, startM = 0;
-    const joined = plan.employee_join_date ? new Date(plan.employee_join_date) : null;
-    if (joined && !isNaN(joined.getTime()) && joined.getFullYear() >= plan.period_year) {
-        startY = joined.getFullYear();
-        startM = joined.getMonth();
-    }
-
-    const now = new Date();
-    const endY = plan.period_year < now.getFullYear() ? plan.period_year : now.getFullYear();
-    const endM = plan.period_year < now.getFullYear() ? 11 : now.getMonth();
-
-    const months: { key: string; month: number; reviewed: boolean }[] = [];
-    let y = startY, m = startM, count = 0;
-    while ((y < endY || (y === endY && m <= endM)) && count < 36) {
-        const key = `${y}-${String(m + 1).padStart(2, '0')}`;
-        months.push({ key, month: m + 1, reviewed: reviewedSet.has(key) });
-        count++;
-        m++;
-        if (m > 11) { m = 0; y++; }
-    }
-    return months;
-};
 
 // Whether the plan already has a supervisor review logged for the current calendar month.
 const isReviewedThisMonth = (plan: IDPPlan): boolean => {
@@ -633,23 +602,7 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
                             </div>
                         </div>
 
-                        {plan.status === 'Approved' && (() => {
-                            const strip = reviewMonthStrip(plan);
-                            return strip.length > 0 && (
-                                <div className="mt-3 flex items-center flex-wrap gap-2">
-                                    <span className="text-xs font-semibold text-gray-400">{t('admin.reviewStripLabel')}</span>
-                                    {strip.map(({ key, month, reviewed }) => (
-                                        <span
-                                            key={key}
-                                            title={reviewed ? t('admin.reviewedThisMonth') : t('admin.notReviewedThisMonth')}
-                                            className={`w-6 h-6 flex items-center justify-center rounded-full text-[11px] font-bold text-white shrink-0 ${reviewed ? 'bg-emerald-500' : 'bg-rose-500'}`}
-                                        >
-                                            {month}
-                                        </span>
-                                    ))}
-                                </div>
-                            );
-                        })()}
+                        <IDPReviewMonthStrip plan={plan} />
 
                         <button onClick={() => toggleExpand(plan.id)} className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700">
                             <ChevronDown className={`w-4 h-4 transition-transform ${expandedId === plan.id ? 'rotate-180' : ''}`} />

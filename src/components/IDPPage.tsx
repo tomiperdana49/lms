@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { parseIdpSheet, validateIdpSheet } from './idpImportParser';
+import IDPReviewMonthStrip from './IDPReviewMonthStrip';
 import type { IdpImportGrid, IdpImportIssue } from './idpImportParser';
 import { API_BASE_URL } from '../config';
 import type { User, IDPPlan, Employee, IDPActionItem } from '../types';
@@ -480,6 +481,7 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
             setReviewModalOpen(false);
             setReviewNote('');
             fetchTeamDetail(teamDetailId);
+            fetchTeamPlans();
         } catch (err) { console.error(err); }
     };
 
@@ -803,6 +805,7 @@ export default function IDPPage({ currentUser }: IDPPageProps) {
                                     {statusBadge(plan.status)}
                                 </div>
                             </div>
+                            <IDPReviewMonthStrip plan={plan} className="mb-3" />
                             <button onClick={() => toggleTeamDetail(plan.id)} className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700">
                                 <ChevronDown className={`w-4 h-4 transition-transform ${teamDetailId === plan.id ? 'rotate-180' : ''}`} />
                                 {teamDetailId === plan.id ? t('team.hideDetail') : t('team.showDetail')}

@@ -8209,9 +8209,15 @@ app.get('/api/idp/subordinates', async (req, res) => {
         const subordinateIds = subordinatesResult.map(s => s.id_employee);
         if (subordinateIds.length === 0) return res.json([]);
 
+        // reviewed_year_months / employee_join_date feed the same monthly review strip HR sees on /api/idp/all.
         const placeholders = subordinateIds.map(() => '?').join(',');
         const rows = await query(
-            `SELECT * FROM idp_plans WHERE employee_id IN (${placeholders}) ORDER BY period_year DESC, created_at DESC`,
+            `SELECT p.*, (
+                SELECT GROUP_CONCAT(DISTINCT DATE_FORMAT(r.review_date, '%Y-%m') ORDER BY r.review_date)
+                FROM idp_reviews r WHERE r.idp_id = p.id
+            ) AS reviewed_year_months,
+            (SELECT e.join_date FROM employees e WHERE e.id_employee = p.employee_id LIMIT 1) AS employee_join_date
+            FROM idp_plans p WHERE p.employee_id IN (${placeholders}) ORDER BY p.period_year DESC, p.created_at DESC`,
             subordinateIds
         );
         res.json(rows);
