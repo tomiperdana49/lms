@@ -95,6 +95,14 @@ const getNusanetToken = async () => {
 // Zero means "no cost recorded" - send '-' rather than the misleading "Rp0" (matches server.js).
 const formatNusaworkCost = (cost) => (Number(cost) > 0 ? `Rp ${Math.round(cost).toLocaleString('id-ID')}` : '-');
 
+// mysql2 returns DATE/DATETIME as a Date in local time (WIB) - toISOString() would shift it to UTC
+// and send the previous day, so format the local calendar date (matches toLocalDateString in server.js).
+const toLocalDateString = (value) => {
+    const d = new Date(value);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
 // Blank when a participant has no such record - same "empty string, not omitted" convention as the
 // live app (matches formatNusaworkScore in server.js).
 const formatNusaworkScore = (score) => (score === null || score === undefined || score === '' ? '' : String(score));
@@ -162,7 +170,7 @@ async function backfillOnlineModules(empId) {
         // free-text duration label like "3 hours" / "3 jam".
         const match = String(row.course_duration || '').match(/(\d+(\.\d+)?)/);
         const hours = match ? Math.round(parseFloat(match[1]) * 100) / 100 : 0;
-        const date = new Date(row.date).toISOString().slice(0, 10);
+        const date = toLocalDateString(row.date);
 
         // Latest PRE-test attempt for this course, same as the preTestRows lookup in /api/quiz/submit.
         const [preRows] = await pool.query(
@@ -237,7 +245,7 @@ async function backfillInternalTraining(empId) {
         // No stored meeting date column read here beyond what's needed - reuse today if absent isn't
         // right, so pull it explicitly.
         const [[dateRow]] = await pool.query('SELECT date FROM meetings WHERE id = ?', [meeting.id]);
-        const date = new Date(dateRow.date).toISOString().slice(0, 10);
+        const date = toLocalDateString(dateRow.date);
 
         // Best PRE/POST score and feedback rating for this employee on this meeting - same "keep the
         // best score" rule as computeLearningStats / getMeetingParticipantScores in server.js.
@@ -311,7 +319,7 @@ async function backfillExternalTraining(empId) {
             (Number(row.registration_fee) || 0) + (Number(row.travel_flight_cost) || 0) +
             (Number(row.accommodation_cost) || 0) + (Number(row.miscellaneous_cost) || 0)
         );
-        const date = new Date(row.start_date).toISOString().slice(0, 10);
+        const date = toLocalDateString(row.start_date);
 
         console.log(`  - [${row.id}] "${row.title}" on ${date}, ${hours}h, ${formatNusaworkCost(cost)}`);
         if (isDryRun) continue;
@@ -360,7 +368,7 @@ async function backfillReadingLog(empId) {
         const hours = getReadingLogHours(row.category, row.incentive_amount);
         const cost = Math.round(Number(row.incentive_amount) || 0);
         const dateSource = row.finish_date || row.date;
-        const date = new Date(dateSource).toISOString().slice(0, 10);
+        const date = toLocalDateString(dateSource);
 
         console.log(`  - [${row.id}] "${row.title}" on ${date}, ${hours}h, ${formatNusaworkCost(cost)}`);
         if (isDryRun) continue;

@@ -996,6 +996,15 @@ const deleteNusaworkNote = async ({ employeeId, idGroup }) => {
     }
 };
 
+// mysql2 hands DATE/DATETIME columns back as a Date at *local* midnight/time (WIB), so
+// toISOString() would shift them to UTC and send the previous day to Nusawork - format the local
+// calendar date instead. Strings (already YYYY-MM-DD...) pass through as-is.
+const toLocalDateString = (value) => {
+    if (!(value instanceof Date)) return String(value).slice(0, 10);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+};
+
 // Zero means "no cost recorded" (e.g. a Reading Log note pushed before HR approves an incentive) -
 // send '-' rather than the misleading "Rp0", matching the online-module note's own convention.
 const formatNusaworkCost = (cost) => (Number(cost) > 0 ? `Rp ${Math.round(cost).toLocaleString('id-ID')}` : '-');
@@ -1349,7 +1358,7 @@ const reconcileExternalTrainingNusawork = async (requestId) => {
             (Number(r.accommodation_cost) || 0) + (Number(r.miscellaneous_cost) || 0)
         );
 
-        const date = r.start_date instanceof Date ? r.start_date.toISOString().slice(0, 10) : String(r.start_date).slice(0, 10);
+        const date = toLocalDateString(r.start_date);
 
         if (r.nusawork_id_group) {
             return await updateExternalTrainingNoteInNusawork({ employeeId: r.employee_id, idGroup: r.nusawork_id_group, title: r.title, date, hours, cost });
@@ -1527,7 +1536,7 @@ const reconcileReadingLogNusawork = async (logId) => {
         const hours = getReadingLogHours(r.category, r.incentive_amount);
         const cost = Math.round(Number(r.incentive_amount) || 0);
         const dateSource = r.finish_date || r.date;
-        const date = dateSource instanceof Date ? dateSource.toISOString().slice(0, 10) : String(dateSource).slice(0, 10);
+        const date = toLocalDateString(dateSource);
 
         if (r.nusawork_id_group) {
             return await updateReadingLogNoteInNusawork({ employeeId: r.employee_id, idGroup: r.nusawork_id_group, title: r.title, date, hours, cost });
@@ -6042,7 +6051,7 @@ app.put('/api/meetings/:id', async (req, res) => {
             syncInternalTrainingNotes({
                 meetingId: Number(id),
                 title: r.title,
-                date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date).slice(0, 10),
+                date: toLocalDateString(r.date),
                 previous: previousSync,
                 current: currentSync
             });
@@ -7052,7 +7061,7 @@ app.put('/api/courses/:id', async (req, res) => {
                         employeeId: row.employee_id,
                         idGroup: row.nusawork_id_group,
                         title: c.title,
-                        date: new Date(row.date).toISOString().slice(0, 10),
+                        date: toLocalDateString(new Date(row.date)),
                         hours
                     });
                 });
@@ -7392,7 +7401,7 @@ app.post('/api/quiz/submit', async (req, res) => {
                 pushOnlineModuleCompletionToNusawork({
                     employeeId,
                     title: course?.title || `Course #${courseId}`,
-                    date: now.toISOString().slice(0, 10),
+                    date: toLocalDateString(now),
                     hours: totalHours !== null ? Math.round(totalHours * 100) / 100 : 0,
                     preTest: preTestRows.length > 0 ? preTestRows[0].score : '',
                     postTest: score,
