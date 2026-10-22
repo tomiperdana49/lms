@@ -37,6 +37,7 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
     const [selectedYear, setSelectedYear] = useState<number | 'All'>(new Date().getFullYear());
     const [onlyNotReviewedThisMonth, setOnlyNotReviewedThisMonth] = useState(false);
     const [onlyPendingHrApproval, setOnlyPendingHrApproval] = useState(false);
+    const [showArchived, setShowArchived] = useState(false);
 
     const fetchPlans = async () => {
         try {
@@ -55,7 +56,10 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
             const q = searchQuery.toLowerCase();
             if (!p.employee_name?.toLowerCase().includes(q) && !p.employee_id?.toLowerCase().includes(q)) return false;
         }
-        if (onlyNotReviewedThisMonth && (p.status !== 'Approved' || isReviewedThisMonth(p))) return false;
+        // Archived plans (resigned employees) stay out of the list unless asked for, and never count
+        // as "not reviewed this month" - there's no one left to review.
+        if (!showArchived && p.is_archived) return false;
+        if (onlyNotReviewedThisMonth && (p.status !== 'Approved' || p.is_archived || isReviewedThisMonth(p))) return false;
         if (onlyPendingHrApproval && p.status !== 'Pending') return false;
         return true;
     });
@@ -90,6 +94,7 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
         setSearchQuery('');
         setOnlyNotReviewedThisMonth(false);
         setOnlyPendingHrApproval(false);
+        if (plan.is_archived) setShowArchived(true);
         if (expandedId !== plan.id) toggleExpand(plan.id);
         setTimeout(() => document.getElementById(`idp-plan-${plan.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -557,6 +562,12 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
                 >
                     {t('admin.notReviewedThisMonthFilter')}
                 </button>
+                <button
+                    onClick={() => setShowArchived(v => !v)}
+                    className={`px-4 py-3 rounded-2xl text-sm font-semibold border transition-colors ${showArchived ? 'bg-slate-600 border-slate-600 text-white' : 'bg-white border-gray-100 text-gray-600 hover:border-slate-300'}`}
+                >
+                    {t('admin.showArchivedFilter')}
+                </button>
             </div>
 
             <div className="space-y-3">
@@ -577,8 +588,13 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
                                 )}
                             </div>
                             <div className="flex items-center gap-3">
+                                {plan.is_archived ? (
+                                    <span className="px-3 py-1 rounded-full text-xs font-bold border bg-slate-100 text-slate-600 border-slate-300">
+                                        {t('admin.archivedBadge')}
+                                    </span>
+                                ) : null}
                                 {statusBadge(plan.status)}
-                                {plan.status === 'Pending' && (
+                                {plan.status === 'Pending' && !plan.is_archived && (
                                     <>
                                         <button onClick={() => approvePlan(plan.id)} className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors"><CheckCircle size={14} /> {t('team.approve')}</button>
                                         <button onClick={() => { setRejectTargetId(plan.id); setRejectModalOpen(true); }} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-rose-200 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-50 transition-colors"><XCircle size={14} /> {t('team.reject')}</button>
@@ -722,11 +738,15 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="flex justify-end">
-                                            <button onClick={() => startEdit(detail)} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-indigo-200 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-50 transition-colors">
-                                                <Pencil size={14} /> Edit IDP
-                                            </button>
-                                        </div>
+                                        {plan.is_archived ? (
+                                            <p className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">{t('admin.archivedNotice')}</p>
+                                        ) : (
+                                            <div className="flex justify-end">
+                                                <button onClick={() => startEdit(detail)} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-indigo-200 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-50 transition-colors">
+                                                    <Pencil size={14} /> Edit IDP
+                                                </button>
+                                            </div>
+                                        )}
                                         <IDPDetailInfoTable plan={detail} />
                                     </>
                                 )}
@@ -742,10 +762,13 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
                                     <label className="flex items-center gap-1.5 text-sm font-semibold text-amber-900">
                                         <MessageSquare size={14} /> {t('admin.hrNoteLabel')}
                                     </label>
-                                    <p className="text-xs text-amber-700">{t('admin.hrNoteHint')}</p>
+                                    {!plan.is_archived && <p className="text-xs text-amber-700">{t('admin.hrNoteHint')}</p>}
                                     {detail.hr_note_by && (
                                         <p className="text-xs text-amber-600 font-semibold">— {detail.hr_note_by}</p>
                                     )}
+                                    {plan.is_archived ? (
+                                        <p className="text-sm text-amber-900 whitespace-pre-wrap">{detail.hr_note || '-'}</p>
+                                    ) : (<>
                                     <textarea
                                         value={hrNoteDraft}
                                         onChange={e => setHrNoteDraft(e.target.value)}
@@ -760,6 +783,7 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
                                     >
                                         {t('admin.saveHrNote')}
                                     </button>
+                                    </>)}
                                 </div>
 
                                 <div>

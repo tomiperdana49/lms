@@ -351,7 +351,8 @@
           "tips": [
             "Import tidak pernah menimpa IDP yang sudah ada — hanya mengisi kombinasi karyawan + periode yang belum punya IDP.",
             "Menghapus IDP bersifat permanen dan tidak bisa dibatalkan — rencana aksi & riwayat evaluasinya ikut terhapus.",
-            "Nama atasan dan riwayat evaluasi bersifat catatan historis tetap — kalau atasan seorang karyawan berganti di kemudian hari, data lama tidak ikut berubah."
+            "Nama atasan dan riwayat evaluasi bersifat catatan historis tetap — kalau atasan seorang karyawan berganti di kemudian hari, data lama tidak ikut berubah.",
+            "IDP milik karyawan yang sudah resign otomatis diarsipkan (label \"Arsip (Resign)\"). IDP arsip disembunyikan dari daftar, tidak ikut filter \"Belum direview bulan ini\", dan tidak bisa diubah. Klik \"Tampilkan arsip\" untuk melihatnya."
           ]
         }
       }

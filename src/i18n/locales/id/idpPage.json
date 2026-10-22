@@ -125,6 +125,9 @@
     "hrNoteHint": "Beri tahu apa yang masih kurang atau perlu ditambahkan pada IDP ini. Catatan ini akan terlihat oleh karyawan dan atasannya.",
     "hrNotePlaceholder": "cth. Tujuan karir masih terlalu umum, tolong dijelaskan lebih spesifik...",
     "saveHrNote": "Simpan Catatan",
-    "downloadOne": "Unduh IDP karyawan ini"
+    "downloadOne": "Unduh IDP karyawan ini",
+    "archivedBadge": "Arsip (Resign)",
+    "showArchivedFilter": "Tampilkan arsip",
+    "archivedNotice": "IDP ini diarsipkan karena karyawannya sudah resign. Datanya tetap tersimpan dan bisa dibaca, tetapi tidak bisa diubah lagi."
   }
 }

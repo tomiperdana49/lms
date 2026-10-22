@@ -18,8 +18,15 @@ const reviewMonthStrip = (plan: IDPPlan): { key: string; month: number; reviewed
     }
 
     const now = new Date();
-    const endY = plan.period_year < now.getFullYear() ? plan.period_year : now.getFullYear();
-    const endM = plan.period_year < now.getFullYear() ? 11 : now.getMonth();
+    let endY = plan.period_year < now.getFullYear() ? plan.period_year : now.getFullYear();
+    let endM = plan.period_year < now.getFullYear() ? 11 : now.getMonth();
+
+    // An archived plan's employee has resigned - no review is due after their resign month.
+    const resigned = plan.is_archived && plan.employee_resign_date ? new Date(plan.employee_resign_date) : null;
+    if (resigned && !isNaN(resigned.getTime()) && (resigned.getFullYear() < endY || (resigned.getFullYear() === endY && resigned.getMonth() < endM))) {
+        endY = resigned.getFullYear();
+        endM = resigned.getMonth();
+    }
 
     const months: { key: string; month: number; reviewed: boolean }[] = [];
     let y = startY, m = startM, count = 0;

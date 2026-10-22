@@ -8484,6 +8484,22 @@ app.get('/api/idp/my-plans', async (req, res) => {
 });
 
 // 3. Supervisor's team plans (same org-chart resolution as /api/external-training/subordinates).
+// An IDP is archived once its employee is marked Resign in employees - there's no flag of its own,
+// so it follows the employee's status (and un-archives if they come back). Archived plans stay
+// readable and HR can still delete them, but nothing else can change them.
+const IDP_ARCHIVE_COLUMNS = `
+            (SELECT e.resign_date FROM employees e WHERE e.id_employee = p.employee_id LIMIT 1) AS employee_resign_date,
+            EXISTS (SELECT 1 FROM employees e WHERE e.id_employee = p.employee_id AND e.active_status = 'Resign') AS is_archived`;
+const IDP_ARCHIVED_ERROR = 'This IDP is archived because the employee has resigned, so it can no longer be changed.';
+const isArchivedIdp = async (idpId) => {
+    const rows = await query(
+        `SELECT 1 FROM idp_plans p JOIN employees e ON e.id_employee = p.employee_id
+         WHERE p.id = ? AND e.active_status = 'Resign' LIMIT 1`,
+        [idpId]
+    );
+    return rows.length > 0;
+};
+
 app.get('/api/idp/subordinates', async (req, res) => {
     try {
         const { leader_id } = req.query;
@@ -8498,6 +8514,7 @@ app.get('/api/idp/subordinates', async (req, res) => {
 
         // Interns are excluded here too - they're never eligible for an IDP (see the isInternEmployeeId
         // guard on POST /api/idp), so this list stays consistent even if a stray plan somehow exists.
+        // Resigned employees drop out like everywhere else leader-facing; HR keeps their archived plan.
         const subordinatesResult = await querySimAsset(`
             SELECT id_employee FROM employees
             WHERE (id_report_to_value = ?
@@ -8506,6 +8523,7 @@ app.get('/api/idp/subordinates', async (req, res) => {
                OR id_report_to LIKE ?
                OR id_report_to LIKE ?)
                AND (status_join IS NULL OR status_join != 'Internship')
+               AND (active_status IS NULL OR active_status != 'Resign')
         `, [leaderUserId, leaderFullName, leaderNickName, `${leaderFullName},%`, `%,${leaderFullName},%`]);
 
         const subordinateIds = subordinatesResult.map(s => s.id_employee);
@@ -8570,7 +8588,8 @@ app.get('/api/idp/all', async (req, res) => {
             ) AS reviewed_year_months,
             -- The monthly review strip starts no earlier than the employee's join month, so a
             -- mid-year joiner isn't shown as missing reviews for months before they started.
-            (SELECT e.join_date FROM employees e WHERE e.id_employee = p.employee_id LIMIT 1) AS employee_join_date
+            (SELECT e.join_date FROM employees e WHERE e.id_employee = p.employee_id LIMIT 1) AS employee_join_date,
+            ${IDP_ARCHIVE_COLUMNS}
             FROM idp_plans p
             WHERE NOT EXISTS (
                 SELECT 1 FROM employees e WHERE e.id_employee = p.employee_id AND e.status_join = 'Internship'
@@ -8588,6 +8607,7 @@ app.put('/api/idp/:id', async (req, res) => {
         const { id } = req.params;
         const existing = await query('SELECT status, employee_id FROM idp_plans WHERE id = ?', [id]);
         if (existing.length === 0) return res.status(404).json({ error: 'IDP not found' });
+        if (await isArchivedIdp(id)) return res.status(403).json({ error: IDP_ARCHIVED_ERROR });
         const currentStatus = existing[0].status;
 
         const {
@@ -8640,6 +8660,7 @@ app.post('/api/idp/:id/submit', async (req, res) => {
         const { id } = req.params;
         const rows = await query('SELECT status FROM idp_plans WHERE id = ?', [id]);
         if (rows.length === 0) return res.status(404).json({ error: 'IDP not found' });
+        if (await isArchivedIdp(id)) return res.status(403).json({ error: IDP_ARCHIVED_ERROR });
         if (!['Draft', 'Rejected'].includes(rows[0].status)) {
             return res.status(400).json({ error: 'Only Draft or Rejected plans can be submitted.' });
         }
@@ -8664,6 +8685,7 @@ app.post('/api/idp/:id/approve', async (req, res) => {
         if (!['Approved', 'Rejected'].includes(status)) {
             return res.status(400).json({ error: "status must be 'Approved' or 'Rejected'" });
         }
+        if (await isArchivedIdp(id)) return res.status(403).json({ error: IDP_ARCHIVED_ERROR });
         if (status === 'Rejected') {
             await query('UPDATE idp_plans SET status = ?, rejection_reason = ? WHERE id = ?', [status, rejection_reason || null, id]);
         } else {
@@ -8679,6 +8701,7 @@ app.post('/api/idp/:id/hr-note', async (req, res) => {
     try {
         const { id } = req.params;
         const { hr_note, hr_note_by } = req.body;
+        if (await isArchivedIdp(id)) return res.status(403).json({ error: IDP_ARCHIVED_ERROR });
         await query('UPDATE idp_plans SET hr_note = ?, hr_note_by = ? WHERE id = ?', [hr_note || null, hr_note_by || null, id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -8692,6 +8715,7 @@ app.post('/api/idp/:id/review', async (req, res) => {
         if (!review_date || !supervisor_note) {
             return res.status(400).json({ error: 'review_date and supervisor_note are required' });
         }
+        if (await isArchivedIdp(id)) return res.status(403).json({ error: IDP_ARCHIVED_ERROR });
         const result = await query(
             'INSERT INTO idp_reviews (idp_id, review_date, supervisor_note, reviewed_by) VALUES (?, ?, ?, ?)',
             [id, review_date, supervisor_note, reviewed_by || null]
@@ -8706,8 +8730,9 @@ app.patch('/api/idp/action-items/:itemId', async (req, res) => {
     try {
         const { itemId } = req.params;
         const { is_completed, notes } = req.body;
-        const rows = await query('SELECT is_mandatory FROM idp_action_items WHERE id = ?', [itemId]);
+        const rows = await query('SELECT is_mandatory, idp_id FROM idp_action_items WHERE id = ?', [itemId]);
         if (rows.length === 0) return res.status(404).json({ error: 'Action item not found' });
+        if (await isArchivedIdp(rows[0].idp_id)) return res.status(403).json({ error: IDP_ARCHIVED_ERROR });
         if (rows[0].is_mandatory && is_completed !== undefined) {
             return res.status(400).json({ error: 'The mandatory learning-hours item tracks automatically and cannot be checked manually.' });
         }

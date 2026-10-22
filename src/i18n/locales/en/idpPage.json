@@ -125,6 +125,9 @@
     "hrNoteHint": "Let them know what's missing or what needs to be added to this IDP. This note is visible to the employee and their supervisor.",
     "hrNotePlaceholder": "e.g. The career goal is still too generic, please make it more specific...",
     "saveHrNote": "Save Note",
-    "downloadOne": "Download this employee's IDP"
+    "downloadOne": "Download this employee's IDP",
+    "archivedBadge": "Archived (Resigned)",
+    "showArchivedFilter": "Show archived",
+    "archivedNotice": "This IDP is archived because the employee has resigned. Its data is kept and can still be read, but it can no longer be changed."
   }
 }

@@ -351,7 +351,8 @@
           "tips": [
             "Import never overwrites an existing IDP — it only fills in employee + period combinations that don't have one yet.",
             "Deleting an IDP is permanent and can't be undone — its action plan and review history are deleted with it.",
-            "The supervisor name and review history are a fixed historical record — if an employee's supervisor changes later on, past data doesn't change to match."
+            "The supervisor name and review history are a fixed historical record — if an employee's supervisor changes later on, past data doesn't change to match.",
+            "IDPs of employees who have resigned are archived automatically (labelled \"Archived (Resigned)\"). Archived IDPs are hidden from the list, left out of the \"Not reviewed this month\" filter, and can't be changed. Click \"Show archived\" to see them."
           ]
         }
       }

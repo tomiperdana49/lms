@@ -416,6 +416,9 @@ export interface IDPPlan {
     reviewed_year_months?: string;
     // SimAsset join date (raw, e.g. "2026-04-26") - the monthly review strip starts no earlier than this.
     employee_join_date?: string | null;
+    // HR list only: the employee is marked Resign, so the plan is archived (read-only). MySQL sends 0/1.
+    is_archived?: number | boolean;
+    employee_resign_date?: string | null;
     created_at?: string;
     updated_at?: string;
     // Present only on the single-plan detail endpoint (GET /api/idp/:id)
