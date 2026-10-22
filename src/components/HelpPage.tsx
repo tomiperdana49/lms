@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { HelpCircle, Library, BookOpen, Users, Globe, Lightbulb, ListChecks, GraduationCap, UserCheck, Target, Shield, ClipboardList } from 'lucide-react';
+import { HelpCircle, Library, BookOpen, Users, Globe, Lightbulb, ListChecks, GraduationCap, UserCheck, Target, Shield, ClipboardList, Trophy, BadgeCheck } from 'lucide-react';
 
-export type TopicKey = 'readingLog' | 'onlineModules' | 'trainingInternal' | 'trainingExternal' | 'postTrainingEvaluation' | 'idp';
+export type TopicKey = 'readingLog' | 'onlineModules' | 'trainingInternal' | 'trainingExternal' | 'postTrainingEvaluation' | 'idp' | 'competency' | 'leaderboard';
 export type AudienceKey = 'participant' | 'trainer' | 'employee' | 'supervisor' | 'hr';
 
 export const TOPIC_ICONS: Record<TopicKey, typeof Library> = {
@@ -11,7 +11,9 @@ export const TOPIC_ICONS: Record<TopicKey, typeof Library> = {
     trainingInternal: Users,
     trainingExternal: Globe,
     postTrainingEvaluation: ClipboardList,
-    idp: Target
+    idp: Target,
+    competency: BadgeCheck,
+    leaderboard: Trophy
 };
 
 export const AUDIENCE_ICONS: Record<AudienceKey, typeof Users> = {
@@ -22,7 +24,7 @@ export const AUDIENCE_ICONS: Record<AudienceKey, typeof Users> = {
     hr: Shield
 };
 
-export const TOPIC_ORDER: TopicKey[] = ['readingLog', 'onlineModules', 'trainingInternal', 'trainingExternal', 'postTrainingEvaluation', 'idp'];
+export const TOPIC_ORDER: TopicKey[] = ['readingLog', 'onlineModules', 'trainingInternal', 'trainingExternal', 'postTrainingEvaluation', 'idp', 'competency', 'leaderboard'];
 
 // Topics whose guide differs depending on who's using the feature (e.g. a training session's
 // participant vs. its trainer/host, or IDP's employee/supervisor/HR) render a role sub-selector,
@@ -30,7 +32,8 @@ export const TOPIC_ORDER: TopicKey[] = ['readingLog', 'onlineModules', 'training
 export const TOPIC_AUDIENCES: Partial<Record<TopicKey, AudienceKey[]>> = {
     trainingInternal: ['participant', 'trainer'],
     postTrainingEvaluation: ['participant', 'supervisor'],
-    idp: ['employee', 'supervisor', 'hr']
+    idp: ['employee', 'supervisor', 'hr'],
+    competency: ['employee', 'supervisor']
 };
 
 export interface Step {

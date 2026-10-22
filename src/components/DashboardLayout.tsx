@@ -853,7 +853,9 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onI
         label: string;
         Icon: typeof Library;
     }
-    const helpIndex: HelpIndexEntry[] = TOPIC_ORDER.flatMap((topic): HelpIndexEntry[] => {
+    // The Leaderboard guide only shows when its module is switched on, matching the menu.
+    const helpTopics = TOPIC_ORDER.filter(topic => topic !== 'leaderboard' || config?.moduleLeaderboard);
+    const helpIndex: HelpIndexEntry[] = helpTopics.flatMap((topic): HelpIndexEntry[] => {
         const audiences = TOPIC_AUDIENCES[topic];
         if (!audiences) {
             return [{

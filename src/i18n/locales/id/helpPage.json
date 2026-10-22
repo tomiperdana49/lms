@@ -15,7 +15,9 @@
     "trainingInternal": "Training Internal",
     "trainingExternal": "Training Eksternal",
     "postTrainingEvaluation": "Post Training Evaluation",
-    "idp": "IDP"
+    "idp": "IDP",
+    "leaderboard": "Leaderboard",
+    "competency": "Kompetensi"
   },
   "labels": {
     "purpose": "Untuk apa fitur ini?",
@@ -34,7 +36,7 @@
         },
         {
           "title": "Isi form pelaporan",
-          "description": "Di form \"Laporkan Bacaan Pribadi\", isi Judul Buku, Kategori, Tanggal Mulai, Link Review (Goodreads/Google Drive), dan Foto Bukti Cover, lalu klik \"Simpan Laporan\"."
+          "description": "Di form \"Laporkan Bacaan Pribadi\", isi Judul Buku, Kategori, Tanggal Mulai, Tanggal Selesai, Link Review (Goodreads/Google Drive), dan Foto Bukti Cover, lalu klik \"Simpan Laporan\"."
         },
         {
           "title": "Lanjutkan buku yang belum selesai",
@@ -100,6 +102,10 @@
           "purpose": "Lihat sesi training internal (tatap muka/online) yang kamu ikuti, kerjakan pre-test, post-test, dan feedback, lalu unduh sertifikat.",
           "steps": [
             {
+              "title": "Minta ikut training (opsional)",
+              "description": "Mau ikut training internal yang belum mencantumkan namamu? Buka Kalender, klik training-nya, lalu klik \"Minta Ikut Training\". Permintaanmu menunggu persetujuan HR; begitu disetujui, kamu otomatis tercatat sebagai peserta dan sesinya muncul di daftarmu."
+            },
+            {
               "title": "Buka detail sesi",
               "description": "Klik sesi training di daftarmu untuk membuka detailnya: jadwal, lokasi atau link meeting (untuk sesi online/hybrid), deskripsi, dan link materi presentasi kalau ada."
             },
@@ -121,7 +127,7 @@
             }
           ],
           "tips": [
-            "Tidak ada tombol daftar sendiri untuk sesi Training Internal — sesi dan pesertanya ditentukan oleh HR/Host, kamu hanya perlu mengerjakan sesi yang sudah muncul di daftarmu.",
+            "Tombol \"Minta Ikut Training\" hanya muncul untuk training yang belum ditutup dan jadwalnya hari ini atau nanti. Kalau permintaanmu ditolak HR, alasannya ditampilkan dan kamu bisa klik \"Minta Lagi\".",
             "Kalau ada tombol yang masih abu-abu/terkunci, biasanya karena Host/HR belum membuka tahap itu — bukan karena kamu salah langkah.",
             "Sertifikat baru bisa diunduh setelah HR menutup sesi, bukan langsung setelah kamu selesai mengisi feedback."
           ]
@@ -179,7 +185,7 @@
       "steps": [
         {
           "title": "Ajukan permintaan baru",
-          "description": "Di tab \"Permintaan Saya\", isi form \"Permintaan Baru\": Kategori, Judul/Nama Kursus, Vendor, Lokasi, Tanggal Mulai & Selesai, Biaya Pendaftaran, Metode Pembayaran, dan Link Lampiran (opsional), lalu klik \"Kirim Permintaan\"."
+          "description": "Di tab \"Permintaan Saya\", isi form \"Permintaan Baru\": Kategori, Judul/Nama Kursus, Vendor, Lokasi, dan Tanggal Mulai & Selesai. Kalau training-nya berbayar, centang \"Ada Biaya\" lalu isi Biaya Pendaftaran dan Metode Pembayaran. Tambahkan Lampiran (opsional), lalu klik \"Kirim Permintaan\"."
         },
         {
           "title": "Menunggu persetujuan atasan",
@@ -200,7 +206,9 @@
       ],
       "tips": [
         "Tab \"Persetujuan Tim\" hanya muncul kalau kamu memang punya bawahan yang tercatat di data kepegawaian.",
-        "\"Lihat Detail\" tersedia di kedua tab (Permintaan Saya & Persetujuan Tim) untuk melihat rincian lengkap termasuk sertifikat."
+        "\"Lihat Detail\" tersedia di kedua tab (Permintaan Saya & Persetujuan Tim) untuk melihat rincian lengkap termasuk sertifikat.",
+        "Kategori yang tersedia: \"Pelatihan dengan Sertifikat Kepesertaan\", \"Pelatihan dengan Sertifikasi Kompetensi\", dan \"E-Learning / Pembelajaran Mandiri\".",
+        "Untuk kategori E-Learning / Pembelajaran Mandiri, lampiran bisa berupa file (\"Unggah File\") atau tautan seperti Google Drive (\"Masukkan Tautan\")."
       ]
     },
     "postTrainingEvaluation": {
@@ -283,7 +291,9 @@
           "tips": [
             "Jam learning wajib (48 jam/tahun) dihitung otomatis dari Log Bacaan, Modul Online, dan Training — jangan diisi manual.",
             "Kalau HR meninggalkan \"Catatan HR\", perbaiki IDP sesuai catatan itu sebelum mengajukan ulang.",
-            "Riwayat evaluasi bulanan dari atasan akan muncul di halaman IDP-mu begitu atasan mengisinya."
+            "Riwayat evaluasi bulanan dari atasan akan muncul di halaman IDP-mu begitu atasan mengisinya.",
+            "Karyawan level Staff/Senior Staff tetap menulis IDP sendiri walaupun punya bawahan (misalnya anak magang). IDP bawahanmu tampil di bawah IDP-mu.",
+            "Karyawan baru akan menerima tiket pengingat untuk menulis IDP, dengan tenggat sebulan setelah tanggal bergabung."
           ]
         },
         "supervisor": {
@@ -304,12 +314,13 @@
             },
             {
               "title": "Perbarui checklist progress",
-              "description": "Untuk rencana aksi non-wajib milik anggota tim, kamu bisa mencentang status selesai dan mengisi keterangan progresnya."
+              "description": "Untuk rencana aksi non-wajib milik anggota tim, kamu bisa mencentang status selesai dan mengisi keterangan progresnya. Di baris wajib \"[WAJIB] Jam Learning\", progres jam dihitung otomatis oleh sistem, dan kamu bisa menambahkan catatan di bawahnya."
             }
           ],
           "tips": [
             "Lakukan evaluasi 1-on-1 minimal sebulan sekali; HR bisa melihat status \"Belum direview bulan ini\" untuk IDP yang tertinggal.",
-            "Checklist progress & keterangan rencana aksi cuma bisa diubah oleh atasan langsung — bukan oleh karyawan sendiri atau HR."
+            "Checklist progress & keterangan rencana aksi cuma bisa diubah oleh atasan langsung — bukan oleh karyawan sendiri atau HR.",
+            "Strip riwayat review bulanan di setiap IDP anggota tim menunjukkan bulan mana yang sudah dan belum kamu review."
           ]
         },
         "hr": {
@@ -341,6 +352,89 @@
             "Import tidak pernah menimpa IDP yang sudah ada — hanya mengisi kombinasi karyawan + periode yang belum punya IDP.",
             "Menghapus IDP bersifat permanen dan tidak bisa dibatalkan — rencana aksi & riwayat evaluasinya ikut terhapus.",
             "Nama atasan dan riwayat evaluasi bersifat catatan historis tetap — kalau atasan seorang karyawan berganti di kemudian hari, data lama tidak ikut berubah."
+          ]
+        }
+      }
+    },
+    "leaderboard": {
+      "title": "Leaderboard",
+      "purpose": "Lihat peringkat poin pembelajaranmu dan timmu sepanjang tahun berjalan.",
+      "steps": [
+        {
+          "title": "Buka menu Leaderboard",
+          "description": "Di sidebar, klik \"Leaderboard\". Kartu \"Skor Saya\" di atas menampilkan peringkat, total poin, dan posisi timmu."
+        },
+        {
+          "title": "Pilih tab Perorangan atau Tim",
+          "description": "Tab \"Perorangan\" mengurutkan semua karyawan berdasarkan total poin, sedangkan tab \"Tim\" mengurutkan tim berdasarkan rata-rata poin leader dan bawahan langsungnya. Gunakan kolom pencarian untuk mencari nama, posisi, atau departemen."
+        },
+        {
+          "title": "Lihat rincian poin",
+          "description": "Klik \"Lihat rincian\" untuk melihat dari aktivitas mana saja poinmu berasal: Reading Log, Online Module, Training Internal, Host Training, dan Training Eksternal (plus tugas tim untuk leader)."
+        },
+        {
+          "title": "Pahami cara penilaian",
+          "description": "Bagian \"Cara penilaian\" di halaman Leaderboard menjelaskan berapa poin untuk tiap aktivitas."
+        }
+      ],
+      "tips": [
+        "Poin tidak ada batasnya: semakin banyak aktivitas, semakin banyak poin.",
+        "Buku yang sudah selesai dibaca tetap dihitung walaupun belum diklaim insentif. Buku yang ditolak HR atau dibatalkan tidak dihitung.",
+        "Khusus leader: poin bertambah kalau tugas tim (review IDP bulanan, penilaian kompetensi per kuartal, Post Training Evaluation) dikerjakan, dan berkurang kalau terlewat. Bulan/kuartal yang masih berjalan baru dihitung setelah dikerjakan.",
+        "Kalau muncul pesan akunmu belum terhubung ke data karyawan aktif, hubungi HR."
+      ]
+    },
+    "competency": {
+      "title": "Kompetensi",
+      "audiences": {
+        "employee": {
+          "label": "Sebagai Karyawan",
+          "purpose": "Lihat hasil penilaian kompetensimu dari atasan terhadap standar jabatanmu.",
+          "steps": [
+            {
+              "title": "Buka Kompetensi Saya",
+              "description": "Di sidebar, buka Kompetensi → Kompetensi Saya, lalu pilih kuartal yang ingin dilihat."
+            },
+            {
+              "title": "Baca hasil penilaian",
+              "description": "Untuk setiap kompetensi (Inti, Fungsional, dan Kepemimpinan) terlihat Standar Jabatan, nilai Aktual, dan Gap-nya, beserta nama atasan yang menilai."
+            },
+            {
+              "title": "Cek ringkasan dan catatan atasan",
+              "description": "Di bagian bawah ada Total Skor, % Pencapaian terhadap Standar, jumlah kompetensi yang belum memenuhi standar, Status Kesiapan pada Jabatan, dan Catatan/Rekomendasi Atasan."
+            }
+          ],
+          "tips": [
+            "Halaman ini read-only. Penilaian diisi oleh atasan langsungmu.",
+            "Klik \"Lihat penjelasan\" di Skala Keahlian untuk memahami arti nilai 1 (Basic) sampai 4 (Expert).",
+            "Gap kompetensi yang muncul bisa kamu jadikan bahan untuk Area Pengembangan di IDP-mu."
+          ]
+        },
+        "supervisor": {
+          "label": "Sebagai Atasan Langsung",
+          "purpose": "Nilai kompetensi setiap anggota tim terhadap standar jabatannya setiap kuartal, dan ajukan kompetensi atau standar untuk posisi di timmu.",
+          "steps": [
+            {
+              "title": "Buka Kompetensi Tim",
+              "description": "Di sidebar, buka Kompetensi → Kompetensi Tim. Daftar anggota tim yang report langsung ke kamu akan tampil."
+            },
+            {
+              "title": "Isi penilaian",
+              "description": "Klik nama karyawan, pilih kuartal, lalu beri nilai Aktual (1-4) untuk setiap kompetensi. Skor penilaian sebelumnya ditampilkan sebagai acuan."
+            },
+            {
+              "title": "Tulis catatan dan simpan",
+              "description": "Isi \"Catatan / Rekomendasi Atasan\", lalu klik \"Simpan Penilaian\". Karyawan akan mendapat notifikasi bahwa penilaiannya sudah diisi."
+            },
+            {
+              "title": "Ajukan perubahan di Kamus Kompetensi",
+              "description": "Klik \"Kamus Kompetensi\" untuk menambah, mengubah, atau menghapus kompetensi dan standar untuk posisi di timmu. Semua perubahan baru berlaku setelah disetujui HR."
+            }
+          ],
+          "tips": [
+            "Penilaian satu kuartal terkunci setelah disimpan dan tidak bisa diubah lagi, jadi periksa dulu sebelum klik simpan.",
+            "Untuk posisimu sendiri, kamu hanya bisa mengajukan perubahan Standar. Kompetensinya ditentukan oleh HR.",
+            "Lakukan penilaian untuk setiap anggota tim setiap kuartal. Penilaian yang terlewat mengurangi poin leader di Leaderboard."
           ]
         }
       }

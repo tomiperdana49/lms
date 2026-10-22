@@ -15,7 +15,9 @@
     "trainingInternal": "Internal Training",
     "trainingExternal": "External Training",
     "postTrainingEvaluation": "Post Training Evaluation",
-    "idp": "IDP"
+    "idp": "IDP",
+    "leaderboard": "Leaderboard",
+    "competency": "Competency"
   },
   "labels": {
     "purpose": "What is this feature for?",
@@ -34,7 +36,7 @@
         },
         {
           "title": "Fill in the report form",
-          "description": "In the \"Report Private Reading\" form, fill in Book Title, Category, Start Date, Review Link (Goodreads/Google Drive), and Cover Photo Evidence, then click \"Save Report\"."
+          "description": "In the \"Report Private Reading\" form, fill in Book Title, Category, Start Date, Finish Date, Review Link (Goodreads/Google Drive), and Cover Photo Evidence, then click \"Save Report\"."
         },
         {
           "title": "Finish a book you're still reading",
@@ -100,6 +102,10 @@
           "purpose": "View the internal (in-person/online) training sessions you're on, complete the pre-test, post-test, and feedback, then download your certificate.",
           "steps": [
             {
+              "title": "Request to join a training (optional)",
+              "description": "Want to join an internal training you're not listed on? Open the Calendar, click the training, then click \"Request to Join\". Your request waits for HR approval; once approved, you're added as a participant and the session shows up on your list."
+            },
+            {
               "title": "Open a session's detail",
               "description": "Click a training session in your list to open its details: schedule, location or meeting link (for online/hybrid sessions), description, and a presentation material link if provided."
             },
@@ -121,7 +127,7 @@
             }
           ],
           "tips": [
-            "There's no self-enrollment button for Internal Training sessions — sessions and their participants are set by HR/the Host; you just complete whatever session already shows up on your list.",
+            "The \"Request to Join\" button only shows for trainings that aren't closed yet and are scheduled for today or later. If HR rejects your request, the reason is shown and you can click \"Request Again\".",
             "If a button still looks greyed out/locked, it's almost always because the Host/HR hasn't opened that step yet — not something you're doing wrong.",
             "The certificate only becomes downloadable after HR closes the session, not right after you finish submitting feedback."
           ]
@@ -179,7 +185,7 @@
       "steps": [
         {
           "title": "Submit a new request",
-          "description": "On the \"My Requests\" tab, fill in the \"New Request\" form: Category, Title/Course Name, Vendor, Location, Start & End Date, Registration Fee, Payment Method, and an optional Attachment Link, then click \"Submit Request\"."
+          "description": "On the \"My Requests\" tab, fill in the \"New Request\" form: Category, Title/Course Name, Vendor, Location, and Start & End Date. If the training costs money, tick \"Has a cost\" and fill in the Registration Fee and Payment Method. Add an optional Attachment, then click \"Submit Request\"."
         },
         {
           "title": "Wait for your supervisor's approval",
@@ -200,7 +206,9 @@
       ],
       "tips": [
         "The \"Team Approvals\" tab only appears if you actually have direct reports recorded in the employee data.",
-        "\"Show Detail\" is available on both tabs (My Requests & Team Approvals) to see the full breakdown, including the certificate."
+        "\"Show Detail\" is available on both tabs (My Requests & Team Approvals) to see the full breakdown, including the certificate.",
+        "The available categories are \"Training with Certificate of Participation\", \"Training with Competency Certification\", and \"E-Learning / Self-Paced Learning\".",
+        "For the E-Learning / Self-Paced Learning category, the attachment can be a file (\"Upload File\") or a link such as Google Drive (\"Enter Link\")."
       ]
     },
     "postTrainingEvaluation": {
@@ -283,7 +291,9 @@
           "tips": [
             "The mandatory learning hours item (48 hours/year) is tracked automatically from Reading Log, Online Modules, and Training — don't fill it in manually.",
             "If HR leaves an \"HR Note\", address it before resubmitting your IDP.",
-            "Your supervisor's monthly review history shows up on your IDP page as soon as they log one."
+            "Your supervisor's monthly review history shows up on your IDP page as soon as they log one.",
+            "Staff and Senior Staff employees still write their own IDP even if someone reports to them (for example an intern). Your reports' IDPs show below your own.",
+            "New employees get a reminder ticket to write their IDP, due one month after their join date."
           ]
         },
         "supervisor": {
@@ -304,12 +314,13 @@
             },
             {
               "title": "Update checklist progress",
-              "description": "For a team member's non-mandatory action items, you can check them off as completed and fill in a progress note."
+              "description": "For a team member's non-mandatory action items, you can check them off as completed and fill in a progress note. On the \"[MANDATORY] Learning Hours\" row, the hours are tracked by the system automatically, and you can add a note below them."
             }
           ],
           "tips": [
             "Log a 1-on-1 evaluation at least once a month; HR can see a \"Not reviewed this month\" status for IDPs that have fallen behind.",
-            "Checklist progress and notes on action items can only be changed by the direct supervisor — not by the employee themselves or by HR."
+            "Checklist progress and notes on action items can only be changed by the direct supervisor — not by the employee themselves or by HR.",
+            "The monthly review strip on each team member's IDP shows which months you have and haven't reviewed yet."
           ]
         },
         "hr": {
@@ -341,6 +352,89 @@
             "Import never overwrites an existing IDP — it only fills in employee + period combinations that don't have one yet.",
             "Deleting an IDP is permanent and can't be undone — its action plan and review history are deleted with it.",
             "The supervisor name and review history are a fixed historical record — if an employee's supervisor changes later on, past data doesn't change to match."
+          ]
+        }
+      }
+    },
+    "leaderboard": {
+      "title": "Leaderboard",
+      "purpose": "See the learning-points ranking for you and your team over the current year.",
+      "steps": [
+        {
+          "title": "Open the Leaderboard menu",
+          "description": "In the sidebar, click \"Leaderboard\". The \"My Score\" card at the top shows your rank, total points, and where your team stands."
+        },
+        {
+          "title": "Pick the Individual or Team tab",
+          "description": "The \"Individual\" tab ranks every employee by total points; the \"Team\" tab ranks teams by the average points of the leader and their direct reports. Use the search box to look up a name, position, or department."
+        },
+        {
+          "title": "View the points breakdown",
+          "description": "Click \"Show breakdown\" to see which activities your points came from: Reading Log, Online Module, Internal Training, Training Host, and External Training (plus team duties for leaders)."
+        },
+        {
+          "title": "Learn how scoring works",
+          "description": "The \"How it's scored\" section on the Leaderboard page explains how many points each activity is worth."
+        }
+      ],
+      "tips": [
+        "Points are uncapped: the more activities you complete, the more points you earn.",
+        "Finished books count even if you haven't claimed the incentive yet. Books rejected by HR or canceled don't count.",
+        "Leaders only: points go up when team duties (monthly IDP reviews, quarterly competency assessments, Post Training Evaluations) are done, and go down when they're missed. The month or quarter in progress only counts once it's done.",
+        "If you see a message that your account isn't linked to active employee data, contact HR."
+      ]
+    },
+    "competency": {
+      "title": "Competency",
+      "audiences": {
+        "employee": {
+          "label": "As an Employee",
+          "purpose": "View your supervisor's assessment of your competencies against your position's standard.",
+          "steps": [
+            {
+              "title": "Open My Competency",
+              "description": "In the sidebar, open Competency → My Competency, then pick the quarter you want to view."
+            },
+            {
+              "title": "Read the assessment",
+              "description": "For each competency (Core, Functional, and Leadership) you can see the Position Standard, the Actual score, and the Gap, along with the name of the supervisor who assessed you."
+            },
+            {
+              "title": "Check the summary and your supervisor's notes",
+              "description": "At the bottom are the Total Score, % Achievement against Standard, the number of competencies below standard, your Position Readiness Status, and your supervisor's Notes/Recommendations."
+            }
+          ],
+          "tips": [
+            "This page is read-only. Your direct supervisor fills in the assessment.",
+            "Click \"View explanation\" on the Proficiency Scale to see what scores 1 (Basic) through 4 (Expert) mean.",
+            "Use any competency gaps as input for the Development Areas in your IDP."
+          ]
+        },
+        "supervisor": {
+          "label": "As a Direct Supervisor",
+          "purpose": "Assess each team member's competencies against their position's standard every quarter, and propose competencies or standards for positions on your team.",
+          "steps": [
+            {
+              "title": "Open Team Competencies",
+              "description": "In the sidebar, open Competency → Team Competencies. The team members who report directly to you are listed."
+            },
+            {
+              "title": "Fill in the assessment",
+              "description": "Click an employee, pick the quarter, then give an Actual score (1-4) for each competency. The previous assessment's scores are shown for reference."
+            },
+            {
+              "title": "Write notes and save",
+              "description": "Fill in \"Notes / Supervisor's Recommendation\", then click \"Save Assessment\". The employee gets a notification that their assessment is in."
+            },
+            {
+              "title": "Propose changes in the Competency Dictionary",
+              "description": "Click \"Competency Dictionary\" to add, edit, or delete competencies and standards for positions on your team. No change takes effect until HR approves it."
+            }
+          ],
+          "tips": [
+            "A quarter's assessment is locked once saved and can't be changed, so double-check before you save.",
+            "For your own position, you can only propose a change to the Standard. HR sets the competencies themselves.",
+            "Assess every team member each quarter. Missed assessments lower a leader's points on the Leaderboard."
           ]
         }
       }
