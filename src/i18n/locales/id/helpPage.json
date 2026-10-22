@@ -428,12 +428,12 @@
             },
             {
               "title": "Ajukan perubahan di Kamus Kompetensi",
-              "description": "Klik \"Kamus Kompetensi\" untuk menambah, mengubah, atau menghapus kompetensi dan standar untuk posisi di timmu. Semua perubahan baru berlaku setelah disetujui HR."
+              "description": "Klik \"Kamus Kompetensi\" untuk mengajukan perubahan kompetensi bagi posisi anggota timmu. Untuk Kompetensi Inti, kamu hanya bisa mengubah skor Standar. Untuk Kompetensi Fungsional, kamu bisa menambah, mengubah, atau menghapus kompetensinya. Semua perubahan baru berlaku setelah disetujui HR."
             }
           ],
           "tips": [
             "Penilaian satu kuartal terkunci setelah disimpan dan tidak bisa diubah lagi, jadi periksa dulu sebelum klik simpan.",
-            "Untuk posisimu sendiri, kamu hanya bisa mengajukan perubahan Standar. Kompetensinya ditentukan oleh HR.",
+            "Isi Kompetensi Inti (nama dan definisinya) ditentukan oleh HR. Kamu hanya bisa mengajukan perubahan skor Standar-nya, tidak bisa mengubah isinya.",
             "Lakukan penilaian untuk setiap anggota tim setiap kuartal. Penilaian yang terlewat mengurangi poin leader di Leaderboard."
           ]
         }

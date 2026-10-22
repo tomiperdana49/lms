@@ -428,12 +428,12 @@
             },
             {
               "title": "Propose changes in the Competency Dictionary",
-              "description": "Click \"Competency Dictionary\" to add, edit, or delete competencies and standards for positions on your team. No change takes effect until HR approves it."
+              "description": "Click \"Competency Dictionary\" to propose competency changes for your team members' positions. For Core Competencies you can only change the Standard score. For Functional Competencies you can add, edit, or delete them. No change takes effect until HR approves it."
             }
           ],
           "tips": [
             "A quarter's assessment is locked once saved and can't be changed, so double-check before you save.",
-            "For your own position, you can only propose a change to the Standard. HR sets the competencies themselves.",
+            "The content of Core Competencies (name and definition) is set by HR. You can only propose a change to their Standard score, not to what they say.",
             "Assess every team member each quarter. Missed assessments lower a leader's points on the Leaderboard."
           ]
         }

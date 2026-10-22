@@ -66,7 +66,7 @@
     "openButton": "Competency Dictionary",
     "title": "Competency Dictionary",
     "subtitle": "Propose competencies and standards for your team's position(s). Nothing takes effect until HR approves it.",
-    "standardOnlyNotice": "Defined by HR. You can only propose a Standard change for your own position."
+    "standardOnlyNotice": "Defined by HR. You can only propose a change to the Standard score, not to the competency itself."
   },
   "templateActions": {
     "add": "Add",
