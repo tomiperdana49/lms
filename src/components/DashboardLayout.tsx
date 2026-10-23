@@ -65,7 +65,7 @@ interface DashboardLayoutProps {
     onStopImpersonating: () => Promise<void>;
     onLogout: () => void;
     adminView?: string;
-    config?: { moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean; moduleIDP: boolean; moduleLeaderboard?: boolean };
+    config?: { moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean; moduleIDP: boolean; moduleLeaderboard?: boolean; modulePTE?: boolean };
 }
 
 const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onImpersonate, onStopImpersonating, onLogout, adminView, config }: DashboardLayoutProps) => {
@@ -711,7 +711,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onI
                 // synthetic `id` above is only for per-category read/unread tracking and is not
                 // comparable across categories (each has its own numeric offset), so it must not
                 // be used for ordering.
-                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpStatusNotifs, ...idpNoteNotifs, ...idpSubmittedNotifs, ...idpReviewNotifs, ...pteLeaderNotifs, ...pteMineNotifs, ...incentiveNotifs, ...competencySubmittedNotifs, ...competencyStatusNotifs, ...myCompetencyAssessmentNotifs, ...ccBudgetNotifs, ...joinRequestHrNotifs, ...joinRequestStatusNotifs].sort((a, b) => b.sortTime - a.sortTime);
+                const all = [...meetingNotifs, ...trainingNotifs, ...readingNotifs, ...hostPaymentNotifs, ...externalTrainingLeaderNotifs, ...externalTrainingStatusNotifs, ...internalTrainingDeletedNotifs, ...externalTrainingDeletedNotifs, ...idpStatusNotifs, ...idpNoteNotifs, ...idpSubmittedNotifs, ...idpReviewNotifs, ...(config?.modulePTE ? [...pteLeaderNotifs, ...pteMineNotifs] : []), ...incentiveNotifs, ...competencySubmittedNotifs, ...competencyStatusNotifs, ...myCompetencyAssessmentNotifs, ...ccBudgetNotifs, ...joinRequestHrNotifs, ...joinRequestStatusNotifs].sort((a, b) => b.sortTime - a.sortTime);
                 setNotifications(all);
             } catch (error) {
                 console.error("Failed to fetch header notifications", error);
@@ -723,7 +723,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onI
         // Refresh notifications every 60 seconds
         const interval = setInterval(fetchNotifications, 60000);
         return () => clearInterval(interval);
-    }, [user, userRole, i18n.language]);
+    }, [user, userRole, i18n.language, config?.modulePTE]);
 
     useEffect(() => {
         if (!isNotificationsOpen) return;
@@ -790,7 +790,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onI
         ...((config?.moduleInternal || config?.moduleExternal) ? [{ header: t('admin.trainingHeader') }] : []),
         ...(config?.moduleInternal ? [{ icon: Users, label: t('admin.internal'), id: 'admin-dashboard', view: 'meetings' }] : []),
         ...(config?.moduleExternal ? [{ icon: FileText, label: t('admin.external'), id: 'admin-dashboard', view: 'training' }] : []),
-        ...(config?.moduleInternal ? [{ icon: ClipboardList, label: t('admin.postTrainingEvaluation'), id: 'admin-dashboard', view: 'post-training-evaluation' }] : []),
+        ...(config?.moduleInternal && config?.modulePTE ? [{ icon: ClipboardList, label: t('admin.postTrainingEvaluation'), id: 'admin-dashboard', view: 'post-training-evaluation' }] : []),
         { header: t('admin.reportHeader') },
         { icon: Library, label: t('admin.readingLog'), id: 'admin-dashboard', view: 'logs' },
         { icon: Award, label: t('admin.quizReport'), id: 'admin-dashboard', view: 'quiz-reports' },
@@ -831,8 +831,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onI
         ...(config?.moduleExternal ? [{ icon: Globe, label: t('menu.external'), id: 'external' }] : []),
         // Supervisors evaluate their direct reports here after a training session is marked
         // Paid; staff instead get a read-only view scoped to evaluations about themselves.
-        ...(config?.moduleInternal && user?.isSupervisor ? [{ icon: ClipboardList, label: t('menu.pteTeam'), id: 'pte-team' }] : []),
-        ...(config?.moduleInternal && !user?.isSupervisor ? [{ icon: ClipboardList, label: t('menu.pteMine'), id: 'pte-mine' }] : []),
+        ...(config?.moduleInternal && config?.modulePTE && user?.isSupervisor ? [{ icon: ClipboardList, label: t('menu.pteTeam'), id: 'pte-team' }] : []),
+        ...(config?.moduleInternal && config?.modulePTE && !user?.isSupervisor ? [{ icon: ClipboardList, label: t('menu.pteMine'), id: 'pte-mine' }] : []),
     ];
 
     const getInitials = (name: string) => {
@@ -853,8 +853,8 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onI
         label: string;
         Icon: typeof Library;
     }
-    // The Leaderboard guide only shows when its module is switched on, matching the menu.
-    const helpTopics = TOPIC_ORDER.filter(topic => topic !== 'leaderboard' || config?.moduleLeaderboard);
+    // The Leaderboard and Post Training Evaluation guides only show when their module is switched on, matching the menu.
+    const helpTopics = TOPIC_ORDER.filter(topic => (topic !== 'leaderboard' || config?.moduleLeaderboard) && (topic !== 'postTrainingEvaluation' || config?.modulePTE));
     const helpIndex: HelpIndexEntry[] = helpTopics.flatMap((topic): HelpIndexEntry[] => {
         const audiences = TOPIC_AUDIENCES[topic];
         if (!audiences) {

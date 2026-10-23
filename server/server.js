@@ -2845,7 +2845,9 @@ app.get('/api/config', (req, res) => {
         moduleExternal: process.env.module_external === 'true',
         moduleIncentive: process.env.module_incentive_certification === 'true',
         moduleIDP: process.env.module_IDP !== 'false',
-        moduleLeaderboard: isLeaderboardEnabled()
+        moduleLeaderboard: isLeaderboardEnabled(),
+        // Post Training Evaluation menus - closed for now, off unless module_PTE=true.
+        modulePTE: process.env.module_PTE === 'true'
     });
 });
 

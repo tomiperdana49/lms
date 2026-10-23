@@ -167,12 +167,13 @@ function App() {
     return localStorage.getItem('lms_admin_view') || 'overview';
   });
 
-  const [config, setConfig] = useState<{ moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean; moduleIDP: boolean; moduleLeaderboard: boolean }>({
+  const [config, setConfig] = useState<{ moduleInternal: boolean; moduleExternal: boolean; moduleIncentive: boolean; moduleIDP: boolean; moduleLeaderboard: boolean; modulePTE: boolean }>({
     moduleInternal: false,
     moduleExternal: false,
     moduleIncentive: false,
     moduleIDP: false,
-    moduleLeaderboard: false
+    moduleLeaderboard: false,
+    modulePTE: false
   });
 
   useEffect(() => {
@@ -186,7 +187,8 @@ function App() {
             moduleExternal: !!data.moduleExternal,
             moduleIncentive: !!data.moduleIncentive,
             moduleIDP: !!data.moduleIDP,
-            moduleLeaderboard: !!data.moduleLeaderboard
+            moduleLeaderboard: !!data.moduleLeaderboard,
+            modulePTE: !!data.modulePTE
           });
         }
       } catch (err) {
@@ -448,8 +450,8 @@ function App() {
         )}
         {activePage === 'courses' && <CoursePlayer user={user!} />}
         {activePage === 'internal' && <TrainingInternalList userRole={userRole} user={user!} isManagementMode={false} />}
-        {activePage === 'pte-team' && <PostTrainingEvaluationTeam user={user!} />}
-        {activePage === 'pte-mine' && <PostTrainingEvaluationMine user={user!} />}
+        {activePage === 'pte-team' && config.modulePTE && <PostTrainingEvaluationTeam user={user!} />}
+        {activePage === 'pte-mine' && config.modulePTE && <PostTrainingEvaluationMine user={user!} />}
         {activePage === 'help' && <HelpPage />}
         {activePage === 'idp' && <IDPPage currentUser={user} />}
         {activePage === 'competency-team' && <CompetencyTeamPage currentUser={user} />}
@@ -498,6 +500,7 @@ function App() {
             }}
             initialView={adminView}
             focusIdpPlanId={deepLinkRecord.idpPlanId}
+            modulePTE={config.modulePTE}
           />
         )}
       </DashboardLayout>

@@ -34,6 +34,8 @@ interface AdminDashboardProps {
     initialView?: string;
     // IDP plan to open in the IDP view - from an IS5 ticket link (/admin/idp?idp=<id>).
     focusIdpPlanId?: number | null;
+    // Post Training Evaluation is closed unless module_PTE=true (see /api/config).
+    modulePTE?: boolean;
 }
 
 type AdminView = 'overview' | 'users' | 'logs' | 'training' | 'meetings' | 'courses' | 'reports' | 'calendar' | 'quiz-reports' | 'employee-learning-report' | 'idp' | 'post-training-evaluation' | 'competency-template' | 'competency-approvals' | 'competency-overview' | 'activity-logs';
@@ -69,7 +71,7 @@ const StatCard = ({ label, value, icon: Icon, color, trend }: StatCardProps) => 
     );
 };
 
-const AdminDashboard = ({ user, onNavigate, initialView, focusIdpPlanId }: AdminDashboardProps) => {
+const AdminDashboard = ({ user, onNavigate, initialView, focusIdpPlanId, modulePTE }: AdminDashboardProps) => {
     const { t } = useTranslation('adminDashboard');
     const [currentView, setCurrentView] = useState<AdminView>((initialView as AdminView) || 'overview');
     const [meetingsReloadKey, setMeetingsReloadKey] = useState(0);
@@ -153,7 +155,7 @@ const AdminDashboard = ({ user, onNavigate, initialView, focusIdpPlanId }: Admin
             case 'users': return <UserManagement userRole={user.role} onBack={() => setCurrentView('overview')} />;
             case 'logs': return <AdminReadingLog user={user} onBack={() => setCurrentView('overview')} />;
             case 'training': return <TrainingExternalManager userRole={user.role} userName={user.name} />;
-            case 'post-training-evaluation': return <PostTrainingEvaluationManager userName={user.name} />;
+            case 'post-training-evaluation': return modulePTE && <PostTrainingEvaluationManager userName={user.name} />;
             case 'meetings':
                 return (
                     <>
