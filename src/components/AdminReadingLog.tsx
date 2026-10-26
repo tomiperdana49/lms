@@ -644,7 +644,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
     };
 
     const handleVerifyClick = (log: ReadingLogEntry) => {
-        const y = new Date(log.finishDate || log.date).getFullYear();
+        const y = getCutoffYear(log.finishDate || log.date);
         const key = `${log.employee_id || log.userName || 'unknown'}_${y}`;
         const currentSeq = (approvedCounts[key] || 0) + 1;
 
@@ -1543,7 +1543,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         </div>
                         <div className="space-y-4">
                             {(() => {
-                                const y = new Date(verifyModal.log.finishDate || verifyModal.log.date).getFullYear();
+                                const y = getCutoffYear(verifyModal.log.finishDate || verifyModal.log.date);
                                 const key = `${verifyModal.log.employee_id || verifyModal.log.userName || 'unknown'}_${y}`;
                                 const currentSeq = (approvedCounts[key] || 0) + 1;
                                 if (currentSeq === 5) {
@@ -1592,11 +1592,11 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
 
                                 {/* Approved Books History Section */}
                                 {(() => {
-                                    const y = new Date(verifyModal.log.finishDate || verifyModal.log.date).getFullYear();
-                                    const approvedLogs = allLogs.filter(l => 
-                                        areSameUser(verifyModal.log!, l) && 
-                                        l.hrApprovalStatus === 'Approved' && 
-                                        new Date(l.finishDate || l.date).getFullYear() === y
+                                    const y = getCutoffYear(verifyModal.log.finishDate || verifyModal.log.date);
+                                    const approvedLogs = allLogs.filter(l =>
+                                        areSameUser(verifyModal.log!, l) &&
+                                        l.hrApprovalStatus === 'Approved' &&
+                                        getCutoffYear(l.finishDate || l.date) === y
                                     ).sort((a, b) => new Date(a.finishDate || a.date).getTime() - new Date(b.finishDate || b.date).getTime());
 
                                     if (approvedLogs.length === 0) return null;
@@ -1711,7 +1711,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                     className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                                     value={verifyModal.category}
                                     onChange={(e) => {
-                                        const y = new Date(verifyModal.log!.finishDate || verifyModal.log!.date).getFullYear();
+                                        const y = getCutoffYear(verifyModal.log!.finishDate || verifyModal.log!.date);
                                         const key = `${verifyModal.log!.employee_id || verifyModal.log!.userName || 'unknown'}_${y}`;
                                         const isFifth = ((approvedCounts[key] || 0) + 1) === 5;
                                         

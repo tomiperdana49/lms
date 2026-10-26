@@ -595,15 +595,19 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Reading-log incentive claims are capped at 5 (Approved + Pending) per calendar year per employee -
+// Reading-log incentive claims are capped at 5 (Approved + Pending) per incentive year per employee -
 // matches the frontend's claim-button gating in ReadingLogPage.tsx. Enforced here too since the
-// frontend check can't stop a direct API call from bypassing it.
+// frontend check can't stop a direct API call from bypassing it. The incentive year runs 26 Dec - 25 Dec
+// (same cutoff as AdminReadingLog's getCutoffYear), so a book finished on 26-31 Dec counts toward the
+// next year; shifting the date by 6 days lands exactly those days in January.
 const NO_INCENTIVE_CATEGORIES = ['buku fiksi/novel', 'majalah', 'fiction'];
 
 const isIncentiveEligibleCategory = (category) => !NO_INCENTIVE_CATEGORIES.includes((category || '').trim().toLowerCase());
 
 const isUnderIncentiveClaimLimit = async (employeeId, userName, referenceDate) => {
-    const year = new Date(referenceDate || Date.now()).getFullYear();
+    const shifted = new Date(referenceDate || Date.now());
+    shifted.setDate(shifted.getDate() + 6);
+    const year = shifted.getFullYear();
     const identifier = employeeId || userName;
     if (!identifier) return true;
     const matchClause = employeeId ? 'employee_id = ?' : 'user_name = ?';
@@ -612,7 +616,7 @@ const isUnderIncentiveClaimLimit = async (employeeId, userName, referenceDate) =
          WHERE hr_approval_status IN ('Approved', 'Pending')
          AND status != 'Cancelled'
          AND ${matchClause}
-         AND YEAR(COALESCE(finish_date, date)) = ?`,
+         AND YEAR(DATE_ADD(COALESCE(finish_date, date), INTERVAL 6 DAY)) = ?`,
         [identifier, year]
     );
     return (rows[0]?.cnt || 0) < 5;

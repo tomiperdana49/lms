@@ -373,7 +373,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
         "Buku Lainnya"
     ];
 
-    const [filterYear] = useState(new Date().getFullYear());
+    const [filterYear] = useState(getIncentivePeriod(new Date().toISOString()).year);
     const [filterPeriod] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'Reading', 'Approved', 'Pending'
     const [searchQuery, setSearchQuery] = useState('');
@@ -632,7 +632,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
 
                 {/* Logic for Stats */}
                 {(() => {
-                    const approvedLogs = readingLogs.filter(l => l.hrApprovalStatus === 'Approved' && new Date(l.finishDate || l.date).getFullYear() === filterYear);
+                    const approvedLogs = readingLogs.filter(l => l.hrApprovalStatus === 'Approved' && getIncentivePeriod(l.finishDate || l.date).year === filterYear);
                     const totalApproved = approvedLogs.length;
                     const totalEarned = approvedLogs.reduce((acc, log) => acc + Number(log.incentiveAmount || 0), 0);
                     const totalLearningHours = approvedLogs.reduce((acc, log) => {
@@ -663,7 +663,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                     }, 0);
                     const progress = Math.min(100, (totalApproved / 5) * 100);
                     const totalRead = readingLogs.filter(l =>
-                        new Date(l.finishDate || l.date).getFullYear() === filterYear &&
+                        getIncentivePeriod(l.finishDate || l.date).year === filterYear &&
                         l.status === 'Finished'
                     ).length;
 
@@ -843,7 +843,7 @@ const ReadingLogPage = ({ user, onBack }: ReadingLogPageProps) => {
                                                                 // Count Pending (already claimed, awaiting HR review) too - otherwise the limit
                                                                 // never kicks in until HR gets around to approving the backlog, letting the
                                                                 // employee keep claiming past 5.
-                                                                const totalClaimedOrApproved = readingLogs.filter(l => (l.hrApprovalStatus === 'Approved' || l.hrApprovalStatus === 'Pending') && new Date(l.finishDate || l.date).getFullYear() === filterYear).length;
+                                                                const totalClaimedOrApproved = readingLogs.filter(l => (l.hrApprovalStatus === 'Approved' || l.hrApprovalStatus === 'Pending') && getIncentivePeriod(l.finishDate || l.date).year === filterYear).length;
                                                                 if (!isNoIncentive && totalClaimedOrApproved < 5) {
                                                                     return <button onClick={(e) => { e.stopPropagation(); handleClaimIncentive(log.id); }} className="px-4 py-1.5 text-[11px] font-bold bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all shadow-sm flex-1 sm:flex-none text-center">{t('list.claimIncentiveButton')}</button>;
                                                                 }
