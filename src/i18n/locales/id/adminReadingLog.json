@@ -88,6 +88,7 @@
   },
   "verifyModal": {
     "title": "Verifikasi Log Membaca",
+    "verifyingFor": "Karyawan:",
     "milestoneDetected": "Milestone #5 Terdeteksi!",
     "milestoneBonusNote": "Pengguna ini akan menerima bonus tambahan sebesar Rp 500.000.",
     "verifiedBookYear": "Buku Terverifikasi #{{seq}} Tahun {{year}}",

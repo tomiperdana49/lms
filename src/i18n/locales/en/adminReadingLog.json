@@ -88,6 +88,7 @@
   },
   "verifyModal": {
     "title": "Verify Reading Log",
+    "verifyingFor": "Employee:",
     "milestoneDetected": "Milestone #5 Detected!",
     "milestoneBonusNote": "This user will receive an additional Rp 500,000 bonus.",
     "verifiedBookYear": "Verified Book #{{seq}} Year {{year}}",

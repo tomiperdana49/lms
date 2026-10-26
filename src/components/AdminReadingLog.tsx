@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2, RefreshCw, BookOpen, Trophy, ArrowUp, ArrowDown, Save, Download, ZoomIn, ZoomOut, RotateCcw, Upload } from 'lucide-react';
+import { ArrowLeft, Search, CheckCircle, XCircle, Clock, Edit, ExternalLink, Image as ImageIcon, Trash2, RefreshCw, BookOpen, Trophy, ArrowUp, ArrowDown, Save, Download, ZoomIn, ZoomOut, RotateCcw, Upload, User as UserIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry, User, Employee } from '../types';
@@ -1543,6 +1543,20 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                         </div>
                         <div className="space-y-4">
                             {(() => {
+                                // Same lookup as the verification table's employee column.
+                                const log = verifyModal.log;
+                                let emp = users.find(u => log.employee_id && u.employee_id === log.employee_id);
+                                if (!emp) emp = users.find(u => log.userName && u.name && log.userName.trim().toLowerCase() === u.name.trim().toLowerCase());
+                                return (
+                                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs min-w-0">
+                                        <UserIcon size={14} className="text-slate-400 shrink-0" />
+                                        <span className="text-slate-500 shrink-0">{t('verifyModal.verifyingFor')}</span>
+                                        <span className="font-bold text-slate-800 truncate">{emp?.name || log.userName || t('verificationTable.unknown')}</span>
+                                        {emp?.employee_id && <span className="text-slate-400 shrink-0">· {emp.employee_id}</span>}
+                                    </div>
+                                );
+                            })()}
+                            {(() => {
                                 const y = getCutoffYear(verifyModal.log.finishDate || verifyModal.log.date);
                                 const key = `${verifyModal.log.employee_id || verifyModal.log.userName || 'unknown'}_${y}`;
                                 const currentSeq = (approvedCounts[key] || 0) + 1;
@@ -1662,10 +1676,18 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                                             href={verifyModal.log.link || verifyModal.log.review}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="text-blue-600 text-[11px] font-bold hover:underline flex items-center gap-1 w-fit"
+                                            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-md shadow-blue-600/20 transition-colors"
                                         >
-                                            <ExternalLink size={12} /> {t('verifyModal.openReviewLink')}
+                                            <ExternalLink size={16} /> {t('verifyModal.openReviewLink')}
                                         </a>
+                                        {(() => {
+                                            try {
+                                                const host = new URL(verifyModal.log.link || verifyModal.log.review || '').hostname.replace(/^www\./, '');
+                                                return <p className="text-[10px] text-slate-400 text-center mt-1 truncate">{host}</p>;
+                                            } catch {
+                                                return null;
+                                            }
+                                        })()}
                                     </div>
                                 )}
 
