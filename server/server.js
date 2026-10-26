@@ -4923,14 +4923,26 @@ app.post('/api/simas/sync', async (req, res) => {
                             const finishDateRaw = isReturned ? b.loanHistory.return.returnTime : null;
                             const finishDate = finishDateRaw ? parseFlexibleDate(finishDateRaw) : null;
 
-                            // Check if exists
-                            const existing = await query('SELECT * FROM reading_logs WHERE source = ? AND employee_id = ? AND sn = ? AND start_date = ?',
-                                ['SIMAS', targetEid, sn, startDate]);
+                            // Match on the SIMAS loan id, not sn: SIMAS can relabel a book with a new code,
+                            // and matching on sn then synced the same loan in again as a second claimable book.
+                            let existing = await query('SELECT * FROM reading_logs WHERE source = ? AND employee_id = ? AND simas_loan_id = ?',
+                                ['SIMAS', targetEid, uuid]);
+                            if (existing.length === 0) {
+                                // Rows synced before simas_loan_id existed: same loan start, and the same code
+                                // or (after a relabel) the same title. Prefer the live row over a cancelled copy.
+                                existing = await query(
+                                    "SELECT * FROM reading_logs WHERE source = ? AND employee_id = ? AND simas_loan_id IS NULL AND start_date = ? AND (sn = ? OR LOWER(title) = LOWER(?)) ORDER BY (sn = ?) DESC, (status != 'Cancelled') DESC, id LIMIT 1",
+                                    ['SIMAS', targetEid, startDate, sn, b.name, sn]
+                                );
+                                if (existing.length > 0) {
+                                    await query('UPDATE reading_logs SET simas_loan_id = ?, sn = ? WHERE id = ?', [uuid, sn, existing[0].id]);
+                                }
+                            }
 
                             if (existing.length === 0) {
                                 console.log(`[SIMAS SYNC] Inserting new book for ${targetName}: ${b.name}`);
                                 await query(
-                                    'INSERT IGNORE INTO reading_logs (title, author, category, date, review, status, user_name, employee_id, evidence_url, return_evidence_url, start_date, finish_date, hr_approval_status, link, sn, location, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                                    'INSERT IGNORE INTO reading_logs (title, author, category, date, review, status, user_name, employee_id, evidence_url, return_evidence_url, start_date, finish_date, hr_approval_status, link, sn, location, source, simas_loan_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                                     [
                                         b.name, '', normalizeReadingLogCategory(b.subCategory, { source: 'SIMAS' }), startDate,
                                         isReturned ? (b.loanHistory.return.linkReview || '') : '',
@@ -4940,7 +4952,7 @@ app.post('/api/simas/sync', async (req, res) => {
                                         startDate, finishDate,
                                         isReturned ? 'Draft' : null,
                                         isReturned ? (b.loanHistory.return.linkReview || '') : '',
-                                        sn, 'Kantor', 'SIMAS'
+                                        sn, 'Kantor', 'SIMAS', uuid
                                     ]
                                 );
                             } else {

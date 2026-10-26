@@ -212,6 +212,13 @@ export const initDB = async () => {
         } catch (e) { /* Ignore if exists */ }
 
         try {
+            // SIMAS's own key for a loan. Unlike sn (the book's asset code) it doesn't change when
+            // SIMAS relabels the book, which is what let a relabeled loan sync in a second time.
+            await connection.query("ALTER TABLE reading_logs ADD COLUMN simas_loan_id VARCHAR(64)");
+            console.log("Added simas_loan_id column to reading_logs.");
+        } catch (e) { /* Ignore if exists */ }
+
+        try {
             await connection.query("ALTER TABLE meetings ADD COLUMN type VARCHAR(50) DEFAULT 'Offline'");
             console.log("Added type column to meetings.");
         } catch (e) { /* Ignore if exists */ }
