@@ -9278,23 +9278,47 @@ app.put('/api/training/:id', async (req, res) => {
 app.put('/api/external-training/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { cost, costTraining, costTransport, costAccommodation, costOthers, additionalCost, settlementNote, certificateLink, pte_form_id } = req.body;
+        const { costTraining, costTransport, costAccommodation, costOthers, additionalCost, settlementNote, certificateLink, pte_form_id, payment_method, category, title, vendor, location, start_date, end_date, training_gr_type, participation_type, learning_hours, certificate_expiry_date, certification_result } = req.body;
+        const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
+
+        let sql = 'UPDATE external_training_requests SET registration_fee = ?, travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, additional_cost = ?, settlement_note = ?, pte_form_id = ?';
+        const params = [costTraining || 0, costTransport || 0, costAccommodation || 0, costOthers || 0, additionalCost || 0, settlementNote || '', pte_form_id || null];
+        const set = (fragment, ...values) => {
+            sql += `, ${fragment}`;
+            params.push(...values);
+        };
+
+        // The update form after processing mirrors HR's approval form, so the same request details
+        // (learning hours, GRI type, dates, ...) can be corrected here too; undefined leaves a field untouched.
+        if (payment_method !== undefined) set('payment_method = ?', payment_method || null);
+        if (category !== undefined) set('category = ?', category);
+        if (title !== undefined) set('title = ?', title);
+        if (vendor !== undefined) set('vendor = ?', vendor);
+        if (location !== undefined) set('location = ?', location);
+        if (start_date !== undefined) set('start_date = ?', toMysqlDatetime(start_date));
+        if (end_date !== undefined) set('end_date = ?', toMysqlDatetime(end_date));
+        if (training_gr_type !== undefined) set('training_gr_type = ?', training_gr_type || null);
+        if (participation_type !== undefined) set('participation_type = ?', participation_type || null);
+        if (learning_hours !== undefined) set('learning_hours = ?', learning_hours ? Number(learning_hours) : null);
+        if (certification_result !== undefined) set('certification_result = ?', certification_result || null);
+        if (certificate_expiry_date !== undefined) {
+            set('certificate_expiry_date = ?, original_certificate_expiry_date = COALESCE(original_certificate_expiry_date, ?)', certificate_expiry_date || null, certificate_expiry_date || null);
+        }
 
         // certificateLink: a URL replaces the certificate, null removes it, undefined leaves it untouched.
+        let prevCertificateLink = null;
         if (certificateLink !== undefined) {
             const prev = await query('SELECT certificate_link FROM external_training_requests WHERE id = ?', [id]);
-            await query(
-                'UPDATE external_training_requests SET registration_fee = ?, travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, additional_cost = ?, settlement_note = ?, certificate_link = ?, pte_form_id = ? WHERE id = ?',
-                [costTraining || 0, costTransport || 0, costAccommodation || 0, costOthers || 0, additionalCost || 0, settlementNote || '', certificateLink || null, pte_form_id || null, id]
-            );
-            if (prev[0]?.certificate_link && prev[0].certificate_link !== certificateLink) {
-                deleteLocalUpload(prev[0].certificate_link);
-            }
-        } else {
-            await query(
-                'UPDATE external_training_requests SET registration_fee = ?, travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, additional_cost = ?, settlement_note = ?, pte_form_id = ? WHERE id = ?',
-                [costTraining || 0, costTransport || 0, costAccommodation || 0, costOthers || 0, additionalCost || 0, settlementNote || '', pte_form_id || null, id]
-            );
+            prevCertificateLink = prev[0]?.certificate_link || null;
+            set('certificate_link = ?', certificateLink || null);
+        }
+
+        sql += ' WHERE id = ?';
+        params.push(id);
+        await query(sql, params);
+
+        if (prevCertificateLink && prevCertificateLink !== certificateLink) {
+            deleteLocalUpload(prevCertificateLink);
         }
 
         // Settlement happens after the request is already Processed - HR can attach or swap the PTE

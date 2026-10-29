@@ -380,19 +380,16 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
             setHrEditLearningHours(selectedRequest._original?.learning_hours != null ? String(selectedRequest._original.learning_hours) : '');
             setHrEditPteFormId(selectedRequest._original?.pte_form_id ? String(selectedRequest._original.pte_form_id) : '');
             setPteFormSearch('');
+            setIsHrUpdating(false);
+            setHrRemoveCertificate(false);
+            setHrSettlementNote(selectedRequest._original?.settlement_note || '');
         }
     }, [selectedRequest]);
 
-    const [isSettlementOpen, setIsSettlementOpen] = useState(false);
-    const [settleCertificate, setSettleCertificate] = useState<File | null>(null);
-    const [settleRemoveCertificate, setSettleRemoveCertificate] = useState(false);
-    const [settleData, setSettleData] = useState({
-        training: 0,
-        transport: 0,
-        accommodation: 0,
-        others: 0,
-        settlementNotes: ''
-    });
+    // Updating an already-processed request reuses the approval form (same fields), plus settlement notes
+    const [isHrUpdating, setIsHrUpdating] = useState(false);
+    const [hrRemoveCertificate, setHrRemoveCertificate] = useState(false);
+    const [hrSettlementNote, setHrSettlementNote] = useState('');
 
     const periodOptions = [
         "All Year",
@@ -539,57 +536,35 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
         }
     };
 
+    // Required fields shared by HR approval and the post-processing update, which use the same form.
+    // `hasCertificate` is whether a certificate will still be attached once the form is saved.
+    const validateHrForm = (hasCertificate: boolean) => {
+        const requiresCertificateProof = hrEditCategory === 'Sertifikat' && hrCertificationResult === 'Passed';
+        const error =
+            !hrEditTitle.trim() ? 'alerts.titleRequired' :
+            !hrEditVendor.trim() ? 'alerts.vendorRequired' :
+            !hrEditLocation.trim() ? 'alerts.locationRequired' :
+            !hrEditStartDate ? 'alerts.startDateRequired' :
+            !hrEditEndDate ? 'alerts.endDateRequired' :
+            !hrEditGriType ? 'alerts.griTypeRequired' :
+            !hrEditParticipationType ? 'alerts.participationTypeRequired' :
+            (!hrEditLearningHours || Number(hrEditLearningHours) <= 0) ? 'alerts.learningHoursRequired' :
+            !hrEditPteFormId ? 'alerts.pteFormRequired' :
+            (requiresCertificateProof && !hasCertificate) ? 'alerts.certificateEvidenceRequired' :
+            (requiresCertificateProof && !hrCertificateExpiryDate) ? 'alerts.certificateExpiryRequired' :
+            null;
+        if (error) showNotif('error', t(error));
+        return !error;
+    };
+
     const handleApprove = async () => {
         if (!selectedRequest) return;
 
         try {
-            if (!hrEditTitle.trim()) {
-                showNotif('error', t('alerts.titleRequired'));
-                return;
-            }
-            if (!hrEditVendor.trim()) {
-                showNotif('error', t('alerts.vendorRequired'));
-                return;
-            }
-            if (!hrEditLocation.trim()) {
-                showNotif('error', t('alerts.locationRequired'));
-                return;
-            }
-            if (!hrEditStartDate) {
-                showNotif('error', t('alerts.startDateRequired'));
-                return;
-            }
-            if (!hrEditEndDate) {
-                showNotif('error', t('alerts.endDateRequired'));
-                return;
-            }
-            if (!hrEditGriType) {
-                showNotif('error', t('alerts.griTypeRequired'));
-                return;
-            }
-            if (!hrEditParticipationType) {
-                showNotif('error', t('alerts.participationTypeRequired'));
-                return;
-            }
-            if (!hrEditLearningHours || Number(hrEditLearningHours) <= 0) {
-                showNotif('error', t('alerts.learningHoursRequired'));
-                return;
-            }
-            if (!hrEditPteFormId) {
-                showNotif('error', t('alerts.pteFormRequired'));
-                return;
-            }
             let certLink = selectedRequest?._original?.certificate_link;
             const isCertificateCategory = hrEditCategory === 'Sertifikat';
             const requiresCertificateProof = isCertificateCategory && hrCertificationResult === 'Passed';
-            if (requiresCertificateProof && !certLink && !hrCertificateFile) {
-                showNotif('error', t('alerts.certificateEvidenceRequired'));
-                return;
-            }
-            if (requiresCertificateProof && !hrCertificateExpiryDate) {
-                showNotif('error', t('alerts.certificateExpiryRequired'));
-                return;
-            }
+            if (!validateHrForm(!!certLink || !!hrCertificateFile)) return;
             if (requiresCertificateProof && hrGrantIncentive && !hrIncentiveReward) {
                 showNotif('error', t('alerts.incentiveRewardRequired'));
                 return;
@@ -676,66 +651,75 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
         } catch (err) { console.error(err); }
     };
 
-    const handleOpenSettlement = (req: TrainingRequest) => {
-        setSettleData({
-            training: Number(req.costTraining) || Number(req.cost) || 0,
-            transport: Number(req.costTransport) || 0,
-            accommodation: Number(req.costAccommodation) || 0,
-            others: Number(req.costOthers) || 0,
-            settlementNotes: req.rejectionReason || ''
-        });
-        setIsSettlementOpen(true);
-        setSettleCertificate(null);
-        setSettleRemoveCertificate(false);
-    };
-
-    const handleSaveSettlement = async () => {
+    // Saves HR's changes to an already-processed request - same fields as approval, status stays Processed
+    const handleSaveUpdate = async () => {
         if (!selectedRequest) return;
-        if (!hrEditPteFormId) {
-            showNotif('error', t('alerts.pteFormRequired'));
-            return;
-        }
+        const currentCertLink = selectedRequest._original?.certificate_link;
+        if (!validateHrForm(!!hrCertificateFile || (!!currentCertLink && !hrRemoveCertificate))) return;
+        const isCertificateCategory = hrEditCategory === 'Sertifikat';
+        const requiresCertificateProof = isCertificateCategory && hrCertificationResult === 'Passed';
+        setIsSavingDetails(true);
         try {
-            const newTotal = settleData.training + settleData.transport + settleData.accommodation + settleData.others;
+            const newTotal = breakdownCost.training + breakdownCost.transport + breakdownCost.accommodation + breakdownCost.others;
             const excess = Math.max(0, newTotal - (selectedRequest.cost || 0));
 
             // undefined keeps the current certificate, null tells the server to remove it
-            let certLink: string | null | undefined = settleRemoveCertificate ? null : undefined;
-            if (settleCertificate) {
+            let certLink: string | null | undefined = hrRemoveCertificate ? null : undefined;
+            if (hrCertificateFile) {
                 const formData = new FormData();
-                formData.append('file', settleCertificate);
+                formData.append('file', hrCertificateFile);
                 const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
                     method: 'POST',
                     body: formData
                 });
-                if (uploadRes.ok) {
-                    const uploadData = await uploadRes.json();
-                    certLink = uploadData.fileUrl;
+                if (!uploadRes.ok) {
+                    showNotif('error', t('alerts.detailsSaveFailed'));
+                    return;
                 }
+                const uploadData = await uploadRes.json();
+                certLink = uploadData.fileUrl;
             }
 
             const res = await fetch(`${API_BASE_URL}/api/external-training/${selectedRequest.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    cost: newTotal,
-                    costTraining: settleData.training,
-                    costTransport: settleData.transport,
-                    costAccommodation: settleData.accommodation,
-                    costOthers: settleData.others,
+                    costTraining: breakdownCost.training,
+                    costTransport: breakdownCost.transport,
+                    costAccommodation: breakdownCost.accommodation,
+                    costOthers: breakdownCost.others,
                     additionalCost: excess,
-                    settlementNote: settleData.settlementNotes,
+                    settlementNote: hrSettlementNote,
                     certificateLink: certLink,
+                    payment_method: hrPaymentMethod,
+                    certificate_expiry_date: requiresCertificateProof ? hrCertificateExpiryDate : undefined,
+                    certification_result: isCertificateCategory ? hrCertificationResult : undefined,
+                    category: hrEditCategory,
+                    title: hrEditTitle,
+                    vendor: hrEditVendor,
+                    location: hrEditLocation,
+                    start_date: hrEditStartDate,
+                    end_date: hrEditEndDate,
+                    training_gr_type: hrEditGriType || null,
+                    participation_type: hrEditParticipationType || null,
+                    learning_hours: hrEditLearningHours ? Number(hrEditLearningHours) : null,
                     pte_form_id: hrEditPteFormId ? Number(hrEditPteFormId) : null
                 })
             });
 
             if (res.ok) {
                 await fetchRequests();
-                setIsSettlementOpen(false);
                 setSelectedRequest(null);
+                showNotif('success', t('alerts.detailsSaved'));
+            } else {
+                showNotif('error', t('alerts.detailsSaveFailed'));
             }
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error("Save update failed", err);
+            showNotif('error', t('alerts.detailsSaveFailed'));
+        } finally {
+            setIsSavingDetails(false);
+        }
     };
 
     // --- Statistics ---
@@ -1348,14 +1332,39 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
 
             {/* Modal Components */}
             {selectedRequest && (() => {
-                const isHrEditable = (userRole === 'HR' || userRole === 'HR_ADMIN') && selectedRequest.status === 'PENDING_HR';
+                const isHr = userRole === 'HR' || userRole === 'HR_ADMIN';
+                const isUpdatingProcessed = isHr && selectedRequest.status === 'APPROVED' && isHrUpdating;
+                const isHrEditable = isHr && (selectedRequest.status === 'PENDING_HR' || isUpdatingProcessed);
+                const currentCertificateNote = selectedRequest._original?.certificate_link && !hrCertificateFile && (
+                    isUpdatingProcessed ? (
+                        <div className="flex items-center justify-between gap-3 mt-2 px-4 py-2 rounded-xl border border-slate-200 bg-slate-50">
+                            {hrRemoveCertificate ? (
+                                <>
+                                    <span className="text-xs font-semibold text-rose-600">{t('settlementModal.certificateWillBeRemoved')}</span>
+                                    <button type="button" onClick={() => setHrRemoveCertificate(false)} className="text-xs font-bold text-indigo-600 hover:underline">{t('settlementModal.undoRemoveCertificate')}</button>
+                                </>
+                            ) : (
+                                <>
+                                    <a href={resolveFileUrl(selectedRequest._original.certificate_link)} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs font-bold text-emerald-600 hover:underline truncate">
+                                        <Award size={14} /> {t('settlementModal.viewCurrentCertificate')}
+                                    </a>
+                                    <button type="button" onClick={() => setHrRemoveCertificate(true)} className="flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700">
+                                        <Trash2 size={14} /> {t('settlementModal.removeCertificate')}
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    ) : (
+                        <p className="text-xs text-emerald-600 mt-1">{t('requestModal.certificateAlreadyUploaded')}</p>
+                    )
+                );
                 return (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
                             <div>
                                 <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                                    <Briefcase size={20} className="text-indigo-600" /> {t('requestModal.processTitle')}
+                                    <Briefcase size={20} className="text-indigo-600" /> {isUpdatingProcessed ? t('requestModal.updateTitle') : t('requestModal.processTitle')}
                                 </h3>
                                 <p className="text-sm text-slate-500">{t('requestModal.ltrId', { id: selectedRequest.id, name: selectedRequest.employeeName })}</p>
                             </div>
@@ -1527,7 +1536,7 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                 </div>
                             )}
 
-                            {(userRole === 'HR' || userRole === 'HR_ADMIN') && selectedRequest.status === 'PENDING_HR' && (
+                            {isHrEditable && (
                                 <>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
@@ -1688,9 +1697,7 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                                     onChange={(e) => setHrCertificateFile(e.target.files ? e.target.files[0] : null)}
                                                     className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none text-sm"
                                                 />
-                                                {selectedRequest._original?.certificate_link && !hrCertificateFile && (
-                                                    <p className="text-xs text-emerald-600 mt-1">{t('requestModal.certificateAlreadyUploaded')}</p>
-                                                )}
+                                                {currentCertificateNote}
                                             </div>
                                             )}
                                             {hrCertificationResult === 'Passed' && (
@@ -1706,7 +1713,8 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                                 />
                                             </div>
                                             )}
-                                            {hrCertificationResult === 'Passed' && (
+                                            {/* Incentives for an already-processed certificate go through Renew Certificate */}
+                                            {hrCertificationResult === 'Passed' && !isUpdatingProcessed && (
                                             <div className="pt-2 border-t border-slate-100">
                                                 <label className="flex items-center gap-2 cursor-pointer select-none">
                                                     <input
@@ -1774,9 +1782,19 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                                 onChange={(e) => setHrCertificateFile(e.target.files ? e.target.files[0] : null)}
                                                 className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none text-sm"
                                             />
-                                            {selectedRequest._original?.certificate_link && !hrCertificateFile && (
-                                                <p className="text-xs text-emerald-600 mt-1">{t('requestModal.certificateAlreadyUploaded')}</p>
-                                            )}
+                                            {currentCertificateNote}
+                                        </div>
+                                    )}
+                                    {isUpdatingProcessed && (
+                                        <div className="mt-4">
+                                            <label className="block text-sm font-semibold text-slate-700 mb-1">{t('settlementModal.settlementNotes')}</label>
+                                            <textarea
+                                                rows={3}
+                                                placeholder={t('settlementModal.settlementNotesPlaceholder')}
+                                                value={hrSettlementNote}
+                                                onChange={(e) => setHrSettlementNote(e.target.value)}
+                                                className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 focus:border-indigo-500 outline-none text-sm resize-none"
+                                            />
                                         </div>
                                     )}
                                 </>
@@ -1785,7 +1803,7 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                         </div>
 
                         <div className="p-6 border-t border-slate-100 bg-slate-50 flex flex-wrap gap-3 rounded-b-2xl">
-                            {isHrEditable && (
+                            {isHr && selectedRequest.status === 'PENDING_HR' && (
                                 <button
                                     onClick={handleSaveDetails}
                                     disabled={isSavingDetails}
@@ -1794,14 +1812,21 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                     {isSavingDetails ? t('requestModal.saving') : t('requestModal.save')}
                                 </button>
                             )}
-                            {((userRole === 'HR' || userRole === 'HR_ADMIN') && selectedRequest.status === 'PENDING_HR') && (
+                            {isHr && selectedRequest.status === 'PENDING_HR' && (
                                 <button onClick={() => setIsApproveConfirmOpen(true)} className="flex-[2] py-2 bg-indigo-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-indigo-700 transition-colors">{t('requestModal.approveRequest')}</button>
                             )}
 
-                            {selectedRequest.status === 'APPROVED' && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
-                                <button onClick={() => handleOpenSettlement(selectedRequest)} className="flex-[2] py-2 bg-emerald-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-emerald-700 transition-colors">{t('requestModal.updateSettlement')}</button>
+                            {isUpdatingProcessed && (
+                                <>
+                                    {/* Re-selecting the same request resets every field back to its saved value */}
+                                    <button onClick={() => setSelectedRequest({ ...selectedRequest })} disabled={isSavingDetails} className="flex-1 py-2 bg-white text-slate-500 font-bold rounded-xl text-sm border border-slate-200 shadow-sm hover:bg-slate-100 transition-colors disabled:opacity-60">{t('requestModal.cancel')}</button>
+                                    <button onClick={handleSaveUpdate} disabled={isSavingDetails} className="flex-[2] py-2 bg-emerald-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-emerald-700 transition-colors disabled:opacity-60">{isSavingDetails ? t('requestModal.saving') : t('requestModal.saveChanges')}</button>
+                                </>
                             )}
-                            {selectedRequest.status === 'APPROVED' && selectedRequest.employeeRole === 'Sertifikat' && selectedRequest.certificateExpiryDate && (userRole === 'HR' || userRole === 'HR_ADMIN') && (
+                            {isHr && selectedRequest.status === 'APPROVED' && !isHrUpdating && (
+                                <button onClick={() => setIsHrUpdating(true)} className="flex-[2] py-2 bg-emerald-600 text-white font-bold rounded-xl text-sm shadow-md hover:bg-emerald-700 transition-colors">{t('requestModal.updateData')}</button>
+                            )}
+                            {selectedRequest.status === 'APPROVED' && !isHrUpdating && selectedRequest.employeeRole === 'Sertifikat' && selectedRequest.certificateExpiryDate && isHr && (
                                 <button onClick={() => openRenewModal(selectedRequest)} className="flex-[2] py-2 bg-amber-500 text-white font-bold rounded-xl text-sm shadow-md hover:bg-amber-600 transition-colors flex items-center justify-center gap-1.5">
                                     <Award size={16} /> {t('requestModal.renewCertificate')}
                                 </button>
@@ -1810,162 +1835,6 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                     </div>
                 </div>
                 ); })()}
-
-            {/* Settlement Modal */}
-            {isSettlementOpen && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
-                        <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 shrink-0">
-                            <div>
-                                <h2 className="font-black text-2xl text-slate-900 tracking-tight">{t('settlementModal.title')}</h2>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{t('settlementModal.subtitle')}</p>
-                            </div>
-                            <button onClick={() => setIsSettlementOpen(false)} className="p-3 hover:bg-slate-100 rounded-2xl text-slate-300 transition-colors"><XCircle size={24} /></button>
-                        </div>
-
-                        <div className="p-6 space-y-6 overflow-y-auto">
-                            <div className="grid grid-cols-2 gap-4">
-                                {[
-                                    { label: t('settlementModal.trainingCost'), field: 'training' },
-                                    { label: t('settlementModal.transport'), field: 'transport' },
-                                    { label: t('settlementModal.accommodation'), field: 'accommodation' },
-                                    { label: t('settlementModal.others'), field: 'others' }
-                                ].map((item) => (
-                                    <div key={item.field}>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{item.label}</label>
-                                        <div className="relative">
-                                            <span className="absolute left-4 top-3 text-xs font-black text-slate-300">Rp</span>
-                                            <input
-                                                type="text"
-                                                value={new Intl.NumberFormat('id-ID').format((settleData as any)[item.field])}
-                                                onChange={(e) => {
-                                                    const val = Number(e.target.value.replace(/\D/g, ''));
-                                                    setSettleData(prev => ({ ...prev, [item.field]: val }));
-                                                }}
-                                                className="w-full pl-10 pr-4 py-2.5 rounded-2xl border-2 border-slate-100 focus:border-emerald-500 outline-none text-sm font-black text-slate-700 bg-white transition-all"
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="bg-emerald-900 p-5 rounded-xl text-white shadow-xl shadow-emerald-100">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">{t('settlementModal.totalActualExpenditure')}</span>
-                                    <span className="text-2xl font-black">
-                                        {formatCurrency(settleData.training + settleData.transport + settleData.accommodation + settleData.others)}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{t('settlementModal.uploadCertificateEvidenceOptional')}</label>
-                                {selectedRequest?._original?.certificate_link && !settleCertificate && (
-                                    <div className="flex items-center justify-between gap-3 mb-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50">
-                                        {settleRemoveCertificate ? (
-                                            <>
-                                                <span className="text-xs font-semibold text-rose-600">{t('settlementModal.certificateWillBeRemoved')}</span>
-                                                <button type="button" onClick={() => setSettleRemoveCertificate(false)} className="text-xs font-bold text-indigo-600 hover:underline">{t('settlementModal.undoRemoveCertificate')}</button>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <a href={resolveFileUrl(selectedRequest._original.certificate_link)} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs font-bold text-emerald-600 hover:underline truncate">
-                                                    <Award size={14} /> {t('settlementModal.viewCurrentCertificate')}
-                                                </a>
-                                                <button type="button" onClick={() => setSettleRemoveCertificate(true)} className="flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700">
-                                                    <Trash2 size={14} /> {t('settlementModal.removeCertificate')}
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
-                                <input
-                                    type="file"
-                                    accept="image/*,.pdf"
-                                    onChange={(e) => setSettleCertificate(e.target.files ? e.target.files[0] : null)}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm text-slate-600 bg-white"
-                                />
-                            </div>
-
-                            {/* Post Training Evaluation - HR can attach or swap the linked form here too, same as
-                                Internal Training letting HR edit it after the session is already Paid. */}
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{t('requestModal.pteFormLabel')} <span className="text-red-500">*</span></label>
-                                <div className="relative" ref={pteFormDropdownRef}>
-                                    <input
-                                        type="text"
-                                        title={pteFormOptions.find(f => String(f.id) === hrEditPteFormId)?.title || t('requestModal.selectPteFormPlaceholder')}
-                                        placeholder={pteFormOptions.find(f => String(f.id) === hrEditPteFormId)?.title || t('requestModal.selectPteFormPlaceholder')}
-                                        className="w-full pl-4 pr-10 py-2.5 rounded-2xl border-2 border-slate-100 focus:border-emerald-500 outline-none text-sm font-black text-slate-700 bg-white transition-all truncate"
-                                        value={pteFormSearch}
-                                        onFocus={() => setShowPteFormDropdown(true)}
-                                        onChange={(e) => setPteFormSearch(e.target.value)}
-                                    />
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                                        <ClipboardList size={16} />
-                                    </div>
-
-                                    {showPteFormDropdown && (
-                                        <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
-                                            <button
-                                                type="button"
-                                                className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm text-slate-400 italic border-b border-slate-100"
-                                                onClick={() => {
-                                                    setHrEditPteFormId('');
-                                                    setPteFormSearch('');
-                                                    setShowPteFormDropdown(false);
-                                                }}
-                                            >
-                                                {t('requestModal.selectPteFormPlaceholder')}
-                                            </button>
-                                            {(() => {
-                                                const filtered = pteFormOptions.filter(f =>
-                                                    f.title.toLowerCase().includes(pteFormSearch.toLowerCase()) ||
-                                                    (f.category || '').toLowerCase().includes(pteFormSearch.toLowerCase())
-                                                );
-                                                if (filtered.length === 0) {
-                                                    return <div className="p-4 text-center text-xs text-slate-400 italic">{t('requestModal.noMatchingPteForms')}</div>;
-                                                }
-                                                return filtered.map(f => (
-                                                    <button
-                                                        key={f.id}
-                                                        type="button"
-                                                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm text-slate-700 font-semibold"
-                                                        onClick={() => {
-                                                            setHrEditPteFormId(String(f.id));
-                                                            setPteFormSearch('');
-                                                            setShowPteFormDropdown(false);
-                                                        }}
-                                                    >
-                                                        {f.category && <span className="text-indigo-600">[{f.category}] </span>}
-                                                        {f.title}
-                                                    </button>
-                                                ));
-                                            })()}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{t('settlementModal.settlementNotes')}</label>
-                                <textarea
-                                    className="w-full px-6 py-4 rounded-lg bg-slate-50 border border-slate-100 focus:bg-white outline-none font-bold text-slate-700 text-sm resize-none"
-                                    rows={3}
-                                    placeholder={t('settlementModal.settlementNotesPlaceholder')}
-                                    value={settleData.settlementNotes}
-                                    onChange={(e) => setSettleData(prev => ({ ...prev, settlementNotes: e.target.value }))}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="p-5 bg-slate-50 border-t border-slate-100 flex justify-end gap-4 shrink-0">
-                            <button onClick={() => setIsSettlementOpen(false)} className="px-8 py-3 bg-white text-slate-400 rounded-2xl font-black text-xs tracking-widest border border-slate-200">{t('settlementModal.cancel')}</button>
-                            <button onClick={handleSaveSettlement} className="px-8 py-3 bg-emerald-600 text-white rounded-2xl font-black text-xs tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all">{t('settlementModal.confirmSettlement')}</button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {renewTarget && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in">

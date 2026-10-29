@@ -118,25 +118,18 @@
     "approveRequest": "Setujui Permintaan",
     "save": "Simpan",
     "saving": "Menyimpan...",
-    "updateSettlement": "Perbarui Penyelesaian"
+    "updateData": "Perbarui Data",
+    "updateTitle": "Perbarui Data Pelatihan",
+    "saveChanges": "Simpan Perubahan"
   },
   "settlementModal": {
-    "title": "Alokasi Biaya",
-    "subtitle": "Tinjauan Pengeluaran Aktual Akhir",
-    "trainingCost": "Biaya Pelatihan",
-    "transport": "Transportasi",
-    "accommodation": "Akomodasi",
-    "others": "Lainnya",
-    "totalActualExpenditure": "Total Pengeluaran Aktual",
-    "uploadCertificateEvidenceOptional": "Unggah Bukti Sertifikat (Opsional untuk Diperbarui)",
     "viewCurrentCertificate": "Lihat sertifikat saat ini",
     "removeCertificate": "Hapus",
     "certificateWillBeRemoved": "Sertifikat akan dihapus saat disimpan.",
     "undoRemoveCertificate": "Batalkan",
     "settlementNotes": "Catatan Penyelesaian",
     "settlementNotesPlaceholder": "Tambahkan catatan untuk departemen keuangan...",
-    "cancel": "BATAL",
-    "confirmSettlement": "KONFIRMASI PENYELESAIAN"
+    "cancel": "BATAL"
   },
   "alerts": {
     "rejectionReasonRequired": "Silakan berikan alasan penolakan.",
