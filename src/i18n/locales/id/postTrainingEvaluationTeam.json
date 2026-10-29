@@ -18,5 +18,6 @@
   "loadingForm": "Memuat form...",
   "textPlaceholder": "Tulis jawaban Anda di sini...",
   "sending": "Mengirim...",
-  "submitButton": "KIRIM EVALUASI"
+  "submitButton": "KIRIM EVALUASI",
+  "byVendor": "oleh {{vendor}}"
 }

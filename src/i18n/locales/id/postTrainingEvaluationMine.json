@@ -13,5 +13,6 @@
   "viewButton": "Lihat",
   "score": "Nilai: {{score}} / 4",
   "formHeader": "POST TRAINING EVALUATION",
-  "loadingForm": "Memuat form..."
+  "loadingForm": "Memuat form...",
+  "byVendor": "oleh {{vendor}}"
 }

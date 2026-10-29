@@ -13,5 +13,6 @@
   "viewButton": "View",
   "score": "Score: {{score}} / 4",
   "formHeader": "POST TRAINING EVALUATION",
-  "loadingForm": "Loading form..."
+  "loadingForm": "Loading form...",
+  "byVendor": "by {{vendor}}"
 }

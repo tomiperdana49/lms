@@ -18,5 +18,6 @@
   "loadingForm": "Loading form...",
   "textPlaceholder": "Write your answer here...",
   "sending": "Sending...",
-  "submitButton": "SUBMIT EVALUATION"
+  "submitButton": "SUBMIT EVALUATION",
+  "byVendor": "by {{vendor}}"
 }

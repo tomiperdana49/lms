@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ClipboardList, X, UsersRound, CheckCircle2 } from 'lucide-react';
+import { ClipboardList, X, UsersRound, CheckCircle2, CalendarDays } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { User } from '../types';
@@ -9,6 +9,8 @@ interface EvaluationItem {
     formTitle: string;
     externalTrainingRequestId: number;
     externalTrainingTitle: string | null;
+    externalTrainingVendor: string | null;
+    externalTrainingStartDate: string | null;
     externalTrainingDate: string | null;
     evaluateeEmployeeId: string;
     evaluateeName: string;
@@ -20,7 +22,37 @@ interface EvaluationItem {
 // Every item is one External Training request.
 const contextKey = (item: EvaluationItem) => `e${item.externalTrainingRequestId}`;
 const contextTitle = (item: EvaluationItem) => item.externalTrainingTitle ?? '';
-const contextDate = (item: EvaluationItem) => item.externalTrainingDate;
+const formatDate = (value: string) => new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+// "18 Jul 2026" for a one-day training, "17 Jul 2026 – 18 Jul 2026" when it spans several days.
+const contextDateRange = (item: EvaluationItem) => {
+    const end = item.externalTrainingDate;
+    const start = item.externalTrainingStartDate;
+    if (!end) return start ? formatDate(start) : null;
+    if (!start || formatDate(start) === formatDate(end)) return formatDate(end);
+    return `${formatDate(start)} – ${formatDate(end)}`;
+};
+
+// Which training is being evaluated - title, organizer and when - so the supervisor can tell
+// trainings apart without opening them.
+const TrainingContext = ({ item }: { item: EvaluationItem }) => {
+    const { t } = useTranslation('postTrainingEvaluationTeam');
+    const dateRange = contextDateRange(item);
+    return (
+        <>
+            <p className="text-sm font-semibold text-slate-600 truncate">
+                {contextTitle(item)}
+                {item.externalTrainingVendor && (
+                    <span className="font-normal text-slate-500"> {t('byVendor', { vendor: item.externalTrainingVendor })}</span>
+                )}
+            </p>
+            {dateRange && (
+                <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                    <CalendarDays size={12} className="shrink-0" /> {dateRange}
+                </p>
+            )}
+        </>
+    );
+};
 
 interface EvaluationQuestionDTO {
     id: number;
@@ -108,12 +140,7 @@ const PostTrainingEvaluationTeam = ({ user }: { user: User }) => {
                         <div key={`${item.formId}-${contextKey(item)}-${item.evaluateeEmployeeId}`} className="p-4 flex items-center justify-between gap-3">
                             <div className="min-w-0">
                                 <p className="font-bold text-slate-800 truncate">{item.evaluateeName}</p>
-                                <p className="text-sm text-slate-500 truncate">
-                                    {contextTitle(item)} &mdash; {item.formTitle}
-                                    {contextDate(item) && (
-                                        <span className="text-slate-400"> ({new Date(contextDate(item)!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})</span>
-                                    )}
-                                </p>
+                                <TrainingContext item={item} />
                             </div>
                             {item.submitted ? (
                                 <div className="flex items-center gap-3 shrink-0">
