@@ -6,11 +6,8 @@ import type { User } from '../types';
 
 interface EvaluationItem {
     formId: number;
-    meetingId: number | null;
     formTitle: string;
-    meetingTitle: string | null;
-    meetingDate: string | null;
-    externalTrainingRequestId: number | null;
+    externalTrainingRequestId: number;
     externalTrainingTitle: string | null;
     externalTrainingDate: string | null;
     evaluateeEmployeeId: string;
@@ -20,11 +17,10 @@ interface EvaluationItem {
     averageScore: number | null;
 }
 
-// Every item is either meeting-based or external-training-based (never both) - these fall back
-// from one to the other so the rest of the UI doesn't need to know which.
-const contextKey = (item: EvaluationItem) => item.meetingId ? `m${item.meetingId}` : `e${item.externalTrainingRequestId}`;
-const contextTitle = (item: EvaluationItem) => item.meetingTitle ?? item.externalTrainingTitle ?? '';
-const contextDate = (item: EvaluationItem) => item.meetingDate ?? item.externalTrainingDate;
+// Every item is one External Training request.
+const contextKey = (item: EvaluationItem) => `e${item.externalTrainingRequestId}`;
+const contextTitle = (item: EvaluationItem) => item.externalTrainingTitle ?? '';
+const contextDate = (item: EvaluationItem) => item.externalTrainingDate;
 
 interface EvaluationQuestionDTO {
     id: number;
@@ -185,12 +181,11 @@ const ViewModal = ({ item, onClose }: {
     const [detail, setDetail] = useState<EvaluationResponseDetailDTO | null>(null);
 
     useEffect(() => {
-        const contextParam = item.meetingId ? `meetingId=${item.meetingId}` : `externalTrainingRequestId=${item.externalTrainingRequestId}`;
-        fetch(`${API_BASE_URL}/api/post-training-evaluations/${item.formId}/response/${encodeURIComponent(item.evaluateeEmployeeId)}?${contextParam}`)
+        fetch(`${API_BASE_URL}/api/post-training-evaluations/${item.formId}/response/${encodeURIComponent(item.evaluateeEmployeeId)}?externalTrainingRequestId=${item.externalTrainingRequestId}`)
             .then(res => res.json())
             .then(setDetail)
             .catch(err => console.error(err));
-    }, [item.formId, item.meetingId, item.externalTrainingRequestId, item.evaluateeEmployeeId]);
+    }, [item.formId, item.externalTrainingRequestId, item.evaluateeEmployeeId]);
 
     const questions = detail?.questions || [];
 
@@ -287,8 +282,7 @@ const FillModal = ({ pending, evaluatorEmployeeId, onClose, onSubmitted }: {
                 body: JSON.stringify({
                     evaluatee_employee_id: pending.evaluateeEmployeeId,
                     evaluator_employee_id: evaluatorEmployeeId,
-                    meeting_id: pending.meetingId ?? undefined,
-                    external_training_request_id: pending.externalTrainingRequestId ?? undefined,
+                    external_training_request_id: pending.externalTrainingRequestId,
                     answers
                 })
             });

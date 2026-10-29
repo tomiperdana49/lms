@@ -30,12 +30,10 @@ import {
     Download,
     Award,
     Copy,
-    ClipboardList,
     XCircle
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import type { Role, Meeting, CostReport, Employee, QuizResult, QuizAnswerReview, User } from '../types';
-import { PteResponseViewModal } from './PostTrainingEvaluationMine';
 import PopupNotification from './PopupNotification';
 import ConfirmationModal from './ConfirmationModal';
 import InternalCertificateTemplate from './InternalCertificateTemplate';
@@ -119,16 +117,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     });
     const [reportingId, setReportingId] = useState<number | null>(null);
     const [employees, setEmployees] = useState<Employee[]>([]);
-    // Post Training Evaluation templates available to attach to a session. Reused across many
-    // sessions - the linked form auto-publishes once this session is marked Paid.
-    const [pteFormOptions, setPteFormOptions] = useState<{ id: number; title: string; category: string | null }[]>([]);
-
-    useEffect(() => {
-        fetch(`${API_BASE_URL}/api/post-training-evaluations`)
-            .then(res => res.ok ? res.json() : [])
-            .then(data => setPteFormOptions(Array.isArray(data) ? data : []))
-            .catch(err => console.error(err));
-    }, []);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -147,8 +135,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
         pre_test_data: null as any,
         post_test_data: null as any,
         material_link: '',
-        training_gr_type: '' as string,
-        pte_form_id: '' as string
+        training_gr_type: '' as string
     });
 
     // Email Invites State
@@ -160,9 +147,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [recapDetailHost, setRecapDetailHost] = useState<string | null>(null);
     const [allResults, setAllResults] = useState<any[]>([]);
     const [allFeedback, setAllFeedback] = useState<any[]>([]);
-    // Every Post Training Evaluation response, pre-reduced to its average SCALE score, so the
-    // Recap tab can show an "AVG PTE" / "PTE" column the same way it already shows feedback.
-    const [allPteResponses, setAllPteResponses] = useState<{ formId: number; meetingId: number | null; evaluateeEmployeeId: string; averageScore: number | null }[]>([]);
 
     const [expandedHosts, setExpandedHosts] = useState<Record<string, boolean>>({});
     const [expandedMeetings, setExpandedMeetings] = useState<Record<number, boolean>>({});
@@ -213,13 +197,10 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     // Search states for dropdowns
     const [hostSearch, setHostSearch] = useState('');
     const [participantSearch, setParticipantSearch] = useState('');
-    const [pteFormSearch, setPteFormSearch] = useState('');
     const [showHostDropdown, setShowHostDropdown] = useState(false);
     const [showParticipantDropdown, setShowParticipantDropdown] = useState(false);
-    const [showPteFormDropdown, setShowPteFormDropdown] = useState(false);
     const hostDropdownRef = useRef<HTMLDivElement>(null);
     const participantDropdownRef = useRef<HTMLDivElement>(null);
-    const pteFormDropdownRef = useRef<HTMLDivElement>(null);
     const [activeCreateTab, setActiveCreateTab] = useState<'details' | 'assessment'>('details');
     const startDateRef = useRef<HTMLInputElement>(null);
     const photoInputRef = useRef<HTMLInputElement>(null);
@@ -235,7 +216,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [participantDetail, setParticipantDetail] = useState<
         | { kind: 'QUIZ'; name: string; result: QuizResult }
         | { kind: 'FEEDBACK'; name: string; data: Record<string, unknown> }
-        | { kind: 'PTE'; name: string; employeeId: string; formId: number }
         | null
     >(null);
     // Clicking a pre/post-test the participant already finished opens the review of their answers.
@@ -248,29 +228,9 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     const [meetingQuizResults, setMeetingQuizResults] = useState<QuizResult[]>([]);
     const [meetingSummary, setMeetingSummary] = useState<{ quiz: { quiz_type: string, count: number }[], feedback: number, allQuizResults?: any[], allFeedbackResults?: any[] } | null>(null);
     const [userFeedback, setUserFeedback] = useState<any>(null);
-    const [pteResponse, setPteResponse] = useState<{
-        title: string;
-        description: string | null;
-        scaleMinLabel: string | null;
-        scaleMaxLabel: string | null;
-        questions: { id: number; type: 'SCALE' | 'TEXT'; competency_label: string | null; question_text: string }[];
-        submitted: boolean;
-        answers: Record<string, number | string> | null;
-    } | null>(null);
     const [showParticipantModal, setShowParticipantModal] = useState<'sudah' | 'belum' | null>(null);
     const [showFeedbackList, setShowFeedbackList] = useState(false);
-    const [showPteFeedback, setShowPteFeedback] = useState(false);
     const [completionSummary, setCompletionSummary] = useState<{ totalParticipants: number; completed: number; notCompleted: number } | null>(null);
-    // Every attendee's PTE answers - Host/HR only (unlike pteResponse above, which is scoped to
-    // just the current viewer's own answer for a plain participant).
-    const [allPteAttendees, setAllPteAttendees] = useState<{
-        employeeId: string;
-        name: string;
-        submitted: boolean;
-        answers: Record<string, number | string> | null;
-    }[]>([]);
-    const [pteQuestionsForHost, setPteQuestionsForHost] = useState<{ id: number; type: 'SCALE' | 'TEXT'; competency_label: string | null; question_text: string }[]>([]);
-    const [showPteFeedbackList, setShowPteFeedbackList] = useState(false);
 
     // No longer using force update since refresh button was removed
 
@@ -635,17 +595,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 setCompletionSummary(summaryRes.ok ? await summaryRes.json() : null);
             } catch (e) { setCompletionSummary(null); }
 
-            // Fetch this participant's own Post Training Evaluation (scoped to just their
-            // employee_id server-side, so their browser never receives other attendees' answers).
-            if (selectedMeeting?.pte_form_id && user.employee_id) {
-                try {
-                    const pteRes = await fetch(`${API_BASE_URL}/api/post-training-evaluations/${selectedMeeting.pte_form_id}/response/${encodeURIComponent(user.employee_id)}?meetingId=${mid}`);
-                    setPteResponse(pteRes.ok ? await pteRes.json() : null);
-                } catch (e) { setPteResponse(null); }
-            } else {
-                setPteResponse(null);
-            }
-
             // Fetch summary - every viewer can open the Completed/Not Completed participant list
             // (Pre-Test/Post-Test/Feedback per person), not just Host/HR.
             if (selectedMeeting) {
@@ -656,24 +605,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                         setMeetingSummary(sData);
                     }
                 } catch (e) { console.error("Failed to fetch summary", e); }
-            }
-
-            if (selectedMeeting && (effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' || (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id))) {
-                // Every attendee's PTE answers - admin view only, mirrors the Participant Feedback
-                // list above which is also host/HR-only.
-                if (selectedMeeting.pte_form_id) {
-                    try {
-                        const pteAllRes = await fetch(`${API_BASE_URL}/api/post-training-evaluations/${selectedMeeting.pte_form_id}?meetingId=${selectedMeeting.id}`);
-                        if (pteAllRes.ok) {
-                            const pteAllData = await pteAllRes.json();
-                            setPteQuestionsForHost(pteAllData.questions || []);
-                            setAllPteAttendees(pteAllData.attendees || []);
-                        }
-                    } catch (e) { console.error("Failed to fetch PTE detail", e); }
-                } else {
-                    setPteQuestionsForHost([]);
-                    setAllPteAttendees([]);
-                }
             }
         } catch (err) { console.error(err);        }
     };
@@ -848,9 +779,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             }
             if (participantDropdownRef.current && !participantDropdownRef.current.contains(event.target as Node)) {
                 setShowParticipantDropdown(false);
-            }
-            if (pteFormDropdownRef.current && !pteFormDropdownRef.current.contains(event.target as Node)) {
-                setShowPteFormDropdown(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -1052,11 +980,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                 .then(res => res.json())
                 .then(data => setAllFeedback(Array.isArray(data) ? data : (data.data || [])))
                 .catch(err => console.error("Failed to fetch all feedback", err));
-
-            fetch(`${API_BASE_URL}/api/post-training-evaluations/responses/all`)
-                .then(res => res.json())
-                .then(data => setAllPteResponses(Array.isArray(data) ? data : []))
-                .catch(err => console.error("Failed to fetch all PTE responses", err));
         }
     }, [isManagementMode]);
 
@@ -1148,8 +1071,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             pre_test_data: meeting.pre_test_data || { questions: [] },
             post_test_data: meeting.post_test_data || { questions: [] },
             material_link: meeting.material_link || '',
-            training_gr_type: meeting.training_gr_type || '',
-            pte_form_id: meeting.pte_form_id ? String(meeting.pte_form_id) : ''
+            training_gr_type: meeting.training_gr_type || ''
         });
 
         // Preserve is_closed status - do not allow reopening a closed meeting
@@ -1202,8 +1124,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             pre_test_data: meeting.pre_test_data || { questions: [] },
             post_test_data: meeting.post_test_data || { questions: [] },
             material_link: meeting.material_link || '',
-            training_gr_type: meeting.training_gr_type || '',
-            pte_form_id: meeting.pte_form_id ? String(meeting.pte_form_id) : ''
+            training_gr_type: meeting.training_gr_type || ''
         });
 
         // Participants are intentionally left empty for the duplicated session
@@ -1350,7 +1271,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             (!formData.startTime || !formData.endTime) && t('notifications.timeFieldLabel'),
             !formData.host && t('createModal.hostNameLabel'),
             !formData.type && t('createModal.eventTypeLabel'),
-            !formData.pte_form_id && t('createModal.pteFormLabel'),
         ].filter(Boolean);
         if (missingFields.length > 0) {
             setNotification({ show: true, type: 'error', message: t('notifications.fillRequiredFields', { fields: missingFields.join(', ') }) });
@@ -1407,8 +1327,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
             pre_test_data: formData.pre_test_data,
             post_test_data: formData.post_test_data,
             material_link: formData.material_link,
-            training_gr_type: formData.training_gr_type,
-            pte_form_id: formData.pte_form_id ? Number(formData.pte_form_id) : null
+            training_gr_type: formData.training_gr_type
         };
 
         if (isEditing && editId) {
@@ -1696,7 +1615,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
     };
 
     const resetForm = () => {
-        setFormData({ title: '', date: '', startTime: '', endTime: '', host: '', host_id: '', type: 'Online', location: '', meetLink: '', description: '', competency_type: '', competency_name: '', pre_test_data: { questions: [] }, post_test_data: { questions: [] }, material_link: '', training_gr_type: '', pte_form_id: '' });
+        setFormData({ title: '', date: '', startTime: '', endTime: '', host: '', host_id: '', type: 'Online', location: '', meetLink: '', description: '', competency_type: '', competency_name: '', pre_test_data: { questions: [] }, post_test_data: { questions: [] }, material_link: '', training_gr_type: '' });
         setInvitedEmails([]);
         setInvitedEmployeeIds([]);
         setHostSearch('');
@@ -2441,25 +2360,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                             onClose={() => setParticipantDetail(null)}
                         />
                     )}
-                    {participantDetail.kind === 'PTE' && (
-                        <PteResponseViewModal
-                            item={{
-                                formId: participantDetail.formId,
-                                formTitle: '',
-                                meetingId: selectedMeeting.id,
-                                meetingTitle: `${participantDetail.name} · ${selectedMeeting.title}`,
-                                meetingDate: null,
-                                externalTrainingRequestId: null,
-                                externalTrainingTitle: null,
-                                externalTrainingDate: null,
-                                submitted: true,
-                                submittedAt: null,
-                                averageScore: null
-                            }}
-                            employeeId={participantDetail.employeeId}
-                            onClose={() => setParticipantDetail(null)}
-                        />
-                    )}
                 </div>
             )}
 
@@ -2486,7 +2386,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest text-center">{t('participantModal.colPreTest')}</th>
                                         <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest text-center">{t('participantModal.colPostTest')}</th>
                                         <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest text-center">{t('participantModal.colFeedback')}</th>
-                                        <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest text-center">{t('participantModal.colPte')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -2778,24 +2677,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                 }
                                             }
 
-                                            // PTE score - only meaningful when this meeting has a linked
-                                            // Post Training Evaluation form; matched by employee_id, resolving
-                                            // participantId (which may be an email) via the employees lookup.
-                                            let pteScore: any = '-';
-                                            let pteEmployeeIdForView: string | null = null;
-                                            if (selectedMeeting.pte_form_id) {
-                                                const pteEmployeeId = String(emp?.id_employee || matchingGuest?.employee_id || participantId).toLowerCase().trim();
-                                                const pteResp = allPteResponses.find(r =>
-                                                    r.formId === selectedMeeting.pte_form_id &&
-                                                    r.meetingId === selectedMeeting.id &&
-                                                    String(r.evaluateeEmployeeId).toLowerCase().trim() === pteEmployeeId
-                                                );
-                                                if (pteResp && pteResp.averageScore !== null) {
-                                                    pteScore = pteResp.averageScore;
-                                                    pteEmployeeIdForView = String(pteResp.evaluateeEmployeeId);
-                                                }
-                                            }
-
                                             return (
                                                 <tr key={participantId} className="hover:bg-slate-50/50 transition-colors">
                                                     <td className="px-6 py-4 font-bold text-slate-700">{name}</td>
@@ -2817,13 +2698,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                             if (feedbackAnswers) setParticipantDetail({ kind: 'FEEDBACK', name, data: feedbackAnswers });
                                                         }} />
                                                     </td>
-                                                    <td className="px-6 py-4 text-center font-black text-purple-600">
-                                                        <ParticipantScoreCell value={pteScore} clickable={canViewAnswers} title={t('participantModal.viewDetail')} onClick={() => {
-                                                            if (pteEmployeeIdForView && selectedMeeting.pte_form_id) {
-                                                                setParticipantDetail({ kind: 'PTE', name, employeeId: pteEmployeeIdForView, formId: selectedMeeting.pte_form_id });
-                                                            }
-                                                        }} />
-                                                    </td>
                                                 </tr>
                                             );
                                         }).filter(Boolean);
@@ -2831,7 +2705,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         if (renderedRows.length === 0) {
                                             return (
                                                 <tr>
-                                                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
+                                                    <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic">
                                                         {t('participantModal.noData')}
                                                     </td>
                                                 </tr>
@@ -3067,7 +2941,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 <th className="px-6 py-3 text-center">{t('recap.colAvgPreTest')}</th>
                                                                 <th className="px-6 py-3 text-center">{t('recap.colAvgPostTest')}</th>
                                                                  <th className="px-6 py-3 text-center">{t('recap.colAvgFeedback')}</th>
-                                                                 <th className="px-6 py-3 text-center">{t('recap.colAvgPte')}</th>
                                                                  <th className="px-6 py-3 text-right">{t('recap.colCost')}</th>
                                                                 <th className="px-6 py-3 text-center">{t('recap.colStatus')}</th>
                                                             </tr>
@@ -3203,21 +3076,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                     return true;
                                                                 });
 
-                                                                // PTE (Post Training Evaluation) average, matched the same way as Feedback
-                                                                const pteResponsesForMeeting = m.pte_form_id ? allPteResponses.filter(r => r.formId === m.pte_form_id && r.meetingId === m.id) : [];
-                                                                const pteScoresList: number[] = [];
-                                                                validParticipantEmails.forEach(email => {
-                                                                    const emp = employees?.find(e =>
-                                                                        e.email?.toLowerCase() === email ||
-                                                                        String(e.id_employee) === email ||
-                                                                        String(e.id) === email
-                                                                    );
-                                                                    const empId = emp ? String(emp.id_employee).toLowerCase().trim() : email.toLowerCase().trim();
-                                                                    const r = pteResponsesForMeeting.find(r => String(r.evaluateeEmployeeId).toLowerCase().trim() === empId);
-                                                                    if (r && r.averageScore !== null && r.averageScore !== undefined) pteScoresList.push(r.averageScore);
-                                                                });
-                                                                const avgPte = pteScoresList.length > 0 ? (Math.round((pteScoresList.reduce((a,b) => a+b, 0) / pteScoresList.length) * 10) / 10).toFixed(1) : '-';
-
                                                                 return (
                                                                     <Fragment key={m.id}>
                                                                         <tr 
@@ -3245,9 +3103,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                              <td className="px-6 py-4 text-center">
                                                                                  <span className="text-xs font-black text-emerald-600">{avgFeedback}</span>
                                                                              </td>
-                                                                             <td className="px-6 py-4 text-center">
-                                                                                 <span className="text-xs font-black text-purple-600">{avgPte}</span>
-                                                                             </td>
                                                                              <td className="px-6 py-4 text-right">
                                                                                  <span className="text-xs font-bold text-slate-700">
                                                                                      {(() => {
@@ -3268,7 +3123,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                         </tr>
                                                                         {expandedMeetings[m.id] && (
                                                                             <tr className="bg-indigo-50/20">
-                                                                                <td colSpan={8} className="p-0">
+                                                                                <td colSpan={7} className="p-0">
                                                                                     <div className="mx-6 my-2 border border-indigo-100/50 rounded-xl overflow-hidden bg-white shadow-inner animate-in slide-in-from-top-2 duration-200">
                                                                                         <table className="w-full text-[10px]">
                                                                                             <thead className="bg-slate-50/50 text-slate-400 font-black uppercase tracking-widest border-b border-slate-50">
@@ -3277,7 +3132,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                                     <th className="px-4 py-2 text-center">{t('recap.colPreTest')}</th>
                                                                                                     <th className="px-4 py-2 text-center">{t('recap.colPostTest')}</th>
                                                                                                     <th className="px-4 py-2 text-center">{t('recap.colFeedback')}</th>
-                                                                                                    <th className="px-4 py-2 text-center">{t('recap.colPte')}</th>
                                                                                                     <th className="px-4 py-2 text-center">{t('recap.colAttendance')}</th>
                                                                                                     <th className="px-4 py-2 text-center">{t('recap.colParticipationType')}</th>
                                                                                                     <th className="px-4 py-2 text-right pr-6">{t('recap.colCost')}</th>
@@ -3286,7 +3140,7 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
 <tbody className="divide-y divide-slate-50">
                                                                                                 {participantEmails.length === 0 ? (
                                                                                                     <tr>
-                                                                                                        <td colSpan={8} className="px-4 py-4 text-center italic text-slate-400">{t('recap.noParticipants')}</td>
+                                                                                                        <td colSpan={7} className="px-4 py-4 text-center italic text-slate-400">{t('recap.noParticipants')}</td>
                                                                                                     </tr>
                                                                                                 ) : participantEmails.map(email => {
                                                                                                     const findById = (item: any, id: string) => {
@@ -3370,17 +3224,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                                         }
                                                                                                     }
 
-                                                                                                    let pteDisplay = <span className="text-slate-300">-</span>;
-                                                                                                    if (m.pte_form_id) {
-                                                                                                        const empIdForPte = emp ? String(emp.id_employee).toLowerCase().trim() : email.toLowerCase().trim();
-                                                                                                        const pteResp = allPteResponses.find(r => r.formId === m.pte_form_id && r.meetingId === m.id && String(r.evaluateeEmployeeId).toLowerCase().trim() === empIdForPte);
-                                                                                                        if (pteResp) {
-                                                                                                            pteDisplay = pteResp.averageScore !== null && pteResp.averageScore !== undefined
-                                                                                                                ? <span className="text-purple-600 font-bold">{pteResp.averageScore} / 4</span>
-                                                                                                                : <span className="text-purple-500 font-bold">{t('recap.pteSent')}</span>;
-                                                                                                        }
-                                                                                                    }
-
                                                                                                     const isInternshipOrPKL = emp && (emp.status_join === 'Internship' || emp.status_join === 'PKL');
 
                                                                                                     return (
@@ -3389,7 +3232,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                                                             <td className="px-4 py-2 text-center font-bold text-slate-500">{pre}</td>
                                                                                                             <td className="px-4 py-2 text-center font-bold text-indigo-600">{post}</td>
                                                                                                             <td className="px-4 py-2 text-center">{feedbackDisplay}</td>
-                                                                                                            <td className="px-4 py-2 text-center">{pteDisplay}</td>
                                                                                                             {/* Attendance */}
                                                                                                             <td className="px-4 py-2 text-center">
                                                                                                                 {(() => {
@@ -3807,65 +3649,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                         <option value="HSE">{t('createModal.griHse')}</option>
                                         <option value="Other">{t('createModal.griOther')}</option>
                                     </select>
-                                </div>
-
-                                {/* Post Training Evaluation - the linked form auto-publishes once this session is marked Paid */}
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">{t('createModal.pteFormLabel')} <span className="text-red-500">*</span></label>
-                                    <div className="relative" ref={pteFormDropdownRef}>
-                                        <input
-                                            type="text"
-                                            title={pteFormOptions.find(f => String(f.id) === formData.pte_form_id)?.title || t('createModal.selectPteFormPlaceholder')}
-                                            placeholder={pteFormOptions.find(f => String(f.id) === formData.pte_form_id)?.title || t('createModal.selectPteFormPlaceholder')}
-                                            className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-semibold text-slate-700 truncate"
-                                            value={pteFormSearch}
-                                            onFocus={() => setShowPteFormDropdown(true)}
-                                            onChange={e => setPteFormSearch(e.target.value)}
-                                        />
-                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                                            <ClipboardList size={16} />
-                                        </div>
-
-                                        {showPteFormDropdown && (
-                                            <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
-                                                <button
-                                                    type="button"
-                                                    className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm text-slate-400 italic border-b border-slate-100"
-                                                    onClick={() => {
-                                                        setFormData({ ...formData, pte_form_id: '' });
-                                                        setPteFormSearch('');
-                                                        setShowPteFormDropdown(false);
-                                                    }}
-                                                >
-                                                    {t('createModal.selectPteFormPlaceholder')}
-                                                </button>
-                                                {(() => {
-                                                    const filtered = pteFormOptions.filter(f =>
-                                                        f.title.toLowerCase().includes(pteFormSearch.toLowerCase()) ||
-                                                        (f.category || '').toLowerCase().includes(pteFormSearch.toLowerCase())
-                                                    );
-                                                    if (filtered.length === 0) {
-                                                        return <div className="p-4 text-center text-xs text-slate-400 italic">{t('createModal.noMatchingPteForms')}</div>;
-                                                    }
-                                                    return filtered.map(f => (
-                                                        <button
-                                                            key={f.id}
-                                                            type="button"
-                                                            className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-sm text-slate-700 font-semibold"
-                                                            onClick={() => {
-                                                                setFormData({ ...formData, pte_form_id: String(f.id) });
-                                                                setPteFormSearch('');
-                                                                setShowPteFormDropdown(false);
-                                                            }}
-                                                        >
-                                                            {f.category && <span className="text-indigo-600">[{f.category}] </span>}
-                                                            {f.title}
-                                                        </button>
-                                                    ));
-                                                })()}
-                                            </div>
-                                        )}
-                                    </div>
                                 </div>
 
                                 {/* Location & Link - Conditional */}
@@ -4755,153 +4538,6 @@ const TrainingInternalList = ({ userRole, user, isManagementMode }: TrainingInte
                                                                 )}
                                                             </div>
                                                         ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })()}
-
-                                    {/* PTE Feedback - Host/HR see every attendee's Post Training Evaluation
-                                        answers (mirrors the Participant Feedback list above); a plain
-                                        participant only ever sees their own (handled further below). */}
-                                    {(() => {
-                                        const isHostOrHR = effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' ||
-                                            (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id) ||
-                                            (selectedMeeting.host && user.name && selectedMeeting.host === user.name);
-                                        if (!isHostOrHR) return null;
-                                        if (!selectedMeeting.pte_form_id || allPteAttendees.length === 0) return null;
-
-                                        const submittedAttendees = allPteAttendees.filter(a => a.submitted && a.answers);
-                                        if (submittedAttendees.length === 0) return null;
-
-                                        return (
-                                            <div className="mt-6 pt-4 border-t border-slate-50">
-                                                <button
-                                                    onClick={() => setShowPteFeedbackList(prev => !prev)}
-                                                    className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-purple-50 hover:bg-purple-100 rounded-lg transition-all"
-                                                >
-                                                    <h4 className="text-[10px] font-black text-purple-600 uppercase tracking-widest flex items-center gap-2">
-                                                        <ClipboardList size={14} /> {t('detailModal.pteFeedback')}
-                                                    </h4>
-                                                    <ChevronDown className={`text-purple-400 transition-transform ${showPteFeedbackList ? 'rotate-180' : ''}`} />
-                                                </button>
-
-                                                {showPteFeedbackList && (
-                                                    <div className="mt-3 space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
-                                                        {submittedAttendees.map(attendee => (
-                                                            <div key={attendee.employeeId} className="bg-white border border-slate-100 rounded-xl p-3 shadow-sm space-y-2">
-                                                                <p className="text-xs font-bold text-slate-700">{attendee.name}</p>
-                                                                {pteQuestionsForHost.map(q => {
-                                                                    const answer = attendee.answers?.[String(q.id)];
-                                                                    if (answer === undefined || answer === null || answer === '') return null;
-                                                                    return (
-                                                                        <div key={q.id}>
-                                                                            <p className="text-[9px] font-bold text-purple-500 uppercase tracking-wider mb-1">{q.question_text}</p>
-                                                                            {q.type === 'SCALE' ? (
-                                                                                <p className="text-xs font-black text-slate-700">{answer} / 4</p>
-                                                                            ) : (
-                                                                                <p className="text-xs text-slate-600">{answer}</p>
-                                                                            )}
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })()}
-
-                                    {/* A plain participant only ever sees their OWN feedback here, never a
-                                        coworker's - the host/HR branch above already returned for them. */}
-                                    {(() => {
-                                        const isHostOrHR = effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' ||
-                                            (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id) ||
-                                            (selectedMeeting.host && user.name && selectedMeeting.host === user.name);
-                                        if (isHostOrHR) return null;
-                                        if (!userFeedback || (!userFeedback.q11 && !userFeedback.q12)) return null;
-
-                                        return (
-                                            <div className="mt-6 pt-4 border-t border-slate-50">
-                                                <button
-                                                    onClick={() => setShowFeedbackList(prev => !prev)}
-                                                    className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-purple-50 hover:bg-purple-100 rounded-lg transition-all"
-                                                >
-                                                    <h4 className="text-[10px] font-black text-purple-600 uppercase tracking-widest flex items-center gap-2">
-                                                        <MessageSquare size={14} /> {t('detailModal.participantFeedback')}
-                                                    </h4>
-                                                    <ChevronDown className={`text-purple-400 transition-transform ${showFeedbackList ? 'rotate-180' : ''}`} />
-                                                </button>
-
-                                                {showFeedbackList && (
-                                                    <div className="mt-3 space-y-2">
-                                                        <div className="bg-white border border-slate-100 rounded-xl p-3 shadow-sm">
-                                                            {userFeedback.q11 && (
-                                                                <div className="mb-2">
-                                                                    <p className="text-[9px] font-bold text-purple-500 uppercase tracking-wider mb-1">{t('detailModal.whatWentWell')}</p>
-                                                                    <p className="text-xs text-slate-600">{userFeedback.q11}</p>
-                                                                </div>
-                                                            )}
-                                                            {userFeedback.q12 && (
-                                                                <div>
-                                                                    <p className="text-[9px] font-bold text-purple-500 uppercase tracking-wider mb-1">{t('detailModal.whatToImprove')}</p>
-                                                                    <p className="text-xs text-slate-600">{userFeedback.q12}</p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })()}
-
-                                    {/* PTE Feedback - the participant's own Post Training Evaluation result,
-                                        once their leader has submitted it. Leader/HR already have dedicated
-                                        screens for this (Post Training Evaluation team queue / admin), so this
-                                        block is participant-only. */}
-                                    {(() => {
-                                        const isHostOrHR = effectiveRole === 'HR' || effectiveRole === 'HR_ADMIN' ||
-                                            (user.employee_id && selectedMeeting.employee_id && user.employee_id === selectedMeeting.employee_id) ||
-                                            (selectedMeeting.host && user.name && selectedMeeting.host === user.name);
-                                        if (isHostOrHR) return null;
-                                        if (!pteResponse || !pteResponse.submitted) return null;
-
-                                        const answeredQuestions = pteResponse.questions.filter(q => {
-                                            const a = pteResponse.answers?.[String(q.id)];
-                                            return a !== undefined && a !== null && a !== '';
-                                        });
-                                        if (answeredQuestions.length === 0) return null;
-
-                                        return (
-                                            <div className="mt-6 pt-4 border-t border-slate-50">
-                                                <button
-                                                    onClick={() => setShowPteFeedback(prev => !prev)}
-                                                    className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-purple-50 hover:bg-purple-100 rounded-lg transition-all"
-                                                >
-                                                    <h4 className="text-[10px] font-black text-purple-600 uppercase tracking-widest flex items-center gap-2">
-                                                        <ClipboardList size={14} /> {t('detailModal.pteFeedback')}
-                                                    </h4>
-                                                    <ChevronDown className={`text-purple-400 transition-transform ${showPteFeedback ? 'rotate-180' : ''}`} />
-                                                </button>
-
-                                                {showPteFeedback && (
-                                                    <div className="mt-3 space-y-2">
-                                                        <div className="bg-white border border-slate-100 rounded-xl p-3 shadow-sm space-y-3">
-                                                            {answeredQuestions.map(q => {
-                                                                const answer = pteResponse.answers?.[String(q.id)];
-                                                                return (
-                                                                    <div key={q.id}>
-                                                                        <p className="text-[9px] font-bold text-purple-500 uppercase tracking-wider mb-1">{q.question_text}</p>
-                                                                        {q.type === 'SCALE' ? (
-                                                                            <p className="text-xs font-black text-slate-700">{answer} / 4</p>
-                                                                        ) : (
-                                                                            <p className="text-xs text-slate-600">{answer}</p>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
                                                     </div>
                                                 )}
                                             </div>

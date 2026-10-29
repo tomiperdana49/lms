@@ -198,8 +198,6 @@ export interface Meeting {
     training_gr_type?: string;  // ESG/HSE/Other
     esg_hse_other?: string;
     action_plan?: string;
-    // Post Training Evaluation template attached to this session - auto-publishes once Paid.
-    pte_form_id?: number | null;
     detail_participant_type?: string;
 }
 

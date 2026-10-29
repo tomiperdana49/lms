@@ -342,7 +342,7 @@ const EmployeeLearningReport = ({ userRole }: { userRole?: string }) => {
                 [t('export.preTestColumn')]: hasTestScores ? (item.preTestScore ?? '') : '',
                 [t('export.postTestColumn')]: hasTestScores ? (item.postTestScore ?? '') : '',
                 [t('export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (item.feedbackScore ?? t('export.submitted')) : '') : '',
-                [t('export.pteColumn')]: (section.key === 'training' || section.key === 'trainingExternal') ? (item.pteScore ?? '') : ''
+                [t('export.pteColumn')]: section.key === 'trainingExternal' ? (item.pteScore ?? '') :''
             }));
         });
         rows.push({

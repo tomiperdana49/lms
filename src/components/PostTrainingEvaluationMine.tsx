@@ -6,11 +6,8 @@ import type { User } from '../types';
 
 interface EvaluationItem {
     formId: number;
-    meetingId: number | null;
     formTitle: string;
-    meetingTitle: string | null;
-    meetingDate: string | null;
-    externalTrainingRequestId: number | null;
+    externalTrainingRequestId: number;
     externalTrainingTitle: string | null;
     externalTrainingDate: string | null;
     submitted: boolean;
@@ -18,11 +15,10 @@ interface EvaluationItem {
     averageScore: number | null;
 }
 
-// Every item is either meeting-based or external-training-based (never both) - these fall back
-// from one to the other so the rest of the UI doesn't need to know which.
-const contextKey = (item: EvaluationItem) => item.meetingId ? `m${item.meetingId}` : `e${item.externalTrainingRequestId}`;
-const contextTitle = (item: EvaluationItem) => item.meetingTitle ?? item.externalTrainingTitle ?? '';
-const contextDate = (item: EvaluationItem) => item.meetingDate ?? item.externalTrainingDate;
+// Every item is one External Training request.
+const contextKey = (item: EvaluationItem) => `e${item.externalTrainingRequestId}`;
+const contextTitle = (item: EvaluationItem) => item.externalTrainingTitle ?? '';
+const contextDate = (item: EvaluationItem) => item.externalTrainingDate;
 
 interface EvaluationQuestionDTO {
     id: number;
@@ -144,8 +140,7 @@ const PostTrainingEvaluationMine = ({ user }: { user: User }) => {
     );
 };
 
-// Read-only view of one evaluatee's PTE answers - also used by the Internal Training trainer view
-// (TrainingInternalList's participant status modal), exported as PteResponseViewModal.
+// Read-only view of one evaluatee's PTE answers.
 const ViewModal = ({ item, employeeId, onClose }: {
     item: EvaluationItem;
     employeeId: string;
@@ -155,12 +150,11 @@ const ViewModal = ({ item, employeeId, onClose }: {
     const [detail, setDetail] = useState<EvaluationResponseDetailDTO | null>(null);
 
     useEffect(() => {
-        const contextParam = item.meetingId ? `meetingId=${item.meetingId}` : `externalTrainingRequestId=${item.externalTrainingRequestId}`;
-        fetch(`${API_BASE_URL}/api/post-training-evaluations/${item.formId}/response/${encodeURIComponent(employeeId)}?${contextParam}`)
+        fetch(`${API_BASE_URL}/api/post-training-evaluations/${item.formId}/response/${encodeURIComponent(employeeId)}?externalTrainingRequestId=${item.externalTrainingRequestId}`)
             .then(res => res.json())
             .then(setDetail)
             .catch(err => console.error(err));
-    }, [item.formId, item.meetingId, item.externalTrainingRequestId, employeeId]);
+    }, [item.formId, item.externalTrainingRequestId, employeeId]);
 
     const questions = detail?.questions || [];
 
@@ -225,6 +219,4 @@ const ViewModal = ({ item, employeeId, onClose }: {
     );
 };
 
-export { ViewModal as PteResponseViewModal };
-export type { EvaluationItem as PteEvaluationItem };
 export default PostTrainingEvaluationMine;

@@ -500,17 +500,17 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onI
                     })
                 );
 
-                // 13. Post Training Evaluation: notify the LEADER when a direct report has a training
-                // session closed out (Paid) that's now waiting on their evaluation.
+                // 13. Post Training Evaluation: notify the LEADER when a direct report's External
+                // Training request is Processed and now waiting on their evaluation.
                 const pteLeaderNotifs = pteSubordinates
                     .filter((it: any) => !it.submitted)
                     .map((it: any) => {
                         const notifId = 1100000 + it.formId * 10000000 + Number(it.evaluateeEmployeeId || 0);
-                        const notifDate = new Date(it.meetingDate || Date.now());
+                        const notifDate = new Date(it.externalTrainingDate || Date.now());
                         return {
                             id: notifId,
                             title: t('notifications.pteNewEvaluationTitle'),
-                            message: t('notifications.pteNewEvaluationMessage', { name: it.evaluateeName, title: it.meetingTitle }),
+                            message: t('notifications.pteNewEvaluationMessage', { name: it.evaluateeName, title: it.externalTrainingTitle }),
                             time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
                             sortTime: notifDate.getTime(),
                             type: 'INFO',
@@ -524,12 +524,12 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onI
                 const pteMineNotifs = pteMine
                     .filter((it: any) => it.submitted)
                     .map((it: any) => {
-                        const notifId = 1200000000 + it.formId * 100000 + it.meetingId;
+                        const notifId = 1200000000 + it.formId * 100000 + it.externalTrainingRequestId;
                         const notifDate = new Date(it.submittedAt || Date.now());
                         return {
                             id: notifId,
                             title: t('notifications.pteEvaluationCompletedTitle'),
-                            message: t('notifications.pteEvaluationCompletedMessage', { title: it.meetingTitle }),
+                            message: t('notifications.pteEvaluationCompletedMessage', { title: it.externalTrainingTitle }),
                             time: notifDate.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
                             sortTime: notifDate.getTime(),
                             type: 'SUCCESS',
@@ -790,7 +790,7 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onI
         ...((config?.moduleInternal || config?.moduleExternal) ? [{ header: t('admin.trainingHeader') }] : []),
         ...(config?.moduleInternal ? [{ icon: Users, label: t('admin.internal'), id: 'admin-dashboard', view: 'meetings' }] : []),
         ...(config?.moduleExternal ? [{ icon: FileText, label: t('admin.external'), id: 'admin-dashboard', view: 'training' }] : []),
-        ...(config?.moduleInternal && config?.modulePTE ? [{ icon: ClipboardList, label: t('admin.postTrainingEvaluation'), id: 'admin-dashboard', view: 'post-training-evaluation' }] : []),
+        ...(config?.moduleExternal && config?.modulePTE ? [{ icon: ClipboardList, label: t('admin.postTrainingEvaluation'), id: 'admin-dashboard', view: 'post-training-evaluation' }] : []),
         { header: t('admin.reportHeader') },
         { icon: Library, label: t('admin.readingLog'), id: 'admin-dashboard', view: 'logs' },
         { icon: Award, label: t('admin.quizReport'), id: 'admin-dashboard', view: 'quiz-reports' },
@@ -829,10 +829,10 @@ const DashboardLayout = ({ children, activePage, onNavigate, userRole, user, onI
     const trainingSubItems = [
         ...(config?.moduleInternal ? [{ icon: Users, label: t('menu.internal'), id: 'internal' }] : []),
         ...(config?.moduleExternal ? [{ icon: Globe, label: t('menu.external'), id: 'external' }] : []),
-        // Supervisors evaluate their direct reports here after a training session is marked
-        // Paid; staff instead get a read-only view scoped to evaluations about themselves.
-        ...(config?.moduleInternal && config?.modulePTE && user?.isSupervisor ? [{ icon: ClipboardList, label: t('menu.pteTeam'), id: 'pte-team' }] : []),
-        ...(config?.moduleInternal && config?.modulePTE && !user?.isSupervisor ? [{ icon: ClipboardList, label: t('menu.pteMine'), id: 'pte-mine' }] : []),
+        // Supervisors evaluate their direct reports here once an External Training request is
+        // Processed; staff instead get a read-only view scoped to evaluations about themselves.
+        ...(config?.moduleExternal && config?.modulePTE && user?.isSupervisor ? [{ icon: ClipboardList, label: t('menu.pteTeam'), id: 'pte-team' }] : []),
+        ...(config?.moduleExternal && config?.modulePTE && !user?.isSupervisor ? [{ icon: ClipboardList, label: t('menu.pteMine'), id: 'pte-mine' }] : []),
     ];
 
     const getInitials = (name: string) => {

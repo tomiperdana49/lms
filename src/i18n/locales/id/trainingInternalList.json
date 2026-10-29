@@ -56,7 +56,7 @@
   },
   "confirmUnlockPaidModal": {
     "title": "Buka Kunci Laporan yang Sudah Lunas?",
-    "message": "Ini akan membuka laporan untuk diedit kembali. Sertifikat yang sudah terbit dan Post Training Evaluation yang sudah dipublish tidak akan terpengaruh, tapi kamu perlu klik \"Tandai Lunas\" lagi setelah selesai melakukan koreksi.",
+    "message": "Ini akan membuka laporan untuk diedit kembali. Sertifikat yang sudah terbit tidak akan terpengaruh, tapi kamu perlu klik \"Tandai Lunas\" lagi setelah selesai melakukan koreksi.",
     "confirmText": "Ya, Buka Kunci"
   },
   "participantModal": {
@@ -67,7 +67,6 @@
     "colPreTest": "Pre-Test",
     "colPostTest": "Post-Test",
     "colFeedback": "Feedback",
-    "colPte": "PTE",
     "noData": "Tidak ada data peserta.",
     "viewDetail": "Lihat jawaban peserta"
   },
@@ -102,7 +101,6 @@
     "colAvgPreTest": "Rata-rata Pre-Test",
     "colAvgPostTest": "Rata-rata Post-Test",
     "colAvgFeedback": "Rata-rata Feedback",
-    "colAvgPte": "Rata-rata PTE",
     "colCost": "Biaya",
     "colStatus": "Status",
     "paid": "Lunas",
@@ -111,12 +109,10 @@
     "colPreTest": "Pre-Test",
     "colPostTest": "Post-Test",
     "colFeedback": "Feedback",
-    "colPte": "PTE",
     "colAttendance": "Kehadiran",
     "colParticipationType": "Jenis Partisipasi",
     "noParticipants": "Tidak ada peserta tercatat untuk sesi ini.",
-    "feedbackSent": "Terkirim",
-    "pteSent": "Terkirim"
+    "feedbackSent": "Terkirim"
   },
   "listView": {
     "noMeetings": "Belum ada pertemuan yang dijadwalkan.",
@@ -162,9 +158,6 @@
     "griEsg": "ESG (Environmental, Social, and Governance)",
     "griHse": "HSE (Health, Safety, and Environment)",
     "griOther": "Lainnya",
-    "pteFormLabel": "Post Training Evaluation",
-    "selectPteFormPlaceholder": "Pilih form evaluasi...",
-    "noMatchingPteForms": "Tidak ada form evaluasi yang cocok.",
     "locationLabel": "Ruangan / Lokasi",
     "locationPlaceholder": "cth. Ruang Rapat A, Lantai 2",
     "meetLinkLabel": "Link Meeting Online",
@@ -233,7 +226,6 @@
     "invitedGuests": "{{count}} Tamu Diundang",
     "noInvitesSent": "Tidak ada undangan khusus yang dikirim.",
     "participantFeedback": "Feedback Peserta",
-    "pteFeedback": "PTE Feedback",
     "whatWentWell": "Hal yang sudah baik:",
     "whatToImprove": "Yang perlu ditingkatkan:",
     "trainingDocumentation": "Dokumentasi Training",

@@ -264,7 +264,7 @@ const LearningReport = ({ userEmail, userName, userEmployeeId, isSupervisor, isI
                 [t('export.preTestColumn')]: hasTestScores ? (item.preTestScore ?? '') : '',
                 [t('export.postTestColumn')]: hasTestScores ? (item.postTestScore ?? '') : '',
                 [t('export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (item.feedbackScore ?? t('export.submitted')) : '') : '',
-                [t('export.pteColumn')]: (section.key === 'training' || section.key === 'trainingExternal') ? (item.pteScore ?? '') : ''
+                [t('export.pteColumn')]: section.key === 'trainingExternal' ? (item.pteScore ?? '') : ''
             }));
         });
         rows.push({
@@ -304,7 +304,7 @@ const LearningReport = ({ userEmail, userName, userEmployeeId, isSupervisor, isI
                     [t('team.export.postTestColumn')]: item.postTestScore ?? '',
                     [t('team.export.costColumn')]: item.cost || '',
                     [t('team.export.feedbackColumn')]: section.key === 'training' ? (item.feedbackSubmitted ? (t('export.submitted')) : '') : '',
-                    [t('team.export.pteColumn')]: (section.key === 'training' || section.key === 'trainingExternal') ? (item.pteScore ?? '') : ''
+                    [t('team.export.pteColumn')]: section.key === 'trainingExternal' ? (item.pteScore ?? '') : ''
                 }))
             );
         });
@@ -594,7 +594,7 @@ export const LearningStatsBreakdown = ({ stats, t, canSyncNusawork, employeeCoun
                                                     {section.key === 'training' && (
                                                         <FeedbackBadge submitted={!!item.feedbackSubmitted} score={item.feedbackScore} t={t} />
                                                     )}
-                                                    {(section.key === 'training' || section.key === 'trainingExternal') && (
+                                                    {section.key === 'trainingExternal' && (
                                                         <ScoreBadge label={t('assessment.pte')} score={item.pteScore} />
                                                     )}
                                                 </div>
@@ -669,7 +669,7 @@ const LearningStatsTable = ({ stats, t }: LearningStatsTableProps) => {
                                             : <XCircle size={14} className="inline text-slate-300" />
                                     ) : '-'}
                                 </td>
-                                <td className="px-4 py-3 text-center text-slate-500 whitespace-nowrap">{(item.categoryKey === 'training' || item.categoryKey === 'trainingExternal') ? (item.pteScore ?? '-') : '-'}</td>
+                                <td className="px-4 py-3 text-center text-slate-500 whitespace-nowrap">{item.categoryKey === 'trainingExternal' ? (item.pteScore ?? '-') : '-'}</td>
                             </tr>
                         ))}
                     </tbody>
