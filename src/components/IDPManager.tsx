@@ -104,7 +104,15 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
     // (e.g. fixing bad import data), reusing the same PUT /api/idp/:id the employee's own edit form uses.
     // The mandatory learning-hours row is never editable here — it stays locked, same as elsewhere.
     interface EditActionRow { id?: number; action_description: string; target_time: string; is_completed: boolean; notes: string }
-    interface EditDraft { job_position: string; achievements: string; career_goal: string; existing_skills: string; development_area: string; actionItems: EditActionRow[] }
+    interface EditDraft { job_position: string; created_by_date: string; achievements: string; career_goal: string; existing_skills: string; development_area: string; actionItems: EditActionRow[] }
+    // DATE columns arrive as an ISO timestamp of local midnight, so read the date back in local time.
+    const toDateInputValue = (v?: string) => {
+        if (!v) return '';
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return '';
+        const pad = (n: number) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -113,6 +121,7 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
         setEditingId(plan.id);
         setEditDraft({
             job_position: plan.job_position || '',
+            created_by_date: toDateInputValue(plan.created_by_date),
             achievements: plan.achievements || '',
             career_goal: plan.career_goal || '',
             existing_skills: plan.existing_skills || '',
@@ -138,6 +147,7 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     job_position: editDraft.job_position,
+                    created_by_date: editDraft.created_by_date || null,
                     achievements: editDraft.achievements,
                     career_goal: editDraft.career_goal,
                     existing_skills: editDraft.existing_skills,
@@ -725,6 +735,18 @@ export default function IDPManager({ userName, focusPlanId }: IDPManagerProps) {
                                                             </td>
                                                         </tr>
                                                     ))}
+
+                                                    <tr>
+                                                        <td className={idpLabelCell}>{t('form.createdByDate')}:</td>
+                                                        <td className={idpValueCell}>
+                                                            <input type="date" value={editDraft.created_by_date} onChange={e => setEditDraft(d => d ? { ...d, created_by_date: e.target.value } : d)} className="w-full bg-indigo-50 border border-indigo-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500" />
+                                                        </td>
+                                                        <td className={idpLabelCell}>{t('form.approvedDate')}:</td>
+                                                        <td colSpan={3} className={idpValueCell}>
+                                                            {detail.approved_date ? new Date(detail.approved_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}
+                                                            {detail.approved_by && <span className="block text-xs text-slate-500">{detail.approved_by}</span>}
+                                                        </td>
+                                                    </tr>
                                                 </tbody>
                                             </table>
                                         </div>

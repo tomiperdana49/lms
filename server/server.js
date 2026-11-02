@@ -8353,8 +8353,18 @@ app.put('/api/idp/:id', async (req, res) => {
 
         const {
             job_position, achievements, career_goal,
-            existing_skills, development_area, action_items
+            existing_skills, development_area, action_items, created_by_date
         } = req.body;
+
+        // HR can fill in / correct the date the employee created the IDP (e.g. blank or unparseable on import).
+        // Only HR - for the employee it's set automatically on submit. undefined leaves it untouched.
+        if (created_by_date !== undefined) {
+            if (!isHRRole(req.user?.role)) return res.status(403).json({ error: 'Only HR can change the IDP creation date' });
+            if (created_by_date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(String(created_by_date))) {
+                return res.status(400).json({ error: 'created_by_date must be YYYY-MM-DD' });
+            }
+            await query('UPDATE idp_plans SET created_by_date = ? WHERE id = ?', [created_by_date, id]);
+        }
 
         const { department, join_date_label } = await findEmployeeIdpFields(existing[0].employee_id);
 
