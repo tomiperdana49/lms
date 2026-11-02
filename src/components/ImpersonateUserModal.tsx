@@ -23,7 +23,7 @@ const ImpersonateUserModal = ({ currentUserId, onClose, onSelect }: ImpersonateU
     useEffect(() => {
         fetch(`${API_BASE_URL}/api/users`)
             .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
-            .then((data: User[]) => setUsers(data.filter((u) => u.role === 'STAFF' && String(u.id) !== String(currentUserId))))
+            .then((data: User[]) => setUsers(data.filter((u) => String(u.id) !== String(currentUserId))))
             .catch(() => setError(t('impersonation.loadFailed')))
             .finally(() => setLoading(false));
     }, [currentUserId, t]);
@@ -90,7 +90,12 @@ const ImpersonateUserModal = ({ currentUserId, onClose, onSelect }: ImpersonateU
                                 className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-indigo-50 disabled:opacity-60 transition-colors"
                             >
                                 <div className="min-w-0">
-                                    <div className="font-semibold text-sm text-slate-800 truncate">{u.name}</div>
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span className="font-semibold text-sm text-slate-800 truncate">{u.name}</span>
+                                        {u.role !== 'STAFF' && (
+                                            <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-orange-100 text-orange-700">{u.role?.replace('_', ' ')}</span>
+                                        )}
+                                    </div>
                                     <div className="text-xs text-slate-400 truncate">{[u.employee_id, u.email, u.branch].filter(Boolean).join(' · ')}</div>
                                 </div>
                                 {switchingId === u.id

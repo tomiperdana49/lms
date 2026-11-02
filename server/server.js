@@ -2841,9 +2841,6 @@ app.post('/api/auth/impersonate', async (req, res) => {
 
         const user = await loadSessionUser(targetId);
         if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-        // Only employee (STAFF) accounts - never another HR account.
-        if (isHRRole(user.role)) return res.status(403).json({ success: false, message: 'Only employee accounts can be signed in as' });
-
         console.log(`[AUTH] ${req.user.email} started impersonating ${user.email}`);
         res.json({
             success: true,
