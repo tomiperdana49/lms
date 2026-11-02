@@ -120,7 +120,15 @@
     "saving": "Saving...",
     "updateData": "Update Data",
     "updateTitle": "Update Training Data",
-    "saveChanges": "Save Changes"
+    "saveChanges": "Save Changes",
+    "employeeAttachment": "Employee Attachment",
+    "viewCurrentAttachment": "View current attachment",
+    "removeAttachment": "Remove",
+    "attachmentWillBeRemoved": "The attachment will be removed on save.",
+    "undoRemoveAttachment": "Undo",
+    "noAttachment": "The employee didn't upload an attachment.",
+    "replaceAttachmentHint": "Choose a file to replace the employee's attachment.",
+    "addAttachmentHint": "Choose a file to add an attachment."
   },
   "settlementModal": {
     "viewCurrentCertificate": "View current certificate",
@@ -150,7 +158,8 @@
     "confirmApproveTitle": "Approve Training Request?",
     "confirmApproveMessage": "Are you sure you want to approve this external training request \"{{title}}\"?",
     "confirmDeleteRequest": "This will permanently delete all data for this training request, including any uploaded certificate file. Incentives already granted from this request (if any) will not be removed. This action cannot be undone.",
-    "confirmDeleteTitle": "Delete Training Request"
+    "confirmDeleteTitle": "Delete Training Request",
+    "attachmentUploadFailed": "Failed to upload the attachment. Please try again."
   },
   "printDocument": {
     "windowTitle": "Training Approval - {{id}}",

@@ -120,7 +120,15 @@
     "saving": "Menyimpan...",
     "updateData": "Perbarui Data",
     "updateTitle": "Perbarui Data Pelatihan",
-    "saveChanges": "Simpan Perubahan"
+    "saveChanges": "Simpan Perubahan",
+    "employeeAttachment": "Lampiran Karyawan",
+    "viewCurrentAttachment": "Lihat lampiran saat ini",
+    "removeAttachment": "Hapus",
+    "attachmentWillBeRemoved": "Lampiran akan dihapus saat disimpan.",
+    "undoRemoveAttachment": "Batal",
+    "noAttachment": "Karyawan tidak mengunggah lampiran.",
+    "replaceAttachmentHint": "Pilih file untuk mengganti lampiran karyawan.",
+    "addAttachmentHint": "Pilih file untuk menambahkan lampiran."
   },
   "settlementModal": {
     "viewCurrentCertificate": "Lihat sertifikat saat ini",
@@ -150,7 +158,8 @@
     "confirmApproveTitle": "Setujui Permintaan Training?",
     "confirmApproveMessage": "Apakah Anda yakin ingin menyetujui permintaan training eksternal \"{{title}}\" ini?",
     "confirmDeleteRequest": "Tindakan ini akan menghapus permanen seluruh data permintaan pelatihan ini beserta file sertifikat yang sudah diupload. Data insentif yang sudah pernah diberikan (jika ada) tidak akan ikut terhapus. Aksi ini tidak dapat dibatalkan.",
-    "confirmDeleteTitle": "Hapus Permintaan Training"
+    "confirmDeleteTitle": "Hapus Permintaan Training",
+    "attachmentUploadFailed": "Gagal mengunggah lampiran. Silakan coba lagi."
   },
   "printDocument": {
     "windowTitle": "Persetujuan Pelatihan - {{id}}",

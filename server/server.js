@@ -7603,9 +7603,18 @@ app.get('/api/external-training/deleted', async (req, res) => {
 });
 
 // 6. HR processes payment
+// HR can replace (a new upload URL) or remove (null) the employee's attachment while verifying an
+// External Training request; undefined leaves it untouched. Returns the link it replaces so the caller
+// can delete that file once its UPDATE has succeeded.
+const readExternalTrainingAttachment = async (id) =>
+    (await query('SELECT attachment_link FROM external_training_requests WHERE id = ?', [id]))[0]?.attachment_link || null;
+const cleanupReplacedAttachment = (prevLink, newLink) => {
+    if (prevLink && prevLink !== newLink) deleteLocalUpload(prevLink);
+};
+
 app.post('/api/external-training/hr-process', async (req, res) => {
     try {
-        const { id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date, category, title, vendor, location, start_date, end_date, certification_result, incentive_reward, incentive_payment_type, hr_name, training_gr_type, participation_type, learning_hours, pte_form_id } = req.body;
+        const { attachment_link, id, travel_flight_cost, accommodation_cost, miscellaneous_cost, payment_method, registration_fee, certificate_link, certificate_expiry_date, category, title, vendor, location, start_date, end_date, certification_result, incentive_reward, incentive_payment_type, hr_name, training_gr_type, participation_type, learning_hours, pte_form_id } = req.body;
         // datetime-local inputs send "YYYY-MM-DDTHH:MM"; MySQL DATETIME literals need a space instead of "T"
         const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
 
@@ -7620,6 +7629,12 @@ app.post('/api/external-training/hr-process', async (req, res) => {
         if (certificate_link !== undefined) {
             sql += `, certificate_link = ?`;
             params.push(certificate_link);
+        }
+        let prevAttachmentLink = null;
+        if (attachment_link !== undefined) {
+            prevAttachmentLink = await readExternalTrainingAttachment(id);
+            sql += `, attachment_link = ?`;
+            params.push(attachment_link || '');
         }
         if (certificate_expiry_date !== undefined) {
             sql += `, certificate_expiry_date = ?, original_certificate_expiry_date = COALESCE(original_certificate_expiry_date, ?)`;
@@ -7681,6 +7696,7 @@ app.post('/api/external-training/hr-process', async (req, res) => {
         params.push(id);
 
         await query(sql, params);
+        if (attachment_link !== undefined) cleanupReplacedAttachment(prevAttachmentLink, attachment_link);
         reconcileExternalTrainingNusawork(id);
 
         // The linked Post Training Evaluation template only goes live once this request is
@@ -7702,7 +7718,7 @@ app.post('/api/external-training/hr-process', async (req, res) => {
 // running the full approval flow — status and cost/incentive fields are left untouched.
 app.post('/api/external-training/hr-update-details', async (req, res) => {
     try {
-        const { id, category, title, vendor, location, start_date, end_date, training_gr_type, participation_type, learning_hours, pte_form_id } = req.body;
+        const { id, category, title, vendor, location, start_date, end_date, training_gr_type, participation_type, learning_hours, pte_form_id, attachment_link } = req.body;
         if (!id) return res.status(400).json({ error: 'id is required' });
         const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
 
@@ -7723,6 +7739,11 @@ app.post('/api/external-training/hr-update-details', async (req, res) => {
         if (participation_type !== undefined) set('participation_type = ?', participation_type || null);
         if (learning_hours !== undefined) set('learning_hours = ?', learning_hours ? Number(learning_hours) : null);
         if (pte_form_id !== undefined) set('pte_form_id = ?', pte_form_id || null);
+        let prevAttachmentLink = null;
+        if (attachment_link !== undefined) {
+            prevAttachmentLink = await readExternalTrainingAttachment(id);
+            set('attachment_link = ?', attachment_link || '');
+        }
 
         if (params.length === 0) return res.json({ success: true });
 
@@ -7730,6 +7751,7 @@ app.post('/api/external-training/hr-update-details', async (req, res) => {
         params.push(id);
 
         await query(sql, params);
+        if (attachment_link !== undefined) cleanupReplacedAttachment(prevAttachmentLink, attachment_link);
         reconcileExternalTrainingNusawork(id);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -9278,7 +9300,7 @@ app.put('/api/training/:id', async (req, res) => {
 app.put('/api/external-training/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { costTraining, costTransport, costAccommodation, costOthers, additionalCost, settlementNote, certificateLink, pte_form_id, payment_method, category, title, vendor, location, start_date, end_date, training_gr_type, participation_type, learning_hours, certificate_expiry_date, certification_result } = req.body;
+        const { costTraining, costTransport, costAccommodation, costOthers, additionalCost, settlementNote, certificateLink, pte_form_id, payment_method, category, title, vendor, location, start_date, end_date, training_gr_type, participation_type, learning_hours, certificate_expiry_date, certification_result, attachment_link } = req.body;
         const toMysqlDatetime = (v) => v ? v.replace('T', ' ') : null;
 
         let sql = 'UPDATE external_training_requests SET registration_fee = ?, travel_flight_cost = ?, accommodation_cost = ?, miscellaneous_cost = ?, additional_cost = ?, settlement_note = ?, pte_form_id = ?';
@@ -9312,6 +9334,11 @@ app.put('/api/external-training/:id', async (req, res) => {
             prevCertificateLink = prev[0]?.certificate_link || null;
             set('certificate_link = ?', certificateLink || null);
         }
+        let prevAttachmentLink = null;
+        if (attachment_link !== undefined) {
+            prevAttachmentLink = await readExternalTrainingAttachment(id);
+            set('attachment_link = ?', attachment_link || '');
+        }
 
         sql += ' WHERE id = ?';
         params.push(id);
@@ -9320,6 +9347,7 @@ app.put('/api/external-training/:id', async (req, res) => {
         if (prevCertificateLink && prevCertificateLink !== certificateLink) {
             deleteLocalUpload(prevCertificateLink);
         }
+        if (attachment_link !== undefined) cleanupReplacedAttachment(prevAttachmentLink, attachment_link);
 
         // Settlement happens after the request is already Processed - HR can attach or swap the PTE
         // form at this point too (mirrors Internal Training letting HR edit pte_form_id via Edit

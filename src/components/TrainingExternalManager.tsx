@@ -205,6 +205,11 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
     // --- Modal State ---
     const [selectedRequest, setSelectedRequest] = useState<TrainingRequest | null>(null);
     const [hrCertificateFile, setHrCertificateFile] = useState<File | null>(null);
+    // The employee's own attachment, which HR may replace or remove while verifying. hrCurrentAttachment is the
+    // saved link (kept in sync after a plain Save, since selectedRequest itself isn't refreshed then).
+    const [hrCurrentAttachment, setHrCurrentAttachment] = useState<string | null>(null);
+    const [hrAttachmentFile, setHrAttachmentFile] = useState<File | null>(null);
+    const [hrRemoveAttachment, setHrRemoveAttachment] = useState(false);
     const [hrCertificateExpiryDate, setHrCertificateExpiryDate] = useState('');
     const [hrCertificationResult, setHrCertificationResult] = useState<'Passed' | 'Not Passed'>('Passed');
 
@@ -366,6 +371,9 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
             setHrCertificateExpiryDate(expiry ? String(expiry).slice(0, 10) : '');
             setHrCertificationResult(selectedRequest._original?.certification_result === 'Not Passed' ? 'Not Passed' : 'Passed');
             setHrCertificateFile(null);
+            setHrCurrentAttachment(selectedRequest._original?.attachment_link || null);
+            setHrAttachmentFile(null);
+            setHrRemoveAttachment(false);
             setHrGrantIncentive(false);
             setHrIncentiveReward('');
             setHrIncentivePaymentType('One-Time');
@@ -475,6 +483,20 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
 
     const [isSavingDetails, setIsSavingDetails] = useState(false);
 
+    // What to send as attachment_link: undefined leaves the employee's attachment untouched, null removes it,
+    // and a URL replaces it with HR's upload. Throws if the replacement file fails to upload.
+    const resolveHrAttachmentLink = async (): Promise<string | null | undefined> => {
+        if (hrAttachmentFile) {
+            const formData = new FormData();
+            formData.append('file', hrAttachmentFile);
+            const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, { method: 'POST', body: formData });
+            if (!uploadRes.ok) throw new Error('Attachment upload failed');
+            const uploadData = await uploadRes.json();
+            return uploadData.fileUrl;
+        }
+        return hrRemoveAttachment ? null : undefined;
+    };
+
     // Lets HR fix up a request's details (category, title, vendor, dates, ...) and persist them
     // without running the full approval flow — status and cost/incentive fields stay untouched.
     const handleSaveDetails = async () => {
@@ -505,6 +527,7 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
         }
         setIsSavingDetails(true);
         try {
+            const attachmentLink = await resolveHrAttachmentLink();
             const res = await fetch(`${API_BASE_URL}/api/external-training/hr-update-details`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -519,11 +542,17 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                     training_gr_type: hrEditGriType || null,
                     participation_type: hrEditParticipationType || null,
                     learning_hours: hrEditLearningHours ? Number(hrEditLearningHours) : null,
-                    pte_form_id: hrEditPteFormId ? Number(hrEditPteFormId) : null
+                    pte_form_id: hrEditPteFormId ? Number(hrEditPteFormId) : null,
+                    attachment_link: attachmentLink
                 })
             });
             if (res.ok) {
                 await fetchRequests();
+                if (attachmentLink !== undefined) {
+                    setHrCurrentAttachment(attachmentLink);
+                    setHrAttachmentFile(null);
+                    setHrRemoveAttachment(false);
+                }
                 showNotif('success', t('alerts.detailsSaved'));
             } else {
                 showNotif('error', t('alerts.detailsSaveFailed'));
@@ -581,6 +610,13 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                     certLink = uploadData.fileUrl;
                 }
             }
+            let attachmentLink: string | null | undefined;
+            try {
+                attachmentLink = await resolveHrAttachmentLink();
+            } catch {
+                showNotif('error', t('alerts.attachmentUploadFailed'));
+                return;
+            }
             const res = await fetch(`${API_BASE_URL}/api/external-training/hr-process`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -606,7 +642,8 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                     training_gr_type: hrEditGriType || null,
                     participation_type: hrEditParticipationType || null,
                     learning_hours: hrEditLearningHours ? Number(hrEditLearningHours) : null,
-                    pte_form_id: hrEditPteFormId ? Number(hrEditPteFormId) : null
+                    pte_form_id: hrEditPteFormId ? Number(hrEditPteFormId) : null,
+                    attachment_link: attachmentLink
                 })
             });
             if (res.ok && requiresCertificateProof && hrGrantIncentive) {
@@ -679,6 +716,7 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                 const uploadData = await uploadRes.json();
                 certLink = uploadData.fileUrl;
             }
+            const attachmentLink = await resolveHrAttachmentLink();
 
             const res = await fetch(`${API_BASE_URL}/api/external-training/${selectedRequest.id}`, {
                 method: 'PUT',
@@ -703,7 +741,8 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                     training_gr_type: hrEditGriType || null,
                     participation_type: hrEditParticipationType || null,
                     learning_hours: hrEditLearningHours ? Number(hrEditLearningHours) : null,
-                    pte_form_id: hrEditPteFormId ? Number(hrEditPteFormId) : null
+                    pte_form_id: hrEditPteFormId ? Number(hrEditPteFormId) : null,
+                    attachment_link: attachmentLink
                 })
             });
 
@@ -1618,6 +1657,42 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                                 )}
                                             </div>
                                         </div>
+                                    </div>
+                                    {/* The employee's attachment - HR can swap in a corrected file or drop it entirely */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-1">{t('requestModal.employeeAttachment')}</label>
+                                        {hrCurrentAttachment && !hrAttachmentFile ? (
+                                            <div className="flex items-center justify-between gap-3 mb-2 px-4 py-2 rounded-xl border border-slate-200 bg-slate-50">
+                                                {hrRemoveAttachment ? (
+                                                    <>
+                                                        <span className="text-xs font-semibold text-rose-600">{t('requestModal.attachmentWillBeRemoved')}</span>
+                                                        <button type="button" onClick={() => setHrRemoveAttachment(false)} className="text-xs font-bold text-indigo-600 hover:underline">{t('requestModal.undoRemoveAttachment')}</button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <a href={resolveFileUrl(hrCurrentAttachment)} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs font-bold text-indigo-600 hover:underline truncate">
+                                                            <FileText size={14} /> {t('requestModal.viewCurrentAttachment')}
+                                                        </a>
+                                                        <button type="button" onClick={() => setHrRemoveAttachment(true)} className="flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700">
+                                                            <Trash2 size={14} /> {t('requestModal.removeAttachment')}
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        ) : !hrCurrentAttachment && !hrAttachmentFile ? (
+                                            <p className="text-xs text-slate-400 mb-2">{t('requestModal.noAttachment')}</p>
+                                        ) : null}
+                                        <input
+                                            key={hrCurrentAttachment || 'none'}
+                                            type="file"
+                                            accept="image/*,.pdf"
+                                            onChange={(e) => {
+                                                setHrAttachmentFile(e.target.files ? e.target.files[0] : null);
+                                                setHrRemoveAttachment(false);
+                                            }}
+                                            className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none text-sm"
+                                        />
+                                        <p className="text-[11px] text-slate-400 mt-1">{hrCurrentAttachment ? t('requestModal.replaceAttachmentHint') : t('requestModal.addAttachmentHint')}</p>
                                     </div>
                                     <div className="pt-4 border-t border-slate-100">
                                         <h4 className="font-bold text-slate-800 mb-3">{t('requestModal.financeAllocation')}</h4>
