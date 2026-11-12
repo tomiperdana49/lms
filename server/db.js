@@ -759,6 +759,20 @@ export const initDB = async () => {
             console.error("Error creating general_ticket_reminders table:", e);
         }
 
+        // MIGRATION: Widen general_ticket_reminders.period - per-record reminders (Nusawork tasks for a
+        // SIMAS loan "loan:<uuid>" or an external training request) use longer keys than a month/quarter.
+        try {
+            const [periodCol] = await connection.query(
+                "SELECT CHARACTER_MAXIMUM_LENGTH AS len FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'general_ticket_reminders' AND COLUMN_NAME = 'period'"
+            );
+            if (periodCol.length > 0 && periodCol[0].len < 100) {
+                await connection.query("ALTER TABLE general_ticket_reminders MODIFY period VARCHAR(100) NOT NULL");
+                console.log("Widened general_ticket_reminders.period to VARCHAR(100).");
+            }
+        } catch (e) {
+            console.error("Error widening general_ticket_reminders.period:", e);
+        }
+
         // MIGRATION: Add hr_note to idp_plans — general HR feedback on what's missing/needs adding,
         // independent of the approve/reject decision.
         try {

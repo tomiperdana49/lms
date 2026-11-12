@@ -100,7 +100,7 @@ initDB().then(async () => {
         setInterval(runSync, NUSAWORK_NEW_EMPLOYEE_SYNC_INTERVAL_MS);
     }
 
-    // Opt-in, so a dev machine running on a copy of production data never sends real IS5 tickets.
+    // Opt-in, so a dev machine running on a copy of production data never sends real Nusawork tasks.
     if (process.env.IDP_REVIEW_REMINDERS_ENABLED === 'true') {
         scheduleReminderJob('IDP GT', runIdpReviewReminders);
     }
@@ -112,6 +112,15 @@ initDB().then(async () => {
     }
     if (process.env.IDP_NEW_EMPLOYEE_REMINDERS_ENABLED === 'true') {
         scheduleReminderJob('IDP NEW EMPLOYEE GT', runNewEmployeeIdpReminders);
+    }
+    if (process.env.IDP_STAFF_REMINDERS_ENABLED === 'true') {
+        scheduleReminderJob('IDP STAFF TASK', runStaffIdpReminders);
+    }
+    if (process.env.SIMAS_BOOK_RETURN_REMINDERS_ENABLED === 'true') {
+        scheduleReminderJob('SIMAS BOOK TASK', runSimasBookReturnReminders);
+    }
+    if (process.env.EXTERNAL_CERTIFICATE_REMINDERS_ENABLED === 'true') {
+        scheduleReminderJob('CERTIFICATE TASK', runExternalCertificateReminders);
     }
 });
 
@@ -4663,9 +4672,102 @@ const createGeneralTicket = async ({ kind = 'manual', reference = null, subject,
     return data;
 };
 
-// Sends a scheduled reminder ticket at most once per (kind, recipient, period): the row in
+// --- NUSAWORK TASKS ---
+// Every LMS reminder/notification for leaders, staff and HR is a task in Nusawork's Task Management
+// (it replaced the IS5 general tickets above, which are now only used by POST /api/general-tickets).
+// Master switch FITUR_NUSAWORK_TASK=true; the reporter of every task is NUSAWORK_TASK_REPORTER_ID
+// (a Nusawork user_id). Assignees are given as LMS employee IDs and resolved to their Nusawork
+// user_id via employees.user_id.
+const isNusaworkTaskEnabled = () => process.env.FITUR_NUSAWORK_TASK === 'true';
+const getNusaworkTaskReporterId = () => (process.env.NUSAWORK_TASK_REPORTER_ID || '').trim();
+// HR employee ID that gets the HR tasks (approved external training, missing certificate, imported IDP).
+const getNusaworkTaskHrEmployeeId = () => (process.env.NUSAWORK_TASK_HR_EMPLOYEE_ID || process.env.IS5_TICKET_PIC_HR || '').trim();
+const NUSAWORK_TASK_TAGS = ['LMS'];
+const NUSAWORK_TASK_PRIORITIES = new Set(['low', 'currently', 'high']);
+
+// Task descriptions are plain text, so the lmsAnchor() links the comments are written with become
+// "label: url".
+const htmlAnchorsToText = (text) => String(text || '')
+    .replace(/<a\s+href="([^"]*)"[^>]*>(.*?)<\/a>/gi, (_, href, label) => `${label}: ${href.replace(/&quot;/g, '"')}`);
+
+// Creates one task in Nusawork: generate a serial number, then store the task. `dueDate` is
+// "YYYY-MM-DD" (a "YYYY-MM-DD HH:MM:SS" timeExpired is accepted too and cut to its date); it never
+// falls before today. `kind` and `reference` label the attempt in general_ticket_logs, the same log
+// the IS5 tickets use (ticket_pic = the assignee's employee ID, ticket_id = the Nusawork task id).
+// Throws if Nusawork rejects the task.
+const createNusaworkTask = async ({ kind = 'manual', reference = null, subject, comment, dueDate, timeExpired, priority = 'currently', assigneeEmployeeId }) => {
+    const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
+    const today = formatWibDate(nowInWib());
+    const due = String(dueDate || timeExpired || generalTicketDueDate()).slice(0, 10);
+    const requestBody = {
+        title: String(subject).slice(0, 255),
+        serial_no: null,
+        reporter_id: getNusaworkTaskReporterId(),
+        assignees: [],
+        start_date: today,
+        due_date: due < today ? today : due,
+        priority: NUSAWORK_TASK_PRIORITIES.has(priority) ? priority : 'currently',
+        tags: NUSAWORK_TASK_TAGS,
+        description: htmlAnchorsToText(comment),
+        is_private: 0
+    };
+    const log = (fields) => logGeneralTicket({ kind, reference, ticketPic: assigneeEmployeeId, subject, requestBody, ...fields });
+    const fail = async (message, fields = {}) => {
+        await log({ status: 'FAILED', errorMessage: message, ...fields });
+        throw new Error(message);
+    };
+
+    // Callers check isNusaworkTaskEnabled() first; this only catches one that doesn't.
+    if (!isNusaworkTaskEnabled()) await fail('Nusawork tasks are disabled (FITUR_NUSAWORK_TASK is not true)');
+    if (!requestBody.reporter_id) await fail('NUSAWORK_TASK_REPORTER_ID is not configured');
+    const [assignee] = await querySimAsset('SELECT user_id FROM employees WHERE id_employee = ? LIMIT 1', [String(assigneeEmployeeId)]);
+    if (!assignee?.user_id) await fail(`No Nusawork user_id for employee ${assigneeEmployeeId}`);
+    requestBody.assignees = [assignee.user_id];
+
+    const call = async (url, options, step) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        try {
+            const response = await nusaworkFetch(url, {
+                ...options,
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                signal: controller.signal
+            });
+            const text = await response.text();
+            let data;
+            try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+            return { response, text, data };
+        } catch (err) {
+            const message = err.name === 'AbortError'
+                ? `Nusawork did not respond within 15 seconds (${step})`
+                : `Could not reach Nusawork (${step}): ${err.cause?.code || err.cause?.message || err.message}`;
+            return fail(message);
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    };
+    const rejection = (data, text, response) => (data && typeof data === 'object' && (data.message || data.error)) || text || response.statusText;
+
+    const serial = await call(`${baseUrl}/task-management/api/task/generate-serial-no`, { method: 'GET' }, 'generate-serial-no');
+    if (!serial.response.ok || !serial.data?.serial_no) {
+        await fail(`Nusawork rejected generate-serial-no (${serial.response.status}): ${rejection(serial.data, serial.text, serial.response)}`,
+            { httpStatus: serial.response.status, responseBody: serial.text });
+    }
+    requestBody.serial_no = serial.data.serial_no;
+
+    const stored = await call(`${baseUrl}/task-management/api/task/store`, { method: 'POST', body: JSON.stringify(requestBody) }, 'store');
+    if (!stored.response.ok) {
+        await fail(`Nusawork rejected the task (${stored.response.status}): ${rejection(stored.data, stored.text, stored.response)}`,
+            { httpStatus: stored.response.status, responseBody: stored.text });
+    }
+    const taskId = stored.data?.task?.id != null ? String(stored.data.task.id) : null;
+    await log({ status: 'SUCCESS', httpStatus: stored.response.status, responseBody: stored.text, ticketId: taskId });
+    return stored.data;
+};
+
+// Sends a scheduled reminder task at most once per (kind, recipient, period): the row in
 // general_ticket_reminders is claimed first so a concurrent or repeated run skips it, and released
-// again if IS5 rejects the ticket so the next run retries. Returns true only when a ticket was sent.
+// again if Nusawork rejects the task so the next run retries. Returns true only when a task was sent.
 const sendReminderTicketOnce = async ({ kind, recipientEmployeeId, period, refIds = [], ticket }) => {
     const claim = await query(
         'INSERT IGNORE INTO general_ticket_reminders (kind, recipient_employee_id, period, ref_ids) VALUES (?, ?, ?, ?)',
@@ -4673,7 +4775,7 @@ const sendReminderTicketOnce = async ({ kind, recipientEmployeeId, period, refId
     );
     if (claim.affectedRows === 0) return false;
     try {
-        await createGeneralTicket({ ...ticket, kind, reference: period, ticketPic: String(recipientEmployeeId) });
+        await createNusaworkTask({ ...ticket, kind, reference: period, assigneeEmployeeId: String(recipientEmployeeId) });
         return true;
     } catch (err) {
         await query('DELETE FROM general_ticket_reminders WHERE kind = ? AND recipient_employee_id = ? AND period = ?',
@@ -4683,15 +4785,15 @@ const sendReminderTicketOnce = async ({ kind, recipientEmployeeId, period, refId
 };
 
 // Runs a reminder job now and then hourly. Only started when its *_ENABLED flag is "true" (see
-// initDB above), so a dev machine on a copy of production data never sends real tickets.
+// initDB above), so a dev machine on a copy of production data never sends real tasks.
 const REMINDER_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 const scheduleReminderJob = (label, job) => {
-    if (!isGeneralTicketEnabled()) {
-        console.warn(`[${label}] Enabled, but FITUR_GENERAL_TICKET is not true - reminders are disabled.`);
+    if (!isNusaworkTaskEnabled()) {
+        console.warn(`[${label}] Enabled, but FITUR_NUSAWORK_TASK is not true - reminders are disabled.`);
         return;
     }
-    if (!process.env.IS5_API_KEY) {
-        console.warn(`[${label}] Enabled, but IS5_API_KEY is not set - reminders are disabled.`);
+    if (!getNusaworkTaskReporterId()) {
+        console.warn(`[${label}] Enabled, but NUSAWORK_TASK_REPORTER_ID is not set - reminders are disabled.`);
         return;
     }
     console.log(`[${label}] Reminders enabled (checked hourly).`);
@@ -6172,7 +6274,7 @@ app.get('/api/post-training-evaluations/subordinates', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- POST TRAINING EVALUATION REMINDERS (IS5 general tickets) ---
+// --- POST TRAINING EVALUATION REMINDERS (Nusawork tasks) ---
 // A leader has PTE_FILL_WINDOW_DAYS from when an External Training request is processed
 // (processed_at) to evaluate their attendees; PTE_REMINDER_DAYS_BEFORE_DEADLINE before that runs out,
 // every leader who still has someone unevaluated gets ONE ticket per training naming them. Same
@@ -6227,7 +6329,9 @@ const runPteReminders = async () => {
             }
         }
 
-        const deadlineLabel = formatIndoDate(new Date(new Date(training.startedAt).getTime() + PTE_FILL_WINDOW_DAYS * DAY_MS));
+        const deadline = new Date(new Date(training.startedAt).getTime() + PTE_FILL_WINDOW_DAYS * DAY_MS);
+        const deadlineLabel = formatIndoDate(deadline);
+        const deadlineDate = formatWibDate(new Date(deadline.getTime() + WIB_OFFSET_MS));
         const trainingDateLabel = formatIndoDate(training.date) || '-';
         for (const [leaderId, { leader, evaluatees: pending }] of byLeader) {
             const names = pending.map(e => `- ${e.full_name} (${e.id_employee})`);
@@ -6240,8 +6344,7 @@ const runPteReminders = async () => {
                     ticket: {
                         subject: `Pengingat Post Training Evaluation: ${training.title}`,
                         comment: `Halo ${leader.full_name}, Post Training Evaluation untuk training "${training.title}" (${trainingDateLabel}) belum Anda isi untuk anggota tim berikut:\n${names.join('\n')}\n\nBatas pengisian ${deadlineLabel}. Mohon isi di LMS (menu Post Training Evaluation Tim).\n\n${lmsAnchor('/training/pte-team', 'Buka Post Training Evaluation Tim')}`,
-                        timeExpired: generalTicketDueDate(),
-                        priorityId: 1
+                        dueDate: deadlineDate,
                     }
                 });
                 if (sent) console.log(`[PTE GT] Reminder sent to ${leader.full_name} for "${training.title}" (${names.length} employee(s)).`);
@@ -7258,10 +7361,10 @@ const findApprovingLeaders = async (employeeId) => {
     );
 };
 
-// An employee submitted an external training request -> a general ticket for each leader who has
-// to approve it, followed by IS5_TICKET_FOLLOW. Skipped when the employee has no leader on the org chart.
+// An employee submitted an external training request -> a Nusawork task for each leader who has
+// to approve it. Skipped when the employee has no leader on the org chart.
 const notifyLeaderExternalTrainingRequest = async ({ requestId, employee_id, employee_name, category, title, start_date, end_date, registration_fee, vendor }) => {
-    if (!isGeneralTicketEnabled()) return;
+    if (!isNusaworkTaskEnabled()) return;
     const leaders = await findApprovingLeaders(employee_id);
     if (leaders.length === 0) {
         console.warn(`[EXTERNAL TRAINING GT] No leader found for ${employee_name} (${employee_id}) - skipping the ticket.`);
@@ -7271,7 +7374,7 @@ const notifyLeaderExternalTrainingRequest = async ({ requestId, employee_id, emp
     const fee = Number(registration_fee) || 0;
     for (const leader of leaders) {
         try {
-            await createGeneralTicket({
+            await createNusaworkTask({
                 kind: 'external_training_request',
                 reference: `external_training_request:${requestId}`,
                 subject: `Pengajuan training eksternal: ${employee_name} - ${title}`,
@@ -7287,8 +7390,8 @@ const notifyLeaderExternalTrainingRequest = async ({ requestId, employee_id, emp
                     lmsAnchor(`/training/external?tab=team_approvals&request=${requestId}`, 'Buka Pengajuan')
                 ].join('\n'),
                 timeExpired: generalTicketDueDate(),
-                priorityId: 1,
-                ticketPic: String(leader.id_employee)
+                priority: 'high',
+                assigneeEmployeeId: String(leader.id_employee)
             });
             console.log(`[EXTERNAL TRAINING GT] Ticket created for leader ${leader.full_name} (${employee_name}: "${title}").`);
         } catch (err) {
@@ -7297,13 +7400,13 @@ const notifyLeaderExternalTrainingRequest = async ({ requestId, employee_id, emp
     }
 };
 
-// A leader approved an external training request -> a general ticket for the HR PIC in
-// IS5_TICKET_PIC_HR to process it, followed by IS5_TICKET_FOLLOW.
+// A leader approved an external training request -> a Nusawork task for the HR employee in
+// NUSAWORK_TASK_HR_EMPLOYEE_ID to process it.
 const notifyHRApprovedExternalTraining = async ({ request, approvedBy, approvalNote, totalCost, budgetNoticeMessage }) => {
-    if (!isGeneralTicketEnabled()) return;
-    const hrPic = (process.env.IS5_TICKET_PIC_HR || '').trim();
+    if (!isNusaworkTaskEnabled()) return;
+    const hrPic = getNusaworkTaskHrEmployeeId();
     if (!hrPic) {
-        console.warn('[EXTERNAL TRAINING GT] IS5_TICKET_PIC_HR is not set - skipping the HR ticket for an approved request.');
+        console.warn('[EXTERNAL TRAINING GT] NUSAWORK_TASK_HR_EMPLOYEE_ID is not set - skipping the HR task for an approved request.');
         return;
     }
     // The row's DATETIMEs come back as Dates read in the server's local time - format them the same way.
@@ -7312,7 +7415,7 @@ const notifyHRApprovedExternalTraining = async ({ request, approvedBy, approvalN
         if (!d || isNaN(d.getTime())) return '-';
         return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
     };
-    await createGeneralTicket({
+    await createNusaworkTask({
         kind: 'external_training_approved',
         reference: `external_training_request:${request.id}`,
         subject: `Training eksternal disetujui: ${request.employee_name} - ${request.title}`,
@@ -7331,10 +7434,10 @@ const notifyHRApprovedExternalTraining = async ({ request, approvedBy, approvalN
             lmsAnchor('/admin/training', 'Buka Training Eksternal')
         ].join('\n'),
         timeExpired: generalTicketDueDate(),
-        priorityId: 1,
-        ticketPic: hrPic
+        priority: 'high',
+        assigneeEmployeeId: hrPic
     });
-    console.log(`[EXTERNAL TRAINING GT] HR ticket created for ${request.employee_name}'s approved request "${request.title}".`);
+    console.log(`[EXTERNAL TRAINING GT] HR task created for ${request.employee_name}'s approved request "${request.title}".`);
 };
 
 app.post('/api/external-training/request', async (req, res) => {
@@ -8057,32 +8160,30 @@ app.post('/api/idp/bulk-import', async (req, res) => {
 });
 
 // --- IDP GENERAL TICKETS (IS5) ---
-// An employee imported their own IDP -> a general ticket for the HR PIC in IS5_TICKET_PIC_HR.
+// An employee imported their own IDP -> a Nusawork task for the HR employee in NUSAWORK_TASK_HR_EMPLOYEE_ID.
 const notifyHRImportedIdp = async ({ planId, employeeId, employeeName, periodYear }) => {
-    if (!isGeneralTicketEnabled()) return;
-    const hrPic = (process.env.IS5_TICKET_PIC_HR || '').trim();
+    if (!isNusaworkTaskEnabled()) return;
+    const hrPic = getNusaworkTaskHrEmployeeId();
     if (!hrPic) {
-        console.warn('[IDP GT] IS5_TICKET_PIC_HR is not set - skipping the HR ticket for an imported IDP.');
+        console.warn('[IDP GT] NUSAWORK_TASK_HR_EMPLOYEE_ID is not set - skipping the HR task for an imported IDP.');
         return;
     }
-    await createGeneralTicket({
+    await createNusaworkTask({
         kind: 'idp_import',
         reference: `idp:${planId}`,
         subject: `IDP baru diimpor: ${employeeName} (${periodYear})`,
         comment: `${employeeName} (${employeeId}) telah mengimpor Individual Development Plan periode ${periodYear} di LMS. Mohon ditinjau dan disetujui oleh HR.\n\n${lmsAnchor(`/admin/idp?idp=${planId}`, 'Buka IDP')}`,
         timeExpired: generalTicketDueDate(),
-        priorityId: 1,
-        ticketPic: hrPic
+        assigneeEmployeeId: hrPic
     });
-    console.log(`[IDP GT] HR ticket created for ${employeeName}'s imported IDP (${periodYear}).`);
+    console.log(`[IDP GT] HR task created for ${employeeName}'s imported IDP (${periodYear}).`);
 };
 
-// A new employee gets ONE general ticket asking them to write this year's IDP within their first
+// A new employee gets ONE Nusawork task asking them to write this year's IDP within their first
 // month: active, non-intern employees who joined in the last IDP_NEW_EMPLOYEE_WINDOW_DAYS days, have
 // no IDP for this year yet, and write their own IDP (same rule as the IDP page - staff-level, or no
-// reports). The ticket is due a month after the join date. ticket_pic is the new employee;
-// followers come from IS5_TICKET_FOLLOW / IS5_TICKET_FOLLOW_GROUP. Safe to run repeatedly - one
-// ticket per employee per join date.
+// reports). The task is assigned to the new employee and due a month after the join date. Safe to run
+// repeatedly - one task per employee per join date.
 const IDP_NEW_EMPLOYEE_WINDOW_DAYS = 30;
 const IDP_STAFF_JOB_LEVELS = new Set(['Staff', 'Senior Staff']);
 
@@ -8127,7 +8228,6 @@ const runNewEmployeeIdpReminders = async () => {
                     subject: `Wajib membuat IDP ${year} - karyawan baru`,
                     comment: `Halo ${e.full_name}, selamat bergabung! Sebagai karyawan baru (bergabung ${formatIndoDate(`${joinDate}T00:00:00`)}), kamu wajib menyusun Individual Development Plan (IDP) ${year} di LMS dalam bulan pertama, paling lambat ${dueLabel}.\n\nIDP berisi pencapaian, tujuan karier, dan rencana aksi pengembangan diri (minimal 4 baris, termasuk item wajib jam learning 48 jam/tahun). Setelah diisi, ajukan ke atasan langsung untuk disetujui.\n\n${lmsAnchor('/idp', 'Buka IDP')}`,
                     timeExpired,
-                    priorityId: 1
                 }
             });
             if (sent) console.log(`[IDP NEW EMPLOYEE GT] Ticket sent to ${e.full_name} (joined ${joinDate}).`);
@@ -8137,13 +8237,13 @@ const runNewEmployeeIdpReminders = async () => {
     }
 };
 
-// Days before the end of the month when leaders get a ticket for IDPs not yet reviewed that month.
+// Days before the end of the month when leaders get a task for IDPs not yet reviewed that month.
 const IDP_REVIEW_REMINDER_DAYS_BEFORE_MONTH_END = 7;
 
 // Monthly, from H-7 before month end: every leader with an Approved IDP (current year) on their
-// team that has no review logged this month gets ONE general ticket listing those employees.
-// ticket_pic is the leader; followers come from IS5_TICKET_FOLLOW (HR). Safe to run repeatedly -
-// sendReminderTicketOnce allows one ticket per leader per month and retries a failed send next run.
+// team that has no review logged this month gets ONE Nusawork task listing those employees, due at
+// month end. Safe to run repeatedly - sendReminderTicketOnce allows one task per leader per month and
+// retries a failed send next run.
 const runIdpReviewReminders = async () => {
     const today = nowInWib();
     const year = today.getUTCFullYear();
@@ -8188,13 +8288,184 @@ const runIdpReviewReminders = async () => {
                 ticket: {
                     subject: `Pengingat review IDP ${monthLabel}`,
                     comment: `Halo ${leader.full_name}, IDP anggota tim berikut belum direview untuk bulan ${monthLabel}:\n${names}\n\nMohon lakukan review 1-on-1 dan catat di LMS sebelum akhir bulan.\n\n${lmsAnchor('/idp', 'Buka IDP Tim')}`,
-                    timeExpired: generalTicketDueDate(),
-                    priorityId: 1
+                    dueDate: monthEnd,
                 }
             });
             if (sent) console.log(`[IDP GT] Review reminder sent to ${leader.full_name} for ${plans.length} IDP(s), ${periodMonth}.`);
         } catch (err) {
             console.error(`[IDP GT] Review reminder for ${leader.full_name} failed:`, err.message);
+        }
+    }
+};
+
+// Days before the end of the month when staff with no submitted IDP get a task.
+const IDP_STAFF_REMINDER_DAYS_BEFORE_MONTH_END = 3;
+
+// Monthly, from H-3 before month end: every active, non-intern employee who writes their own IDP
+// (same rule as runNewEmployeeIdpReminders) and has no IDP for this year yet, or only a Draft that
+// was never submitted, gets ONE Nusawork task due at month end. Employees who joined in the last
+// IDP_NEW_EMPLOYEE_WINDOW_DAYS days are left to runNewEmployeeIdpReminders. Safe to run repeatedly -
+// one task per employee per month.
+const runStaffIdpReminders = async () => {
+    const today = nowInWib();
+    const year = today.getUTCFullYear();
+    const month = today.getUTCMonth() + 1;
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    if (today.getUTCDate() < lastDay - IDP_STAFF_REMINDER_DAYS_BEFORE_MONTH_END) return;
+
+    const periodMonth = `${year}-${pad2(month)}`;
+    const monthEnd = `${periodMonth}-${pad2(lastDay)}`;
+    const newEmployeeSince = formatWibDate(new Date(today.getTime() - IDP_NEW_EMPLOYEE_WINDOW_DAYS * DAY_MS));
+
+    // Any plan past Draft (Pending/Approved/Rejected) has been submitted at least once.
+    const submitted = new Set((await query(
+        "SELECT DISTINCT employee_id FROM idp_plans WHERE period_year = ? AND status != 'Draft'", [year]
+    )).map(r => String(r.employee_id)));
+    const drafts = new Map((await query(
+        "SELECT employee_id, id FROM idp_plans WHERE period_year = ? AND status = 'Draft'", [year]
+    )).map(r => [String(r.employee_id), r.id]));
+
+    const employees = await querySimAsset(
+        `SELECT id_employee, user_id, full_name, job_level, status_join, active_status, join_date, deleted_at, id_report_to
+         FROM employees`
+    );
+    const reportToSet = new Set(employees
+        .filter(e => e.active_status !== 'Resign')
+        .map(e => e.id_report_to)
+        .filter(Boolean));
+
+    const monthLabel = `${INDO_MONTHS[month - 1]} ${year}`;
+    for (const e of employees) {
+        // No Nusawork user_id (an incomplete employee row) - there's no one to assign the task to.
+        if (!e.id_employee || !e.user_id || e.deleted_at || !isActiveNonIntern(e) || submitted.has(String(e.id_employee))) continue;
+        const hasReports = reportToSet.has(e.id_employee) || reportToSet.has(e.full_name);
+        if (hasReports && !IDP_STAFF_JOB_LEVELS.has(e.job_level)) continue;
+        const joinDate = e.join_date ? String(formatWibDate(new Date(new Date(e.join_date).getTime() + WIB_OFFSET_MS))) : null;
+        if (joinDate && joinDate >= newEmployeeSince) continue;
+
+        const draftId = drafts.get(String(e.id_employee));
+        const state = draftId ? 'masih berupa draft dan belum diajukan' : 'belum dibuat';
+        try {
+            const sent = await sendReminderTicketOnce({
+                kind: 'idp_staff_empty',
+                recipientEmployeeId: e.id_employee,
+                period: periodMonth,
+                refIds: draftId ? [draftId] : [],
+                ticket: {
+                    subject: `Pengingat pengisian IDP ${year}`,
+                    comment: `Halo ${e.full_name}, Individual Development Plan (IDP) ${year} kamu ${state}. Mohon lengkapi IDP di LMS dan ajukan ke atasan langsung sebelum akhir ${monthLabel}.\n\n${lmsAnchor('/idp', 'Buka IDP')}`,
+                    dueDate: monthEnd
+                }
+            });
+            if (sent) console.log(`[IDP STAFF TASK] Reminder sent to ${e.full_name} (${state}), ${periodMonth}.`);
+        } catch (err) {
+            console.error(`[IDP STAFF TASK] Reminder for ${e.full_name} failed:`, err.message);
+        }
+    }
+};
+
+// --- SIMAS BOOK RETURN REMINDERS (Nusawork tasks) ---
+// A book borrowed from SIMAS for SIMAS_BOOK_LOAN_REMINDER_MONTHS months or more and still not returned
+// -> ONE task per loan for the borrower to finish reading and return it. Read straight from SIMAS'
+// loan list (the same source /api/simas/sync uses), so it doesn't depend on when reading_logs was
+// last synced.
+const SIMAS_BOOK_LOAN_REMINDER_MONTHS = 3;
+const SIMAS_BOOK_RETURN_DUE_DAYS = 7;
+
+const runSimasBookReturnReminders = async () => {
+    const baseUrl = process.env.SIMAS_API_BASE_URL || 'https://simas.nusa.id/';
+    const response = await fetch(`${baseUrl}api/book/loan`, { headers: { 'x-api-key': process.env.SIMAS_API_KEY || '' } });
+    if (!response.ok) throw new Error(`SIMAS loans returned ${response.status}`);
+    const dataJson = await response.json();
+    const loansByEmployee = dataJson?.success && dataJson.data?.[0] ? dataJson.data[0] : {};
+
+    const today = nowInWib();
+    const cutoff = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - SIMAS_BOOK_LOAN_REMINDER_MONTHS, today.getUTCDate()));
+    const cutoffDate = formatWibDate(cutoff);
+    const dueDate = formatWibDate(new Date(today.getTime() + SIMAS_BOOK_RETURN_DUE_DAYS * DAY_MS));
+
+    const employees = new Map((await querySimAsset(
+        'SELECT id_employee, user_id, full_name, active_status, status_join, deleted_at FROM employees'
+    )).map(e => [String(e.id_employee), e]));
+
+    for (const [employeeId, { bookLoans }] of Object.entries(loansByEmployee)) {
+        const employee = employees.get(String(employeeId).trim());
+        if (!employee?.user_id || employee.deleted_at || employee.active_status === 'Resign' || !bookLoans) continue;
+
+        for (const [loanId, book] of Object.entries(bookLoans)) {
+            const loaning = book?.loanHistory?.loaning;
+            if (!loaning || book.loanHistory.return?.returnTime) continue;
+            const loanedAt = parseFlexibleDate(loaning.loanPeriod);
+            if (!loanedAt) continue;
+            // loanPeriod is a WIB wall-clock time without an offset - its date part is the loan date.
+            const loanDate = `${loanedAt.getFullYear()}-${pad2(loanedAt.getMonth() + 1)}-${pad2(loanedAt.getDate())}`;
+            if (loanDate > cutoffDate) continue;
+
+            try {
+                const sent = await sendReminderTicketOnce({
+                    kind: 'simas_book_return',
+                    recipientEmployeeId: employee.id_employee,
+                    period: `loan:${loanId}`.slice(0, 100),
+                    refIds: [book.code].filter(Boolean),
+                    ticket: {
+                        subject: `Pengingat pengembalian buku: ${book.name}`,
+                        comment: `Halo ${employee.full_name}, buku "${book.name}"${book.code ? ` (${book.code})` : ''} yang kamu pinjam dari SIMAS sejak ${formatIndoDate(`${loanDate}T00:00:00`)} sudah lebih dari ${SIMAS_BOOK_LOAN_REMINDER_MONTHS} bulan dan belum dikembalikan.\n\nMohon selesaikan membaca, kembalikan bukunya melalui SIMAS, lalu lengkapi reading log di LMS.\n\n${lmsAnchor('/reading-log', 'Buka Reading Log')}`,
+                        dueDate
+                    }
+                });
+                if (sent) console.log(`[SIMAS BOOK TASK] Reminder sent to ${employee.full_name} for "${book.name}" (loaned ${loanDate}).`);
+            } catch (err) {
+                console.error(`[SIMAS BOOK TASK] Reminder for ${employee.full_name} ("${book.name}") failed:`, err.message);
+            }
+        }
+    }
+};
+
+// --- EXTERNAL TRAINING CERTIFICATE CHECK (Nusawork task for HR) ---
+// A certification training (category "Sertifikat", plus its legacy names) that is approved/processed,
+// ended EXTERNAL_CERTIFICATE_CHECK_DAYS_AFTER_END days ago or more and still has no certificate_link
+// -> ONE task per request for the HR employee in NUSAWORK_TASK_HR_EMPLOYEE_ID to chase the certificate.
+// Only trainings that ended within the last EXTERNAL_CERTIFICATE_CHECK_LOOKBACK_DAYS days are checked,
+// so turning this on doesn't raise a task for every old training that never had a certificate.
+const EXTERNAL_CERTIFICATE_CATEGORIES = ['Sertifikat', 'Training with Competency Certification', 'Training with Certification'];
+const EXTERNAL_CERTIFICATE_CHECK_DAYS_AFTER_END = 2;
+const EXTERNAL_CERTIFICATE_CHECK_LOOKBACK_DAYS = 30;
+
+const runExternalCertificateReminders = async () => {
+    const hrPic = getNusaworkTaskHrEmployeeId();
+    if (!hrPic) {
+        console.warn('[CERTIFICATE TASK] NUSAWORK_TASK_HR_EMPLOYEE_ID is not set - skipping.');
+        return;
+    }
+    const today = nowInWib();
+    const checkUntil = formatWibDate(new Date(today.getTime() - EXTERNAL_CERTIFICATE_CHECK_DAYS_AFTER_END * DAY_MS));
+    const checkFrom = formatWibDate(new Date(today.getTime() - EXTERNAL_CERTIFICATE_CHECK_LOOKBACK_DAYS * DAY_MS));
+
+    const requests = await query(
+        `SELECT id, employee_id, employee_name, title, vendor, category, end_date
+         FROM external_training_requests
+         WHERE status IN ('Approved', 'Processed')
+           AND category IN (?)
+           AND COALESCE(certificate_link, '') = ''
+           AND end_date IS NOT NULL AND DATE(end_date) BETWEEN ? AND ?`,
+        [EXTERNAL_CERTIFICATE_CATEGORIES, checkFrom, checkUntil]
+    );
+
+    for (const r of requests) {
+        try {
+            const sent = await sendReminderTicketOnce({
+                kind: 'external_certificate_check',
+                recipientEmployeeId: hrPic,
+                period: `external_training_request:${r.id}`,
+                refIds: [r.employee_id],
+                ticket: {
+                    subject: `Cek sertifikat training: ${r.employee_name} - ${r.title}`,
+                    comment: `Training sertifikasi "${r.title}" (${r.vendor || '-'}) oleh ${r.employee_name} (${r.employee_id}) sudah selesai pada ${formatIndoDate(r.end_date)}, tetapi sertifikatnya belum ada di LMS.\n\nMohon cek apakah sertifikat sudah terbit dan lengkapi di LMS.\n\n${lmsAnchor('/admin/training', 'Buka Training Eksternal')}`
+                }
+            });
+            if (sent) console.log(`[CERTIFICATE TASK] HR task sent for request ${r.id} (${r.employee_name}: "${r.title}").`);
+        } catch (err) {
+            console.error(`[CERTIFICATE TASK] HR task for request ${r.id} failed:`, err.message);
         }
     }
 };
@@ -9023,8 +9294,8 @@ app.put('/api/competency-change-requests/:id/reject', async (req, res) => {
 
 // One row per quarter/year the employee has been assessed for - used to notify the employee
 // when their leader submits a new period, since /latest requires already knowing the period.
-// --- COMPETENCY ASSESSMENT REMINDERS (IS5 general tickets) ---
-const COMPETENCY_REMINDER_DAYS_BEFORE_QUARTER_END = 7;
+// --- COMPETENCY ASSESSMENT REMINDERS (Nusawork tasks) ---
+const COMPETENCY_REMINDER_DAYS_BEFORE_QUARTER_END = 14;
 const COMPETENCY_ALL_POSITIONS = 'Umum';
 const COMPETENCY_ALL_LEADERS = 'Semua Posisi Level Leader';
 
@@ -9056,10 +9327,10 @@ const reportsToLeader = (employee, leader) => {
 
 const isActiveNonIntern = (e) => e.active_status !== 'Resign' && e.status_join !== 'Internship';
 
-// From H-7 before the current quarter ends: every leader whose team (same members as the
+// From H-14 before the current quarter ends: every leader whose team (same members as the
 // "Kompetensi Tim" page - active, non-intern) still has someone with no competency assessment for
-// this quarter gets ONE general ticket naming them. ticket_pic is the leader; followers come from
-// IS5_TICKET_FOLLOW. Safe to run repeatedly - one ticket per leader per quarter.
+// this quarter gets ONE Nusawork task naming them, due at quarter end. Safe to run repeatedly - one
+// task per leader per quarter.
 const runCompetencyAssessmentReminders = async () => {
     const today = nowInWib();
     const year = today.getUTCFullYear();
@@ -9109,8 +9380,7 @@ const runCompetencyAssessmentReminders = async () => {
                 ticket: {
                     subject: `Pengingat penilaian kompetensi ${periodLabel}`,
                     comment: `Halo ${leader.full_name}, penilaian kompetensi ${periodLabel} untuk anggota tim berikut belum diisi:\n${names}\n\nMohon isi penilaian di LMS (menu Kompetensi Tim) sebelum kuartal berakhir pada ${quarterEndLabel}.\n\n${lmsAnchor('/competency-team', 'Buka Kompetensi Tim')}`,
-                    timeExpired: generalTicketDueDate(),
-                    priorityId: 1
+                    dueDate: formatWibDate(quarterEnd),
                 }
             });
             if (sent) console.log(`[COMPETENCY GT] Reminder sent to ${leader.full_name} for ${pending.length} employee(s), ${period}.`);
