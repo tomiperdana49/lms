@@ -37,7 +37,7 @@
     "pending": "MENUNGGU",
     "viewDocument": "Lihat Dokumen",
     "openDocument": "Buka Dokumen",
-    "viewCertificateAttachment": "Lihat Sertifikat/Lampiran",
+    "viewCertificateAttachment": "Lihat Sertifikat/Invoice Training",
     "viewDossier": "Lihat Berkas",
     "detail": "Detail",
     "delete": "Hapus",
@@ -47,9 +47,10 @@
     "certificateExpired": "Kedaluwarsa",
     "incentive": "Insentif",
     "month": "bulan",
-    "certificateOriginal": "Asli",
-    "certificateRenewed": "Perpanjangan",
-    "attachment": "Lampiran"
+    "certificateOriginal": "Sertifikat",
+    "certificateRenewed": "Sertifikat Perpanjangan",
+    "attachment": "Invoice Training",
+    "documents": "Dokumen"
   },
   "requestModal": {
     "dateRange": "Tanggal: {{start}} sampai {{end}}",
@@ -121,14 +122,14 @@
     "updateData": "Perbarui Data",
     "updateTitle": "Perbarui Data Pelatihan",
     "saveChanges": "Simpan Perubahan",
-    "employeeAttachment": "Lampiran Karyawan",
-    "viewCurrentAttachment": "Lihat lampiran saat ini",
+    "employeeAttachment": "Invoice Training (dari Karyawan)",
+    "viewCurrentAttachment": "Lihat invoice saat ini",
     "removeAttachment": "Hapus",
-    "attachmentWillBeRemoved": "Lampiran akan dihapus saat disimpan.",
+    "attachmentWillBeRemoved": "Invoice akan dihapus saat disimpan.",
     "undoRemoveAttachment": "Batal",
-    "noAttachment": "Karyawan tidak mengunggah lampiran.",
-    "replaceAttachmentHint": "Pilih file untuk mengganti lampiran karyawan.",
-    "addAttachmentHint": "Pilih file untuk menambahkan lampiran."
+    "noAttachment": "Karyawan tidak mengunggah invoice training.",
+    "replaceAttachmentHint": "Pilih file untuk mengganti invoice training karyawan.",
+    "addAttachmentHint": "Pilih file untuk menambahkan invoice training."
   },
   "settlementModal": {
     "viewCurrentCertificate": "Lihat sertifikat saat ini",
@@ -159,7 +160,7 @@
     "confirmApproveMessage": "Apakah Anda yakin ingin menyetujui permintaan training eksternal \"{{title}}\" ini?",
     "confirmDeleteRequest": "Tindakan ini akan menghapus permanen seluruh data permintaan pelatihan ini beserta file sertifikat yang sudah diupload. Data insentif yang sudah pernah diberikan (jika ada) tidak akan ikut terhapus. Aksi ini tidak dapat dibatalkan.",
     "confirmDeleteTitle": "Hapus Permintaan Training",
-    "attachmentUploadFailed": "Gagal mengunggah lampiran. Silakan coba lagi."
+    "attachmentUploadFailed": "Gagal mengunggah invoice training. Silakan coba lagi."
   },
   "printDocument": {
     "windowTitle": "Persetujuan Pelatihan - {{id}}",

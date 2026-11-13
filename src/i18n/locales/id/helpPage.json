@@ -185,7 +185,7 @@
       "steps": [
         {
           "title": "Ajukan permintaan baru",
-          "description": "Di tab \"Permintaan Saya\", isi form \"Permintaan Baru\": Kategori, Judul/Nama Kursus, Vendor, Lokasi, dan Tanggal Mulai & Selesai. Kalau training-nya berbayar, centang \"Ada Biaya\" lalu isi Biaya Pendaftaran dan Metode Pembayaran. Tambahkan Lampiran (opsional), lalu klik \"Kirim Permintaan\"."
+          "description": "Di tab \"Permintaan Saya\", isi form \"Permintaan Baru\": Kategori, Judul/Nama Kursus, Vendor, Lokasi, dan Tanggal Mulai & Selesai. Kalau training-nya berbayar, centang \"Ada Biaya\" lalu isi Biaya Pendaftaran dan Metode Pembayaran. Tambahkan Invoice Training (opsional), lalu klik \"Kirim Permintaan\"."
         },
         {
           "title": "Menunggu persetujuan atasan",

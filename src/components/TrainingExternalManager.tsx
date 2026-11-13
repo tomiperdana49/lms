@@ -21,7 +21,8 @@ import {
     ChevronDown,
     ChevronUp,
     ClipboardList,
-    ClipboardCheck
+    ClipboardCheck,
+    Receipt,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useTranslation } from 'react-i18next';
@@ -128,7 +129,7 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                     costTransport: req.travel_flight_cost || 0,
                     costAccommodation: req.accommodation_cost || 0,
                     costOthers: req.miscellaneous_cost || 0,
-                    evidenceUrl: resolveFileUrl(req.certificate_link || req.attachment_link),
+                    evidenceUrl: resolveFileUrl(req.certificate_link),
                     renewalCertificateUrl: resolveFileUrl(req.renewal_certificate_link),
                     attachmentUrl: resolveFileUrl(req.attachment_link),
                     hrName: req.status === 'Processed' ? (req.hr_name || t('common.hrProcessed')) : '',
@@ -177,7 +178,7 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                     costTransport: req.travel_flight_cost || 0,
                     costAccommodation: req.accommodation_cost || 0,
                     costOthers: req.miscellaneous_cost || 0,
-                    evidenceUrl: resolveFileUrl(req.certificate_link || req.attachment_link),
+                    evidenceUrl: resolveFileUrl(req.certificate_link),
                     renewalCertificateUrl: resolveFileUrl(req.renewal_certificate_link),
                     attachmentUrl: resolveFileUrl(req.attachment_link),
                     hrName: req.status === 'Processed' ? (req.hr_name || t('common.hrProcessed')) : '',
@@ -1308,11 +1309,10 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                             {[
                                                 { url: req.evidenceUrl, label: t('list.certificateOriginal'), expiry: req.originalCertificateExpiryDate || req.certificateExpiryDate },
                                                 { url: req.renewalCertificateUrl, label: t('list.certificateRenewed'), expiry: req.certificateExpiryDate },
-                                                // Only shown as its own thumbnail when it's a different file than what's already
-                                                // displayed above — evidenceUrl falls back to the same attachment when no
-                                                // certificate was ever uploaded, which would otherwise duplicate the thumbnail.
-                                                ...(req.attachmentUrl && req.attachmentUrl !== req.evidenceUrl ? [{ url: req.attachmentUrl, label: t('list.attachment'), expiry: undefined as string | undefined }] : [])
-                                            ].filter(cert => cert.url).map((cert, idx) => (
+                                                // Employee's upload is the training invoice; HR's upload is the certificate.
+                                                // Skip the invoice when it's the very same file as the certificate.
+                                                ...(req.attachmentUrl && req.attachmentUrl !== req.evidenceUrl ? [{ url: req.attachmentUrl, label: t('list.attachment'), expiry: undefined as string | undefined, isInvoice: true }] : [])
+                                            ].filter(cert => cert.url).map((cert: { url?: string; label: string; expiry?: string; isInvoice?: boolean }, idx) => (
                                                 <div key={idx} className="flex flex-col items-center gap-1">
                                                     {cert.url!.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
                                                         <a href={cert.url} target="_blank" rel="noreferrer" className="group/img relative block overflow-hidden rounded-xl border border-slate-100 shadow-sm w-36 h-24 shrink-0">
@@ -1323,7 +1323,7 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                                         </a>
                                                     ) : (
                                                         <a href={cert.url} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center w-36 h-24 bg-slate-50 border border-slate-100 rounded-xl hover:bg-slate-100 hover:border-slate-300 transition-colors group/doc text-slate-400 hover:text-indigo-600 shrink-0">
-                                                            <FileText size={24} className="mb-2" />
+                                                            {cert.isInvoice ? <Receipt size={24} className="mb-2" /> : <FileText size={24} className="mb-2" />}
                                                             <span className="text-[9px] font-black uppercase tracking-widest text-center px-2">{t('list.openDocument')}</span>
                                                         </a>
                                                     )}
@@ -1342,8 +1342,8 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                     )}
 
                                     <div className="flex items-center gap-2">
-                                        {req.evidenceUrl && (
-                                            <a href={req.evidenceUrl} target="_blank" rel="noreferrer" className="p-3 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all lg:hidden" title={t('list.viewCertificateAttachment')}>
+                                        {(req.evidenceUrl || req.attachmentUrl) && (
+                                            <a href={req.evidenceUrl || req.attachmentUrl} target="_blank" rel="noreferrer" className="p-3 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all lg:hidden" title={t('list.viewCertificateAttachment')}>
                                                 <Link size={20} />
                                             </a>
                                         )}
@@ -1543,15 +1543,15 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                         <div className="sm:col-span-2">
                                             <span className="flex items-center gap-2 text-slate-600 mb-2">
                                                 <Award className="w-4 h-4 shrink-0 text-slate-400" />
-                                                {t('list.certificateAlt')}
+                                                {t('list.documents')}
                                             </span>
                                             <div className="flex flex-wrap gap-4">
                                                 {[
                                                     { url: selectedRequest.evidenceUrl, label: t('list.certificateOriginal'), expiry: selectedRequest.originalCertificateExpiryDate || selectedRequest.certificateExpiryDate },
                                                     { url: selectedRequest.renewalCertificateUrl, label: t('list.certificateRenewed'), expiry: selectedRequest.certificateExpiryDate },
-                                                    // See the equivalent list-card thumbnails above — same dedup rule.
-                                                    ...(selectedRequest.attachmentUrl && selectedRequest.attachmentUrl !== selectedRequest.evidenceUrl ? [{ url: selectedRequest.attachmentUrl, label: t('list.attachment'), expiry: undefined as string | undefined }] : [])
-                                                ].filter((cert): cert is { url: string; label: string; expiry: string | undefined } => !!cert.url).map((cert, idx, arr) => (
+                                                    // Same rule as the list-card thumbnails above.
+                                                    ...(selectedRequest.attachmentUrl && selectedRequest.attachmentUrl !== selectedRequest.evidenceUrl ? [{ url: selectedRequest.attachmentUrl, label: t('list.attachment'), expiry: undefined as string | undefined, isInvoice: true }] : [])
+                                                ].filter((cert): cert is { url: string; label: string; expiry: string | undefined; isInvoice?: boolean } => !!cert.url).map((cert, idx) => (
                                                     <div key={idx} className="flex flex-col gap-1">
                                                         {cert.url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
                                                             <a href={cert.url} target="_blank" rel="noreferrer" className="block w-32 h-24 rounded-lg overflow-hidden border border-slate-200 hover:opacity-90 transition-opacity">
@@ -1559,11 +1559,11 @@ const TrainingExternalManager = ({ userRole, userName }: { userRole: string; use
                                                             </a>
                                                         ) : (
                                                             <a href={cert.url} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center w-32 h-24 bg-white border border-slate-200 rounded-lg hover:border-indigo-300 transition-colors text-slate-400 hover:text-indigo-600">
-                                                                <FileText size={20} className="mb-1" />
+                                                                {cert.isInvoice ? <Receipt size={20} className="mb-1" /> : <FileText size={20} className="mb-1" />}
                                                                 <span className="text-[9px] font-black uppercase tracking-widest">{t('list.openDocument')}</span>
                                                             </a>
                                                         )}
-                                                        {arr.length > 1 && <span className="text-xs font-semibold text-slate-500">{cert.label}</span>}
+                                                        <span className="text-xs font-semibold text-slate-500">{cert.label}</span>
                                                         {cert.expiry && (
                                                             <span className="text-xs text-slate-500">{new Date(cert.expiry).toLocaleDateString()}</span>
                                                         )}

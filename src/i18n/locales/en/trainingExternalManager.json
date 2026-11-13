@@ -37,7 +37,7 @@
     "pending": "PENDING",
     "viewDocument": "View Document",
     "openDocument": "Open Document",
-    "viewCertificateAttachment": "View Certificate/Attachment",
+    "viewCertificateAttachment": "View Certificate/Training Invoice",
     "viewDossier": "View Dossier",
     "detail": "Detail",
     "delete": "Delete",
@@ -47,9 +47,10 @@
     "certificateExpired": "Expired",
     "incentive": "Incentive",
     "month": "month",
-    "certificateOriginal": "Original",
-    "certificateRenewed": "Renewed",
-    "attachment": "Attachment"
+    "certificateOriginal": "Certificate",
+    "certificateRenewed": "Renewed Certificate",
+    "attachment": "Training Invoice",
+    "documents": "Documents"
   },
   "requestModal": {
     "dateRange": "Dates: {{start}} to {{end}}",
@@ -121,14 +122,14 @@
     "updateData": "Update Data",
     "updateTitle": "Update Training Data",
     "saveChanges": "Save Changes",
-    "employeeAttachment": "Employee Attachment",
-    "viewCurrentAttachment": "View current attachment",
+    "employeeAttachment": "Training Invoice (from Employee)",
+    "viewCurrentAttachment": "View current invoice",
     "removeAttachment": "Remove",
-    "attachmentWillBeRemoved": "The attachment will be removed on save.",
+    "attachmentWillBeRemoved": "The invoice will be removed on save.",
     "undoRemoveAttachment": "Undo",
-    "noAttachment": "The employee didn't upload an attachment.",
-    "replaceAttachmentHint": "Choose a file to replace the employee's attachment.",
-    "addAttachmentHint": "Choose a file to add an attachment."
+    "noAttachment": "The employee didn't upload a training invoice.",
+    "replaceAttachmentHint": "Choose a file to replace the employee's training invoice.",
+    "addAttachmentHint": "Choose a file to add a training invoice."
   },
   "settlementModal": {
     "viewCurrentCertificate": "View current certificate",
@@ -159,7 +160,7 @@
     "confirmApproveMessage": "Are you sure you want to approve this external training request \"{{title}}\"?",
     "confirmDeleteRequest": "This will permanently delete all data for this training request, including any uploaded certificate file. Incentives already granted from this request (if any) will not be removed. This action cannot be undone.",
     "confirmDeleteTitle": "Delete Training Request",
-    "attachmentUploadFailed": "Failed to upload the attachment. Please try again."
+    "attachmentUploadFailed": "Failed to upload the training invoice. Please try again."
   },
   "printDocument": {
     "windowTitle": "Training Approval - {{id}}",

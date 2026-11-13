@@ -185,7 +185,7 @@
       "steps": [
         {
           "title": "Submit a new request",
-          "description": "On the \"My Requests\" tab, fill in the \"New Request\" form: Category, Title/Course Name, Vendor, Location, and Start & End Date. If the training costs money, tick \"Has a cost\" and fill in the Registration Fee and Payment Method. Add an optional Attachment, then click \"Submit Request\"."
+          "description": "On the \"My Requests\" tab, fill in the \"New Request\" form: Category, Title/Course Name, Vendor, Location, and Start & End Date. If the training costs money, tick \"Has a cost\" and fill in the Registration Fee and Payment Method. Add the Training Invoice (optional), then click \"Submit Request\"."
         },
         {
           "title": "Wait for your supervisor's approval",
