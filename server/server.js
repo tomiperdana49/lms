@@ -4683,7 +4683,7 @@ const getNusaworkTaskReporterId = () => (process.env.NUSAWORK_TASK_REPORTER_ID |
 // HR employee ID that gets the HR tasks (approved external training, missing certificate, imported IDP).
 const getNusaworkTaskHrEmployeeId = () => (process.env.NUSAWORK_TASK_HR_EMPLOYEE_ID || process.env.IS5_TICKET_PIC_HR || '').trim();
 const NUSAWORK_TASK_TAGS = ['LMS'];
-const NUSAWORK_TASK_PRIORITIES = new Set(['low', 'currently', 'high']);
+const NUSAWORK_TASK_PRIORITIES = new Set(['low', 'medium', 'high']);
 
 // Task Management currently only works with a token tied to a user: the client_credentials token the
 // rest of the Nusawork integration uses gets HTTP 500 on every task endpoint. While that's the case,
@@ -4753,7 +4753,7 @@ const htmlAnchorsToText = (text) => String(text || '')
 // falls before today. `kind` and `reference` label the attempt in general_ticket_logs, the same log
 // the IS5 tickets use (ticket_pic = the assignee's employee ID, ticket_id = the Nusawork task id).
 // Throws if Nusawork rejects the task.
-const createNusaworkTask = async ({ kind = 'manual', reference = null, subject, comment, dueDate, timeExpired, priority = 'currently', assigneeEmployeeId }) => {
+const createNusaworkTask = async ({ kind = 'manual', reference = null, subject, comment, dueDate, timeExpired, priority = 'medium', assigneeEmployeeId }) => {
     const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
     const today = formatWibDate(nowInWib());
     const due = String(dueDate || timeExpired || generalTicketDueDate()).slice(0, 10);
@@ -4764,7 +4764,7 @@ const createNusaworkTask = async ({ kind = 'manual', reference = null, subject, 
         assignees: [],
         start_date: today,
         due_date: due < today ? today : due,
-        priority: NUSAWORK_TASK_PRIORITIES.has(priority) ? priority : 'currently',
+        priority: NUSAWORK_TASK_PRIORITIES.has(priority) ? priority : 'medium',
         tags: NUSAWORK_TASK_TAGS,
         description: htmlAnchorsToText(comment),
         is_private: 0
