@@ -4676,10 +4676,10 @@ const createGeneralTicket = async ({ kind = 'manual', reference = null, subject,
 // Every LMS reminder/notification for leaders, staff and HR is a task in Nusawork's Task Management
 // (it replaced the IS5 general tickets above, which are now only used by POST /api/general-tickets).
 // Master switch FITUR_NUSAWORK_TASK=true; the reporter of every task is NUSAWORK_TASK_REPORTER_ID
-// (a Nusawork user_id). Assignees are given as LMS employee IDs and resolved to their Nusawork
-// user_id via employees.user_id.
+// (a Nusawork user_id), which is optional - when it's empty, tasks are sent with reporter_id: null.
+// Assignees are given as LMS employee IDs and resolved to their Nusawork user_id via employees.user_id.
 const isNusaworkTaskEnabled = () => process.env.FITUR_NUSAWORK_TASK === 'true';
-const getNusaworkTaskReporterId = () => (process.env.NUSAWORK_TASK_REPORTER_ID || '').trim();
+const getNusaworkTaskReporterId = () => (process.env.NUSAWORK_TASK_REPORTER_ID || '').trim() || null;
 // HR employee ID that gets the HR tasks (approved external training, missing certificate, imported IDP).
 const getNusaworkTaskHrEmployeeId = () => (process.env.NUSAWORK_TASK_HR_EMPLOYEE_ID || process.env.IS5_TICKET_PIC_HR || '').trim();
 const NUSAWORK_TASK_TAGS = ['LMS'];
@@ -4719,7 +4719,6 @@ const createNusaworkTask = async ({ kind = 'manual', reference = null, subject, 
 
     // Callers check isNusaworkTaskEnabled() first; this only catches one that doesn't.
     if (!isNusaworkTaskEnabled()) await fail('Nusawork tasks are disabled (FITUR_NUSAWORK_TASK is not true)');
-    if (!requestBody.reporter_id) await fail('NUSAWORK_TASK_REPORTER_ID is not configured');
     const [assignee] = await querySimAsset('SELECT user_id FROM employees WHERE id_employee = ? LIMIT 1', [String(assigneeEmployeeId)]);
     if (!assignee?.user_id) await fail(`No Nusawork user_id for employee ${assigneeEmployeeId}`);
     requestBody.assignees = [assignee.user_id];
@@ -4790,10 +4789,6 @@ const REMINDER_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 const scheduleReminderJob = (label, job) => {
     if (!isNusaworkTaskEnabled()) {
         console.warn(`[${label}] Enabled, but FITUR_NUSAWORK_TASK is not true - reminders are disabled.`);
-        return;
-    }
-    if (!getNusaworkTaskReporterId()) {
-        console.warn(`[${label}] Enabled, but NUSAWORK_TASK_REPORTER_ID is not set - reminders are disabled.`);
         return;
     }
     console.log(`[${label}] Reminders enabled (checked hourly).`);
