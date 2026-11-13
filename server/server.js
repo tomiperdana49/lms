@@ -4685,6 +4685,64 @@ const getNusaworkTaskHrEmployeeId = () => (process.env.NUSAWORK_TASK_HR_EMPLOYEE
 const NUSAWORK_TASK_TAGS = ['LMS'];
 const NUSAWORK_TASK_PRIORITIES = new Set(['low', 'currently', 'high']);
 
+// Task Management currently only works with a token tied to a user: the client_credentials token the
+// rest of the Nusawork integration uses gets HTTP 500 on every task endpoint. While that's the case,
+// set NUSAWORK_TASK_USERNAME / NUSAWORK_TASK_PASSWORD (a Nusawork account allowed to create tasks) and
+// tasks get their own token from a password grant - the reporter stays NUSAWORK_TASK_REPORTER_ID, or
+// "System" when that's empty. The grant uses NUSAWORK_TASK_CLIENT_ID / NUSAWORK_TASK_CLIENT_SECRET
+// (a client that accepts password grants, e.g. client 4); the token is kept in memory until shortly
+// before it expires. Leave both empty to send tasks with the shared NUSAWORK_CLIENT_ID token (nusaworkFetch)
+// once Nusawork allows that client to use Task Management - no code change needed to switch.
+const hasNusaworkTaskCredentials = () => !!((process.env.NUSAWORK_TASK_USERNAME || '').trim() && process.env.NUSAWORK_TASK_PASSWORD);
+let nusaworkTaskToken = null; // { token, expiresAt }
+
+const getNusaworkTaskToken = async () => {
+    if (nusaworkTaskToken && Date.now() < nusaworkTaskToken.expiresAt) return nusaworkTaskToken.token;
+    const baseUrl = process.env.NUSAWORK_BASE_URL || process.env.NUSANET_BASE_URL || 'https://nusanet.app.nusawork.com';
+    const authUrl = process.env.NUSANET_AUTH_URL || `${baseUrl}/auth/api/oauth/token`;
+    const clientId = (process.env.NUSAWORK_TASK_CLIENT_ID || '').trim();
+    const clientSecret = process.env.NUSAWORK_TASK_CLIENT_SECRET || '';
+    if (!clientId || !clientSecret) {
+        const err = new Error('NUSAWORK_TASK_CLIENT_ID / NUSAWORK_TASK_CLIENT_SECRET are not configured (needed with NUSAWORK_TASK_USERNAME)');
+        err.isTaskLogin = true;
+        throw err;
+    }
+    const username = process.env.NUSAWORK_TASK_USERNAME.trim();
+    const response = await fetch(authUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+            'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+        },
+        body: new URLSearchParams({ grant_type: 'password', client_id: clientId, client_secret: clientSecret, username, password: process.env.NUSAWORK_TASK_PASSWORD })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.access_token) {
+        const err = new Error(`Nusawork task login failed for ${username} (${response.status}): ${data.message || data.error || response.statusText}`);
+        err.isTaskLogin = true;
+        throw err;
+    }
+    // Refresh 5 minutes early; without expires_in, assume the 24h the shared token cache uses.
+    const lifetimeMs = (Number(data.expires_in) > 0 ? Number(data.expires_in) * 1000 : 86400000) - 5 * 60 * 1000;
+    nusaworkTaskToken = { token: data.access_token, expiresAt: Date.now() + Math.max(lifetimeMs, 60 * 1000) };
+    console.log(`[NUSAWORK TASK] Signed in as ${username} for task management.`);
+    return data.access_token;
+};
+
+// Like nusaworkFetch, but with the task token; a 401/403 drops it and retries once with a fresh login.
+// Without task credentials it is just nusaworkFetch.
+const nusaworkTaskFetch = async (url, options = {}) => {
+    if (!hasNusaworkTaskCredentials()) return nusaworkFetch(url, options);
+    const withAuth = (t) => ({ ...options, headers: { ...(options.headers || {}), 'Authorization': `Bearer ${t}` } });
+    let response = await fetch(url, withAuth(await getNusaworkTaskToken()));
+    if (response.status === 401 || response.status === 403) {
+        nusaworkTaskToken = null;
+        response = await fetch(url, withAuth(await getNusaworkTaskToken()));
+    }
+    return response;
+};
+
 // Task descriptions are plain text, so the lmsAnchor() links the comments are written with become
 // "label: url".
 const htmlAnchorsToText = (text) => String(text || '')
@@ -4727,7 +4785,7 @@ const createNusaworkTask = async ({ kind = 'manual', reference = null, subject, 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
         try {
-            const response = await nusaworkFetch(url, {
+            const response = await nusaworkTaskFetch(url, {
                 ...options,
                 headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
                 signal: controller.signal
@@ -4739,6 +4797,7 @@ const createNusaworkTask = async ({ kind = 'manual', reference = null, subject, 
         } catch (err) {
             const message = err.name === 'AbortError'
                 ? `Nusawork did not respond within 15 seconds (${step})`
+                : err.isTaskLogin ? err.message
                 : `Could not reach Nusawork (${step}): ${err.cause?.code || err.cause?.message || err.message}`;
             return fail(message);
         } finally {
@@ -4791,7 +4850,7 @@ const scheduleReminderJob = (label, job) => {
         console.warn(`[${label}] Enabled, but FITUR_NUSAWORK_TASK is not true - reminders are disabled.`);
         return;
     }
-    console.log(`[${label}] Reminders enabled (checked hourly).`);
+    console.log(`[${label}] Reminders enabled (checked hourly, ${hasNusaworkTaskCredentials() ? `as ${process.env.NUSAWORK_TASK_USERNAME.trim()}` : 'with the NUSAWORK_CLIENT_ID token'}).`);
     const run = () => job().catch(err => console.error(`[${label}] Reminder run failed:`, err.message));
     run();
     setInterval(run, REMINDER_CHECK_INTERVAL_MS);
