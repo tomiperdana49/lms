@@ -4396,12 +4396,18 @@ app.get('/api/employees/directory', async (req, res) => {
              ORDER BY full_name ASC`
         );
         const reportToSet = await getSupervisorIdentifierSet();
-        const mapped = employees.map(e => ({
-            employeeId: e.id_employee,
-            fullName: e.full_name,
-            jobPosition: e.job_position,
-            isSupervisor: reportToSet.has(e.id_employee) || reportToSet.has(e.full_name)
-        }));
+        const templatePositions = new Set((await query('SELECT DISTINCT posisi FROM competency_templates')).map(r => r.posisi));
+        const mapped = employees.map(e => {
+            const isSupervisor = reportToSet.has(e.id_employee) || reportToSet.has(e.full_name);
+            return {
+                employeeId: e.id_employee,
+                fullName: e.full_name,
+                jobPosition: e.job_position,
+                isSupervisor,
+                // false = no competency in the dictionary applies, so there is no form to fill in
+                hasCompetencies: hasAssessableCompetencies(e.job_position, isSupervisor, templatePositions)
+            };
+        });
         res.json(mapped);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -9454,6 +9460,21 @@ app.get('/api/competency-assessments/periods', async (req, res) => {
             [employee_id]
         );
         res.json(rows.map(r => ({ quarter: r.quarter, year: r.year, assessedAt: r.assessed_at, assessedByName: r.assessed_by_name })));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Employee ids with a saved assessment for one quarter - powers the filled/not-filled filter on
+// HR's Competency Overview.
+app.get('/api/competency-assessments/assessed-employees', async (req, res) => {
+    try {
+        const quarter = Number(req.query.quarter);
+        const year = Number(req.query.year);
+        if (!quarter || !year) return res.status(400).json({ error: 'quarter and year are required' });
+        const rows = await query(
+            'SELECT DISTINCT employee_id FROM competency_assessments WHERE quarter = ? AND year = ?',
+            [quarter, year]
+        );
+        res.json(rows.map(r => String(r.employee_id)));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

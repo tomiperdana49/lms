@@ -54,6 +54,8 @@ export interface TeamMember {
     fullName: string;
     jobPosition: string;
     isSupervisor: boolean;
+    // Only sent by /api/employees/directory: false when no competency applies to the position
+    hasCompetencies?: boolean;
 }
 
 export interface Question {

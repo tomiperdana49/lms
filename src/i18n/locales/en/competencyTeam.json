@@ -119,7 +119,19 @@
     "accessDenied": "Access Denied. HR Only.",
     "searchPlaceholder": "Search by name, ID or position...",
     "noResults": "No employees match your search.",
-    "selectPrompt": "Select an employee from the list to view their competency assessment."
+    "selectPrompt": "Select an employee from the list to view their competency assessment.",
+    "filter": {
+      "all": "All",
+      "assessed": "Filled in",
+      "pending": "Not filled in",
+      "noForm": "No form"
+    },
+    "status": {
+      "assessed": "Filled in",
+      "pending": "Not filled in",
+      "noForm": "No form"
+    },
+    "noFormHint": "The dictionary has no competency for this position yet, so there is no form to fill in."
   },
   "scaleLegend": {
     "title": "Proficiency Scale",

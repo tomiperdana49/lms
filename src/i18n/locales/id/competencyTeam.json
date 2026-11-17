@@ -119,7 +119,19 @@
     "accessDenied": "Akses Ditolak. Khusus HR.",
     "searchPlaceholder": "Cari berdasarkan nama, ID, atau posisi...",
     "noResults": "Tidak ada karyawan yang sesuai dengan pencarian.",
-    "selectPrompt": "Pilih karyawan dari daftar untuk melihat penilaian kompetensinya."
+    "selectPrompt": "Pilih karyawan dari daftar untuk melihat penilaian kompetensinya.",
+    "filter": {
+      "all": "Semua",
+      "assessed": "Sudah diisi",
+      "pending": "Belum diisi",
+      "noForm": "Tanpa form"
+    },
+    "status": {
+      "assessed": "Sudah diisi",
+      "pending": "Belum diisi",
+      "noForm": "Tanpa form"
+    },
+    "noFormHint": "Belum ada kompetensi di Kamus untuk posisi ini, sehingga tidak ada form yang bisa diisi."
   },
   "scaleLegend": {
     "title": "Skala Keahlian",
