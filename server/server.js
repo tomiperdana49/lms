@@ -4681,80 +4681,23 @@ const createGeneralTicket = async ({ kind = 'manual', reference = null, subject,
 // --- NUSAWORK TASKS ---
 // Every LMS reminder/notification for leaders, staff and HR is a task in Nusawork's Task Management
 // (it replaced the IS5 general tickets above, which are now only used by POST /api/general-tickets).
-// Master switch FITUR_NUSAWORK_TASK=true; the reporter of every task is NUSAWORK_TASK_REPORTER_ID
-// (a Nusawork user_id), which is optional - when it's empty, tasks are sent with reporter_id: null.
-// Assignees are given as LMS employee IDs and resolved to their Nusawork user_id via employees.user_id.
+// Master switch FITUR_NUSAWORK_TASK=true; the reporter of every task is the employee in
+// NUSAWORK_TASK_REPORTER_EMPLOYEE_ID, which is optional - when it's empty the reporter is "System".
 const isNusaworkTaskEnabled = () => process.env.FITUR_NUSAWORK_TASK === 'true';
-const getNusaworkTaskReporterId = () => (process.env.NUSAWORK_TASK_REPORTER_ID || '').trim() || null;
+const getNusaworkTaskReporterEmployeeId = () => (process.env.NUSAWORK_TASK_REPORTER_EMPLOYEE_ID || '').trim() || null;
 // HR employee ID that gets the HR tasks (approved external training, missing certificate, imported IDP).
 const getNusaworkTaskHrEmployeeId = () => (process.env.NUSAWORK_TASK_HR_EMPLOYEE_ID || process.env.IS5_TICKET_PIC_HR || '').trim();
 const NUSAWORK_TASK_TAGS = ['LMS'];
 const NUSAWORK_TASK_PRIORITIES = new Set(['low', 'medium', 'high']);
-
-// Task Management currently only works with a token tied to a user: the client_credentials token the
-// rest of the Nusawork integration uses gets HTTP 500 on every task endpoint. While that's the case,
-// set NUSAWORK_TASK_USERNAME / NUSAWORK_TASK_PASSWORD (a Nusawork account allowed to create tasks) and
-// tasks get their own token from a password grant - the reporter stays NUSAWORK_TASK_REPORTER_ID, or
-// "System" when that's empty. The grant uses NUSAWORK_TASK_CLIENT_ID / NUSAWORK_TASK_CLIENT_SECRET
-// (a client that accepts password grants, e.g. client 4); the token is kept in memory until shortly
-// before it expires. Leave both empty to send tasks with the shared NUSAWORK_CLIENT_ID token (nusaworkFetch)
-// once Nusawork allows that client to use Task Management - no code change needed to switch.
-const hasNusaworkTaskCredentials = () => !!((process.env.NUSAWORK_TASK_USERNAME || '').trim() && process.env.NUSAWORK_TASK_PASSWORD);
-let nusaworkTaskToken = null; // { token, expiresAt }
-
-const getNusaworkTaskToken = async () => {
-    if (nusaworkTaskToken && Date.now() < nusaworkTaskToken.expiresAt) return nusaworkTaskToken.token;
-    const baseUrl = process.env.NUSAWORK_BASE_URL || process.env.NUSANET_BASE_URL || 'https://nusanet.app.nusawork.com';
-    const authUrl = process.env.NUSANET_AUTH_URL || `${baseUrl}/auth/api/oauth/token`;
-    const clientId = (process.env.NUSAWORK_TASK_CLIENT_ID || '').trim();
-    const clientSecret = process.env.NUSAWORK_TASK_CLIENT_SECRET || '';
-    if (!clientId || !clientSecret) {
-        const err = new Error('NUSAWORK_TASK_CLIENT_ID / NUSAWORK_TASK_CLIENT_SECRET are not configured (needed with NUSAWORK_TASK_USERNAME)');
-        err.isTaskLogin = true;
-        throw err;
-    }
-    const username = process.env.NUSAWORK_TASK_USERNAME.trim();
-    const response = await fetch(authUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Accept': 'application/json',
-            'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
-        },
-        body: new URLSearchParams({ grant_type: 'password', client_id: clientId, client_secret: clientSecret, username, password: process.env.NUSAWORK_TASK_PASSWORD })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.access_token) {
-        const err = new Error(`Nusawork task login failed for ${username} (${response.status}): ${data.message || data.error || response.statusText}`);
-        err.isTaskLogin = true;
-        throw err;
-    }
-    // Refresh 5 minutes early; without expires_in, assume the 24h the shared token cache uses.
-    const lifetimeMs = (Number(data.expires_in) > 0 ? Number(data.expires_in) * 1000 : 86400000) - 5 * 60 * 1000;
-    nusaworkTaskToken = { token: data.access_token, expiresAt: Date.now() + Math.max(lifetimeMs, 60 * 1000) };
-    console.log(`[NUSAWORK TASK] Signed in as ${username} for task management.`);
-    return data.access_token;
-};
-
-// Like nusaworkFetch, but with the task token; a 401/403 drops it and retries once with a fresh login.
-// Without task credentials it is just nusaworkFetch.
-const nusaworkTaskFetch = async (url, options = {}) => {
-    if (!hasNusaworkTaskCredentials()) return nusaworkFetch(url, options);
-    const withAuth = (t) => ({ ...options, headers: { ...(options.headers || {}), 'Authorization': `Bearer ${t}` } });
-    let response = await fetch(url, withAuth(await getNusaworkTaskToken()));
-    if (response.status === 401 || response.status === 403) {
-        nusaworkTaskToken = null;
-        response = await fetch(url, withAuth(await getNusaworkTaskToken()));
-    }
-    return response;
-};
 
 // Task descriptions are plain text, so the lmsAnchor() links the comments are written with become
 // "label: url".
 const htmlAnchorsToText = (text) => String(text || '')
     .replace(/<a\s+href="([^"]*)"[^>]*>(.*?)<\/a>/gi, (_, href, label) => `${label}: ${href.replace(/&quot;/g, '"')}`);
 
-// Creates one task in Nusawork: generate a serial number, then store the task. `dueDate` is
+// Creates one task in Nusawork through the client endpoint (POST /task-management/api/client/task,
+// multipart form-data, sent with the shared NUSAWORK_CLIENT_ID token via nusaworkFetch). Reporter and
+// assignee are LMS employee IDs; Nusawork generates the serial number itself. `dueDate` is
 // "YYYY-MM-DD" (a "YYYY-MM-DD HH:MM:SS" timeExpired is accepted too and cut to its date); it never
 // falls before today. `kind` and `reference` label the attempt in general_ticket_logs, the same log
 // the IS5 tickets use (ticket_pic = the assignee's employee ID, ticket_id = the Nusawork task id).
@@ -4765,9 +4708,9 @@ const createNusaworkTask = async ({ kind = 'manual', reference = null, subject, 
     const due = String(dueDate || timeExpired || generalTicketDueDate()).slice(0, 10);
     const requestBody = {
         title: String(subject).slice(0, 255),
-        serial_no: null,
-        reporter_id: getNusaworkTaskReporterId(),
-        assignees: [],
+        // empty (not 0) = no reporter, shown as "System"
+        reporter_employee_id: getNusaworkTaskReporterEmployeeId() || '',
+        assignee_employee_ids: [String(assigneeEmployeeId)],
         start_date: today,
         due_date: due < today ? today : due,
         priority: NUSAWORK_TASK_PRIORITIES.has(priority) ? priority : 'medium',
@@ -4783,50 +4726,42 @@ const createNusaworkTask = async ({ kind = 'manual', reference = null, subject, 
 
     // Callers check isNusaworkTaskEnabled() first; this only catches one that doesn't.
     if (!isNusaworkTaskEnabled()) await fail('Nusawork tasks are disabled (FITUR_NUSAWORK_TASK is not true)');
-    const [assignee] = await querySimAsset('SELECT user_id FROM employees WHERE id_employee = ? LIMIT 1', [String(assigneeEmployeeId)]);
-    if (!assignee?.user_id) await fail(`No Nusawork user_id for employee ${assigneeEmployeeId}`);
-    requestBody.assignees = [assignee.user_id];
+    if (!assigneeEmployeeId) await fail('No assignee employee ID for the Nusawork task');
 
-    const call = async (url, options, step) => {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
-        try {
-            const response = await nusaworkTaskFetch(url, {
-                ...options,
-                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                signal: controller.signal
-            });
-            const text = await response.text();
-            let data;
-            try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-            return { response, text, data };
-        } catch (err) {
-            const message = err.name === 'AbortError'
-                ? `Nusawork did not respond within 15 seconds (${step})`
-                : err.isTaskLogin ? err.message
-                : `Could not reach Nusawork (${step}): ${err.cause?.code || err.cause?.message || err.message}`;
-            return fail(message);
-        } finally {
-            clearTimeout(timeoutId);
-        }
-    };
-    const rejection = (data, text, response) => (data && typeof data === 'object' && (data.message || data.error)) || text || response.statusText;
-
-    const serial = await call(`${baseUrl}/task-management/api/task/generate-serial-no`, { method: 'GET' }, 'generate-serial-no');
-    if (!serial.response.ok || !serial.data?.serial_no) {
-        await fail(`Nusawork rejected generate-serial-no (${serial.response.status}): ${rejection(serial.data, serial.text, serial.response)}`,
-            { httpStatus: serial.response.status, responseBody: serial.text });
+    const form = new FormData();
+    for (const [key, value] of Object.entries(requestBody)) {
+        if (Array.isArray(value)) value.forEach((v, i) => form.append(`${key}[${i}]`, String(v)));
+        else form.append(key, String(value));
     }
-    requestBody.serial_no = serial.data.serial_no;
 
-    const stored = await call(`${baseUrl}/task-management/api/task/store`, { method: 'POST', body: JSON.stringify(requestBody) }, 'store');
-    if (!stored.response.ok) {
-        await fail(`Nusawork rejected the task (${stored.response.status}): ${rejection(stored.data, stored.text, stored.response)}`,
-            { httpStatus: stored.response.status, responseBody: stored.text });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    let response, text;
+    try {
+        // fetch sets the multipart Content-Type (with its boundary) for a FormData body
+        response = await nusaworkFetch(`${baseUrl}/task-management/api/client/task`, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json' },
+            body: form,
+            signal: controller.signal
+        });
+        text = await response.text();
+    } catch (err) {
+        await fail(err.name === 'AbortError'
+            ? 'Nusawork did not respond within 15 seconds'
+            : `Could not reach Nusawork: ${err.cause?.code || err.cause?.message || err.message}`);
+    } finally {
+        clearTimeout(timeoutId);
     }
-    const taskId = stored.data?.task?.id != null ? String(stored.data.task.id) : null;
-    await log({ status: 'SUCCESS', httpStatus: stored.response.status, responseBody: stored.text, ticketId: taskId });
-    return stored.data;
+    let data;
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    if (!response.ok) {
+        const reason = (data && typeof data === 'object' && (data.message || data.error)) || text || response.statusText;
+        await fail(`Nusawork rejected the task (${response.status}): ${reason}`, { httpStatus: response.status, responseBody: text });
+    }
+    const taskId = data?.task?.id != null ? String(data.task.id) : null;
+    await log({ status: 'SUCCESS', httpStatus: response.status, responseBody: text, ticketId: taskId });
+    return data;
 };
 
 // Sends a scheduled reminder task at most once per (kind, recipient, period): the row in
@@ -4856,7 +4791,7 @@ const scheduleReminderJob = (label, job) => {
         console.warn(`[${label}] Enabled, but FITUR_NUSAWORK_TASK is not true - reminders are disabled.`);
         return;
     }
-    console.log(`[${label}] Reminders enabled (checked hourly, ${hasNusaworkTaskCredentials() ? `as ${process.env.NUSAWORK_TASK_USERNAME.trim()}` : 'with the NUSAWORK_CLIENT_ID token'}).`);
+    console.log(`[${label}] Reminders enabled (checked hourly).`);
     const run = () => job().catch(err => console.error(`[${label}] Reminder run failed:`, err.message));
     run();
     setInterval(run, REMINDER_CHECK_INTERVAL_MS);
