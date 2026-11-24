@@ -262,6 +262,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
     const [editReturnEvidenceFile, setEditReturnEvidenceFile] = useState<File | null>(null);
     const [editReturnEvidencePreview, setEditReturnEvidencePreview] = useState<string | null>(null);
     const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
+    const [isSavingEdit, setIsSavingEdit] = useState(false);
 
     // Cancel Modal State (Admin)
     const [cancelModal, setCancelModal] = useState<{ open: boolean; log: ReadingLogEntry | null; reason: string }>({
@@ -773,7 +774,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
     };
 
     const handleEditLogSubmit = async () => {
-        if (!editLogModal.log) return;
+        if (!editLogModal.log || isSavingEdit) return;
+        setIsSavingEdit(true);
         try {
             let formData = editLogModal.formData;
 
@@ -805,7 +807,9 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
 
             if (res.ok) {
                 const updated = await res.json();
-                setAllLogs(allLogs.map(l => l.id === updated.id ? updated : l));
+                // Functional update: the save waits on the Nusawork sync, so the list captured at
+                // click time may be stale by the time the response lands.
+                setAllLogs(prev => prev.map(l => l.id === updated.id ? updated : l));
                 setEditLogModal({ open: false, log: null, formData: {} });
                 setEditEvidenceFile(null);
                 setEditReturnEvidenceFile(null);
@@ -816,8 +820,16 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 if (updated.nusaworkSync && updated.nusaworkSync.success === false) {
                     alert(t('alerts.nusaworkSyncFailed', { error: updated.nusaworkSync.error || '' }));
                 }
+            } else {
+                const body = await res.json().catch(() => ({}));
+                alert(t('alerts.failedToSaveLog', { error: body.error || res.statusText }));
             }
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error(err);
+            alert(t('alerts.failedToSaveLog', { error: err instanceof Error ? err.message : '' }));
+        } finally {
+            setIsSavingEdit(false);
+        }
     };
 
     const handleOpenDetailModal = (log: ReadingLogEntry) => {
@@ -1922,7 +1934,7 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                             <button onClick={handleDeleteFromEditModal} className="px-4 py-2 text-red-600 font-bold hover:bg-red-50 rounded-xl border border-red-200 flex items-center"><Trash2 size={16} className="mr-2" /> {t('editModal.delete')}</button>
                             <div className="flex gap-2">
                                 <button onClick={() => { setEditLogModal({ open: false, log: null, formData: {} }); setEditEvidenceFile(null); setEditReturnEvidenceFile(null); }} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">{t('editModal.cancel')}</button>
-                                <button onClick={handleEditLogSubmit} disabled={isUploadingEvidence} className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{isUploadingEvidence ? t('editModal.uploadingPhoto') : t('editModal.saveChanges')}</button>
+                                <button onClick={handleEditLogSubmit} disabled={isUploadingEvidence || isSavingEdit} className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{isUploadingEvidence ? t('editModal.uploadingPhoto') : isSavingEdit ? t('editModal.saving') : t('editModal.saveChanges')}</button>
                             </div>
                         </div>
                     </div>

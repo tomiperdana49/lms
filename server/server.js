@@ -5005,6 +5005,29 @@ app.post('/api/simas/sync', async (req, res) => {
 });
 
 // --- READING LOGS ROUTES ---
+// Shapes a reading_logs row the way the admin screen reads it (camelCase alongside the raw
+// columns). GET and PUT share it so an edited row replaces the old one with the same shape.
+const mapReadingLogRow = (log) => ({
+    ...log,
+    userName: log.user_name,
+    employee_id: log.employee_id,
+    readingDuration: log.reading_duration,
+    startDate: log.start_date,
+    finishDate: log.finish_date,
+    evidenceUrl: log.evidence_url,
+    returnEvidenceUrl: log.return_evidence_url,
+    hrApprovalStatus: log.hr_approval_status,
+    incentiveAmount: log.incentive_amount,
+    rejectionReason: log.rejection_reason,
+    approvedBy: log.approved_by,
+    sn: log.sn,
+    approvedAt: log.approved_at,
+    plannedFinishDate: log.planned_finish_date,
+    cancelledAt: log.cancelled_at,
+    cancelledBy: log.cancelled_by,
+    claimedAt: log.claimed_at
+});
+
 app.get('/api/logs', async (req, res) => {
     try {
         // Migration safeguard: Check if column exists
@@ -5023,26 +5046,7 @@ app.get('/api/logs', async (req, res) => {
 
         const logs = await query('SELECT * FROM reading_logs ORDER BY date DESC');
         // Map snake_case to camelCase
-        const mappedLogs = logs.map(log => ({
-            ...log,
-            userName: log.user_name,
-            employee_id: log.employee_id,
-            readingDuration: log.reading_duration,
-            startDate: log.start_date,
-            finishDate: log.finish_date,
-            evidenceUrl: log.evidence_url,
-            returnEvidenceUrl: log.return_evidence_url,
-            hrApprovalStatus: log.hr_approval_status,
-            incentiveAmount: log.incentive_amount,
-            rejectionReason: log.rejection_reason,
-            approvedBy: log.approved_by,
-            sn: log.sn,
-            approvedAt: log.approved_at,
-            plannedFinishDate: log.planned_finish_date,
-            cancelledAt: log.cancelled_at,
-            cancelledBy: log.cancelled_by,
-            claimedAt: log.claimed_at
-        }));
+        const mappedLogs = logs.map(mapReadingLogRow);
         if (logs.length > 0) {
             res.setHeader('X-Debug-Columns', Object.keys(logs[0]).join(','));
         }
@@ -5162,6 +5166,7 @@ app.put('/api/logs/:id', async (req, res) => {
         // But keys won't match. Frontend sends camelCase.
         // We need to construct snake_case update
         const dbUpdates = {};
+        if (updates.title !== undefined) dbUpdates.title = updates.title;
         if (updates.userName !== undefined) dbUpdates.user_name = updates.userName;
         if (updates.employee_id !== undefined) dbUpdates.employee_id = updates.employee_id;
         if (updates.readingDuration !== undefined) dbUpdates.reading_duration = updates.readingDuration;
@@ -5225,23 +5230,7 @@ app.put('/api/logs/:id', async (req, res) => {
             return res.status(404).json({ error: 'Reading log not found after update' });
         }
 
-        const updated = updatedLogs[0];
-
-        res.json({
-            ...updated,
-            userName: updated.user_name,
-            readingDuration: updated.reading_duration,
-            startDate: updated.start_date,
-            finishDate: updated.finish_date,
-            evidenceUrl: updated.evidence_url,
-            hrApprovalStatus: updated.hr_approval_status,
-            incentiveAmount: updated.incentive_amount,
-            rejectionReason: updated.rejection_reason,
-            cancelledAt: updated.cancelled_at,
-            cancelledBy: updated.cancelled_by,
-            claimedAt: updated.claimed_at,
-            nusaworkSync
-        });
+        res.json({ ...mapReadingLogRow(updatedLogs[0]), nusaworkSync });
     } catch (err) {
         console.error(`[API ERROR] Update Reading Log ${req.params.id} Failed:`, err);
         res.status(500).json({ error: err.message });

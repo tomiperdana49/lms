@@ -137,7 +137,8 @@
     "reviewLinkLabel": "Tautan Goodreads / Ulasan",
     "delete": "Hapus",
     "cancel": "Batal",
-    "saveChanges": "Simpan Perubahan"
+    "saveChanges": "Simpan Perubahan",
+    "saving": "Menyimpan..."
   },
   "detailModal": {
     "status": "Status",
@@ -203,6 +204,7 @@
     "simasSyncError": "Terjadi kesalahan saat sinkronisasi data.",
     "failedToExportExcel": "Gagal mengekspor file Excel. Silakan coba lagi.",
     "failedToUploadPhoto": "Gagal mengunggah foto. Silakan coba lagi.",
-    "nusaworkSyncFailed": "Reading log tersimpan di LMS, tapi gagal sinkron ke Nusawork sehingga Hours di sana belum ter-update. {{error}}"
+    "nusaworkSyncFailed": "Reading log tersimpan di LMS, tapi gagal sinkron ke Nusawork sehingga Hours di sana belum ter-update. {{error}}",
+    "failedToSaveLog": "Gagal menyimpan perubahan. {{error}}"
   }
 }

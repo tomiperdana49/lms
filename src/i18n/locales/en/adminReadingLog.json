@@ -137,7 +137,8 @@
     "reviewLinkLabel": "Goodreads / Review Link",
     "delete": "Delete",
     "cancel": "Cancel",
-    "saveChanges": "Save Changes"
+    "saveChanges": "Save Changes",
+    "saving": "Saving..."
   },
   "detailModal": {
     "status": "Status",
@@ -203,6 +204,7 @@
     "simasSyncError": "Error during data synchronization.",
     "failedToExportExcel": "Failed to export Excel file. Please try again.",
     "failedToUploadPhoto": "Failed to upload photo. Please try again.",
-    "nusaworkSyncFailed": "Reading log saved in the LMS, but failed to sync to Nusawork, so its Hours there is not updated yet. {{error}}"
+    "nusaworkSyncFailed": "Reading log saved in the LMS, but failed to sync to Nusawork, so its Hours there is not updated yet. {{error}}",
+    "failedToSaveLog": "Failed to save changes. {{error}}"
   }
 }
