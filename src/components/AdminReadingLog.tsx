@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
 import type { ReadingLogEntry, User, Employee } from '../types';
 import * as XLSX from 'xlsx';
+import { getWibParts } from '../utils/wibTimeZone';
 
 const getFullImageUrl = (path: string) => {
     if (!path) return '';
@@ -47,14 +48,9 @@ const formatToDatetimeLocal = (dateStr?: string | Date) => {
         const d = new Date(dateStr);
         if (isNaN(d.getTime())) return '';
         
-        const pad = (n: number) => String(n).padStart(2, '0');
-        const year = d.getFullYear();
-        const month = pad(d.getMonth() + 1);
-        const day = pad(d.getDate());
-        const hours = pad(d.getHours());
-        const minutes = pad(d.getMinutes());
-        
-        return `${year}-${month}-${day}T${hours}:${minutes}`;
+        // WIB, not the browser's zone - the value is saved back as-is
+        const { year, month, day, hour, minute } = getWibParts(d);
+        return `${year}-${month}-${day}T${hour}:${minute}`;
     } catch (e) {
         return '';
     }
@@ -432,8 +428,8 @@ const AdminReadingLog = ({ onBack, user }: AdminReadingLogProps) => {
                 if (!dateStr) return '';
                 const d = new Date(dateStr);
                 if (isNaN(d.getTime())) return dateStr;
-                const pad = (n: number) => String(n).padStart(2, '0');
-                return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+                const p = getWibParts(d);
+                return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}:${p.second}`;
             };
 
             // Calculate Grand Total

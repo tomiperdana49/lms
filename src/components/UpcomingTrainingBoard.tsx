@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Clock, MapPin, Users, Video, CalendarDays } from 'lucide-react';
 import { API_BASE_URL } from '../config';
+import { WIB_TIME_ZONE } from '../utils/wibTimeZone';
 
 interface PublicTraining {
     id: number;
@@ -37,7 +38,6 @@ const parseTimeRange = (time: string | null) => {
 };
 
 // The board keeps WIB time whatever the TV's own timezone is set to.
-const WIB_TIME_ZONE = 'Asia/Jakarta';
 const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
 const wibDateKey = (ms: number) => new Date(ms + WIB_OFFSET_MS).toISOString().slice(0, 10);
 const wibMinutes = (ms: number) => {
