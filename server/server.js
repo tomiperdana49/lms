@@ -122,6 +122,15 @@ initDB().then(async () => {
     if (process.env.EXTERNAL_CERTIFICATE_REMINDERS_ENABLED === 'true') {
         scheduleReminderJob('CERTIFICATE TASK', runExternalCertificateReminders);
     }
+
+    // Marks Nusawork tasks done once their work is done in the LMS (and in SIMAS, for book returns).
+    if (isNusaworkTaskEnabled()) {
+        const runClose = () => closeCompletedNusaworkTasks()
+            .catch(err => console.error('[NUSAWORK TASK CLOSE] Close pass failed:', err.message));
+        console.log('[NUSAWORK TASK CLOSE] Enabled (checked hourly and after each LMS action that can finish a task).');
+        runClose();
+        setInterval(runClose, NUSAWORK_TASK_CLOSE_INTERVAL_MS);
+    }
 });
 
 // Multer Config
@@ -4797,6 +4806,271 @@ const scheduleReminderJob = (label, job) => {
     setInterval(run, REMINDER_CHECK_INTERVAL_MS);
 };
 
+// --- CLOSING NUSAWORK TASKS ---
+// Every task the LMS sent is marked "done" in Nusawork (POST /task-management/api/client/task/{id}/update-status)
+// once the work it asks for is done in the LMS. The open tasks are the SUCCESS rows of
+// general_ticket_logs that hold a Nusawork task id (Nusawork request bodies start with "title"; the
+// older IS5 tickets in the same table start with "subject") and have no task_closed_at yet.
+// closeCompletedNusaworkTasks runs right after the LMS action that can finish a task, and hourly
+// for the rest (a SIMAS book returned in SIMAS, a task whose close failed).
+const NUSAWORK_OPEN_TASK_FILTER = `l.status = 'SUCCESS' AND l.ticket_id IS NOT NULL AND l.request_body LIKE '{"title"%' AND l.task_closed_at IS NULL`;
+const NUSAWORK_TASK_CLOSE_INTERVAL_MS = 60 * 60 * 1000;
+// Nusawork statuses that already count as finished - a task the assignee closed by hand.
+const NUSAWORK_FINISHED_TASK_STATUSES = new Set(['done', 'closed']);
+
+const nusaworkTaskRequest = async (path, options = {}) => {
+    const baseUrl = process.env.NUSAWORK_BASE_URL || 'https://nusanet.app.nusawork.com';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    try {
+        const response = await nusaworkFetch(`${baseUrl}/task-management/api/client/task/${path}`, {
+            ...options,
+            headers: { 'Accept': 'application/json', ...(options.headers || {}) },
+            signal: controller.signal
+        });
+        const text = await response.text();
+        let data;
+        try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+        return { status: response.status, ok: response.ok, data, text };
+    } finally {
+        clearTimeout(timeoutId);
+    }
+};
+
+// Marks one Nusawork task done. Returns a note for task_close_note when the task is finished in
+// Nusawork afterwards (also when it was already done/closed, or deleted there), throws otherwise.
+const markNusaworkTaskDone = async (taskId, reason) => {
+    const id = encodeURIComponent(taskId);
+    const update = await nusaworkTaskRequest(`${id}/update-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'done', status_reason: reason })
+    });
+    if (update.ok) return reason;
+
+    // Refused (400 "No changes in status" when it's already done): see where the task stands.
+    const current = await nusaworkTaskRequest(id);
+    if (current.status === 404) return `Task not found in Nusawork. ${reason}`;
+    // GET wraps the task in `data`; update-status returns it as `task`.
+    const status = (current.data?.data || current.data?.task)?.status;
+    if (current.ok && NUSAWORK_FINISHED_TASK_STATUSES.has(status)) return `Already ${status} in Nusawork. ${reason}`;
+    throw new Error(`Nusawork refused to mark task ${taskId} done (${update.status}): ${update.data?.message || update.text || 'no response body'}`);
+};
+
+const referenceId = (reference, prefix) => {
+    const match = String(reference || '').match(new RegExp(`^${prefix}:(\\d+)$`));
+    return match ? match[1] : null;
+};
+const splitRefIds = (refIds) => String(refIds || '').split(',').map(v => v.trim()).filter(Boolean);
+const externalTrainingRequestsById = async (tasks, prefix = 'external_training_request') => {
+    const ids = tasks.map(t => referenceId(t.reference, prefix)).filter(Boolean);
+    if (ids.length === 0) return new Map();
+    const rows = await query('SELECT id, status, certificate_link, deleted_at FROM external_training_requests WHERE id IN (?)', [ids]);
+    return new Map(rows.map(r => [String(r.id), r]));
+};
+const DELETED_TRAINING_REASON = 'Pengajuan training eksternal sudah dihapus di LMS.';
+
+// One check per task kind: given the open tasks of that kind, returns Map(task log id -> the
+// status_reason sent to Nusawork) for the tasks whose work is done. A task the check can't decide
+// (its reference doesn't parse, its data is missing) stays open.
+const NUSAWORK_TASK_DONE_CHECKS = {
+    // Leader's task to approve a request: done once any leader approved or rejected it.
+    external_training_request: async (tasks) => {
+        const requests = await externalTrainingRequestsById(tasks);
+        const done = new Map();
+        for (const t of tasks) {
+            const r = requests.get(referenceId(t.reference, 'external_training_request'));
+            if (!r) continue;
+            if (r.deleted_at) done.set(t.id, DELETED_TRAINING_REASON);
+            else if (r.status !== 'Pending') done.set(t.id, `Pengajuan training eksternal sudah ${r.status === 'Rejected' ? 'ditolak' : 'disetujui'} di LMS.`);
+        }
+        return done;
+    },
+    // HR's task to process an approved request: done once HR processed it.
+    external_training_approved: async (tasks) => {
+        const requests = await externalTrainingRequestsById(tasks);
+        const done = new Map();
+        for (const t of tasks) {
+            const r = requests.get(referenceId(t.reference, 'external_training_request'));
+            if (!r) continue;
+            if (r.deleted_at) done.set(t.id, DELETED_TRAINING_REASON);
+            else if (r.status === 'Processed') done.set(t.id, 'Pengajuan training eksternal sudah diproses HR di LMS.');
+        }
+        return done;
+    },
+    // HR's task to chase a certificate: done once the certificate is in the LMS.
+    external_certificate_check: async (tasks) => {
+        const requests = await externalTrainingRequestsById(tasks);
+        const done = new Map();
+        for (const t of tasks) {
+            const r = requests.get(referenceId(t.reference, 'external_training_request'));
+            if (!r) continue;
+            if (r.deleted_at) done.set(t.id, DELETED_TRAINING_REASON);
+            else if (String(r.certificate_link || '').trim()) done.set(t.id, 'Sertifikat training sudah dilengkapi di LMS.');
+        }
+        return done;
+    },
+    // HR's task to review an imported IDP: done once HR approved or rejected it.
+    idp_import: async (tasks) => {
+        const ids = tasks.map(t => referenceId(t.reference, 'idp')).filter(Boolean);
+        if (ids.length === 0) return new Map();
+        const plans = new Map((await query('SELECT id, status FROM idp_plans WHERE id IN (?)', [ids])).map(p => [String(p.id), p]));
+        const done = new Map();
+        for (const t of tasks) {
+            const id = referenceId(t.reference, 'idp');
+            if (!id) continue;
+            const plan = plans.get(id);
+            if (!plan) done.set(t.id, 'IDP sudah dihapus di LMS.');
+            else if (plan.status === 'Approved') done.set(t.id, 'IDP sudah disetujui HR di LMS.');
+            else if (plan.status === 'Rejected') done.set(t.id, 'IDP sudah ditolak HR di LMS.');
+        }
+        return done;
+    },
+    // Employee's task to write this year's IDP: done once it's submitted (past Draft) - the same rule
+    // the reminders use to decide who still needs one. The year is the task's period month, or for a
+    // new employee the year the task was sent.
+    idp_new_employee: async (tasks) => closeSubmittedIdpTasks(tasks, t => new Date(t.created_at).getFullYear()),
+    idp_staff_empty: async (tasks) => closeSubmittedIdpTasks(tasks, t => Number(String(t.reference).slice(0, 4))),
+    // Leader's monthly review task: done once every IDP it listed has a review that month (or is no
+    // longer an Approved plan to review).
+    idp_review: async (tasks) => {
+        const done = new Map();
+        for (const t of tasks) {
+            const match = String(t.reference).match(/^(\d{4})-(\d{2})$/);
+            const planIds = splitRefIds(t.ref_ids);
+            if (!match || planIds.length === 0) continue;
+            const lastDay = new Date(Date.UTC(Number(match[1]), Number(match[2]), 0)).getUTCDate();
+            const [{ pending }] = await query(
+                `SELECT COUNT(*) AS pending FROM idp_plans p
+                 WHERE p.id IN (?) AND p.status = 'Approved'
+                   AND NOT EXISTS (SELECT 1 FROM idp_reviews r WHERE r.idp_id = p.id AND r.review_date BETWEEN ? AND ?)`,
+                [planIds, `${t.reference}-01`, `${t.reference}-${pad2(lastDay)}`]
+            );
+            if (Number(pending) === 0) done.set(t.id, 'Semua IDP tim sudah direview bulan ini di LMS.');
+        }
+        return done;
+    },
+    // Leader's quarterly competency task: done once every employee it listed is assessed that quarter.
+    competency_assessment: async (tasks) => {
+        const done = new Map();
+        for (const t of tasks) {
+            const match = String(t.reference).match(/^(\d{4})-Q([1-4])$/);
+            const employeeIds = splitRefIds(t.ref_ids);
+            if (!match || employeeIds.length === 0) continue;
+            const assessed = await query(
+                'SELECT DISTINCT employee_id FROM competency_assessments WHERE quarter = ? AND year = ? AND employee_id IN (?)',
+                [Number(match[2]), Number(match[1]), employeeIds]
+            );
+            const assessedIds = new Set(assessed.map(r => String(r.employee_id)));
+            if (employeeIds.every(id => assessedIds.has(id))) done.set(t.id, 'Penilaian kompetensi tim sudah diisi di LMS.');
+        }
+        return done;
+    },
+    // Leader's Post Training Evaluation task (period "f<form id>-e<external training request id>"):
+    // done once the evaluation for that training is submitted.
+    pte: async (tasks) => {
+        const done = new Map();
+        for (const t of tasks) {
+            const match = String(t.reference).match(/^f(\d+)-e(\d+)$/);
+            if (!match) continue;
+            const [response] = await query(
+                'SELECT 1 FROM post_training_evaluation_responses WHERE form_id = ? AND external_training_request_id = ? LIMIT 1',
+                [match[1], match[2]]
+            );
+            if (response) done.set(t.id, 'Post Training Evaluation sudah diisi di LMS.');
+        }
+        return done;
+    },
+    // Employee's task to return a SIMAS book (period "loan:<SIMAS loan id>"): done once SIMAS has a
+    // return time for that loan. SIMAS keeps returned loans in its list, so a loan that's missing
+    // from it is left open rather than guessed at.
+    simas_book_return: async (tasks) => {
+        const baseUrl = process.env.SIMAS_API_BASE_URL || 'https://simas.nusa.id/';
+        const response = await fetch(`${baseUrl}api/book/loan`, { headers: { 'x-api-key': process.env.SIMAS_API_KEY || '' } });
+        if (!response.ok) throw new Error(`SIMAS loans returned ${response.status}`);
+        const dataJson = await response.json();
+        const returned = new Set();
+        for (const { bookLoans } of Object.values(dataJson?.success && dataJson.data?.[0] ? dataJson.data[0] : {})) {
+            for (const [loanId, book] of Object.entries(bookLoans || {})) {
+                if (book?.loanHistory?.return?.returnTime) returned.add(String(loanId));
+            }
+        }
+        const done = new Map();
+        for (const t of tasks) {
+            const loanId = referenceId(t.reference, 'loan');
+            if (loanId && returned.has(loanId)) done.set(t.id, 'Buku sudah dikembalikan di SIMAS.');
+        }
+        return done;
+    }
+};
+
+const closeSubmittedIdpTasks = async (tasks, yearOf) => {
+    const employeeIds = [...new Set(tasks.map(t => String(t.ticket_pic)))];
+    if (employeeIds.length === 0) return new Map();
+    const submitted = new Set((await query(
+        "SELECT DISTINCT employee_id, period_year FROM idp_plans WHERE status != 'Draft' AND employee_id IN (?)", [employeeIds]
+    )).map(r => `${r.employee_id}|${r.period_year}`));
+    const done = new Map();
+    for (const t of tasks) {
+        if (submitted.has(`${t.ticket_pic}|${yearOf(t)}`)) done.set(t.id, 'IDP sudah diajukan di LMS.');
+    }
+    return done;
+};
+
+const closeCompletedNusaworkTasksNow = async (kinds) => {
+    if (!isNusaworkTaskEnabled()) return 0;
+    const open = await query(
+        `SELECT l.id, l.kind, l.reference, l.ticket_pic, l.ticket_id, l.created_at, r.ref_ids
+         FROM general_ticket_logs l
+         LEFT JOIN general_ticket_reminders r ON r.kind = l.kind AND r.recipient_employee_id = l.ticket_pic AND r.period = l.reference
+         WHERE ${NUSAWORK_OPEN_TASK_FILTER} AND l.kind IN (?)`,
+        [kinds]
+    );
+    const byKind = new Map();
+    for (const t of open) {
+        if (!byKind.has(t.kind)) byKind.set(t.kind, []);
+        byKind.get(t.kind).push(t);
+    }
+
+    let closed = 0;
+    for (const [kind, tasks] of byKind) {
+        let done;
+        try {
+            done = await NUSAWORK_TASK_DONE_CHECKS[kind](tasks);
+        } catch (err) {
+            console.error(`[NUSAWORK TASK CLOSE] Checking ${kind} tasks failed:`, err.message);
+            continue;
+        }
+        for (const t of tasks) {
+            const reason = done.get(t.id);
+            if (!reason) continue;
+            try {
+                const note = await markNusaworkTaskDone(t.ticket_id, reason);
+                await query('UPDATE general_ticket_logs SET task_closed_at = NOW(), task_close_note = ? WHERE id = ?', [note.slice(0, 500), t.id]);
+                closed++;
+                console.log(`[NUSAWORK TASK CLOSE] Task ${t.ticket_id} (${kind}, ${t.reference}) marked done: ${note}`);
+            } catch (err) {
+                console.error(`[NUSAWORK TASK CLOSE] Task ${t.ticket_id} (${kind}, ${t.reference}) could not be closed:`, err.cause?.code || err.message);
+            }
+        }
+    }
+    return closed;
+};
+
+// Runs one close pass at a time, so an hourly pass and one an LMS action started never send the same
+// task twice. `kinds` limits the pass to the task kinds that action can finish.
+let nusaworkTaskClosePass = Promise.resolve();
+const closeCompletedNusaworkTasks = (kinds = Object.keys(NUSAWORK_TASK_DONE_CHECKS)) => {
+    const pass = nusaworkTaskClosePass.then(() => closeCompletedNusaworkTasksNow(kinds));
+    nusaworkTaskClosePass = pass.catch(() => {});
+    return pass;
+};
+
+// Fire-and-forget from a route, after it has responded - a Nusawork outage must never fail an LMS action.
+const closeNusaworkTasksAfter = (...kinds) => {
+    closeCompletedNusaworkTasks(kinds).catch(err => console.error('[NUSAWORK TASK CLOSE] Close pass failed:', err.message));
+};
+
 const TICKET_DATETIME_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
 // Body: { subject, comment, time_expired?: "YYYY-MM-DD HH:MM:SS", priority_id?, ticket_pic? }
@@ -6571,6 +6845,7 @@ app.post('/api/post-training-evaluations/:id/respond', async (req, res) => {
         );
 
         res.json({ success: true });
+        closeNusaworkTasksAfter('pte');
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -7618,7 +7893,9 @@ app.post('/api/external-training/approve', async (req, res) => {
         const { id, status, approved_by, rejection_reason, approval_note } = req.body; // status should be 'Approved' or 'Rejected'
         if (status === 'Rejected') {
             await query('UPDATE external_training_requests SET status = ?, approved_by = ?, rejection_reason = ? WHERE id = ?', [status, approved_by, rejection_reason || null, id]);
-            return res.json({ success: true });
+            res.json({ success: true });
+            closeNusaworkTasksAfter('external_training_request');
+            return;
         }
         if (status === 'Approved' && !(approval_note && approval_note.trim())) {
             return res.status(400).json({ error: 'A note explaining the approval is required.' });
@@ -7629,6 +7906,7 @@ app.post('/api/external-training/approve', async (req, res) => {
         const { trainingRequest, thisRequestCost, budgetNoticeMessage, exceedsPersonalBudget } = approval;
 
         res.json({ success: true, exceedsPersonalBudget });
+        closeNusaworkTasksAfter('external_training_request');
 
         // Best-effort, after responding - an IS5 outage must never fail or slow down the approval.
         if (status === 'Approved') {
@@ -7795,6 +8073,7 @@ app.post('/api/external-training/hr-process', async (req, res) => {
         }
 
         res.json({ success: true });
+        closeNusaworkTasksAfter('external_training_approved', 'external_certificate_check');
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -7947,6 +8226,7 @@ app.post('/api/idp', async (req, res) => {
         }
 
         res.json({ success: true, id: idpId });
+        closeNusaworkTasksAfter('idp_new_employee', 'idp_staff_empty');
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
             return res.status(409).json({ error: 'Sudah ada IDP untuk karyawan dan periode ini.' });
@@ -8136,6 +8416,7 @@ app.post('/api/idp/bulk-import', async (req, res) => {
     }
 
     res.json(result);
+    closeNusaworkTasksAfter('idp_new_employee', 'idp_staff_empty');
 
     // Best-effort, after responding - an IS5 outage must never fail or slow down the import.
     for (const plan of ownImportedPlans) {
@@ -8676,6 +8957,7 @@ app.post('/api/idp/:id/submit', async (req, res) => {
 
         await query("UPDATE idp_plans SET status = 'Pending', created_by_date = COALESCE(created_by_date, CURDATE()) WHERE id = ?", [id]);
         res.json({ success: true });
+        closeNusaworkTasksAfter('idp_new_employee', 'idp_staff_empty');
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -8695,6 +8977,7 @@ app.post('/api/idp/:id/approve', async (req, res) => {
             await query("UPDATE idp_plans SET status = ?, approved_by = ?, approved_date = CURDATE() WHERE id = ?", [status, approved_by || null, id]);
         }
         res.json({ success: true });
+        closeNusaworkTasksAfter('idp_import', 'idp_review');
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -8724,6 +9007,7 @@ app.post('/api/idp/:id/review', async (req, res) => {
             [id, review_date, supervisor_note, reviewed_by || null]
         );
         res.json({ success: true, id: result.insertId });
+        closeNusaworkTasksAfter('idp_review');
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -8786,6 +9070,7 @@ app.delete('/api/idp/:id', async (req, res) => {
         const result = await query('DELETE FROM idp_plans WHERE id = ?', [id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'IDP not found' });
         res.json({ success: true });
+        closeNusaworkTasksAfter('idp_import', 'idp_review');
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -9470,6 +9755,7 @@ app.post('/api/competency-assessments', async (req, res) => {
             );
         }
         res.json({ success: true });
+        closeNusaworkTasksAfter('competency_assessment');
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -9637,6 +9923,7 @@ app.put('/api/external-training/:id', async (req, res) => {
         const updated = await query('SELECT * FROM external_training_requests WHERE id = ?', [id]);
         reconcileExternalTrainingNusawork(id);
         res.json(updated[0]);
+        if (certificateLink) closeNusaworkTasksAfter('external_certificate_check');
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -9669,6 +9956,7 @@ app.delete('/api/external-training/:id', async (req, res) => {
         }
 
         res.json({ success: true });
+        closeNusaworkTasksAfter('external_training_request', 'external_training_approved', 'external_certificate_check');
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

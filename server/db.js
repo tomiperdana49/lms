@@ -738,6 +738,13 @@ export const initDB = async () => {
             await connection.query("ALTER TABLE general_ticket_logs ADD INDEX idx_general_ticket_logs_ticket (ticket_id)");
             console.log("Added ticket_id column to general_ticket_logs.");
         } catch (e) { /* Ignore if exists */ }
+        // MIGRATION: task_closed_at / task_close_note - when the LMS marked a Nusawork task done
+        // (closeCompletedNusaworkTasks in server.js) and why, so a closed task is never sent again.
+        try {
+            await connection.query("ALTER TABLE general_ticket_logs ADD COLUMN task_closed_at DATETIME NULL AFTER error_message");
+            await connection.query("ALTER TABLE general_ticket_logs ADD COLUMN task_close_note VARCHAR(500) NULL AFTER task_closed_at");
+            console.log("Added task_closed_at/task_close_note columns to general_ticket_logs.");
+        } catch (e) { /* Ignore if exists */ }
 
         // MIGRATION: Add general_ticket_reminders - records every scheduled IS5 general-ticket reminder
         // (IDP monthly review, competency quarterly assessment) per recipient per period. The unique
